@@ -1,0 +1,126 @@
+SAFE-UPDATE MODE (95% confidence required) — Do NOT break the app.
+
+🎯 Objectifs
+1. Scanner tout le repo actuel (code + config) et vérifier l’intégrité des features.
+2. Mettre à jour l’application uniquement si sûr à ≥95% (phases + tests).
+3. Générer/mettre à jour `MISSING_FEATURES.md` en fonction de l’état réel du code.
+4. Scripter les checks pour que je puisse les relancer facilement.
+
+🔒 Règles
+- Jamais de changements sur `main` sans mon OK explicite. Travaille sur une branche de travail.
+- Ne supprime pas de code fonctionnel sans m’expliquer pourquoi.
+- Après CHAQUE phase : `pnpm tsc --noEmit`, `pnpm test`, et mini smoke test (dev server).
+- Si doute <95% : STOP & ask.
+- Ne touche pas aux secrets (.env).
+
+────────────────────────────────────────────────────────
+
+Étape 0 — Préparation
+1. Crée une branche :
+git checkout -b safe-update-$(date +%Y%m%d%H%M)
+
+markdown
+Copier
+Modifier
+
+2. Installe les deps & build check :
+pnpm install --frozen-lockfile || pnpm install
+pnpm tsc --noEmit > .reports/tsc_initial.txt 2>&1 || true
+pnpm test --silent > .reports/tests_initial.txt 2>&1 || true
+
+markdown
+Copier
+Modifier
+
+3. Crée le dossier de rapports :
+mkdir -p .reports
+
+bash
+Copier
+Modifier
+
+────────────────────────────────────────────────────────
+
+Étape 1 — Script d’audit automatique
+Crée le fichier `scripts/audit_repo.ts` (Node/TS exécuté avec tsx) qui :
+- Liste tous les fichiers modifiés depuis le dernier commit (`git status --porcelain`).
+- Lance : tsc, jest, eslint (si config), vite build check (optionnel).
+- Analyse les routes Express (server/routes/**), services (**/services/**), hooks client, et compare avec MISSING_FEATURES.md (sections TODO vs code existant).
+- Produit un JSON + markdown :
+- `reports/audit.json`
+- `reports/audit.md` (sera utilisé pour mettre à jour MISSING_FEATURES.md)
+
+**Implémente ce script maintenant.** Exemple structure minimale :
+
+```ts
+// scripts/audit_repo.ts
+import { execSync } from 'node:child_process';
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
+import glob from 'fast-glob';
+
+function run(cmd: string) {
+try { return execSync(cmd, { stdio: 'pipe' }).toString(); }
+catch (e: any) { return e.stdout?.toString() || e.message; }
+}
+
+const report: any = { timestamps: new Date().toISOString() };
+
+// 1. TS & Tests
+report.tsc = run('pnpm tsc --noEmit');
+report.tests = run('pnpm test --silent');
+
+// 2. Files & routes
+const serverRoutes = glob.sync('server/routes/**/*.ts');
+const services = glob.sync('server/services/**/*.ts');
+const clientPages = glob.sync('client/src/pages/**/*.tsx');
+const hooks = glob.sync('client/src/hooks/**/*.ts?(x)');
+
+report.files = { serverRoutes, services, clientPages, hooks };
+
+// 3. Missing features file
+let missingRaw = '';
+try { missingRaw = readFileSync('MISSING_FEATURES.md','utf8'); } catch {}
+report.missingFeaturesCurrent = missingRaw;
+
+// TODO: add heuristic checks (presence of referral endpoints, quotas, RLS policies, etc.)
+report.heuristics = {
+referralsHelper: glob.sync('server/**/*referr*.*').length > 0,
+rlsPoliciesDoc: /RLS/i.test(missingRaw),
+// ...
+};
+
+mkdirSync('.reports', { recursive: true });
+writeFileSync('.reports/audit.json', JSON.stringify(report, null, 2), 'utf8');
+
+// Generate a simple markdown summary
+const md = `# Audit Summary (${new Date().toISOString()})
+
+## TypeScript
+\`\`\`
+${report.tsc.slice(0, 2000)}
+\`\`\`
+
+## Tests
+\`\`\`
+${report.tests.slice(0, 2000)}
+\`\`\`
+
+## Files scanned
+- Routes: ${serverRoutes.length}
+- Services: ${services.length}
+- Client pages: ${clientPages.length}
+- Hooks: ${hooks.length}
+
+## Heuristics
+${Object.entries(report.heuristics).map(([k,v])=>`- ${k}: ${v ? 'OK' : 'MISSING'}`).join('\n')}
+
+`;
+writeFileSync('.reports/audit.md', md, 'utf8');
+console.log('Audit done -> .reports/audit.*');
+Run it:
+
+bash
+Copier
+Modifier
+pnpm tsx scripts/audit_repo.ts
+STOP, show me .reports/audit.md and propose how to update MISSING_FEATURES.md.

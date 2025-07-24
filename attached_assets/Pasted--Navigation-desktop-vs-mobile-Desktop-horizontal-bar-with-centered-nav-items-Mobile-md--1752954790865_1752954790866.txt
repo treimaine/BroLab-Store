@@ -1,0 +1,51 @@
+ Navigation (desktop vs mobile):
+• Desktop: horizontal bar with centered nav items.
+• Mobile (<md): hide full nav; show hamburger that opens a responsive sheet / drawer at least 90% height with scroll.
+• Ensure focus trapping & ESC close.
+
+Mobile bottom nav:
+• Fixed bottom (Above global audio player; if both present, stack with slight elevation).
+• Hide on screens ≥ md or when a modal/dialog is open.
+
+FeaturedBeatsCarousel:
+• Use CSS scroll snap on mobile: snap-x snap-mandatory overflow-x-auto flex.
+• Desktop: convert to grid (sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6).
+• Provide gradient edge fade overlays for horizontal scroll affordance on small screens.
+
+Beat Cards:
+• Use vertical layout on mobile; show condensed info (title, BPM, play button).
+• Expand on hover (≥md) to reveal license quick actions.
+• Keep min tap target 44x44px for mobile buttons.
+
+Filters Panel:
+• On mobile: collapsible accordion or offcanvas sheet.
+• On desktop: persistent sidebar w-64 (collapsible) or horizontal filter bar.
+• BPM slider transforms to dual-thumb vertical slider if horizontal space limited (<360px).
+
+Service Booking Modal:
+• Mobile full-screen (fixed inset-0 overflow-y-auto).
+• Desktop width max-w-2xl.
+• Stepper becomes horizontal row on ≥md, vertical stacked on small screens.
+
+Pricing / Membership Cards:
+• Stack vertically on mobile (space-y-8).
+• Use equal height cards with flex to align CTA bottom.
+• Add scale / ring highlight on hover (≥md); disable scaling for reduced motion.
+
+Dashboard grid:
+• KPI cards: grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4.
+• Tables: horizontal scroll container with sticky header on mobile (overflow-x-auto + min-w-[640px]).
+• Tabs collapse into a segmented control on narrow widths.
+
+Checkout stepper:
+• Mobile: vertical steps with progress bar top.
+• Desktop: horizontal steps with numbered circles.
+
+Global Audio Player:
+• Mobile: condense to single line (cover thumb, title scroll marquee, play/pause, next, minimal seek bar).
+• Desktop: expanded with progress slider + volume slider (volume hidden < md).
+• Handle orientation change: recalc waveform width on resize.
+
+Forms (login, booking, checkout):
+• Use responsive 1-col <md, 2-col grid for related fields ≥md.
+• Ensure max-w-lg center for auth forms.

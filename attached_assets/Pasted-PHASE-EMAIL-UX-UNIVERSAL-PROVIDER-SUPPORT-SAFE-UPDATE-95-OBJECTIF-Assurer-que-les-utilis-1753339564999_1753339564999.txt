@@ -1,0 +1,167 @@
+PHASE EMAIL-UX (UNIVERSAL PROVIDER SUPPORT) — SAFE UPDATE 95%
+
+🎯 OBJECTIF
+Assurer que les utilisateurs (Gmail, Yahoo, Outlook, etc.) puissent :
+- Créer un compte / s’abonner
+- Recevoir les e‑mails de vérification, réinitialisation, confirmations (transactions & subscriptions)
+- Sans impact négatif sur l’existant (intégrité code + config)
+
+⚠️ RÈGLES DE SÛRETÉ
+- Créer une branche : email-ux-safe-$(date +%Y%m%d%H%M)
+- PAS de modification sur main sans validation explicite
+- ≤ 30 lignes modifiées / fichier, sinon STOP et pose une question
+- Après CHAQUE micro-lot :
+  1. pnpm tsc --noEmit
+  2. pnpm test
+  3. Petit smoke test (mock mailer)
+- Si confiance < 95% → STOP & demander clarification
+
+────────────────────────────────────────────
+ÉTAPE 0 — CARTOGRAPHIE & PLAN
+1. Scanner code pour :
+   - Points d’envoi d’e-mails (signup, reset pwd, orders, subscriptions…)
+   - Service mail existant (nodemailer ? autre ?)
+   - Variables d’env liées mail
+   - Tests existants (mocks jest nodemailer ?)
+2. Lister les manques :
+   - Pas d’email verification ? Pas de resend ? Pas de bounce handling ?
+   - Pas de templating HTML/TXT ?
+   - Manque d’uniformisation “FROM” ?
+3. Proposer PLAN détaillé (micro-lots) :
+   - MAIL-CORE : transport SMTP o2switch + fallback optionnel
+   - MAIL-FLOWS : verifyEmail, resendVerification, resetPassword, receipt, subscriptionConfirm
+   - MAIL-TEMPLATES : HTML/TXT basiques (server/emails/)
+   - MAIL-VALIDATION : Zod pour payloads, rate-limit resend
+   - TESTS : unit/intégration (mock nodemailer)
+   - DOCS : EMAIL_SETUP.md + update MISSING_FEATURES.md
+STOP et montrer ce plan + env à ajouter .env.example
+
+────────────────────────────────────────────
+ÉTAPE 1 — MAIL-CORE (Transport + Helper)
+- Dépendance : nodemailer (si absent)
+- Fichier : server/services/mail.ts (ou server/lib/mail.ts si déjà créé)
+  ```ts
+  import nodemailer from "nodemailer";
+  export interface MailPayload {
+    to: string | string[];
+    subject: string;
+    html: string;
+    text?: string;
+    from?: string;
+  }
+  export async function sendMail(p: MailPayload): Promise<void> { ... }
+Transport SMTP o2switch :
+
+ts
+Copier
+Modifier
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST!,
+  port: Number(process.env.SMTP_PORT || 465),
+  secure: process.env.SMTP_SECURE === "true",
+  auth: { user: process.env.SMTP_USER!, pass: process.env.SMTP_PASS! },
+  pool: true,
+  maxConnections: 3,
+  rateDelta: 1000,
+  rateLimit: 5,
+});
+DEFAULT_FROM = "BroLab contact@brolabentertainment.com"
+
+Fallback text = strip-html(html) si pas fourni
+
+Env à ajouter dans .env.example :
+
+ini
+Copier
+Modifier
+SMTP_HOST=
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=
+SMTP_PASS=
+DEFAULT_FROM="BroLab <contact@brolabentertainment.com>"
+ADMIN_EMAILS=treigua@brolabentertainment.com,contact@brolabentertainment.com
+MAIL_DRY_RUN=false
+STOP après implémentation + tests unitaires (mock)
+
+────────────────────────────────────────────
+ÉTAPE 2 — MAIL-FLOWS (Endpoints + intégration)
+A. Vérification e‑mail (si non présent)
+
+Endpoints /api/auth/register → génère token vérif (uuid), stocke en DB (supabase table email_verifications)
+
+Envoi mail “Verify your email” avec lien /verify?token=...
+
+Endpoint /api/auth/verify-email (GET) → valide token, mark user verified_at, supprime token
+
+Endpoint /api/auth/resend-verification (POST) → rate-limit (ex 3/jour)
+B. Reset password (si nécessaire)
+
+/api/auth/forgot-password, /api/auth/reset-password
+
+Envoi token, expiration (15min)
+C. Confirmation abonnement / commande
+
+Après création subscription/order → sendMailConfirmation()
+D. Admin notifications
+
+sendAdminNotification(type, payload) → ADMIN_EMAILS
+
+Tout payload mail validé avec Zod (sujet, to, html, etc.)
+
+STOP après ajout, tests d’intégration (mock nodemailer), vérifier 401/403 sur endpoints protégés.
+
+────────────────────────────────────────────
+ÉTAPE 3 — DELIVERABILITY & UNIVERSAL PROVIDERS
+
+Unified FROM: always domain @brolabentertainment.com
+
+Reply-To possible utilisateur
+
+DKIM/SPF/DMARC : DOCUMENTATION seulement (pas de modif DNS ici)
+
+Générer EMAIL_SETUP.md avec :
+
+SPF include: o2switch + provider secondary si besoin
+
+DKIM key (si service transactionnel)
+
+DMARC policy (p=quarantine/none au début)
+
+Gestion des bounce/complaints (optionnel) : log ou webhook provider (TO DO note)
+
+Timeout & retry nodemailer (déjà partiel)
+
+Ajouter test script : pnpm tsx scripts/test_mail.ts --to=you@gmail.com
+
+STOP pour validation.
+
+────────────────────────────────────────────
+ÉTAPE 4 — UI/UX côté client
+
+Après register : message “Vérifie ton e‑mail” + bouton “Renvoyer”
+
+Notifications toast en cas d’erreur d’envoi (MAIL_DRY_RUN)
+
+Pages verify-email success/fail
+
+STOP tests e2e si existants.
+
+────────────────────────────────────────────
+ÉTAPE 5 — DOC & CLEANUP
+
+Mettre à jour MISSING_FEATURES.md (P0.3, P0.4 done)
+
+Créer EMAIL_SETUP.md (procédure env/DNS/tests)
+
+Scripts :
+
+scripts/test_mail.ts
+
+scripts/mock_mail.ts (dev)
+
+Rebuild : pnpm tsc --noEmit, pnpm test
+
+Zip export OK
+
+FIN — Ne merge sur main qu’après mon GO.

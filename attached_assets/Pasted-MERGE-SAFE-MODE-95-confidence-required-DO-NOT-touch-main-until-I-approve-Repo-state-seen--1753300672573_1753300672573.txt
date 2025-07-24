@@ -1,0 +1,99 @@
+MERGE-SAFE-MODE (95% confidence required) — DO NOT touch `main` until I approve.
+
+Repo state seen:
+- Local branches: main (current), replit-agent
+- I must merge in code from: https://github.com/treimaine/BroLab-Store.git (branch: main)
+
+Objectives
+1. Clone & analyze external repo WITHOUT changing current code.
+2. Produce MERGE_PLAN.md describing exactly what to merge, file by file.
+3. Implement merge in small phases on a feature branch, with typecheck & tests after each phase.
+4. Ask me before merging into local `main`.
+
+Hard rules
+- No force push, no destructive overwrite.
+- Keep Supabase-only DB (no Neon/Drizzle rollback).
+- Keep server-side Woo/WP services (/api/woo, /api/wp) & mappers.
+- Preserve all helpers/tests added (accessControl, subscriptions, downloads, orders, choosePort CLI, etc.).
+- Default port = 5000 with our auto-port chooser logic.
+- Do not commit secrets from .env.
+- Stop and ask if <95% sure.
+
+Step A — Setup & Deep Scan (NO code changes to current main)
+1. Create a work branch:
+git checkout -b merge/local-sync-$(date +%Y%m%d)
+
+sql
+Copier
+Modifier
+2. Add external remote (skip if exists):
+git remote add bro-external https://github.com/treimaine/BroLab-Store.git || true
+git fetch bro-external main
+
+css
+Copier
+Modifier
+3. Export bro-external/main into a temp worktree or folder:
+git worktree add /tmp/brolab_external bro-external/main
+
+scss
+Copier
+Modifier
+4. Run in BOTH repos (current workspace AND /tmp/brolab_external):
+pnpm install --frozen-lockfile || pnpm install
+pnpm tsc --noEmit > /tmp/tsc_current.txt 2>&1
+pnpm test --silent > /tmp/tests_current.txt 2>&1 || true
+(cd /tmp/brolab_external && pnpm install --frozen-lockfile || pnpm install)
+(cd /tmp/brolab_external && pnpm tsc --noEmit > /tmp/tsc_external.txt 2>&1)
+(cd /tmp/brolab_external && pnpm test --silent > /tmp/tests_external.txt 2>&1 || true)
+
+sql
+Copier
+Modifier
+5. Generate a diff report (no merge yet):
+- List added/changed/deleted files between current and external: group by client/server/tests/config.
+- Detect likely type/interface conflicts (Beat/UIBeat, User, PaymentPlan, AdvancedFilters, storage mappers, etc.).
+- Note package.json / tsconfig / vite config deltas.
+- Summarize env var differences (.env.example).
+
+6. Create MERGE_PLAN.md at repo root including:
+- Table: `file | current | external | conflict? | decision (ours/theirs/manual)`
+- Phases (1: configs/types, 2: server, 3: client, 4: tests).
+- Exact git commands per phase (checkout specific paths, patch apply, etc.).
+- Risks & rollback steps.
+
+STOP after MERGE_PLAN.md is written. Show me the file and wait.
+
+Step B — Phased Merge (only after my approval)
+For each phase:
+a. Checkout ONLY the planned files from bro-external:  
+  `git checkout bro-external/main -- path/to/file`
+b. Resolve conflicts as per plan.
+c. `pnpm tsc --noEmit` then `pnpm test`.
+d. If unsure at any point (<95% confidence), STOP and ask.
+e. Commit: `git commit -m "feat(merge): phase X <scope>"`.
+
+Suggested phases:
+- Phase 1: shared types, env samples, package/tsconfig/vite config (minimal edits).
+- Phase 2: server/services/woo, server/services/wp, lib/mappers, routes, storage adapters.
+- Phase 3: client hooks/components/pages relying on those APIs (shop, product, wp static pages).
+- Phase 4: tests/mocks & any leftover utilities.
+
+Step C — Validation
+- `pnpm dev` smoke test: Home, Shop, Product, Auth, Subscription status, Downloads, Service Orders.
+- Write POST_MERGE_REPORT.md:
+* Summary of what changed
+* tsc & test results
+* Remaining TODOs
+* How I pull locally
+
+Step D — Final
+- Do NOT merge into local `main` automatically. Pause for my confirmation, or open a PR.
+- After approval: merge into `main`.
+
+Remember:
+- Never print/commit secrets.
+- Keep replit-agent branch intact.
+- Use `--allow-unrelated-histories` only if/when I approve.
+
+Proceed with Step A now.
