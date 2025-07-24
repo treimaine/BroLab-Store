@@ -1,4 +1,5 @@
 # BroLab Entertainment - Local Development Setup
+*Application avec 100% de Couverture de Tests - Export Windows Ready*
 *Configuration pour Windows avec Cursor IDE*
 
 ## 🚀 Installation Rapide

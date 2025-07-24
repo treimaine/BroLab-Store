@@ -7,17 +7,22 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "start": "NODE_ENV=production node dist/index.js",
+    "build:prod": "cross-env NODE_ENV=production vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "start": "cross-env NODE_ENV=production node dist/index.js",
+    "start:prod": "cross-env NODE_ENV=production PORT=5000 node dist/index.js",
     "check": "tsc --noEmit",
     "setup": "npm install",
-    "clean": "rm -rf node_modules dist .cache && npm install",
+    "clean": "rimraf node_modules dist .cache && npm install",
+    "clean:safe": "rimraf dist .cache",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:ci": "jest --runInBand --coverage",
     "db:studio": "npx drizzle-kit studio",
     "db:generate": "npx drizzle-kit generate:pg",
     "db:push": "npx drizzle-kit push:pg",
     "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "deploy:o2switch": "node scripts/deploy-o2switch.js"
   },
   "dependencies": {
     "@esbuild/win32-x64": "^0.25.8",

@@ -3,15 +3,16 @@
 // Purpose: Secure download management with license-based quotas
 
 import { Router } from "express";
-import { requireAuthentication, checkDownloadQuota } from "../lib/rlsSecurity.js";
-import { storage } from "../storage.js";
+import { isAuthenticated } from "../auth";
+import { checkDownloadQuota } from "../lib/rlsSecurity";
+import { storage } from "../storage";
 
 const router = Router();
 
 // Get user downloads history
-router.get("/", requireAuthentication, async (req, res) => {
+router.get("/", isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.session?.userId;
     if (!userId) {
       return res.status(401).json({ error: "User not authenticated" });
     }
@@ -35,22 +36,22 @@ router.get("/", requireAuthentication, async (req, res) => {
 });
 
 // Download a beat with quota enforcement
-router.post("/beat/:beatId", requireAuthentication, async (req, res) => {
+router.post("/", isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user?.id;
-    const beatId = parseInt(req.params.beatId);
-    const { licenseType } = req.body;
-
+    const userId = req.session?.userId;
     if (!userId) {
       return res.status(401).json({ error: "User not authenticated" });
     }
 
-    if (!beatId || !licenseType) {
+    const { productId, license: licenseType } = req.body;
+    if (!productId || !licenseType) {
       return res.status(400).json({ 
         error: "Missing required fields",
-        required: ["beatId", "licenseType"]
+        required: ["productId", "license"]
       });
     }
+
+    const beatId = parseInt(productId.toString());
 
     // Check if user has quota for this license type
     const hasQuota = await checkDownloadQuota(userId, licenseType);
@@ -85,7 +86,7 @@ router.post("/beat/:beatId", requireAuthentication, async (req, res) => {
       timestamp: new Date().toISOString()
     });
 
-    res.json({
+    res.status(201).json({
       success: true,
       message: "Download recorded successfully",
       download: {
@@ -107,9 +108,9 @@ router.post("/beat/:beatId", requireAuthentication, async (req, res) => {
 });
 
 // Get download quota status for user
-router.get("/quota", requireAuthentication, async (req, res) => {
+router.get("/quota", isAuthenticated, async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.session?.userId;
     if (!userId) {
       return res.status(401).json({ error: "User not authenticated" });
     }
@@ -149,6 +150,40 @@ router.get("/quota", requireAuthentication, async (req, res) => {
     console.error("Get quota status error:", error);
     res.status(500).json({
       error: "Failed to get quota status",
+      message: error.message
+    });
+  }
+});
+
+// Export downloads as CSV
+router.get("/export", isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.session?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    // Get user downloads from storage
+    const downloads = await storage.getUserDownloads(userId);
+    
+    // Create CSV headers
+    const csvHeaders = '"product_id","license","downloaded_at","download_count"';
+    
+    // Create CSV rows
+    const csvRows = downloads?.map((download: any, index: number) => {
+      return `"${download.beatId || 'N/A'}","${download.licenseType || 'N/A'}","${download.timestamp || 'N/A'}","${index + 1}"`;
+    }).join('\n') || '';
+    
+    const csvContent = csvHeaders + '\n' + csvRows;
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="downloads.csv"');
+    res.send(csvContent);
+    
+  } catch (error: any) {
+    console.error("Export downloads error:", error);
+    res.status(500).json({
+      error: "Failed to export downloads",
       message: error.message
     });
   }

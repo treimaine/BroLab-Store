@@ -2,9 +2,9 @@ import { Router } from "express";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcrypt";
-import { sendMail } from "../services/mail.js";
-import { emailTemplates } from "../templates/emails.js";
-import { storage } from "../storage.js";
+import { sendMail } from "../services/mail";
+import { emailTemplates } from "../templates/emails";
+import { storage } from "../storage";
 
 const router = Router();
 

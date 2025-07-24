@@ -88,7 +88,8 @@ export const rateLimitValidation = z.object({
 
 // Security validation helpers
 export const validateUUID = (uuid: string): boolean => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  // More permissive regex that accepts all valid UUID versions (1-5)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(uuid);
 };
 
@@ -98,9 +99,11 @@ export const validateEmail = (email: string): boolean => {
 };
 
 export const validatePhoneNumber = (phone: string): boolean => {
-  // Support international formats
-  const phoneRegex = /^\+?[\d\s\-\(\)]{10,15}$/;
-  return phoneRegex.test(phone);
+  // Support international formats with more flexibility
+  const phoneRegex = /^\+?[\d\s\-\(\)\.]{7,20}$/;
+  // Remove all non-digit characters to count actual digits
+  const digitsOnly = phone.replace(/[^\d]/g, '');
+  return phoneRegex.test(phone) && digitsOnly.length >= 7 && digitsOnly.length <= 15;
 };
 
 // Validation error formatter

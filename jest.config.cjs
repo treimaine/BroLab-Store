@@ -17,7 +17,13 @@ module.exports = {
     '!**/dist/**',
     '!**/build/**',
   ],
-  'ts-jest': {
-    tsconfig: 'tsconfig.json',
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: 'tsconfig.json',
+    }],
+  },
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/client/src/$1',
+    '^@shared/(.*)$': '<rootDir>/shared/$1',
   },
 };
