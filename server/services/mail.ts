@@ -49,7 +49,7 @@ const stripHTML = (html: string): string => {
 };
 
 // Main send mail function
-export async function sendMail(payload: MailPayload): Promise<void> {
+export async function sendMail(payload: MailPayload): Promise<string> {
   try {
     // Handle DRY_RUN mode
     if (process.env.MAIL_DRY_RUN === "true") {
@@ -58,7 +58,7 @@ export async function sendMail(payload: MailPayload): Promise<void> {
         subject: payload.subject,
         from: payload.from || process.env.DEFAULT_FROM,
       });
-      return;
+      return "dry-run-message-id";
     }
 
     const transporter = getTransporter();
@@ -74,6 +74,7 @@ export async function sendMail(payload: MailPayload): Promise<void> {
 
     const result = await transporter.sendMail(mailOptions);
     console.log("✅ Email sent successfully:", result.messageId);
+    return result.messageId;
 
   } catch (error: any) {
     console.error("❌ Failed to send email:", error.message);
@@ -85,10 +86,10 @@ export async function sendMail(payload: MailPayload): Promise<void> {
 export async function sendAdminNotification(
   type: string,
   payload: { subject: string; html: string; metadata?: any }
-): Promise<void> {
+): Promise<string> {
   const adminEmails = process.env.ADMIN_EMAILS?.split(',') || ['contact@brolabentertainment.com'];
   
-  await sendMail({
+  return await sendMail({
     to: adminEmails,
     subject: `[BroLab Admin] ${payload.subject}`,
     html: `

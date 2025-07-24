@@ -1,0 +1,80 @@
+🎯 OBJECTIF
+Rendre l’intégralité des scripts et configs de build/dev/test/start de l’app compatibles Windows ET Linux (Replit, o2switch). Rien ne doit casser :
+- Local Windows (PowerShell / Git Bash)
+- Replit (Linux)
+- Préprod & prod sur o2switch (Linux / cPanel + Node)
+
+Tu dois :
+1. Auditer tous les fichiers concernés (package.json, package.local.json, scripts *.sh/*.bat, tsconfig, vite, jest, dotenv, .replit, Procfile éventuel, scripts Node internes).
+2. Identifier tous les points non cross-plateforme (rm -rf, cp, quotes, paths, exports d’ENV, etc.).
+3. Proposer un plan par micro-lots (≤30 lignes/fichier) et demander validation si <95% de confiance.
+4. Appliquer les corrections avec des outils cross-platform (cross-env, rimraf, shx/cpx ou scripts Node) OU un script Node unique (scripts/tasks/*) quand c’est plus propre.
+5. Vérifier après chaque lot : `pnpm tsc --noEmit` + `pnpm test --runInBand`.
+6. Lister précisément les fichiers modifiés et me donner un mini-changelog.
+
+⚠️ RÈGLES
+- Tu n’appliques RIEN tant que tu n’as pas présenté : audit + plan par lots + niveau de confiance.
+- 95% de confiance minimum pour modifier. Sinon, pause + questions précises (fichier/ligne).
+- Aucune régression : si un test casse, tu le répares ou expliques pourquoi.
+- Ne touche pas aux secrets. Ne modifie pas la logique métier/DB.
+- Respecte les priorités P0/P1 du projet (stabilité build/dev/test > confort).
+
+🧭 ÉTAPE 0 — AUDIT & CARTOGRAPHIE
+Passe en revue :
+- package.json / package.local.json (scripts : dev, build, start, test, lint, clean, etc.)
+- .replit, .env*, vite.config*, jest.config*, tsconfig*, scripts shell/batch
+- Fichiers custom (choosePort, dotenv loaders, etc.)
+Repère : `rm -rf`, `cp`, `export VAR=`, `NODE_ENV=xxx command`, chemins relatifs sensibles, extensions .sh/.bat, etc.
+
+💼 ÉTAPE 1 — PLAN PAR LOTS
+Structure le travail :
+Lot 1 : Scripts npm/pnpm (clean, build, dev, start, test)
+Lot 2 : Variables d’environnement (cross-env, dotenv-flow/dotenvx déjà présent)
+Lot 3 : Copies/cleanups (rimraf/shx/cpx ou node scripts)
+Lot 4 : Config Replit & o2switch (PORT, start command)
+Lot 5 : Vérif Jest/TS/Vite sur Win/Linux
+Présente-moi ce plan avec niveau de confiance pour chaque lot.
+
+🔧 ÉTAPE 2 — EXÉCUTION PAR LOT
+Pour chaque lot validé :
+1. Propose les diffs (≤30 lignes/fichier). Exemple de corrections :
+   - `"clean": "rimraf dist .tsbuild"` au lieu de `rm -rf`
+   - `"build:server": "cross-env NODE_ENV=production tsx scripts/build-server.ts"`
+   - `"dev": "cross-env NODE_ENV=development node scripts/dev.js"` (script Node qui lance vite + server)
+   - scripts de copie via `shx cp` ou `cpx` si besoin
+2. Applique, puis exécute :
+   - `pnpm tsc --noEmit`
+   - `pnpm test --runInBand`
+3. Donne le résultat + fichiers modifiés + mini-changelog + confiance.
+4. S’il reste des warnings/edge cases Windows (quotes, paths), corrige-les.
+
+📑 RAPPORT FORMAT
+À CHAQUE LOT :
+- ✅ Résumé : ce qui est fixed
+- 🧪 Résultats `tsc` + `test`
+- 🗂 Fichiers modifiés
+- 📝 Mini-changelog (1-2 lignes/fichier)
+- 🔍 TODO restants
+- 🤔 Questions (si <95% confiance)
+
+📌 SPÉCIFIQUE o2switch
+- Prévois scripts `build:prod` et `start:prod` qui :
+  - chargent `.env.production`
+  - utilisent `cross-env` pour NODE_ENV
+  - exportent PORT=5000 par défaut avec fallback choosePort
+- Fournis un README_DEPLOY_O2SWITCH.md si besoin (commande ssh, pm2/passenger)
+
+🚫 NE PAS FAIRE
+- Revenir à drizzle/neon
+- Introduire de grosses libs sans me demander
+- Casser la structure test/prod existante
+
+✅ FIN
+- `pnpm tsc --noEmit` → 0 erreurs
+- `pnpm test` → tous verts (ou expliqué)
+- Scripts npm fonctionnent Win+Linux
+- Plan de déploiement o2switch clair
+
+➡️ COMMENCE
+1. Audit complet & plan par lots → attends ma validation
+2. Puis exécute lot par lot comme décrit
