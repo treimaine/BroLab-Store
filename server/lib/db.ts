@@ -1,4 +1,4 @@
-import type { ActivityLog, Download, ServiceOrder, ServiceOrderInput, User, File, InsertFile } from '../../shared/schema';
+import type { ActivityLog, CartItem, Download, File, InsertFile, Order, ServiceOrder, ServiceOrderInput, User } from '../../shared/schema';
 import { supabaseAdmin } from './supabaseAdmin';
 
 // Get user by email
@@ -238,4 +238,69 @@ export async function logActivity(activity: Omit<ActivityLog, 'id'>): Promise<Ac
     .single();
   if (error) throw error;
   return data as ActivityLog;
+}
+
+// Sauvegarde l'URL de la facture PDF dans la commande
+export async function saveInvoiceUrl(orderId: number, url: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('orders')
+    .update({ invoice_pdf_url: url })
+    .eq('id', orderId);
+  if (error) throw error;
+}
+
+// Génère ou récupère le numéro de facture (BRLB-YYYY-000123)
+export async function ensureInvoiceNumber(orderId: number): Promise<string> {
+  const year = new Date().getFullYear();
+  const { data, error } = await supabaseAdmin
+    .from('orders')
+    .select('invoice_number')
+    .eq('id', orderId)
+    .single();
+  if (error) throw error;
+  if (data && data.invoice_number) return data.invoice_number;
+  const invoiceNumber = `BRLB-${year}-${String(orderId).padStart(6, '0')}`;
+  const { error: updateError } = await supabaseAdmin
+    .from('orders')
+    .update({ invoice_number: invoiceNumber })
+    .eq('id', orderId);
+  if (updateError) throw updateError;
+  return invoiceNumber;
+}
+
+// Récupère la commande et ses items pour la facture
+export async function getOrderInvoiceData(orderId: number): Promise<{ order: Order; items: CartItem[] }> {
+  const { data: order, error: orderError } = await supabaseAdmin
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .single();
+  if (orderError) throw orderError;
+  const { data: items, error: itemsError } = await supabaseAdmin
+    .from('cart_items')
+    .select('*')
+    .eq('order_id', orderId);
+  if (itemsError) throw itemsError;
+  return { order: order as Order, items: items as CartItem[] };
+}
+
+// Liste les commandes d'un utilisateur
+export async function listUserOrders(userId: number): Promise<Order[]> {
+  const { data, error } = await supabaseAdmin
+    .from('orders')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as Order[];
+}
+
+// Liste les items d'une commande
+export async function listOrderItems(orderId: number): Promise<CartItem[]> {
+  const { data, error } = await supabaseAdmin
+    .from('cart_items')
+    .select('*')
+    .eq('order_id', orderId);
+  if (error) throw error;
+  return data as CartItem[];
 } 

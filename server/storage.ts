@@ -8,7 +8,7 @@ import {
   type Order,
   type User
 } from "@shared/schema";
-import { getUserByEmail, getUserById, upsertUser } from './lib/db';
+import { getOrderInvoiceData, getUserByEmail, getUserById, listUserOrders, upsertUser } from './lib/db';
 
 // === Helpers for snake_case <-> camelCase mapping ===
 function toDbBeat(beat: any) {
@@ -513,18 +513,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Order methods - Not fully implemented
-  async getOrder(id: number): Promise<Order | undefined> {
-    const order = this.orders.get(id);
-    if (!order) return undefined;
-    return {
-      ...order,
-      items: Array.isArray(order.items) ? order.items : [],
-    };
+  async getOrdersByUser(userId: number): Promise<Order[]> {
+    const orders = await listUserOrders(userId);
+    return orders.map(fromDbOrder);
   }
 
-  async getOrdersByUser(userId: number): Promise<Order[]> {
-    // Orders not implemented in current helpers
-    return [];
+  async getOrder(id: number): Promise<Order | undefined> {
+    const { order } = await getOrderInvoiceData(id);
+    return fromDbOrder(order);
   }
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {

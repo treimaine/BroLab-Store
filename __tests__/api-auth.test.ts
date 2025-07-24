@@ -11,18 +11,18 @@ const TEST_USER = {
 };
 
 beforeAll(async () => {
-  // Nettoie la table users avant les tests
-  await supabaseAdmin.from('users').delete().eq('email', TEST_USER.email);
+  // Nettoie tous les utilisateurs de test avant les tests
+  await supabaseAdmin.from('users').delete().like('email', 'testuser%');
 });
 
 afterAll(async () => {
-  // Nettoie la table users après les tests
-  await supabaseAdmin.from('users').delete().eq('email', TEST_USER.email);
+  // Nettoie tous les utilisateurs de test après les tests
+  await supabaseAdmin.from('users').delete().like('email', 'testuser%');
 });
 
 beforeEach(async () => {
-  // Nettoie l'utilisateur de test avant chaque test
-  await supabaseAdmin.from('users').delete().eq('email', TEST_USER.email);
+  // Nettoie tous les utilisateurs de test avant chaque test
+  await supabaseAdmin.from('users').delete().like('email', 'testuser%');
 
   // Ajoute un utilisateur de test à chaque test
   const hashedPassword = await bcrypt.hash(TEST_USER.password, 10);
@@ -45,8 +45,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  // Nettoie la table users après chaque test
-  await supabaseAdmin.from('users').delete().eq('email', TEST_USER.email);
+  // Nettoie tous les utilisateurs de test après chaque test
+  await supabaseAdmin.from('users').delete().like('email', 'testuser%');
 });
 
 describe('POST /api/auth/login', () => {

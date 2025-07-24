@@ -136,6 +136,7 @@ export type InsertBeat = z.infer<typeof insertBeatSchema>;
 export type CartItem = {
   id: number;
   beat_id: number;
+  //product_id: number;
   license_type: LicenseTypeEnum;
   price: number;
   quantity: number;
@@ -170,6 +171,8 @@ export type Order = {
   stripe_payment_intent_id?: string | null;
   items: any; // JSONB côté Supabase
   created_at: string;
+  invoice_number?: string;
+  invoice_pdf_url?: string;
 };
 
 export const insertOrderSchema = z.object({
@@ -341,3 +344,25 @@ export interface ActivityLog {
   timestamp: string; // ISO
   download_count?: number;
 }
+
+//
+// ==========================
+// COMMON / UTIL
+// ==========================
+//
+
+export type UUID = string; // ou brandé si tu veux: type UUID = string & { __uuid: true };
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
+//
+// ==========================
+// BEAT / USER (déjà présents normalement) – on crée surtout les variantes DB/Insert
+// ==========================
+//
+
+/** Ligne telle qu’elle sort de Supabase (identique à Beat ici, mais tu peux diverger si besoin) */
+//export type DbBeat = Beat;
+
+/** Quand on insère un beat (on ne connaît pas id/created_at) */
+//export type InsertBeat = Omit<Beat, 'id' | 'created_at'> & Partial<Pick<Beat, 'id' | 'created_at'>>;
+

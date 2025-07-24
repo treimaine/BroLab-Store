@@ -1,4 +1,7 @@
-export { AdvancedBeatFilters } from "../AdvancedBeatFilters";
+// export { AdvancedBeatFilters } from "../AdvancedBeatFilters";
+// ... existing code ...
+export { default as AdvancedBeatFilters } from "../AdvancedBeatFilters";
+// ... existing code ...
 // TODO: Remplacer par un vrai composant si besoin d’une implémentation dédiée.
 export interface AdvancedFiltersProps {
   filters: {
