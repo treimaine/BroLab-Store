@@ -1,0 +1,113 @@
+SAFE-UPDATE / FIX BLOCKERS (95% confidence required)  
+!! Ne modifie rien sur main tant que tout n’est pas vert !!
+
+🎯 Objectif
+Corriger les 4 blockers (TS errors, tests KO, auth/routes healthcheck, build) SANS casser les fonctionnalités ni les configs existantes, puis produire un ZIP exportable et cohérent pour préprod/prod.
+
+🔒 Règles générales
+- Travaille dans une branche dédiée : `safe-fix-$(date +%Y%m%d%H%M)`.
+- Pas plus de 30 lignes modifiées par fichier sans mon accord.
+- Après chaque micro-lot : `pnpm tsc --noEmit`, `pnpm test`, quick smoke (`pnpm dev` 30s) → si doute <95%, STOP & ask.
+- Ne touche pas aux secrets et fichiers d’infra (.env, .replit, replit.nix, package.json) sans justification.
+- Ne supprime pas de code “juste pour faire passer TS”. Préfère : typer correctement, fallback, garde backward compatibility.
+
+────────────────────────────────────────
+PHASE 0 — Re-sync & Contexte
+1. `git checkout -b safe-fix-$(date +%Y%m%d%H%M)`
+2. Re-lance l’audit pour contexte à jour :  
+pnpm tsx scripts/audit_repo.ts
+
+markdown
+Copier
+Modifier
+3. Affiche-moi :  
+- nb d’erreurs TS + liste fichiers/lines  
+- nb tests failing + noms  
+- status auth/routes (/api/auth/user, /api/woo/products, /api/wp/pages/privacy) via `curl` local  
+Puis STOP.
+
+────────────────────────────────────────
+PHASE 1 — Corriger TypeScript (blockers)
+But : 0 erreur TS.
+
+Plan (adapter selon résultats exacts, mais typiquement) :
+A. UI/Beat types (Beat vs UIBeat) & props manquants (BeatCard, ResponsiveBeatCard, AddToCartButton).  
+- Ajouter champs requis (genre, created_at, wordpress_id) via mapping avant de passer à BeatCard.  
+- Éviter d’introduire `any`; préfère Pick/Partial + fallback.
+
+B. LazyComponents generics  
+- Importer explicitement les Props types de chaque composant lazy (WaveformAudioPlayerProps, AdvancedBeatFiltersProps, etc.)  
+- `withLazyLoading<TProps extends Record<string, unknown>>` + signatures correctes et remove ts-expect-error inutilisés.
+
+C. Payment pages (PaymentPlan type export, setState signatures)  
+- Exporter l’interface `PaymentPlan` depuis PaymentPlanSelector.  
+- Adapter `(plan: PaymentPlan | null) => void` et SetStateAction correctement.
+
+D. Misc: MembershipPage billingInterval "yearly" → "annual"; shop.tsx filters typing; remove `is_free` non défini dans UIBeat; WordPress PageRenderer (rendered→html); etc.
+
+Procédure :
+- Corrige par sous-lots (A, B, C, D).  
+- Après chaque sous-lot :
+pnpm tsc --noEmit > .reports/tsc_phaseX.txt 2>&1 || true
+
+markdown
+Copier
+Modifier
+STOP si encore >0 erreurs pour montrer diff & plan suivant.
+
+────────────────────────────────────────
+PHASE 2 — Tests Jest
+1. `pnpm test --silent` → lister tests KO.  
+2. Pour chaque test KO : patch minimal (mocks Supabase/Stripe/Woo déjà en place).  
+3. Ajoute tests manquants si nécessaire (ex: routes WP/woo migrated).  
+4. Vérifie couverture minimale inchangée (ou note la baisse).  
+STOP et montre le rapport.
+
+────────────────────────────────────────
+PHASE 3 — Smoke & Healthchecks
+1. Lancer `pnpm dev` sur port choisi (utilise choosePort déjà implémenté).  
+2. Vérifier rapidement (curl/fetch) :
+ - GET /api/auth/user (renvoie 401 sans session, 200 avec session)  
+ - GET /api/woo/products?min_price=0  
+ - GET /api/wp/pages/privacy  
+ - GET /api/downloads (401 si non logué)  
+3. Si un endpoint casse → patch ciblé (≤30 lignes).  
+STOP et rapport.
+
+────────────────────────────────────────
+PHASE 4 — MISSING_FEATURES.md & Rapport final
+1. Ré-exécute `pnpm tsx scripts/audit_repo.ts` → génère `.reports/audit.md` actualisé.  
+2. Mets à jour `MISSING_FEATURES.md` :
+ - Marque DONE ce qui l’est réellement.  
+ - Ajoute ce qui manque encore (referrals backend, RLS policies, quotas downloads, etc.).  
+ - Classer P0/P1/P2.  
+3. Crée `POST_UPDATE_REPORT.md` :
+ - Résumé des changements (par fichier/groupe)  
+ - État final (TS OK, tests OK, endpoints OK)  
+ - TODO restants avant préprod/prod  
+ - Instructions pour moi (git pull, zip export)
+
+Commit :
+git add .
+git commit -m "chore(safe-fix): TS/tests fixed, audit updated"
+
+bash
+Copier
+Modifier
+
+────────────────────────────────────────
+PHASE 5 — Export prêt
+1. Génère un ZIP propre (sans node_modules si volumineux) :
+./scripts/make_export_zip.sh # si non existant, crée-le : zip -r build-export.zip . -x "node_modules/" ".git/"
+
+markdown
+Copier
+Modifier
+2. STOP et donne-moi le chemin du ZIP + diff final + instructions merge (`git push origin safe-fix-...`).
+
+────────────────────────────────────────
+IMPORTANT
+- A CHAQUE doute <95% : pose-moi la question.  
+- Ne merge pas dans main sans mon feu vert.
+
+➡️ Lance PHASE 0 maintenant, puis attends mon OK à chaque STOP.

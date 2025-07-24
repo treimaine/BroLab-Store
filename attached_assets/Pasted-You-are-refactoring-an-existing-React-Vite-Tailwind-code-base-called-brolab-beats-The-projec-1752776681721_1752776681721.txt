@@ -1,0 +1,88 @@
+You are refactoring an existing React + Vite + Tailwind code-base called “brolab_beats”.
+The project already contains:
+
+• Vite config (`vite.config.mjs`)  
+• Tailwind config (`tailwind.config.js`)  
+• React Router pages (Home, Beats Catalog, Beat Detail…)  
+• Redux Toolkit store and slices  
+• UI components built with Tailwind utility classes  
+• Placeholder audio-player and cart stubs.
+
+### GOAL
+Turn it into a **headless front-end** for https://brolabentertainment.com
+
+1. **API layer**
+   ▸ Create `src/api/wordpress.ts`  
+     – Axios instance with base URL `https://brolabentertainment.com/wp-json/`  
+     – Endpoints:
+       - `getPages()`  → `/wp/v2/pages?per_page=100&status=publish`
+       - `getPost(slug)` → `/wp/v2/posts?slug=${slug}`
+   ▸ Create `src/api/woo.ts`
+     – Use npm pkg `woocommerce-rest-api`  
+     – Read `VITE_WC_KEY` and `VITE_WC_SECRET` from `.env`.  
+     – Expose `listProducts()`, `getProduct(id)`, `createOrder(payload)`.
+
+2. **Cart & Checkout**
+   ▸ Replace the current stub with **zustand** store (`useCartStore.ts`).  
+   ▸ Persist cart in `localStorage`.  
+   ▸ Integrate **CoCart** if installed, else call `woo.ts createOrder` directly on checkout.  
+   ▸ Payment:
+     - Use **Stripe Elements**.  
+     - After `stripe.confirmPayment`, call `createOrder()` with `payment_method: 'stripe'`.
+   ▸ On success, route to `/order/:id/thank-you`.
+
+3. **Audio preview**
+   ▸ Install `wavesurfer.js` and build `components/WaveformPlayer.tsx`.  
+   ▸ Props: `src`, `height`, `color`.  
+   ▸ Memoize WaveSurfer instance so it survives route changes.
+
+4. **Licensing selector**
+   ▸ On `BeatDetail` page add `<LicensePicker />` fed by WooCommerce “Variations”.  
+   ▸ Write helper `mapWcVariationsToLicenses(variations)`.
+
+5. **Global UI enhancements**
+   ▸ Install **shadcn-ui** (`npx shadcn-ui@latest init`) and replace raw Tailwind buttons/inputs with shadcn primitives (Button, Dialog, Sheet).  
+   ▸ Add **dark-mode** toggle using `next-themes` pattern (store theme in `localStorage`).  
+   ▸ Use **react-helmet-async** for SEO meta tags.
+
+6. **Routing & code-split**
+   ▸ Keep React Router but wrap routes in `Suspense` + `lazy()`.  
+   ▸ Add **404** fallback and a `Skeleton` loader while data fetches.
+
+7. **CMS-driven pages**
+   ▸ `src/pages/static/PageRenderer.tsx`
+     fetches page by slug from WordPress → renders HTML via `dangerouslySetInnerHTML` (wrap in `prose` Tailwind class).
+
+8. **Newsletter & freebie capture**
+   ▸ Add `<NewsletterModal />` opened once per user (check localStorage) with Mailchimp embedded form action.
+
+9. **Deployment tweaks for o2switch**
+   ▸ `vite.config.mjs` → ensure `base: '/'`.  
+   ▸ Output `npm run build` to `/dist`.  
+   ▸ Generate `.htaccess` (root of build)  
+     ```
+     <IfModule mod_rewrite.c>
+       RewriteEngine On
+       RewriteCond %{REQUEST_FILENAME} !-f
+       RewriteCond %{REQUEST_FILENAME} !-d
+       RewriteRule ^ index.html [L]
+     </IfModule>
+     ```
+   ▸ In README add step-by-step:
+     1. `npm run build`
+     2. zip `dist`  
+     3. upload to `public_html` via cPanel File Manager  
+     4. extract & overwrite
+
+10. **Tooling**
+    ▸ `npm i -D eslint prettier eslint-plugin-react eslint-config-prettier husky lint-staged`  
+    ▸ Configure Prettier + pre-commit hook.  
+    ▸ Add `vitest` + `@testing-library/react` + example test for `LicensePicker`.
+
+### DELIVERABLES
+• Updated `package.json` with new deps & scripts  
+• New files: `src/api/*`, `src/store/useCartStore.ts`, `components/WaveformPlayer.tsx`, `.env.example`  
+• Refactored pages & components per above  
+• README section “Deploy to o2switch”  
+
+Return the **full diff** or new file contents.
