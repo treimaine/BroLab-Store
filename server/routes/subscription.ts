@@ -13,6 +13,79 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-06-30.basil',
 });
 
+// Get available subscription plans (MUST BE FIRST)
+router.get('/plans', async (req, res) => {
+  try {
+    const plans = [
+      {
+        id: 'basic',
+        name: 'Basic',
+        description: 'Accès aux beats essentiels',
+        monthly: {
+          price: 9.99,
+          priceId: process.env.STRIPE_BASIC_MONTHLY_PRICE_ID || 'price_basic_monthly'
+        },
+        annual: {
+          price: 99.99,
+          priceId: process.env.STRIPE_BASIC_ANNUAL_PRICE_ID || 'price_basic_annual'
+        },
+        features: [
+          'Accès à 100+ beats',
+          'Téléchargements illimités',
+          'Support email'
+        ]
+      },
+      {
+        id: 'pro',
+        name: 'Pro',
+        description: 'Accès complet avec fonctionnalités avancées',
+        monthly: {
+          price: 19.99,
+          priceId: process.env.STRIPE_PRO_MONTHLY_PRICE_ID || 'price_pro_monthly'
+        },
+        annual: {
+          price: 199.99,
+          priceId: process.env.STRIPE_PRO_ANNUAL_PRICE_ID || 'price_pro_annual'
+        },
+        features: [
+          'Accès à 500+ beats',
+          'Téléchargements illimités',
+          'Support prioritaire',
+          'Accès aux exclusivités',
+          'Licences commerciales'
+        ]
+      },
+      {
+        id: 'unlimited',
+        name: 'Unlimited',
+        description: 'Accès illimité à tout le catalogue',
+        monthly: {
+          price: 29.99,
+          priceId: process.env.STRIPE_UNLIMITED_MONTHLY_PRICE_ID || 'price_unlimited_monthly'
+        },
+        annual: {
+          price: 299.99,
+          priceId: process.env.STRIPE_UNLIMITED_ANNUAL_PRICE_ID || 'price_unlimited_annual'
+        },
+        features: [
+          'Accès illimité à tous les beats',
+          'Téléchargements illimités',
+          'Support VIP',
+          'Accès aux exclusivités',
+          'Licences commerciales',
+          'Accès aux packs premium',
+          'Remixes exclusifs'
+        ]
+      }
+    ];
+
+    res.json(plans);
+  } catch (error: any) {
+    console.error('Error fetching plans:', error);
+    res.status(500).json({ error: 'Failed to fetch subscription plans' });
+  }
+});
+
 // Create subscription checkout session
 router.post('/create-subscription', async (req, res) => {
   try {
@@ -137,6 +210,8 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
   res.json({ received: true });
 });
+
+
 
 // Get current user's subscription status
 router.get('/status', async (req, res) => {

@@ -6,9 +6,13 @@ import {
   type InsertOrder,
   type InsertUser,
   type Order,
-  type User
+  type OrderStatusEnum,
+  type User,
+  type Reservation,
+  type InsertReservation,
+  type ReservationStatusEnum
 } from "@shared/schema";
-import { getOrderInvoiceData, getUserByEmail, getUserById, listUserOrders, upsertUser } from './lib/db';
+import { getOrderInvoiceData, getUserByEmail, getUserById, listUserOrders, upsertUser, createReservation, getReservationById, getUserReservations, updateReservationStatus, getReservationsByDateRange } from './lib/db';
 
 // === Helpers for snake_case <-> camelCase mapping ===
 function toDbBeat(beat: any) {
@@ -53,6 +57,13 @@ function fromDbOrder(row: any) {
 }
 
 export interface IStorage {
+  // Reservation management
+  createReservation(reservation: InsertReservation): Promise<Reservation>;
+  getReservation(id: string): Promise<Reservation | undefined>;
+  getUserReservations(userId: number): Promise<Reservation[]>;
+  updateReservationStatus(id: string, status: ReservationStatusEnum): Promise<Reservation>;
+  getReservationsByDateRange(startDate: string, endDate: string): Promise<Reservation[]>;
+
   // User management
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -107,6 +118,8 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
+  private reservations: Map<string, Reservation>;
+
   private users: Map<number, User>;
   private beats: Map<number, Beat>;
   private cartItems: Map<number, CartItem>;
@@ -124,6 +137,7 @@ export class MemStorage implements IStorage {
     this.beats = new Map();
     this.cartItems = new Map();
     this.orders = new Map();
+    this.reservations = new Map();
     this.newsletterSubscriptions = new Set();
     this.contactMessages = [];
     this.currentUserId = 1;
@@ -380,7 +394,7 @@ export class MemStorage implements IStorage {
     return order;
   }
 
-  async updateOrderStatus(id: number, status: string): Promise<Order | undefined> {
+  async updateOrderStatus(id: number, status: OrderStatusEnum): Promise<Order | undefined> {
     const order = this.orders.get(id);
     if (order) {
       const updatedOrder = { ...order, status };
@@ -429,9 +443,81 @@ export class MemStorage implements IStorage {
       timestamp: new Date(),
     });
   }
+
+  // Reservation methods
+  async createReservation(reservation: InsertReservation): Promise<Reservation> {
+    const id = crypto.randomUUID();
+    const newReservation: Reservation = {
+      ...reservation,
+      id,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    this.reservations.set(id, newReservation);
+    return newReservation;
+  }
+
+  async getReservation(id: string): Promise<Reservation | undefined> {
+    return this.reservations.get(id);
+  }
+
+  async getUserReservations(userId: number): Promise<Reservation[]> {
+    return Array.from(this.reservations.values())
+      .filter(reservation => reservation.user_id === userId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  async updateReservationStatus(id: string, status: ReservationStatusEnum): Promise<Reservation> {
+    const reservation = this.reservations.get(id);
+    if (!reservation) {
+      throw new Error(`Reservation not found: ${id}`);
+    }
+    const updatedReservation = {
+      ...reservation,
+      status,
+      updated_at: new Date().toISOString(),
+    };
+    this.reservations.set(id, updatedReservation);
+    return updatedReservation;
+  }
+
+  async getReservationsByDateRange(startDate: string, endDate: string): Promise<Reservation[]> {
+    const start = new Date(startDate).getTime();
+    const end = new Date(endDate).getTime();
+    return Array.from(this.reservations.values())
+      .filter(reservation => {
+        const date = new Date(reservation.preferred_date).getTime();
+        return date >= start && date <= end;
+      })
+      .sort((a, b) => new Date(a.preferred_date).getTime() - new Date(b.preferred_date).getTime());
+  }
 }
 
 export class DatabaseStorage implements IStorage {
+  // Reservation methods
+  async createReservation(reservation: InsertReservation): Promise<Reservation> {
+    return await createReservation(reservation);
+  }
+
+  async getReservation(id: string): Promise<Reservation | undefined> {
+    const reservation = await getReservationById(id);
+    return reservation || undefined;
+  }
+
+  async getUserReservations(userId: number): Promise<Reservation[]> {
+    return await getUserReservations(userId);
+  }
+
+  async updateReservationStatus(id: string, status: ReservationStatusEnum): Promise<Reservation> {
+    return await updateReservationStatus(id, status);
+  }
+
+  async getReservationsByDateRange(startDate: string, endDate: string): Promise<Reservation[]> {
+    return await getReservationsByDateRange(startDate, endDate);
+  }
+
+
   private orders: Map<number, Order> = new Map();
   // User methods
   async getUser(id: number): Promise<User | undefined> {

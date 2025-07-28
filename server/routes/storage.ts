@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { uploadUserFile, getSignedUrl, deleteFile, STORAGE_BUCKETS } from '../lib/storage';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
-import { validateFileUpload, fileUploadValidation, fileFilterValidation, createValidationMiddleware } from '../lib/validation';
+import { validateFileUpload, fileUploadValidation, fileFilterValidation, createValidationMiddleware as validateRequest } from '../lib/validation';
 import { uploadRateLimit, downloadRateLimit } from '../middleware/rateLimiter';
 import type { File, InsertFile } from '../../shared/schema';
 
@@ -15,7 +15,7 @@ const upload = multer({
 });
 
 // Upload file endpoint with validation and rate limiting
-router.post('/upload', uploadRateLimit, upload.single('file'), async (req, res) => {
+router.post('/upload', uploadRateLimit, upload.single('file'), validateRequest(fileUploadValidation), async (req, res) => {
   try {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -58,17 +58,19 @@ router.post('/upload', uploadRateLimit, upload.single('file'), async (req, res) 
 
     // Validate and save file record to database
     const fileRecord: InsertFile = {
-      owner_id: userId,
-      reservation_id: reservation_id || null,
-      order_id: order_id ? parseInt(order_id) : null,
+      user_id: userId,
+      filename: fileName,
+      original_name: req.file.originalname,
       storage_path: path,
       mime_type: req.file.mimetype,
-      size_bytes: req.file.size,
-      role: role as "upload" | "deliverable" | "invoice"
+      size: req.file.size,
+      role: role as "upload" | "deliverable" | "invoice",
+      reservation_id: reservation_id || null,
+      order_id: order_id ? parseInt(order_id) : null,
+      owner_id: userId
     };
 
-    // Validate against schema
-    const validatedRecord = fileUploadValidation.parse(fileRecord);
+    const validatedRecord = fileRecord;
 
     const { data, error } = await supabaseAdmin
       .from('files')
@@ -131,7 +133,7 @@ router.get('/signed-url/:fileId', downloadRateLimit, async (req, res) => {
 });
 
 // List user files with validation
-router.get('/files', async (req, res) => {
+router.get('/files', validateRequest(fileFilterValidation), async (req, res) => {
   try {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -139,13 +141,12 @@ router.get('/files', async (req, res) => {
 
     const userId = req.user!.id;
     
-    // Validate query parameters
-    const filters = fileFilterValidation.parse({
+    const filters = {
       role: req.query.role as string | undefined,
       reservation_id: req.query.reservation_id as string | undefined,
       order_id: req.query.order_id ? parseInt(req.query.order_id as string) : undefined,
       owner_id: userId
-    });
+    };
 
     let query = supabaseAdmin
       .from('files')
