@@ -21,7 +21,7 @@ interface WooCommerceCustomer {
 
 interface CurrentUser {
   // Auth data
-  id: string;
+  id: number;
   email: string;
   username: string;
   

@@ -83,13 +83,16 @@ describe('/api/downloads', () => {
     });
     (storage.logDownload as jest.Mock).mockResolvedValue(fakeDownload);
     const logActivitySpy = jest.spyOn(db, 'logActivity').mockResolvedValue({
-      id: 'log-uuid',
+      id: 123,
       user_id: 123,
-      product_id: 42,
-      license: 'premium',
       event_type: 'download',
+      details: {
+        product_id: 42,
+        license: 'premium',
+        download_count: 1
+      },
       timestamp: new Date().toISOString(),
-      download_count: 1
+      created_at: new Date().toISOString()
     });
     // Act: POST
     const postRes = await agent.post('/api/downloads').send({ productId: 42, license: 'premium' });
@@ -207,4 +210,4 @@ describe('/api/downloads', () => {
     expect(res.status).toBe(403);
     expect(res.body.error).toMatch(/quota exceeded/i);
   });
-}); 
+});
