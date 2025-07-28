@@ -50,16 +50,23 @@ describe('/api/service-orders', () => {
       id: 'order-uuid',
       user_id: 123,
       service_type: 'mixing',
-      details: 'Mix my track',
+      details: {
+        notes: 'Mix my track'
+      },
+      estimated_price: 0,
       status: 'pending',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
     (db.createServiceOrder as jest.Mock).mockResolvedValue(fakeOrder);
     (db.listServiceOrders as jest.Mock).mockResolvedValue([fakeOrder]);
     // Act: POST
     const postRes = await agent.post('/api/service-orders').send({
       service_type: 'mixing',
-      details: 'Mix my track'
+      details: {
+        notes: 'Mix my track'
+      },
+      estimated_price: 0
     });
     // Assert POST
     expect(postRes.status).toBe(201);
@@ -67,7 +74,10 @@ describe('/api/service-orders', () => {
       id: 'order-uuid',
       user_id: 123,
       service_type: 'mixing',
-      details: 'Mix my track'
+      details: {
+        notes: 'Mix my track'
+      },
+      estimated_price: 0
     });
     // Act: GET
     const getRes = await agent.get('/api/service-orders');
@@ -78,7 +88,9 @@ describe('/api/service-orders', () => {
       id: 'order-uuid',
       user_id: 123,
       service_type: 'mixing',
-      details: 'Mix my track'
+      details: {
+        notes: 'Mix my track'
+      }
     });
   });
 
@@ -114,4 +126,4 @@ describe('/api/service-orders', () => {
     expect(res2.status).toBe(400);
     expect(res2.body).toHaveProperty('error');
   });
-}); 
+});

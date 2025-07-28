@@ -4,11 +4,15 @@ import { app } from '../server/app'; // Import backend pur, pas de Vite/ESM
 import { supabaseAdmin } from '../server/lib/supabaseAdmin';
 import { makeTestUser } from './factories';
 
-const TEST_USER = {
-  username: 'testuser',
-  email: 'testuser@example.com',
-  password: 'testpassword',
-};
+// Génère un utilisateur de test unique à chaque fois
+function makeUniqueTestUser() {
+  const rand = Math.floor(Math.random() * 1000000);
+  return {
+    username: `testuser_${rand}`,
+    email: `testuser_${rand}@example.com`,
+    password: 'testpassword',
+  };
+}
 
 beforeAll(async () => {
   // Nettoie tous les utilisateurs de test avant les tests
@@ -23,25 +27,6 @@ afterAll(async () => {
 beforeEach(async () => {
   // Nettoie tous les utilisateurs de test avant chaque test
   await supabaseAdmin.from('users').delete().like('email', 'testuser%');
-
-  // Ajoute un utilisateur de test à chaque test
-  const hashedPassword = await bcrypt.hash(TEST_USER.password, 10);
-
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .upsert([
-      {
-        username: TEST_USER.username,
-        email: TEST_USER.email,
-        password: hashedPassword,
-        created_at: new Date().toISOString(),
-      }
-    ], { onConflict: 'email' })
-    .select()
-    .single();
-
-  if (error) throw new Error(error.message);
-  if (!data?.id) throw new Error('User not inserted correctly');
 });
 
 afterEach(async () => {
@@ -51,19 +36,45 @@ afterEach(async () => {
 
 describe('POST /api/auth/login', () => {
   it('login réussi avec les bons identifiants', async () => {
+    const testUser = makeUniqueTestUser();
+    
+    // Créer l'utilisateur d'abord
+    const hashedPassword = await bcrypt.hash(testUser.password, 10);
+    await supabaseAdmin
+      .from('users')
+      .insert({
+        username: testUser.username,
+        email: testUser.email,
+        password: hashedPassword,
+        created_at: new Date().toISOString(),
+      });
+
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ username: TEST_USER.email, password: TEST_USER.password });
+      .send({ username: testUser.email, password: testUser.password });
 
     expect(res.status).toBe(200);
     expect(res.body.user).toBeDefined();
-    expect(res.body.user.email).toBe(TEST_USER.email);
+    expect(res.body.user.email).toBe(testUser.email);
   });
 
   it('échec si mauvais mot de passe', async () => {
+    const testUser = makeUniqueTestUser();
+    
+    // Créer l'utilisateur d'abord
+    const hashedPassword = await bcrypt.hash(testUser.password, 10);
+    await supabaseAdmin
+      .from('users')
+      .insert({
+        username: testUser.username,
+        email: testUser.email,
+        password: hashedPassword,
+        created_at: new Date().toISOString(),
+      });
+
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ username: TEST_USER.email, password: 'wrongpassword' });
+      .send({ username: testUser.email, password: 'wrongpassword' });
 
     expect(res.status).toBe(401);
     expect(res.body.error).toMatch(/Invalid credentials/);

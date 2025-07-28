@@ -186,10 +186,12 @@ describe('Validation System Tests', () => {
   describe('Schema Validation', () => {
     test('should validate file upload schema', () => {
       const validData = {
-        owner_id: 1,
+        user_id: 1,
+        filename: 'file.pdf',
+        original_name: 'file.pdf',
         storage_path: 'uploads/file.pdf',
         mime_type: 'application/pdf',
-        size_bytes: 1024,
+        size: 1024,
         role: 'upload' as const
       };
 
@@ -198,10 +200,12 @@ describe('Validation System Tests', () => {
 
     test('should reject invalid file upload schema', () => {
       const invalidData = {
-        owner_id: 1,
+        user_id: 1,
+        filename: '',
+        original_name: '',
         storage_path: '',
         mime_type: 'invalid-mime',
-        size_bytes: -1,
+        size: -1,
         role: 'invalid_role'
       };
 
