@@ -1,23 +1,14 @@
-import { useState } from 'react';
-import { Play, Heart, ShoppingCart, Music } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { HoverPlayButton } from '@/components/HoverPlayButton';
-import { LazyWaveformAudioPlayer } from '@/components/LazyComponents';
-import { AddToCartButton } from '@/components/AddToCartButton';
-import { useIsMobile } from '@/hooks/useBreakpoint';
-import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
-import { cn } from '@/lib/utils';
+import { AddToCartButton } from "@/components/AddToCartButton";
+import { LazyWaveformAudioPlayer } from "@/components/LazyComponents";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/useBreakpoint";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { cn } from "@/lib/utils";
+import { Heart, Music } from "lucide-react";
+import { useState } from "react";
 
-interface Beat {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  audioUrl?: string;
-  bpm?: number;
-  genre?: string;
-}
+import type { BeatProduct as Beat } from "@shared/schema";
 
 interface ResponsiveBeatCardProps {
   beat: Beat;
@@ -26,15 +17,15 @@ interface ResponsiveBeatCardProps {
   productName?: string;
 }
 
-export function ResponsiveBeatCard({ 
-  beat, 
-  className = '',
+export function ResponsiveBeatCard({
+  beat,
+  className = "",
   productId,
-  productName 
+  productName,
 }: ResponsiveBeatCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  
+
   const isMobile = useIsMobile();
   const prefersReducedMotion = usePrefersReducedMotion();
 
@@ -47,7 +38,9 @@ export function ResponsiveBeatCard({
     <div
       className={cn(
         "group relative bg-[var(--dark-gray)] rounded-xl overflow-hidden border border-[var(--medium-gray)] transition-all duration-200",
-        !prefersReducedMotion && !isMobile && "hover:scale-105 hover:shadow-xl hover:border-[var(--accent-purple)]/50",
+        !prefersReducedMotion &&
+          !isMobile &&
+          "hover:scale-105 hover:shadow-xl hover:border-[var(--accent-purple)]/50",
         className
       )}
       onMouseEnter={() => !isMobile && setIsHovered(true)}
@@ -56,7 +49,7 @@ export function ResponsiveBeatCard({
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden">
         <img
-          src={beat.image || '/api/placeholder/400/400'}
+          src={beat.image || "/api/placeholder/400/400"}
           alt={beat.name}
           className={cn(
             "w-full h-full object-cover transition-transform duration-300",
@@ -64,9 +57,9 @@ export function ResponsiveBeatCard({
           )}
           loading="lazy"
         />
-        
+
         {/* Overlay */}
-        <div 
+        <div
           className={cn(
             "absolute inset-0 bg-black/40 transition-opacity duration-200",
             isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"
@@ -74,16 +67,16 @@ export function ResponsiveBeatCard({
         />
 
         {/* Audio Preview Overlay */}
-        <div 
+        <div
           className={cn(
             "absolute inset-0 flex items-center justify-center transition-opacity duration-200",
-            isMobile ? "opacity-100" : (isHovered ? "opacity-100" : "opacity-0")
+            isMobile ? "opacity-100" : isHovered ? "opacity-100" : "opacity-0"
           )}
         >
           <div className="w-full h-full flex items-center justify-center p-4">
             <div className="bg-black/80 backdrop-blur-sm rounded-lg p-4 w-full max-w-xs">
               <LazyWaveformAudioPlayer
-                src={beat.audioUrl || '/api/placeholder/audio.mp3'}
+                src={beat.audio_url || "/api/placeholder/audio.mp3"}
                 title={beat.name}
                 artist="BroLab"
                 showControls={false}
@@ -98,10 +91,7 @@ export function ResponsiveBeatCard({
         {/* Top badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-2">
           {beat.genre && (
-            <Badge 
-              variant="secondary" 
-              className="bg-black/70 text-white border-0 text-xs"
-            >
+            <Badge variant="secondary" className="bg-black/70 text-white border-0 text-xs">
               {beat.genre}
             </Badge>
           )}
@@ -117,11 +107,11 @@ export function ResponsiveBeatCard({
           )}
           aria-label={isLiked ? "Unlike beat" : "Like beat"}
         >
-          <Heart 
+          <Heart
             className={cn(
               "w-4 h-4 transition-colors",
               isLiked ? "text-red-500 fill-current" : "text-white"
-            )} 
+            )}
           />
         </button>
       </div>
@@ -134,7 +124,7 @@ export function ResponsiveBeatCard({
             {/* Title and BPM */}
             <div className="space-y-3">
               <h3 className="font-semibold text-white text-lg leading-tight line-clamp-2">
-                {beat.name}
+                {beat.title}
               </h3>
               <div className="flex items-center gap-4 text-sm text-gray-400">
                 {/* Removed BPM display to match WooCommerce-only content */}
@@ -149,10 +139,10 @@ export function ResponsiveBeatCard({
               <AddToCartButton
                 product={{
                   id: beat.id,
-                  title: beat.name,
-                  name: beat.name,
+                  title: beat.title,
+                  name: beat.title,
                   price: beat.price,
-                  image: beat.image
+                  image: beat.image || beat.image_url || undefined,
                 }}
                 size="sm"
                 className="px-3 ml-[6px] mr-[6px] pl-[12px] pr-[12px] pt-[0px] pb-[0px]"
@@ -164,8 +154,8 @@ export function ResponsiveBeatCard({
           <>
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-white text-lg leading-tight line-clamp-2">
-                  {beat.name}
+                <h3 className="font-semibold text-white text-white text-lg leading-tight line-clamp-2">
+                  {beat.title}
                 </h3>
                 <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
                   {beat.bpm && (
@@ -176,7 +166,7 @@ export function ResponsiveBeatCard({
                   )}
                 </div>
               </div>
-              
+
               <div className="text-right">
                 <div className="text-xl font-bold text-[var(--accent-purple)]">
                   ${(beat.price / 100).toFixed(2)}
@@ -185,7 +175,7 @@ export function ResponsiveBeatCard({
             </div>
 
             {/* License Quick Actions (show on hover) */}
-            <div 
+            <div
               className={cn(
                 "transition-all duration-200 overflow-hidden",
                 isHovered ? "max-h-20 opacity-100" : "max-h-0 opacity-0"
@@ -195,10 +185,10 @@ export function ResponsiveBeatCard({
                 <AddToCartButton
                   product={{
                     id: beat.id,
-                    title: beat.name,
-                    name: beat.name,
+                    title: beat.title,
+                    name: beat.title,
                     price: beat.price,
-                    image: beat.image
+                    image: beat.image || beat.image_url || undefined,
                   }}
                   size="sm"
                   className="flex-1 text-xs"

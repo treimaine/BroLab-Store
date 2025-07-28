@@ -1,13 +1,13 @@
-import { useState, useEffect, createContext, useContext } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 interface User {
-  id: string;
+  id: number;
   email: string;
   username: string;
   subscription?: {
-    tier: 'basic' | 'pro' | 'unlimited';
-    status: 'active' | 'inactive' | 'canceled';
+    tier: "basic" | "pro" | "unlimited";
+    status: "active" | "inactive" | "canceled";
     expiresAt: string;
   };
   meta?: {
@@ -39,13 +39,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/user');
+        const response = await fetch("/api/auth/user");
         if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
+          const data = await response.json();
+          setUser(data.user); // L'API retourne { user: { ... } }
         }
       } catch (error) {
-        console.error('Auth check failed:', error);
+        console.error("Auth check failed:", error);
       } finally {
         setIsLoading(false);
       }
@@ -55,25 +55,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: email, password })
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: email, password }),
     });
 
     if (response.ok) {
-      const userData = await response.json();
-      setUser(userData);
+      const data = await response.json();
+      setUser(data.user); // L'API retourne { user: { ... } }
     } else {
-      throw new Error('Login failed');
+      throw new Error("Login failed");
     }
   };
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch("/api/auth/logout", { method: "POST" });
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     } finally {
       setUser(null);
     }
@@ -89,7 +89,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isLoading,
     login,
     logout,
-    checkSubscription
+    checkSubscription,
   };
 
   return <AuthContext.Provider value={authValue}>{children}</AuthContext.Provider>;
@@ -98,7 +98,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

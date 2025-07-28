@@ -88,6 +88,7 @@ export const calculateCartTotal = (items: CartItem[]): number => {
 export interface Cart {
   items: CartItem[];
   total: number;
+  subtotal: number; // Alias pour total (compatibilité)
   itemCount: number;
 }
 
@@ -99,13 +100,15 @@ class CartManager {
     try {
       const stored = localStorage.getItem(CartManager.STORAGE_KEY);
       const items: CartItem[] = stored ? JSON.parse(stored) : [];
+      const total = calculateCartTotal(items);
       return {
         items,
-        total: calculateCartTotal(items),
+        total,
+        subtotal: total, // Alias pour compatibilité
         itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
       };
     } catch {
-      return { items: [], total: 0, itemCount: 0 };
+      return { items: [], total: 0, subtotal: 0, itemCount: 0 };
     }
   }
 
