@@ -129,6 +129,11 @@ WOOCOMMERCE_URL=https://brolabentertainment.com/wp-json/wc/v3
 WOOCOMMERCE_CONSUMER_KEY=your_production_key
 WOOCOMMERCE_CONSUMER_SECRET=your_production_secret
 
+# Supabase Storage
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
 # Payment Processing (Live Keys)
 STRIPE_SECRET_KEY=sk_live_your_stripe_secret_key
 VITE_STRIPE_PUBLIC_KEY=pk_live_your_stripe_public_key
@@ -136,6 +141,8 @@ VITE_PAYPAL_CLIENT_ID=your_live_paypal_client_id
 
 # Security
 SESSION_SECRET=your_very_strong_random_session_secret
+MAX_FILE_SIZE=52428800 # 50MB in bytes
+ALLOWED_FILE_TYPES=audio/*,image/*
 
 # Production Settings
 NODE_ENV=production
