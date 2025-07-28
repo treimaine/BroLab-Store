@@ -7,11 +7,17 @@ const router = express.Router();
 
 // Validation schema
 const serviceOrderSchema = z.object({
-  service_type: z.string().min(1),
-  details: z.string().min(1),
-  status: z.string().optional(),
-  addons: z.array(z.any()).optional(),
-  base_price: z.number().optional()
+  service_type: z.enum(['mixing', 'mastering', 'recording', 'custom_beat', 'consultation']),
+  details: z.object({
+    duration: z.number().optional(),
+    tracks: z.number().optional(),
+    format: z.enum(['wav', 'mp3', 'aiff']).optional(),
+    quality: z.enum(['standard', 'premium']).optional(),
+    rush: z.boolean().optional(),
+    notes: z.string().optional()
+  }),
+  status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']).optional(),
+  estimated_price: z.number().min(0).default(0)
 });
 
 // POST /api/service-orders : create a service order
@@ -42,4 +48,4 @@ router.get('/', isAuthenticated, async (req, res) => {
   }
 });
 
-export default router; 
+export default router;

@@ -1,4 +1,4 @@
-import type { ActivityLog, CartItem, Download, File, InsertFile, Order, ServiceOrder, ServiceOrderInput, User } from '../../shared/schema';
+import type { ActivityLog, CartItem, Download, File, InsertFile, Order, ServiceOrder, ServiceOrderInput, User, Reservation, InsertReservation, ReservationStatusEnum } from '../../shared/schema';
 import { supabaseAdmin } from './supabaseAdmin';
 
 // Get user by email
@@ -303,4 +303,66 @@ export async function listOrderItems(orderId: number): Promise<CartItem[]> {
     .eq('order_id', orderId);
   if (error) throw error;
   return data as CartItem[];
-} 
+}
+
+// Reservation helpers
+export async function createReservation(reservation: InsertReservation): Promise<Reservation> {
+  const { data, error } = await supabaseAdmin
+    .from('reservations')
+    .insert(reservation)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Reservation;
+}
+
+export async function getReservationById(id: string): Promise<Reservation | null> {
+  const { data, error } = await supabaseAdmin
+    .from('reservations')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
+  return data as Reservation | null;
+}
+
+export async function getUserReservations(userId: number): Promise<Reservation[]> {
+  const { data, error } = await supabaseAdmin
+    .from('reservations')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as Reservation[];
+}
+
+export async function updateReservationStatus(
+  id: string,
+  status: ReservationStatusEnum
+): Promise<Reservation> {
+  const { data, error } = await supabaseAdmin
+    .from('reservations')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Reservation;
+}
+
+export async function getReservationsByDateRange(
+  startDate: string,
+  endDate: string
+): Promise<Reservation[]> {
+  const { data, error } = await supabaseAdmin
+    .from('reservations')
+    .select('*')
+    .gte('preferred_date', startDate)
+    .lte('preferred_date', endDate)
+    .order('preferred_date', { ascending: true });
+  if (error) throw error;
+  return data as Reservation[];
+}

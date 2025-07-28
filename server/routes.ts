@@ -1,4 +1,12 @@
-import type { Express, Request as ExpressRequest } from "express";
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import Stripe from "stripe";
+import { registerAuthRoutes, setupAuth } from "./auth";
+import monitoring from "./lib/monitoring";
+import monitoringRoutes from "./routes/monitoring";
+import storageRouter from "./routes/storage";
+import subscriptionRouter from "./routes/subscription";
+import { registerWordPressRoutes } from "./wordpress";
 
 // Extend Express Request interface for authentication
 declare global {
@@ -9,34 +17,26 @@ declare global {
     }
   }
 }
-import { createServer, type Server } from "http";
-import { registerWordPressRoutes } from "./wordpress";
-import { setupAuth, registerAuthRoutes } from "./auth";
-import subscriptionRouter from "./routes/subscription";
-import storageRouter from "./routes/storage";
-import monitoringRoutes from "./routes/monitoring";
-import monitoring from "./lib/monitoring";
-import Stripe from "stripe";
 
 // Initialize Stripe (will be used for subscription handling)
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 // Import advanced payment features
-import { 
-  verifyApplePayDomain, 
-  getGooglePayConfig, 
-  createCryptoPaymentIntent,
-  savePaymentMethod,
-  getCustomerPaymentMethods 
-} from './payment-methods';
-import { calculateTax, getTaxInfo } from './tax-calculator';
 import { generateInvoice, getInvoice, sendReceipt } from './invoice-system';
-import { 
-  calculatePaymentPlan, 
-  createPaymentPlan, 
-  getPaymentPlanStatus, 
-  cancelPaymentPlan 
+import {
+  createCryptoPaymentIntent,
+  getCustomerPaymentMethods,
+  getGooglePayConfig,
+  savePaymentMethod,
+  verifyApplePayDomain
+} from './payment-methods';
+import {
+  calculatePaymentPlan,
+  cancelPaymentPlan,
+  createPaymentPlan,
+  getPaymentPlanStatus
 } from './payment-plans';
+import { calculateTax, getTaxInfo } from './tax-calculator';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication middleware
@@ -50,6 +50,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register subscription routes
   app.use('/api/subscription', subscriptionRouter);
+  
+  // Register wishlist routes
+  try {
+    const wishlistRouter = await import('./routes/wishlist');
+    app.use('/api/wishlist', wishlistRouter.default);
+    console.log('✅ Wishlist routes registered successfully');
+  } catch (error) {
+    console.warn('Wishlist router not available:', error);
+  }
+
+  // Register PayPal routes
+  try {
+    const paypalRouter = await import('./routes/paypal');
+    app.use('/api/payment/paypal', paypalRouter.default);
+    console.log('✅ PayPal routes registered successfully');
+  } catch (error) {
+    console.warn('PayPal router not available:', error);
+  }
   
   // Register downloads routes - PATCH: Fix downloads endpoint routing
   try {
@@ -74,6 +92,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.use('/api/security', securityRouter.default);
   } catch (error) {
     console.warn('Security router not available:', error);
+  }
+
+  // Register uploads routes
+  try {
+    const uploadsRouter = await import('./routes/uploads');
+    app.use('/api/uploads', uploadsRouter.default);
+    console.log('✅ Uploads routes registered successfully');
+  } catch (error) {
+    console.warn('Uploads router not available:', error);
   }
 
   // Stripe payment endpoints

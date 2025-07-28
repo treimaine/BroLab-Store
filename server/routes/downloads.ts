@@ -1,217 +1,280 @@
-// BroLab Entertainment - Downloads Management with Quota Enforcement
-// Generated: January 23, 2025
-// Purpose: Secure download management with license-based quotas
+import express from 'express';
+import { Parser } from 'json2csv';
+import { insertDownloadSchema } from '../../shared/schema';
+import { getCurrentUser, isAuthenticated } from '../auth';
+import { listDownloads, logActivity, logDownload } from '../lib/db';
+import { checkDownloadQuota } from '../lib/rlsSecurity';
+import { supabaseAdmin } from '../lib/supabaseAdmin';
+import { createValidationMiddleware } from '../lib/validation';
 
-import { Router } from "express";
-import { isAuthenticated } from "../auth";
-import { checkDownloadQuota } from "../lib/rlsSecurity";
-import { storage } from "../storage";
+const router = express.Router();
 
-const router = Router();
-
-// Get user downloads history
-router.get("/", isAuthenticated, async (req, res) => {
+// POST /api/downloads - Log a download
+router.post('/', isAuthenticated, createValidationMiddleware(insertDownloadSchema), async (req, res) => {
   try {
-    const userId = req.session?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Get user downloads from storage
-    const downloads = await storage.getUserDownloads(userId);
-    
-    res.json({
-      success: true,
-      downloads: downloads || [],
-      count: downloads?.length || 0
-    });
-    
-  } catch (error: any) {
-    console.error("Get downloads error:", error);
-    res.status(500).json({
-      error: "Failed to retrieve downloads",
-      message: error.message
-    });
-  }
-});
+    const { productId, license } = req.body;
 
-// Download a beat with quota enforcement
-router.post("/", isAuthenticated, async (req, res) => {
-  try {
-    const userId = req.session?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
-    }
-
-    const { productId, license: licenseType } = req.body;
-    if (!productId || !licenseType) {
-      return res.status(400).json({ 
-        error: "Missing required fields",
-        required: ["productId", "license"]
-      });
-    }
-
-    const beatId = parseInt(productId.toString());
-
-    // Check if user has quota for this license type
-    const hasQuota = await checkDownloadQuota(userId, licenseType);
-    
+    // Check download quota
+    const hasQuota = await checkDownloadQuota(user.id, license);
     if (!hasQuota) {
-      const quotaLimits = {
-        basic: 10,
-        premium: 25,
-        unlimited: 999999
-      };
-      
-      return res.status(403).json({
-        error: "Download quota exceeded",
-        message: `You have reached the download limit for ${licenseType} license (${quotaLimits[licenseType as keyof typeof quotaLimits]} downloads)`,
-        licenseType,
-        quotaLimit: quotaLimits[licenseType as keyof typeof quotaLimits]
-      });
+      return res.status(403).json({ error: 'Download quota exceeded for this license type' });
     }
 
-    // Get beat information
-    const beat = await storage.getBeat(beatId);
-    if (!beat) {
-      return res.status(404).json({ error: "Beat not found" });
-    }
+    // Log the download
+    const download = await logDownload({
+      userId: user.id,
+      productId,
+      license
+    });
 
-    // Record the download
-    const download = await storage.logDownload({
-      userId,
-      beatId,
-      licenseType,
-      downloadUrl: beat.audio_url || '',
-      timestamp: new Date().toISOString()
+    // Log activity
+    await logActivity({
+      user_id: user.id,
+      event_type: 'download',
+      details: {
+        product_id: productId,
+        license,
+        download_count: download.download_count || 1
+      },
+      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString()
     });
 
     res.status(201).json({
       success: true,
-      message: "Download recorded successfully",
       download: {
         id: download.id,
-        beatTitle: beat.title,
-        licenseType,
-        downloadUrl: beat.audio_url,
-        timestamp: download.timestamp
+        licenseType: download.license,
+        download_count: download.download_count
       }
     });
-
   } catch (error: any) {
-    console.error("Download beat error:", error);
-    res.status(500).json({
-      error: "Download failed",
-      message: error.message
-    });
+    console.error('Download error:', error);
+    
+    // Handle specific error cases
+    if (error.message?.includes('not found')) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Get download quota status for user
-router.get("/quota", isAuthenticated, async (req, res) => {
+// GET /api/downloads - List user downloads
+router.get('/', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.session?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Get download counts by license type
-    const downloads = await storage.getUserDownloads(userId);
+    const downloads = await listDownloads(user.id);
     
-    const quotaStatus = {
-      basic: {
-        used: downloads?.filter((d: any) => d.licenseType === 'basic').length || 0,
-        limit: 10,
-        remaining: 0
-      },
-      premium: {
-        used: downloads?.filter((d: any) => d.licenseType === 'premium').length || 0,
-        limit: 25,
-        remaining: 0
-      },
-      unlimited: {
-        used: downloads?.filter((d: any) => d.licenseType === 'unlimited').length || 0,
-        limit: 999999,
-        remaining: 999999
-      }
-    };
-
-    // Calculate remaining
-    quotaStatus.basic.remaining = Math.max(0, quotaStatus.basic.limit - quotaStatus.basic.used);
-    quotaStatus.premium.remaining = Math.max(0, quotaStatus.premium.limit - quotaStatus.premium.used);
-
     res.json({
-      success: true,
-      quotaStatus,
-      totalDownloads: downloads?.length || 0
+      downloads: downloads.map(download => ({
+        id: download.id,
+        product_id: download.product_id,
+        license: download.license,
+        downloaded_at: download.downloaded_at,
+        download_count: download.download_count
+      }))
     });
-
   } catch (error: any) {
-    console.error("Get quota status error:", error);
-    res.status(500).json({
-      error: "Failed to get quota status",
-      message: error.message
-    });
+    console.error('List downloads error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Export downloads as CSV
-router.get("/export", isAuthenticated, async (req, res) => {
+// GET /api/downloads/export - Export downloads as CSV
+router.get('/export', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.session?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Get user downloads from storage
-    const downloads = await storage.getUserDownloads(userId);
+    const downloads = await listDownloads(user.id);
     
-    // Create CSV headers
-    const csvHeaders = '"product_id","license","downloaded_at","download_count"';
+    // Prepare CSV data
+    const csvData = downloads.map(download => ({
+      product_id: download.product_id,
+      license: download.license,
+      downloaded_at: download.downloaded_at,
+      download_count: download.download_count || 1
+    }));
+
+    // Generate CSV
+    const parser = new Parser({
+      fields: ['product_id', 'license', 'downloaded_at', 'download_count'],
+      header: true
+    });
     
-    // Create CSV rows
-    const csvRows = downloads?.map((download: any, index: number) => {
-      return `"${download.beatId || 'N/A'}","${download.licenseType || 'N/A'}","${download.timestamp || 'N/A'}","${index + 1}"`;
-    }).join('\n') || '';
-    
-    const csvContent = csvHeaders + '\n' + csvRows;
-    
+    const csv = parser.parse(csvData);
+
+    // Set headers for CSV download
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="downloads.csv"');
-    res.send(csvContent);
     
+    res.send(csv);
   } catch (error: any) {
-    console.error("Export downloads error:", error);
-    res.status(500).json({
-      error: "Failed to export downloads",
-      message: error.message
-    });
+    console.error('Export downloads error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Reset download quota (admin only - for testing)
-router.post("/admin/reset-quota/:userId", async (req, res) => {
+// Get download status for a user
+router.get('/status', isAuthenticated, async (req, res) => {
   try {
-    const userId = parseInt(req.params.userId);
-    
-    // In a real implementation, this would check admin permissions
-    if (process.env.NODE_ENV !== 'development') {
-      return res.status(403).json({ error: "Admin access required" });
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // This would reset download records for the user
-    res.json({
-      success: true,
-      message: `Download quota reset for user ${userId}`,
-      note: "This is a development-only endpoint"
-    });
+    const { data: downloads, error } = await supabaseAdmin
+      .from('downloads')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('downloaded_at', { ascending: false });
 
+    if (error) {
+      console.error('Error fetching downloads:', error);
+      return res.status(500).json({ error: 'Failed to fetch downloads' });
+    }
+
+    res.json(downloads || []);
   } catch (error: any) {
-    console.error("Reset quota error:", error);
-    res.status(500).json({
-      error: "Failed to reset quota",
-      message: error.message
+    console.error('Downloads status error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get download URL for a specific beat
+router.get('/beat/:beatId', isAuthenticated, async (req, res) => {
+  try {
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const beatId = parseInt(req.params.beatId);
+    if (isNaN(beatId)) {
+      return res.status(400).json({ error: 'Valid beat ID is required' });
+    }
+
+    // Vérifier si l'utilisateur a accès au beat
+    // TODO: Implémenter la logique de vérification d'accès selon l'abonnement
+
+    // Simuler l'URL de téléchargement
+    const downloadUrl = `https://brolabentertainment.com/downloads/beat_${beatId}.mp3`;
+    
+    // Enregistrer le téléchargement
+    const { error: downloadError } = await supabaseAdmin
+      .from('downloads')
+      .insert({
+        user_id: user.id,
+        product_id: beatId,
+        license: 'standard',
+        download_count: 1
+      });
+
+    if (downloadError) {
+      console.error('Error recording download:', downloadError);
+    }
+
+    res.json({
+      downloadUrl,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h
+      license: 'standard'
     });
+  } catch (error: any) {
+    console.error('Download beat error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get download history for a user
+router.get('/history', isAuthenticated, async (req, res) => {
+  try {
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { data: history, error } = await supabaseAdmin
+      .from('downloads')
+      .select(`
+        *,
+        beats:product_id (
+          title,
+          genre,
+          bpm
+        )
+      `)
+      .eq('user_id', user.id)
+      .order('downloaded_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('Error fetching download history:', error);
+      return res.status(500).json({ error: 'Failed to fetch download history' });
+    }
+
+    res.json(history || []);
+  } catch (error: any) {
+    console.error('Download history error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get download statistics
+router.get('/stats', isAuthenticated, async (req, res) => {
+  try {
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Statistiques de téléchargement
+    const { data: downloads, error } = await supabaseAdmin
+      .from('downloads')
+      .select('*')
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error fetching download stats:', error);
+      return res.status(500).json({ error: 'Failed to fetch download stats' });
+    }
+
+    const stats = {
+      totalDownloads: downloads?.length || 0,
+      thisMonth: downloads?.filter(d => {
+        const downloadDate = new Date(d.downloaded_at);
+        const now = new Date();
+        return downloadDate.getMonth() === now.getMonth() && 
+               downloadDate.getFullYear() === now.getFullYear();
+      }).length || 0,
+      thisWeek: downloads?.filter(d => {
+        const downloadDate = new Date(d.downloaded_at);
+        const now = new Date();
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return downloadDate >= weekAgo;
+      }).length || 0,
+      today: downloads?.filter(d => {
+        const downloadDate = new Date(d.downloaded_at);
+        const now = new Date();
+        return downloadDate.toDateString() === now.toDateString();
+      }).length || 0
+    };
+
+    res.json(stats);
+  } catch (error: any) {
+    console.error('Download stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

@@ -1,12 +1,29 @@
 import { z } from 'zod';
+import { Request, Response, NextFunction } from 'express';
 import { insertFileSchema, insertServiceOrderSchema } from '../../shared/schema';
+
+// Extend Express Request type to include validatedData
+declare global {
+  namespace Express {
+    interface Request {
+      validatedData: z.infer<z.ZodSchema>;
+    }
+  }
+}
+
+// Type-safe validation middleware
+export type ValidationMiddleware<T extends z.ZodSchema> = (
+  req: Request & { validatedData: z.infer<T> },
+  res: Response,
+  next: NextFunction
+) => Promise<void | Response>;
 
 // File validation schemas
 export const fileUploadValidation = insertFileSchema.extend({
   // Additional server-side validation
   storage_path: z.string().min(1, 'Storage path is required'),
   mime_type: z.string().regex(/^[a-z]+\/[a-z0-9\-\+\.]+$/, 'Invalid MIME type format'),
-  size_bytes: z.number().min(1, 'File size must be greater than 0').max(50 * 1024 * 1024, 'File size cannot exceed 50MB'),
+  size: z.number().min(1, 'File size must be greater than 0').max(50 * 1024 * 1024, 'File size cannot exceed 50MB'),
   role: z.enum(['upload', 'deliverable', 'invoice'], {
     errorMap: () => ({ message: 'Role must be upload, deliverable, or invoice' })
   })
@@ -22,21 +39,19 @@ export const fileFilterValidation = z.object({
 // Service order validation
 export const serviceOrderValidation = insertServiceOrderSchema.extend({
   // Enhanced validation rules
-  service_type: z.enum(['mixing', 'mastering', 'recording', 'consultation', 'custom'], {
+  service_type: z.enum(['mixing', 'mastering', 'recording', 'consultation', 'custom_beat'], {
     errorMap: () => ({ message: 'Invalid service type' })
   }),
   details: z.object({
     duration: z.number().min(1, 'Duration must be at least 1 minute').optional(),
     tracks: z.number().min(1, 'At least 1 track required').max(100, 'Maximum 100 tracks allowed').optional(),
-    format: z.enum(['mp3', 'wav', 'aiff', 'flac']).optional(),
-    quality: z.enum(['standard', 'premium', 'professional']).optional(),
+    format: z.enum(['wav', 'mp3', 'aiff']).optional(),
+    quality: z.enum(['standard', 'premium']).optional(),
     rush: z.boolean().optional(),
     notes: z.string().max(2000, 'Notes cannot exceed 2000 characters').optional()
   }).optional(),
   estimated_price: z.number().min(0, 'Price cannot be negative').max(10000, 'Price cannot exceed $10,000'),
-  status: z.enum(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'], {
-    errorMap: () => ({ message: 'Invalid status' })
-  })
+  status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']).optional()
 });
 
 // User input sanitization
@@ -115,10 +130,16 @@ export const formatValidationError = (error: z.ZodError): { field: string; messa
 };
 
 // Comprehensive validation middleware factory
-export const createValidationMiddleware = (schema: z.ZodSchema) => {
-  return (req: any, res: any, next: any) => {
+export const createValidationMiddleware = <T extends z.ZodSchema>(schema: T): ValidationMiddleware<T> => {
+  return async (req: Request & { validatedData: z.infer<T> }, res: Response, next: NextFunction) => {
     try {
-      const validatedData = schema.parse(req.body);
+      let dataToValidate: any;
+      if (req.method === 'GET') {
+        dataToValidate = req.query;
+      } else {
+        dataToValidate = req.body;
+      }
+      const validatedData = schema.parse(dataToValidate);
       req.validatedData = validatedData;
       next();
     } catch (error) {

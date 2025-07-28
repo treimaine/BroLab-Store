@@ -15,6 +15,17 @@ export const LicensePricing = {
   unlimited: 149.99,
 } as const;
 
+export const OrderStatus = [
+  "pending",
+  "processing",
+  "paid",
+  "completed",
+  "failed",
+  "refunded",
+  "cancelled"
+] as const;
+export type OrderStatusEnum = typeof OrderStatus[number];
+
 //
 // ==========================
 // USER
@@ -82,29 +93,68 @@ export type InsertPasswordReset = z.infer<typeof insertPasswordResetSchema>;
 
 //
 // ==========================
+// EMAIL VALIDATION
+// ==========================
+//
+
+export const verifyEmailSchema = z.object({
+  token: z.string().uuid('Format de token invalide')
+});
+
+export const resendVerificationSchema = z.object({
+  email: z.string().email('Format d\'email invalide')
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Format d\'email invalide')
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().uuid('Format de token invalide'),
+  password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères')
+});
+
+//
+// ==========================
 // BEAT
 // ==========================
 //
 
-export type Beat = {
+// Type unifié pour les produits beats (fusion Beat + ProductLike)
+export type BeatProduct = {
   id: number;
-  wordpress_id: number;
+  wordpress_id?: number;
   title: string;
+  name?: string; // Alias pour title (compatibilité WooCommerce)
   description?: string | null;
   genre: string;
-  bpm: number;
+  bpm?: number;
   key?: string | null;
   mood?: string | null;
   price: number;
   audio_url?: string | null;
   image_url?: string | null;
+  image?: string; // Alias pour image_url (compatibilité WooCommerce)
   tags?: string[] | null;
   featured?: boolean;
   downloads?: number;
   views?: number;
   duration?: number;
   is_active?: boolean;
-  created_at: string;
+  isExclusive?: boolean; // Pour les règles d'accès
+  created_at?: string;
+};
+
+// Type legacy Beat (maintenu pour compatibilité)
+export type Beat = BeatProduct;
+
+// Type ProductLike unifié (pour compatibilité avec accessControl)
+export type ProductLike = {
+  id: number;
+  title: string;
+  price: number;
+  image?: string;
+  isExclusive?: boolean;
 };
 
 export const insertBeatSchema = z.object({
@@ -126,6 +176,25 @@ export const insertBeatSchema = z.object({
   is_active: z.boolean().optional(),
 });
 export type InsertBeat = z.infer<typeof insertBeatSchema>;
+
+//
+// ==========================
+// WISHLIST
+// ==========================
+//
+
+export type WishlistItem = {
+  id: number;
+  user_id: number;
+  beat_id: number;
+  created_at: string;
+};
+
+export const insertWishlistItemSchema = z.object({
+  user_id: z.number(),
+  beat_id: z.number(),
+});
+export type InsertWishlistItem = z.infer<typeof insertWishlistItemSchema>;
 
 //
 // ==========================
@@ -167,12 +236,13 @@ export type Order = {
   session_id?: string | null;
   email: string;
   total: number;
-  status: string;
+  status: OrderStatusEnum;
   stripe_payment_intent_id?: string | null;
-  items: any; // JSONB côté Supabase
+  items: CartItem[]; // Typed array of CartItem
   created_at: string;
   invoice_number?: string;
   invoice_pdf_url?: string;
+  shipping_address?: string | null;
 };
 
 export const insertOrderSchema = z.object({
@@ -180,11 +250,32 @@ export const insertOrderSchema = z.object({
   session_id: z.string().optional().nullable(),
   email: z.string().email(),
   total: z.number(),
-  status: z.string(),
+  status: z.enum(OrderStatus),
   stripe_payment_intent_id: z.string().optional().nullable(),
   items: z.any(),
 });
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
+
+//
+// ==========================
+// ORDER STATUS HISTORY
+// ==========================
+//
+
+export type OrderStatusHistory = {
+  id: number;
+  order_id: number;
+  status: OrderStatusEnum;
+  comment?: string | null;
+  created_at: string;
+};
+
+export const insertOrderStatusHistorySchema = z.object({
+  order_id: z.number(),
+  status: z.enum(OrderStatus),
+  comment: z.string().optional().nullable(),
+});
+export type InsertOrderStatusHistory = z.infer<typeof insertOrderStatusHistorySchema>;
 
 //
 // ==========================
@@ -224,145 +315,160 @@ export interface Download {
   product_id: number;
   license: string;
   downloaded_at: string; // ISO timestamp
-  download_count: number;
+  download_count?: number; // Nombre de téléchargements pour ce produit/license
 }
 
 export const insertDownloadSchema = z.object({
-  user_id: z.number(),
-  beat_id: z.number(),
-  downloaded_at: z.string(),
+  productId: z.number().positive('Product ID must be a positive number'),
+  license: z.enum(LicenseType, { errorMap: () => ({ message: 'License must be basic, premium, or unlimited' }) })
 });
 export type InsertDownload = z.infer<typeof insertDownloadSchema>;
 
 //
 // ==========================
-// SERVICE ORDER
+// ACTIVITY LOG
 // ==========================
 //
 
-export interface ServiceOrderInput {
+export type ActivityLog = {
+  id: number;
   user_id: number;
-  service_type: string;   // 'mixing' | 'mastering' | 'custom_beat' | ...
-  details: string;
-  status?: string;        // 'pending' | 'in_progress' | 'delivered' | 'revision' | 'completed'
-  addons?: any[];         // optional JSON array
-  base_price?: number;
-}
+  event_type: string;
+  details?: any;
+  timestamp: string;
+  created_at: string;
+};
 
-export interface ServiceOrder extends ServiceOrderInput {
-  id: string;             // uuid
-  created_at: string;     // ISO timestamp
-  updated_at?: string;
-}
-
-export const insertServiceOrderSchema = z.object({
+export const insertActivityLogSchema = z.object({
   user_id: z.number(),
-  service_type: z.string(),
-  details: z.any(),
-  status: z.string(),
+  event_type: z.string(),
+  details: z.any().optional(),
+  timestamp: z.string().optional(),
 });
-export type InsertServiceOrder = z.infer<typeof insertServiceOrderSchema>;
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 
 //
 // ==========================
-// FILES
+// FILE MANAGEMENT
 // ==========================
 //
 
 export type File = {
-  id: string; // uuid
-  owner_id: number;
-  reservation_id?: string | null; // uuid reference
-  order_id?: number | null;
+  id: string;
+  user_id: number;
+  filename: string;
+  original_name: string;
+  mime_type: string;
+  size: number;
   storage_path: string;
-  mime_type?: string | null;
-  size_bytes?: number | null;
-  role: "upload" | "deliverable" | "invoice";
+  role: 'upload' | 'deliverable' | 'invoice';
+  reservation_id?: string | null;
+  order_id?: number | null;
+  owner_id?: number | null;
   created_at: string;
 };
 
 export const insertFileSchema = z.object({
-  owner_id: z.number(),
-  reservation_id: z.string().uuid().optional().nullable(),
-  order_id: z.number().optional().nullable(),
+  user_id: z.number(),
+  filename: z.string(),
+  original_name: z.string(),
+  mime_type: z.string(),
+  size: z.number(),
   storage_path: z.string(),
-  mime_type: z.string().optional().nullable(),
-  size_bytes: z.number().optional().nullable(),
-  role: z.enum(["upload", "deliverable", "invoice"]),
+  role: z.enum(['upload', 'deliverable', 'invoice']),
+  reservation_id: z.string().optional().nullable(),
+  order_id: z.number().optional().nullable(),
+  owner_id: z.number().optional().nullable(),
 });
 export type InsertFile = z.infer<typeof insertFileSchema>;
 
 //
 // ==========================
-// RATE LIMITS
+// SERVICE ORDERS
 // ==========================
 //
 
-export type RateLimit = {
-  id: string; // uuid
+export const ServiceType = ['mixing', 'mastering', 'recording', 'custom_beat', 'consultation'] as const;
+export type ServiceTypeEnum = typeof ServiceType[number];
+
+export type ServiceOrder = {
+  id: number;
   user_id: number;
-  action: string;
-  request_count: number;
-  window_start: string;
+  service_type: ServiceTypeEnum;
+  details: {
+    duration?: number;
+    tracks?: number;
+    format?: 'wav' | 'mp3' | 'aiff';
+    quality?: 'standard' | 'premium';
+    rush?: boolean;
+    notes?: string;
+  };
+  estimated_price: number;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   created_at: string;
   updated_at: string;
 };
 
-export const insertRateLimitSchema = z.object({
+export const insertServiceOrderSchema = z.object({
   user_id: z.number(),
-  action: z.string(),
-  request_count: z.number().default(1),
-  window_start: z.string(),
+  service_type: z.enum(ServiceType),
+  details: z.object({
+    duration: z.number().optional(),
+    tracks: z.number().optional(),
+    format: z.enum(['wav', 'mp3', 'aiff']).optional(),
+    quality: z.enum(['standard', 'premium']).optional(),
+    rush: z.boolean().optional(),
+    notes: z.string().optional(),
+  }),
+  estimated_price: z.number().min(0),
+  status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']).optional(),
 });
-export type InsertRateLimit = z.infer<typeof insertRateLimitSchema>;
+export type InsertServiceOrder = z.infer<typeof insertServiceOrderSchema>;
+export type ServiceOrderInput = InsertServiceOrder;
 
 //
 // ==========================
-// HELPERS
+// RESERVATIONS
 // ==========================
 //
 
-export const convertPriceForCurrency = (usdPrice: number, exchangeRate: number): number => {
-  return Math.round(usdPrice * exchangeRate * 100) / 100;
+export const ReservationStatus = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'] as const;
+export type ReservationStatusEnum = typeof ReservationStatus[number];
+
+export type Reservation = {
+  id: string; // UUID
+  user_id?: number | null;
+  service_type: ServiceTypeEnum;
+  status: ReservationStatusEnum;
+  details: {
+    name: string;
+    email: string;
+    phone: string;
+    requirements?: string;
+    reference_links?: string[];
+  };
+  preferred_date: string; // ISO date string
+  duration_minutes: number;
+  total_price: number;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
-export const formatPriceWithCurrency = (
-  usdPrice: number,
-  exchangeRate: number,
-  currencySymbol: string
-): string => {
-  const convertedPrice = convertPriceForCurrency(usdPrice, exchangeRate);
-  return `${currencySymbol}${convertedPrice.toFixed(2)}`;
-};
-
-export interface ActivityLog {
-  id: string;
-  user_id: number;
-  product_id: number;
-  license: string;
-  event_type: string; // "download"
-  timestamp: string; // ISO
-  download_count?: number;
-}
-
-//
-// ==========================
-// COMMON / UTIL
-// ==========================
-//
-
-export type UUID = string; // ou brandé si tu veux: type UUID = string & { __uuid: true };
-export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
-
-//
-// ==========================
-// BEAT / USER (déjà présents normalement) – on crée surtout les variantes DB/Insert
-// ==========================
-//
-
-/** Ligne telle qu’elle sort de Supabase (identique à Beat ici, mais tu peux diverger si besoin) */
-//export type DbBeat = Beat;
-
-/** Quand on insère un beat (on ne connaît pas id/created_at) */
-//export type InsertBeat = Omit<Beat, 'id' | 'created_at'> & Partial<Pick<Beat, 'id' | 'created_at'>>;
+export const insertReservationSchema = z.object({
+  user_id: z.number().optional().nullable(),
+  service_type: z.enum(ServiceType),
+  details: z.object({
+    name: z.string().min(1, 'Name is required'),
+    email: z.string().email('Invalid email format'),
+    phone: z.string().min(10, 'Invalid phone number'),
+    requirements: z.string().optional(),
+    reference_links: z.array(z.string().url()).optional()
+  }),
+  preferred_date: z.string().datetime(),
+  duration_minutes: z.number().min(30).max(480),
+  total_price: z.number().min(0),
+  notes: z.string().optional().nullable()
+});
+export type InsertReservation = z.infer<typeof insertReservationSchema>;
 

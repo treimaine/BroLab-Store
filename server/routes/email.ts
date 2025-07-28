@@ -1,10 +1,11 @@
 import { Router } from "express";
-import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcrypt";
 import { sendMail } from "../services/mail";
 import { emailTemplates } from "../templates/emails";
 import { storage } from "../storage";
+import { createValidationMiddleware as validateRequest } from '../lib/validation';
+import { verifyEmailSchema, resendVerificationSchema, forgotPasswordSchema, resetPasswordSchema } from '../../shared/schema';
 
 const router = Router();
 
@@ -30,28 +31,10 @@ const checkRateLimit = (email: string): boolean => {
   return true;
 };
 
-// Validation schemas
-const verifyEmailSchema = z.object({
-  token: z.string().uuid(),
-});
-
-const resendVerificationSchema = z.object({
-  email: z.string().email(),
-});
-
-const forgotPasswordSchema = z.object({
-  email: z.string().email(),
-});
-
-const resetPasswordSchema = z.object({
-  token: z.string().uuid(),
-  password: z.string().min(6),
-});
-
 // POST /api/email/verify-email - Verify email with token
-router.get("/verify-email", async (req, res) => {
+router.get("/verify-email", validateRequest(verifyEmailSchema), async (req, res) => {
   try {
-    const { token } = verifyEmailSchema.parse(req.query);
+    const { token } = req.validatedData;
     
     // Find verification token in database
     // TODO: Implement database lookup for email_verifications table
@@ -85,9 +68,9 @@ router.get("/verify-email", async (req, res) => {
 });
 
 // POST /api/email/resend-verification - Resend verification email
-router.post("/resend-verification", async (req, res) => {
+router.post("/resend-verification", validateRequest(resendVerificationSchema), async (req, res) => {
   try {
-    const { email } = resendVerificationSchema.parse(req.body);
+    const { email } = req.validatedData;
     
     // Check rate limit
     if (!checkRateLimit(email)) {
@@ -138,9 +121,9 @@ router.post("/resend-verification", async (req, res) => {
 });
 
 // POST /api/email/forgot-password - Send password reset email
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", validateRequest(forgotPasswordSchema), async (req, res) => {
   try {
-    const { email } = forgotPasswordSchema.parse(req.body);
+    const { email } = req.validatedData;
     
     // Find user by email
     const user = await storage.getUserByEmail(email);
@@ -184,9 +167,9 @@ router.post("/forgot-password", async (req, res) => {
 });
 
 // POST /api/email/reset-password - Reset password with token
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", validateRequest(resetPasswordSchema), async (req, res) => {
   try {
-    const { token, password } = resetPasswordSchema.parse(req.body);
+    const { token, password } = req.validatedData;
     
     // TODO: Find and validate reset token in database
     // Mock implementation for now
