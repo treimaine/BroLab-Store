@@ -6,11 +6,13 @@ This guide covers setting up the BroLab beats marketplace for local development 
 ## Project Architecture Summary
 - **Frontend**: React 18 + TypeScript + Vite
 - **Backend**: Node.js + Express
-- **Database**: PostgreSQL (Neon for production, local PostgreSQL for development)
+- **Database**: PostgreSQL (Supabase for production and development)
 - **Styling**: Tailwind CSS + shadcn/ui components
 - **State Management**: Zustand + TanStack Query
 - **Payment**: Stripe + PayPal integration
 - **CMS Integration**: WordPress/WooCommerce REST API
+- **File Management**: Supabase Storage with security scanning
+- **Security**: Row-Level Security (RLS) with comprehensive validation
 
 ## 🚀 Local Development Setup
 
@@ -79,12 +81,12 @@ SESSION_SECRET=your_64_character_hex_session_secret_here
 # Database Configuration (choose one option)
 # Option 1: Supabase (recommended)
 DATABASE_URL=postgresql://postgres:password@db.your-project.supabase.co:5432/postgres
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # Option 2: Local PostgreSQL
 # DATABASE_URL=postgresql://brolab_user:brolab_password@localhost:5432/brolab_beats_dev
-
-# Option 3: Neon (production)
-# DATABASE_URL=postgresql://neondb_owner:password@host.neon.tech/neondb?sslmode=require
 
 # WordPress/WooCommerce API
 WORDPRESS_API_URL=https://brolabentertainment.com/wp-json/wp/v2
@@ -95,9 +97,17 @@ WOOCOMMERCE_CONSUMER_SECRET=your_consumer_secret
 # Stripe (Test Keys)
 STRIPE_SECRET_KEY=sk_test_your_test_key
 VITE_STRIPE_PUBLIC_KEY=pk_test_your_test_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
 
 # PayPal
 VITE_PAYPAL_CLIENT_ID=your_paypal_client_id
+
+# Email Configuration
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+DEFAULT_FROM=BroLab <contact@brolabentertainment.com>
 
 # Development Settings
 NODE_ENV=development
@@ -138,6 +148,10 @@ brolab-beats/
 ├── server/                # Express backend
 │   ├── routes.ts          # API routes
 │   ├── storage.ts         # Database operations
+│   ├── lib/               # Core libraries
+│   │   ├── supabase.ts    # Supabase client configuration
+│   │   ├── rlsSecurity.ts # Row-Level Security management
+│   │   └── validation.ts  # Input validation schemas
 │   └── wordpress.ts       # WooCommerce integration
 ├── shared/                # Shared TypeScript types
 │   └── schema.ts          # Database schema
@@ -151,13 +165,15 @@ brolab-beats/
 npm run db:push            # Push schema changes to database
 npm run db:studio          # Open Drizzle Studio (database GUI)
 npm run db:generate        # Generate migration files
-npm run db:migrate         # Run database migrations
 
 # Development
 npm run dev                # Start unified development server (port 5000)
 npm run build              # Build for production
 npm run start              # Start production server
 npm run check              # TypeScript type checking
+npm run test               # Run test suite
+npm run lint               # Lint code
+npm run format             # Format code
 
 # Local Development Utilities
 npm run setup              # Full setup (install dependencies + sync database)
@@ -240,6 +256,11 @@ Create `.env` file in production with:
 # Production Database
 DATABASE_URL="postgresql://username_brolab_user:password@localhost:5432/username_brolab_beats"
 
+# Supabase Configuration (if using Supabase)
+SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_ANON_KEY="your_anon_key"
+SUPABASE_SERVICE_ROLE_KEY="your_service_role_key"
+
 # WordPress/WooCommerce (Production URLs)
 WORDPRESS_URL="https://brolabentertainment.com/wp-json/wp/v2"
 WOOCOMMERCE_URL="https://brolabentertainment.com/wp-json/wc/v3"
@@ -249,9 +270,17 @@ WOOCOMMERCE_CONSUMER_SECRET="your_production_consumer_secret"
 # Stripe (Live Keys)
 STRIPE_SECRET_KEY="sk_live_your_live_key"
 VITE_STRIPE_PUBLIC_KEY="pk_live_your_live_key"
+STRIPE_WEBHOOK_SECRET="whsec_your_live_webhook_secret"
 
 # PayPal (Live)
 VITE_PAYPAL_CLIENT_ID="your_live_paypal_client_id"
+
+# Email Configuration
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="your_production_email@gmail.com"
+SMTP_PASS="your_production_app_password"
+DEFAULT_FROM="BroLab <contact@brolabentertainment.com>"
 
 # Production Settings
 NODE_ENV="production"
@@ -374,12 +403,15 @@ npm run db:push  # Push schema changes
 - Use strong passwords
 - Limit database user permissions
 - Regular security updates
+- **Row-Level Security (RLS)**: Implement database-level access control
 
 ### Application Security
 - Keep dependencies updated: `npm audit`
 - Use HTTPS in production
 - Implement rate limiting
 - Validate all user inputs
+- **File Upload Security**: Antivirus scanning and validation
+- **Download Quota Enforcement**: License-based limits
 
 ## 📱 Testing Strategy
 
@@ -389,7 +421,7 @@ npm run db:push  # Push schema changes
 npm test
 
 # Type checking
-npm run type-check
+npm run check
 
 # Build verification
 npm run build && npm run start
@@ -403,6 +435,9 @@ npm run build && npm run start
 - [ ] SSL certificate active
 - [ ] Domain configuration correct
 - [ ] Performance acceptable
+- [ ] File upload system functional
+- [ ] Download quota system working
+- [ ] Email system operational
 
 ## 🆘 Troubleshooting Common Issues
 
@@ -438,6 +473,7 @@ echo $DATABASE_URL
 2. **Get Connection String**: Settings > Database > Connection string
 3. **Schema Management**: Use Drizzle to manage schema with `npm run db:push`
 4. **GUI Access**: Use Supabase dashboard or `npm run db:studio` for local management
+5. **Row-Level Security**: Configure RLS policies for data protection
 
 ### Docker Development (Optional)
 ```bash
@@ -480,3 +516,15 @@ chmod +x scripts/setup-local-complete.sh
 - `scripts/setup-local-complete.sh` - Automated setup script for local development
 
 This guide provides a comprehensive foundation for developing and deploying your BroLab beats store. The unified port 5000 architecture simplifies development while Supabase provides a modern cloud database solution for local development.
+
+### Changelog
+
+**2025-01-23** - Local Development Guide Update
+- Updated database configuration to use Supabase as primary option
+- Added comprehensive environment variables for all services
+- Included Row-Level Security (RLS) setup instructions
+- Added file management and upload system configuration
+- Updated project structure to reflect current codebase
+- Added new development commands and scripts
+- Included security considerations for RLS and file uploads
+- Updated troubleshooting section with new services
