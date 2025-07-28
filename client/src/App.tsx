@@ -35,6 +35,7 @@ import Login from "@/pages/login";
 import About from "@/pages/about";
 import Dashboard from "@/pages/dashboard";
 import MembershipPage from "@/pages/MembershipPage";
+import WishlistPage from "@/pages/wishlist";
 
 import MixingMastering from "@/pages/mixing-mastering";
 import RecordingSessions from "@/pages/recording-sessions";
@@ -69,6 +70,7 @@ function Router() {
       <Route path="/about" component={About} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/membership" component={MembershipPage} />
+      <Route path="/wishlist" component={WishlistPage} />
 
       <Route path="/mixing-mastering" component={MixingMastering} />
       <Route path="/recording-sessions" component={RecordingSessions} />
