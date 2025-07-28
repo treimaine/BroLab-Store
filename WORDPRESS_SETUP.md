@@ -95,25 +95,36 @@ Attributes:
 - **Format**: MP3, WAV, or M4A
 - **Quality**: Minimum 128kbps, recommended 320kbps
 - **Duration**: 30-60 second previews recommended
-- **File Size**: Maximum 10MB per preview file
+- **File Size**: Maximum 50MB par fichier
+- **Validation**: Vérification MIME type avec file-type
+- **Sécurité**: Scan antivirus avec ClamAV
 
-### Audio URL Configuration
-Audio URLs should be stored in product meta_data:
+### Supabase Storage Configuration
+Les fichiers audio sont stockés dans Supabase Storage:
 
-```php
-// Method 1: Direct URL in meta_data
-{ key: 'audio_url', value: 'https://cdn.brolabentertainment.com/previews/beat-name.mp3' }
+```typescript
+// Configuration des buckets Supabase
+const STORAGE_BUCKETS = {
+  USER_UPLOADS: 'user-uploads',
+  DELIVERABLES: 'deliverables',
+  INVOICES: 'invoices'
+};
 
-// Method 2: WordPress Media Library
-// Upload to Media Library and reference URL in meta_data
+// Upload sécurisé avec validation
+const uploadFile = async (file: File) => {
+  await validateFile(file); // Validation MIME type et taille
+  await scanFile(file);     // Scan antivirus
+  return uploadToSupabase(file); // Upload avec URL signée 1h
+};
 ```
 
-### CDN Recommendations
-For optimal performance:
-- Use CDN for audio file delivery
-- Configure proper CORS headers
-- Enable gzip compression for faster loading
-- Set appropriate cache headers
+### CDN et Performance
+Optimisations via Supabase Storage:
+- CDN intégré pour distribution globale
+- URLs signées avec TTL configurable
+- Compression gzip automatique
+- Cache-Control optimisé
+- Rate limiting (20 uploads/h, 100 downloads/h)
 
 ## API Security Configuration
 
