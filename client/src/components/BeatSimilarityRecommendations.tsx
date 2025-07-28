@@ -1,27 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Sparkles, Play, Heart, ShoppingCart, TrendingUp, Target } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { BeatCard } from '@/components/beat-card';
-import { ResponsiveBeatCard } from '@/components/ResponsiveBeatCard';
+import { ResponsiveBeatCard } from "@/components/ResponsiveBeatCard";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Sparkles, Target, TrendingUp } from "lucide-react";
+import { useState } from "react";
 
-interface Beat {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  audioUrl?: string;
-  bpm?: number;
-  genre?: string;
-  mood?: string;
-  key?: string;
-  producer?: string;
-  tags?: string[];
-  similarity?: number;
-  reason?: string;
-}
+import type { BeatProduct as Beat } from "@shared/schema";
 
 interface SimilarityScore {
   total: number;
@@ -45,9 +30,11 @@ export function BeatSimilarityRecommendations({
   currentBeat,
   recommendations,
   onBeatSelect,
-  isLoading = false
+  isLoading = false,
 }: BeatSimilarityRecommendationsProps) {
-  const [sortBy, setSortBy] = useState<'similarity' | 'popularity' | 'price' | 'recent'>('similarity');
+  const [sortBy, setSortBy] = useState<"similarity" | "popularity" | "price" | "recent">(
+    "similarity"
+  );
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Calculate similarity score between beats
@@ -57,7 +44,7 @@ export function BeatSimilarityRecommendations({
       bpm: 0,
       key: 0,
       mood: 0,
-      style: 0
+      style: 0,
     };
 
     // Genre similarity (40% weight)
@@ -105,20 +92,20 @@ export function BeatSimilarityRecommendations({
   // Check if two keys are musically related
   const isRelatedKey = (key1: string, key2: string): boolean => {
     const relatedKeys: Record<string, string[]> = {
-      'C': ['Am', 'F', 'G'],
-      'G': ['Em', 'C', 'D'],
-      'D': ['Bm', 'G', 'A'],
-      'A': ['F#m', 'D', 'E'],
-      'E': ['C#m', 'A', 'B'],
-      'B': ['G#m', 'E', 'F#'],
-      'F#': ['D#m', 'B', 'C#'],
-      'C#': ['A#m', 'F#', 'G#'],
-      'F': ['Dm', 'Bb', 'C'],
-      'Bb': ['Gm', 'F', 'Eb'],
-      'Eb': ['Cm', 'Bb', 'Ab'],
-      'Ab': ['Fm', 'Eb', 'Db']
+      C: ["Am", "F", "G"],
+      G: ["Em", "C", "D"],
+      D: ["Bm", "G", "A"],
+      A: ["F#m", "D", "E"],
+      E: ["C#m", "A", "B"],
+      B: ["G#m", "E", "F#"],
+      "F#": ["D#m", "B", "C#"],
+      "C#": ["A#m", "F#", "G#"],
+      F: ["Dm", "Bb", "C"],
+      Bb: ["Gm", "F", "Eb"],
+      Eb: ["Cm", "Bb", "Ab"],
+      Ab: ["Fm", "Eb", "Db"],
     };
-    
+
     return relatedKeys[key1]?.includes(key2) || relatedKeys[key2]?.includes(key1) || false;
   };
 
@@ -126,45 +113,43 @@ export function BeatSimilarityRecommendations({
     const similarity = calculateSimilarity(currentBeat, beat);
     const reasons: string[] = [];
 
-    if (similarity.breakdown.genre > 0) reasons.push('Same genre');
-    if (similarity.breakdown.bpm >= 15) reasons.push('Similar tempo');
-    if (similarity.breakdown.key > 0) reasons.push('Compatible key');
-    if (similarity.breakdown.mood > 0) reasons.push('Similar mood');
-    if (similarity.breakdown.style > 5) reasons.push('Similar style');
+    if (similarity.breakdown.genre > 0) reasons.push("Same genre");
+    if (similarity.breakdown.bpm >= 15) reasons.push("Similar tempo");
+    if (similarity.breakdown.key > 0) reasons.push("Compatible key");
+    if (similarity.breakdown.mood > 0) reasons.push("Similar mood");
+    if (similarity.breakdown.style > 5) reasons.push("Similar style");
 
-    return reasons.length > 0 ? reasons.slice(0, 2).join(', ') : 'Similar characteristics';
+    return reasons.length > 0 ? reasons.slice(0, 2).join(", ") : "Similar characteristics";
   };
 
   const getSimilarityLevel = (score: number): { label: string; color: string } => {
-    if (score >= 80) return { label: 'Excellent Match', color: 'text-green-400' };
-    if (score >= 60) return { label: 'Great Match', color: 'text-[var(--accent-cyan)]' };
-    if (score >= 40) return { label: 'Good Match', color: 'text-[var(--accent-purple)]' };
-    if (score >= 20) return { label: 'Fair Match', color: 'text-yellow-400' };
-    return { label: 'Loose Match', color: 'text-gray-400' };
+    if (score >= 80) return { label: "Excellent Match", color: "text-green-400" };
+    if (score >= 60) return { label: "Great Match", color: "text-[var(--accent-cyan)]" };
+    if (score >= 40) return { label: "Good Match", color: "text-[var(--accent-purple)]" };
+    if (score >= 20) return { label: "Fair Match", color: "text-yellow-400" };
+    return { label: "Loose Match", color: "text-gray-400" };
   };
 
   // Sort recommendations
   const sortedRecommendations = [...recommendations].sort((a, b) => {
     switch (sortBy) {
-      case 'similarity':
+      case "similarity":
         const scoreA = calculateSimilarity(currentBeat, a).total;
         const scoreB = calculateSimilarity(currentBeat, b).total;
         return scoreB - scoreA;
-      case 'popularity':
-        return (b.id.length) - (a.id.length); // Mock popularity based on ID length
-      case 'price':
+      case "popularity":
+        return b.id - a.id; // Mock popularity based on ID
+      case "price":
         return a.price - b.price;
-      case 'recent':
-        return b.name.localeCompare(a.name); // Mock recent based on name
+      case "recent":
+        return (b.title || "").localeCompare(a.title || ""); // Mock recent based on title
       default:
         return 0;
     }
   });
 
   // Get unique tags from all recommendations
-  const allTags = Array.from(new Set(
-    recommendations.flatMap(beat => beat.tags || [])
-  ));
+  const allTags = Array.from(new Set(recommendations.flatMap(beat => beat.tags || [])));
 
   if (isLoading) {
     return (
@@ -204,10 +189,10 @@ export function BeatSimilarityRecommendations({
                 {recommendations.length} found
               </Badge>
             </CardTitle>
-            
+
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
+              onChange={e => setSortBy(e.target.value as any)}
               className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] text-white rounded px-3 py-1 text-sm"
             >
               <option value="similarity">Most Similar</option>
@@ -216,9 +201,10 @@ export function BeatSimilarityRecommendations({
               <option value="recent">Recently Added</option>
             </select>
           </div>
-          
+
           <p className="text-gray-400">
-            Based on "{currentBeat.name}" - {currentBeat.genre} • {currentBeat.bpm} BPM • {currentBeat.key}
+            Based on "{currentBeat.name}" - {currentBeat.genre} • {currentBeat.bpm} BPM •{" "}
+            {currentBeat.key}
           </p>
         </CardHeader>
 
@@ -266,14 +252,12 @@ export function BeatSimilarityRecommendations({
                     variant={selectedTags.includes(tag) ? "default" : "outline"}
                     className={`cursor-pointer transition-colors ${
                       selectedTags.includes(tag)
-                        ? 'bg-[var(--accent-purple)] text-white'
-                        : 'border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]'
+                        ? "bg-[var(--accent-purple)] text-white"
+                        : "border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]"
                     }`}
                     onClick={() => {
                       setSelectedTags(prev =>
-                        prev.includes(tag)
-                          ? prev.filter(t => t !== tag)
-                          : [...prev, tag]
+                        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
                       );
                     }}
                   >
@@ -287,15 +271,15 @@ export function BeatSimilarityRecommendations({
           {/* Recommendations Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sortedRecommendations
-              .filter(beat => 
-                selectedTags.length === 0 || 
-                selectedTags.some(tag => beat.tags?.includes(tag))
+              .filter(
+                beat =>
+                  selectedTags.length === 0 || selectedTags.some(tag => beat.tags?.includes(tag))
               )
               .slice(0, 12)
-              .map((beat) => {
+              .map(beat => {
                 const similarity = calculateSimilarity(currentBeat, beat);
                 const { label, color } = getSimilarityLevel(similarity.total);
-                
+
                 return (
                   <div
                     key={beat.id}
@@ -304,18 +288,18 @@ export function BeatSimilarityRecommendations({
                   >
                     <ResponsiveBeatCard
                       beat={beat}
-                      productId={beat.id}
-                      productName={beat.name}
+                      productId={String(beat.id)}
+                      productName={beat.title}
                       className="h-full"
                     />
-                    
+
                     {/* Similarity Overlay */}
                     <div className="absolute top-2 right-2 z-10">
                       <Badge className={`${color} bg-black/70 backdrop-blur-sm text-xs`}>
                         {Math.round(similarity.total)}% match
                       </Badge>
                     </div>
-                    
+
                     {/* Similarity Breakdown Tooltip */}
                     <div className="absolute bottom-2 left-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                       <div className="bg-black/90 backdrop-blur-sm rounded p-2 text-xs">
@@ -345,9 +329,7 @@ export function BeatSimilarityRecommendations({
           {/* Load More */}
           {sortedRecommendations.length > 12 && (
             <div className="text-center">
-              <Button className="btn-secondary">
-                Load More Recommendations
-              </Button>
+              <Button className="btn-secondary">Load More Recommendations</Button>
             </div>
           )}
         </CardContent>
@@ -366,24 +348,22 @@ export function BeatSimilarityRecommendations({
             {sortedRecommendations
               .filter(beat => beat.genre === currentBeat.genre)
               .slice(0, 4)
-              .map((beat) => (
+              .map(beat => (
                 <div
                   key={`trending-${beat.id}`}
                   className="flex items-center space-x-3 p-3 bg-[var(--medium-gray)] rounded-lg cursor-pointer hover:bg-[var(--medium-gray)]/80 transition-colors"
                   onClick={() => onBeatSelect(beat)}
                 >
                   <img
-                    src={beat.image || '/api/placeholder/400/400'}
-                    alt={beat.name}
+                    src={beat.image || "/api/placeholder/400/400"}
+                    alt={beat.title}
                     className="w-12 h-12 rounded object-cover"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-white truncate">{beat.name}</div>
-                    <div className="text-sm text-gray-400">{beat.producer}</div>
+                    <div className="font-medium text-white truncate">{beat.title}</div>
+                    <div className="text-sm text-gray-400">BroLab</div>
                   </div>
-                  <div className="text-[var(--accent-purple)] font-bold">
-                    ${beat.price}
-                  </div>
+                  <div className="text-[var(--accent-purple)] font-bold">${beat.price}</div>
                 </div>
               ))}
           </div>

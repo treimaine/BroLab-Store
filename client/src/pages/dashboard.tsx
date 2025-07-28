@@ -313,14 +313,24 @@ export default function Dashboard() {
                     <Clock className="w-5 h-5 mr-2 text-[var(--accent-purple)]" />
                     Recent Activity
                   </span>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setActiveTab('activity')}
-                    className="text-[var(--accent-purple)] hover:text-white"
-                  >
-                    View All
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setLocation('/account/orders')}
+                      className="text-[var(--accent-purple)] hover:text-white"
+                    >
+                      Commandes
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setActiveTab('activity')}
+                      className="text-[var(--accent-purple)] hover:text-white"
+                    >
+                      View All
+                    </Button>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
