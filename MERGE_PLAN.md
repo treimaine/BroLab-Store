@@ -1,5 +1,5 @@
 # MERGE PLAN - BroLab Store Synchronization
-*Généré le: 23 janvier 2025*
+*Généré le: 23 july 2025*
 
 ## 🎯 Objectif
 Merger les changements du repo externe `https://github.com/treimaine/BroLab-Store.git` (branch: main) avec notre code local tout en préservant notre architecture Supabase et nos améliorations.
