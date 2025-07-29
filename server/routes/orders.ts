@@ -10,10 +10,32 @@ ordersRouter.use(isAuthenticated);
 
 // GET /api/orders/me
 ordersRouter.get('/me', async (req, res) => {
-  const userId = req.session.userId;
-  if (!userId) return res.status(401).json({ error: 'Not authenticated' });
-  const orders = await listUserOrders(userId);
-  res.json(orders);
+  try {
+    const userId = req.session.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
+    
+    const orders = await listUserOrders(userId);
+    
+    // Toujours retourner une structure valide
+    const total = orders.length;
+    const paginatedOrders = orders.slice(offset, offset + limit);
+    const totalPages = Math.ceil(total / limit);
+    
+    res.json({
+      orders: paginatedOrders,
+      total,
+      page,
+      totalPages,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
 });
 
 // GET /api/orders/:id

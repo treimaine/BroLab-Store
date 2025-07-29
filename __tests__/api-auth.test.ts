@@ -51,7 +51,7 @@ describe('POST /api/auth/login', () => {
 
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ username: testUser.email, password: testUser.password });
+      .send({ username: testUser.username, password: testUser.password });
 
     expect(res.status).toBe(200);
     expect(res.body.user).toBeDefined();
@@ -74,7 +74,7 @@ describe('POST /api/auth/login', () => {
 
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ username: testUser.email, password: 'wrongpassword' });
+      .send({ username: testUser.username, password: 'wrongpassword' });
 
     expect(res.status).toBe(401);
     expect(res.body.error).toMatch(/Invalid credentials/);
@@ -83,7 +83,7 @@ describe('POST /api/auth/login', () => {
   it('échec si utilisateur inexistant', async () => {
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'notfound@example.com', password: 'irrelevant' });
+      .send({ username: 'notfounduser', password: 'irrelevant' });
 
     expect(res.status).toBe(401);
     expect(res.body.error).toMatch(/Invalid credentials/);
@@ -113,7 +113,7 @@ describe('POST /api/auth/logout', () => {
     // Register + login
     await request(app).post('/api/auth/register').send(user);
     const agent = request.agent(app);
-    await agent.post('/api/auth/login').send({ username: user.email, password: user.password });
+    await agent.post('/api/auth/login').send({ username: user.username, password: user.password });
     // Logout
     const res = await agent.post('/api/auth/logout');
     expect(res.status).toBe(200);
@@ -129,7 +129,7 @@ describe('GET /api/auth/user', () => {
     const user = makeTestUser();
     await request(app).post('/api/auth/register').send(user);
     const agent = request.agent(app);
-    const loginRes = await agent.post('/api/auth/login').send({ username: user.email, password: user.password });
+    const loginRes = await agent.post('/api/auth/login').send({ username: user.username, password: user.password });
     const res = await agent.get('/api/auth/user');
     expect(res.status).toBe(200);
     expect(res.body.user).toBeDefined();

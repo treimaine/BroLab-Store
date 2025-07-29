@@ -1,4 +1,4 @@
-import type { ActivityLog, CartItem, Download, File, InsertFile, Order, ServiceOrder, ServiceOrderInput, User, Reservation, InsertReservation, ReservationStatusEnum } from '../../shared/schema';
+import type { ActivityLog, CartItem, Download, File, InsertFile, InsertReservation, Order, Reservation, ReservationStatusEnum, ServiceOrder, ServiceOrderInput, User } from '../../shared/schema';
 import { supabaseAdmin } from './supabaseAdmin';
 
 // Get user by email
@@ -7,6 +7,20 @@ export async function getUserByEmail(email: string): Promise<User | null> {
     .from('users')
     .select('*')
     .eq('email', email)
+    .single();
+  if (error) {
+    if (error.code === 'PGRST116') return null; // no rows
+    throw error;
+  }
+  return data as User | null;
+}
+
+// Get user by username
+export async function getUserByUsername(username: string): Promise<User | null> {
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('*')
+    .eq('username', username)
     .single();
   if (error) {
     if (error.code === 'PGRST116') return null; // no rows

@@ -3,7 +3,7 @@ import cookieParser from "cookie-parser";
 import type { Express, NextFunction, Request, Response } from "express";
 import session from "express-session";
 import type { User } from '../shared/schema';
-import { getUserByEmail, getUserById, upsertUser } from "./lib/db";
+import { getUserByEmail, getUserById, getUserByUsername, upsertUser } from "./lib/db";
 
 // Extend session to include userId
 declare module 'express-session' {
@@ -99,8 +99,13 @@ export function registerAuthRoutes(app: Express) {
         return res.status(400).json({ error: "Username and password are required" });
       }
       
-      // Find user by email or username (adjust as needed)
-      const user: User | null = await getUserByEmail(username); // If you have getUserByUsername, use that
+      // Find user by username first, then by email if not found
+      let user: User | null = await getUserByUsername(username);
+      if (!user) {
+        // Try to find by email if not found by username
+        user = await getUserByEmail(username);
+      }
+      
       if (!user || typeof user !== 'object' || !('id' in user)) {
         return res.status(401).json({ error: "Invalid credentials" });
       }

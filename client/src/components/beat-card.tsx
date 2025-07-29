@@ -1,11 +1,12 @@
 import { HoverPlayButton } from "@/components/HoverPlayButton";
 import { Button } from "@/components/ui/button";
-import { WaveformAudioPlayer } from "@/components/WaveformAudioPlayer";
 import { useToast } from "@/hooks/use-toast";
 import { useRecentlyViewedBeats } from "@/hooks/useRecentlyViewedBeats";
 import { useWishlist } from "@/hooks/useWishlist";
+import { useAudioStore } from "@/store/useAudioStore";
 import { LicenseTypeEnum } from "@shared/schema";
 import { Heart, Music, ShoppingCart } from "lucide-react";
+import { useState } from "react";
 import { useCartContext } from "./cart-provider";
 
 interface BeatCardProps {
@@ -42,9 +43,30 @@ export function BeatCard({
   onViewDetails,
 }: BeatCardProps) {
   const { addItem } = useCartContext();
-  const { toast } = useToast();
+  const { isFavorite, addFavorite, removeFavorite } = useWishlist();
   const { addBeat } = useRecentlyViewedBeats();
-  const { addFavorite, removeFavorite, isFavorite } = useWishlist();
+  const { toast } = useToast();
+  const { setCurrentTrack, setIsPlaying, currentTrack, isPlaying } = useAudioStore();
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handlePreviewAudio = () => {
+    if (audioUrl) {
+      console.log("🎵 Playing audio directly:", audioUrl);
+
+      setCurrentTrack({
+        id: id.toString(),
+        title: title,
+        artist: "BroLab",
+        url: audioUrl,
+        audioUrl: audioUrl,
+        imageUrl: imageUrl || "",
+      });
+      setIsPlaying(true);
+    }
+  };
+
+  const isCurrentTrack = currentTrack?.id === id.toString();
+  const isCurrentlyPlaying = isCurrentTrack && isPlaying;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -115,20 +137,13 @@ export function BeatCard({
       className={`beat-card cursor-pointer fade-in group ${className}`}
       onClick={handleViewDetails}
     >
-      {/* Cover Art */}
-      <div className="relative h-48 bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center overflow-hidden rounded-t-xl">
-        {featured && (
-          <div className="absolute top-2 left-2 bg-[var(--color-gold)] text-black text-xs font-bold px-2 py-1 rounded-full z-10">
-            Featured
-          </div>
-        )}
-
-        {duration && (
-          <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full z-10">
-            {formatDuration(duration)}
-          </div>
-        )}
-
+      {/* Product Image */}
+      <div
+        className="relative aspect-square bg-gradient-to-br from-purple-600 to-blue-600 rounded-t-xl overflow-hidden group cursor-pointer"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={onViewDetails}
+      >
         {/* Wishlist Button */}
         <button
           onClick={handleWishlistToggle}
@@ -155,7 +170,13 @@ export function BeatCard({
         {/* Hover Play Button */}
         {audioUrl && (
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-            <HoverPlayButton audioUrl={audioUrl} size="lg" />
+            <HoverPlayButton
+              audioUrl={audioUrl}
+              productId={id.toString()}
+              productName={title}
+              size="lg"
+              onPlay={handlePreviewAudio}
+            />
           </div>
         )}
       </div>
@@ -185,21 +206,6 @@ export function BeatCard({
             </div>
           )}
         </div>
-
-        {/* Audio Preview */}
-        {audioUrl && (
-          <div className="my-6" onClick={e => e.stopPropagation()}>
-            <WaveformAudioPlayer
-              src={audioUrl}
-              title={title}
-              artist="BroLab"
-              previewOnly={true}
-              showControls={true}
-              showWaveform={true}
-              className="w-full"
-            />
-          </div>
-        )}
 
         {/* Price and Actions */}
         <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-700">

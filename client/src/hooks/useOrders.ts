@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
 import type { Order } from '@shared/schema';
+import { useQuery } from '@tanstack/react-query';
 
 interface OrdersResponse {
   orders: Order[];
@@ -30,9 +30,11 @@ export function useOrders(page = 1, limit = 10) {
     queryKey: ['orders', page, limit],
     queryFn: async () => {
       const response = await fetch(`/api/orders/me?page=${page}&limit=${limit}`);
+      
       if (!response.ok) {
         throw new Error('Failed to fetch orders');
       }
+      
       return response.json();
     }
   });

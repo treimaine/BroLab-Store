@@ -1,6 +1,5 @@
 import { DiscountBanner } from "@/components/DiscountBanner";
 import { HoverPlayButton } from "@/components/HoverPlayButton";
-import { RecentlyViewedBeats } from "@/components/RecentlyViewedBeats";
 import { SearchHero } from "@/components/SearchHero";
 import { ServicesStrip } from "@/components/ServicesStrip";
 import { SocialProofStrip } from "@/components/SocialProofStrip";
@@ -11,28 +10,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { Eye, Info, Music, TrendingUp } from "lucide-react";
-import { useState } from "react";
 import { Link } from "wouter";
 
 export default function Home() {
   useScrollToTop();
-  const [currentTrack, setCurrentTrack] = useState<number | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const { useProducts } = useWooCommerce();
   const { data: beats, isLoading } = useProducts();
 
   // Get featured and trending beats
   const featuredBeats = beats?.slice(0, 3) || [];
   const trendingBeats = beats?.slice(3, 9) || [];
+  const remainingBeats = beats?.slice(9, 15) || []; // Utiliser les produits suivants pour trending
 
-  const togglePlay = (beatId: number) => {
-    if (currentTrack === beatId && isPlaying) {
-      setIsPlaying(false);
-    } else {
-      setCurrentTrack(beatId);
-      setIsPlaying(true);
-    }
-  };
+  // Si pas assez de produits pour trending, utiliser les premiers disponibles
+  const trendingDisplayBeats = remainingBeats.length > 0 ? remainingBeats : trendingBeats;
 
   return (
     <div className="min-h-screen bg-[var(--deep-black)]">
@@ -117,9 +108,13 @@ export default function Home() {
                         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                           <HoverPlayButton
                             audioUrl={
+                              beat.audio_url ||
                               beat.meta_data?.find((meta: any) => meta.key === "audio_url")
-                                ?.value || "/api/placeholder/audio.mp3"
+                                ?.value ||
+                              "/api/placeholder/audio.mp3"
                             }
+                            productId={beat.id.toString()}
+                            productName={beat.name}
                             size="lg"
                           />
                         </div>
@@ -155,11 +150,11 @@ export default function Home() {
       </section>
 
       {/* Recently Viewed Beats */}
-      <section className="py-20 bg-[var(--deep-black)]">
+      {/* <section className="py-20 bg-[var(--deep-black)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <RecentlyViewedBeats maxDisplay={6} />
         </div>
-      </section>
+      </section> */}
 
       {/* Social Proof Strip */}
       <SocialProofStrip />
@@ -202,10 +197,10 @@ export default function Home() {
                     </div>
                   </div>
                 ))
-              : trendingBeats.map((beat: any, index: number) => (
+              : trendingDisplayBeats.map((beat: any, index: number) => (
                   <Card
                     key={beat.id}
-                    className="bg-[var(--dark-gray)] border-[var(--medium-gray)] hover:border-[var(--accent-purple)] transition-all duration-300"
+                    className="bg-[var(--dark-gray)] border-[var(--medium-gray)] hover:border-[var(--accent-purple)] transition-all duration-300 group"
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center space-x-4">
@@ -215,12 +210,16 @@ export default function Home() {
                             alt={beat.name}
                             className="w-16 h-16 rounded-lg object-cover"
                           />
-                          <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                             <HoverPlayButton
                               audioUrl={
+                                beat.audio_url ||
                                 beat.meta_data?.find((meta: any) => meta.key === "audio_url")
-                                  ?.value || "/api/placeholder/audio.mp3"
+                                  ?.value ||
+                                "/api/placeholder/audio.mp3"
                               }
+                              productId={beat.id.toString()}
+                              productName={beat.name}
                               size="sm"
                               className="bg-black bg-opacity-60 hover:bg-[var(--accent-purple)]"
                             />
