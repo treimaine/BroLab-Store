@@ -1,19 +1,16 @@
-import { useOrders } from '@/hooks/useOrders';
-import { OrderCard } from './OrderCard';
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { useOrders } from "@/hooks/useOrders";
+import { Loader2 } from "lucide-react";
+import { OrderCard } from "./OrderCard";
 
 interface OrderListProps {
   page?: number;
   limit?: number;
   onPageChange?: (page: number) => void;
+  onOrderClick?: (orderId: number) => void;
 }
 
-export function OrderList({ 
-  page = 1, 
-  limit = 10,
-  onPageChange 
-}: OrderListProps) {
+export function OrderList({ page = 1, limit = 10, onPageChange, onOrderClick }: OrderListProps) {
   const { data, isLoading, error } = useOrders(page, limit);
 
   if (isLoading) {
@@ -27,9 +24,11 @@ export function OrderList({
   if (error) {
     return (
       <div className="text-center py-8">
-        <p className="text-red-400">Une erreur est survenue lors du chargement des commandes</p>
-        <Button 
-          variant="outline" 
+        <p className="text-red-400 mb-4">
+          Une erreur est survenue lors du chargement des commandes
+        </p>
+        <Button
+          variant="outline"
           className="mt-4 border-gray-600 text-gray-300 hover:text-white"
           onClick={() => window.location.reload()}
         >
@@ -50,8 +49,8 @@ export function OrderList({
   return (
     <div className="space-y-6">
       <div className="grid gap-4">
-        {data.orders.map((order) => (
-          <OrderCard key={order.id} order={order} />
+        {data.orders.map(order => (
+          <OrderCard key={order.id} order={order} onOrderClick={onOrderClick} />
         ))}
       </div>
 
@@ -66,7 +65,7 @@ export function OrderList({
           >
             Précédent
           </Button>
-          
+
           <div className="flex items-center gap-2 px-4 text-sm text-gray-400">
             Page {page} sur {data.totalPages}
           </div>

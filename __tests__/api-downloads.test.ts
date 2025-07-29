@@ -53,7 +53,7 @@ describe('/api/downloads', () => {
     // Setup agent before register/login
     agent = request.agent(app);
     await agent.post('/api/auth/register').send(testUser);
-    const loginRes = await agent.post('/api/auth/login').send({ username: testUser.email, password: testUser.password });
+    const loginRes = await agent.post('/api/auth/login').send({ username: testUser.username, password: testUser.password });
     
     // Verify login succeeded
     if (loginRes.status !== 200) {

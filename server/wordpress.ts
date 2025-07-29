@@ -1,5 +1,5 @@
-import type { Express } from "express";
 import { config } from 'dotenv';
+import type { Express } from "express";
 
 // Ensure environment variables are loaded
 config();
@@ -37,6 +37,16 @@ async function wpApiRequest(endpoint: string, options: RequestInit = {}) {
   }
 
   return response.json();
+}
+
+// Helper function to proxy audio URLs
+function proxyAudioUrl(originalUrl: string | null): string | null {
+  if (!originalUrl) return null;
+  
+  console.log('🔗 Original audio URL:', originalUrl);
+  
+  // Return the original URL directly - no proxy needed
+  return originalUrl;
 }
 
 // WooCommerce REST API helpers
@@ -137,32 +147,75 @@ export function registerWordPressRoutes(app: Express) {
       const products = await wcApiRequest(`/products?${queryString}`);
       
       // Transform products data to match frontend expectations
-      const transformedProducts = products.map((product: any) => ({
-        ...product,
-        // Keep prices in dollar format as provided by WooCommerce
-        price: product.price ? parseFloat(product.price) : 0,
-        regular_price: product.regular_price ? parseFloat(product.regular_price) : 0,
-        sale_price: product.sale_price ? parseFloat(product.sale_price) : 0,
-        // Ensure images are properly formatted
-        images: product.images || [],
-        // Ensure categories are properly formatted
-        categories: product.categories || [],
-        // Extract additional metadata from WooCommerce
-        audio_url: product.meta_data?.find((meta: any) => meta.key === 'audio_url')?.value || null,
-        // Extract BPM, Key, Mood from meta_data if available
-        bpm: product.meta_data?.find((meta: any) => meta.key === 'bpm' || meta.key === 'BPM')?.value || 
-             product.attributes?.find((attr: any) => attr.name === 'BPM')?.options?.[0] || null,
-        key: product.meta_data?.find((meta: any) => meta.key === 'key' || meta.key === 'Key')?.value || 
-             product.attributes?.find((attr: any) => attr.name === 'Key')?.options?.[0] || null,
-        mood: product.meta_data?.find((meta: any) => meta.key === 'mood' || meta.key === 'Mood')?.value || 
-              product.attributes?.find((attr: any) => attr.name === 'Mood')?.options?.[0] || null,
-        // Check if product has FREE tag or is priced at 0
-        is_free: product.tags?.some((tag: any) => tag.name.toLowerCase() === 'free') || 
-                 product.price === 0 || 
-                 product.price === '0' || 
-                 parseFloat(product.price) === 0 || 
-                 false
-      }));
+      const transformedProducts = products.map((product: any) => {
+        // Extract audio URL from various possible sources
+        let audioUrl = null;
+        
+        // Try to find audio URL from meta_data - prioritize alb_tracklist
+        const albTracklistMeta = product.meta_data?.find((meta: any) => meta.key === 'alb_tracklist');
+        const audioUrlMeta = product.meta_data?.find((meta: any) => 
+          meta.key === 'audio_url' || 
+          meta.key === 'sonaar_audio_file'
+        );
+        
+        // Try alb_tracklist first (contains actual audio URLs)
+        if (albTracklistMeta && albTracklistMeta.value) {
+          try {
+            // Handle Sonaar data structure
+            let sonaarData;
+            if (typeof albTracklistMeta.value === 'string') {
+              // If it's a string, try to parse as JSON
+              sonaarData = JSON.parse(albTracklistMeta.value);
+            } else {
+              // If it's already an object (like alb_tracklist), use it directly
+              sonaarData = albTracklistMeta.value;
+            }
+            
+            if (sonaarData && Array.isArray(sonaarData) && sonaarData.length > 0) {
+              // Get the first track's audio URL
+              const firstTrack = sonaarData[0];
+              audioUrl = firstTrack.track_mp3 || firstTrack.audio_preview || firstTrack.src || firstTrack.url;
+            } else if (sonaarData && typeof sonaarData === 'object') {
+              // Handle single track object
+              audioUrl = sonaarData.track_mp3 || sonaarData.audio_preview || sonaarData.src || sonaarData.url;
+            }
+          } catch (e) {
+            // Ignore parsing errors
+          }
+        }
+        
+        // If no audio URL found, try other sources
+        if (!audioUrl && audioUrlMeta) {
+          audioUrl = audioUrlMeta.value;
+        }
+        
+        return {
+          ...product,
+          // Keep prices in dollar format as provided by WooCommerce
+          price: product.price ? parseFloat(product.price) : 0,
+          regular_price: product.regular_price ? parseFloat(product.regular_price) : 0,
+          sale_price: product.sale_price ? parseFloat(product.sale_price) : 0,
+          // Ensure images are properly formatted
+          images: product.images || [],
+          // Ensure categories are properly formatted
+          categories: product.categories || [],
+          // Extract audio URL from various sources and proxy it
+          audio_url: proxyAudioUrl(audioUrl),
+          // Extract BPM, Key, Mood from meta_data if available
+          bpm: product.meta_data?.find((meta: any) => meta.key === 'bpm' || meta.key === 'BPM')?.value || 
+               product.attributes?.find((attr: any) => attr.name === 'BPM')?.options?.[0] || null,
+          key: product.meta_data?.find((meta: any) => meta.key === 'key' || meta.key === 'Key')?.value || 
+               product.attributes?.find((attr: any) => attr.name === 'Key')?.options?.[0] || null,
+          mood: product.meta_data?.find((meta: any) => meta.key === 'mood' || meta.key === 'Mood')?.value || 
+                product.attributes?.find((attr: any) => attr.name === 'Mood')?.options?.[0] || null,
+          // Check if product has FREE tag or is priced at 0
+          is_free: product.tags?.some((tag: any) => tag.name.toLowerCase() === 'free') || 
+                   product.price === 0 || 
+                   product.price === '0' || 
+                   parseFloat(product.price) === 0 || 
+                   false
+        };
+      });
       
       res.json(transformedProducts);
     } catch (error: any) {
@@ -191,8 +244,52 @@ export function registerWordPressRoutes(app: Express) {
         images: product.images || [],
         // Ensure categories are properly formatted
         categories: product.categories || [],
-        // Extract additional metadata from WooCommerce
-        audio_url: product.meta_data?.find((meta: any) => meta.key === 'audio_url')?.value || null,
+        // Extract audio URL using the same logic as the products list
+        audio_url: (() => {
+          let audioUrl = null;
+          
+          // Find alb_tracklist metadata (Sonaar plugin)
+          const albTracklistMeta = product.meta_data?.find((meta: any) => 
+            meta.key === 'alb_tracklist' || 
+            meta.key === 'tracklist' ||
+            meta.key === 'sonaar_tracklist'
+          );
+          
+          // Find other audio URL metadata
+          const audioUrlMeta = product.meta_data?.find((meta: any) => 
+            meta.key === 'audio_url' || 
+            meta.key === 'audio_preview' ||
+            meta.key === 'track_mp3'
+          );
+          
+          // Try alb_tracklist first (contains actual audio URLs)
+          if (albTracklistMeta && albTracklistMeta.value) {
+            try {
+              let sonaarData;
+              if (typeof albTracklistMeta.value === 'string') {
+                sonaarData = JSON.parse(albTracklistMeta.value);
+              } else {
+                sonaarData = albTracklistMeta.value;
+              }
+              
+              if (sonaarData && Array.isArray(sonaarData) && sonaarData.length > 0) {
+                const firstTrack = sonaarData[0];
+                audioUrl = firstTrack.track_mp3 || firstTrack.audio_preview || firstTrack.src || firstTrack.url;
+              } else if (sonaarData && typeof sonaarData === 'object') {
+                audioUrl = sonaarData.track_mp3 || sonaarData.audio_preview || sonaarData.src || sonaarData.url;
+              }
+            } catch (e) {
+              // Ignore parsing errors
+            }
+          }
+          
+          // If no audio URL found, try other sources
+          if (!audioUrl && audioUrlMeta) {
+            audioUrl = audioUrlMeta.value;
+          }
+          
+          return proxyAudioUrl(audioUrl);
+        })(),
         // Extract BPM, Key, Mood from meta_data if available
         bpm: product.meta_data?.find((meta: any) => meta.key === 'bpm' || meta.key === 'BPM')?.value || 
              product.attributes?.find((attr: any) => attr.name === 'BPM')?.options?.[0] || null,

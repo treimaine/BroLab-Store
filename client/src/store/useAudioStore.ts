@@ -69,7 +69,20 @@ const initialState: AudioState = {
 export const useAudioStore = create<AudioState & AudioActions>((set, get) => ({
   ...initialState,
   
-  setCurrentTrack: (track) => set({ currentTrack: track }),
+  setCurrentTrack: (track) => {
+    const state = get();
+    // If changing to a different track, keep playing state but reset time
+    if (state.currentTrack?.id !== track?.id) {
+      set({ 
+        currentTrack: track, 
+        currentTime: 0,
+        duration: 0 
+        // Keep isPlaying as is - don't force it to false
+      });
+    } else {
+      set({ currentTrack: track });
+    }
+  },
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   setCurrentTime: (currentTime) => set({ currentTime }),
   setVolume: (volume) => set({ volume }),

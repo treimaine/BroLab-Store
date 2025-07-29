@@ -39,9 +39,15 @@ describe('/api/service-orders', () => {
       password: hashedPassword,
       created_at: new Date().toISOString()
     }));
-    await request(app).post('/api/auth/register').send(testUser);
+    // Setup agent before register/login
     agent = request.agent(app);
-    await agent.post('/api/auth/login').send({ username: testUser.email, password: testUser.password });
+    await agent.post('/api/auth/register').send(testUser);
+    const loginRes = await agent.post('/api/auth/login').send({ username: testUser.username, password: testUser.password });
+    
+    // Verify login succeeded
+    if (loginRes.status !== 200) {
+      throw new Error(`Login failed: ${loginRes.status} ${JSON.stringify(loginRes.body)}`);
+    }
   });
 
   it('create service order ok (login → POST → GET)', async () => {

@@ -1,11 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Maximize2, Minimize2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { useAudioStore } from '@/store/useAudioStore';
-import { trackAudioAction, trackPlayPreview } from '@/utils/tracking';
-import { useIsMobile } from '@/hooks/useBreakpoint';
-import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { useIsMobile } from "@/hooks/useBreakpoint";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { useAudioStore } from "@/store/useAudioStore";
+import {
+  Maximize2,
+  Minimize2,
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 export function EnhancedGlobalAudioPlayer() {
   const {
@@ -19,7 +27,7 @@ export function EnhancedGlobalAudioPlayer() {
     setCurrentTime,
     setDuration,
     nextTrack,
-    previousTrack
+    previousTrack,
   } = useAudioStore();
 
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -27,7 +35,9 @@ export function EnhancedGlobalAudioPlayer() {
   const animationRef = useRef<number>();
   const [isMuted, setIsMuted] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  
+  const lastTrackRef = useRef<string | null>(null);
+  const lastPlayingRef = useRef<boolean>(false);
+
   const isMobile = useIsMobile();
   const prefersReducedMotion = usePrefersReducedMotion();
 
@@ -36,22 +46,72 @@ export function EnhancedGlobalAudioPlayer() {
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [dataArray, setDataArray] = useState<Uint8Array | null>(null);
 
+  // Update audio source when track changes
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
 
+    console.log("🔍 Setting audio source:", currentTrack.audioUrl);
+
+    // Stop all other audio elements when track changes
+    document.querySelectorAll("audio").forEach(otherAudio => {
+      if (otherAudio !== audio && !otherAudio.paused) {
+        console.log("🛑 Stopping other audio on track change");
+        otherAudio.pause();
+        otherAudio.currentTime = 0;
+      }
+    });
+
     audio.src = currentTrack.audioUrl;
-    
-    // Track play preview when starting
+    lastTrackRef.current = currentTrack.id;
+
+    // Force play when track changes (if isPlaying is true)
     if (isPlaying) {
-      trackPlayPreview(currentTrack.id, currentTrack.title);
-      trackAudioAction('play', currentTrack.id, currentTime);
-      audio.play().catch(console.error);
-    } else {
-      trackAudioAction('pause', currentTrack.id, currentTime);
-      audio.pause();
+      console.log("🎵 Forcing play on track change");
+      audio.play().catch(error => {
+        console.error("❌ Audio play failed on track change:", error);
+      });
     }
-  }, [currentTrack, isPlaying]);
+  }, [currentTrack?.id, isPlaying]);
+
+  // Handle play/pause separately to avoid loops
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !currentTrack) return;
+
+    console.log("🎵 Play/pause state changed:", {
+      isPlaying,
+      currentTrack: currentTrack.title,
+      audioUrl: currentTrack.audioUrl,
+    });
+
+    // Only update if state actually changed
+    if (lastPlayingRef.current !== isPlaying) {
+      if (isPlaying) {
+        console.log("▶️ Attempting to play audio...");
+
+        // Only stop other audio elements if this audio is ready to play
+        if (audio.readyState >= 2) {
+          // HAVE_CURRENT_DATA or higher
+          document.querySelectorAll("audio").forEach(otherAudio => {
+            if (otherAudio !== audio && !otherAudio.paused) {
+              console.log("🛑 Stopping other audio element");
+              otherAudio.pause();
+              otherAudio.currentTime = 0;
+            }
+          });
+        }
+
+        audio.play().catch(error => {
+          console.error("❌ Audio play failed:", error);
+        });
+      } else {
+        console.log("⏸️ Pausing audio...");
+        audio.pause();
+      }
+      lastPlayingRef.current = isPlaying;
+    }
+  }, [isPlaying, currentTrack?.id]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -60,16 +120,16 @@ export function EnhancedGlobalAudioPlayer() {
     const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
 
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
-    audio.addEventListener('ended', () => {
+    audio.addEventListener("timeupdate", updateTime);
+    audio.addEventListener("loadedmetadata", updateDuration);
+    audio.addEventListener("ended", () => {
       setIsPlaying(false);
       nextTrack();
     });
 
     return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
+      audio.removeEventListener("timeupdate", updateTime);
+      audio.removeEventListener("loadedmetadata", updateDuration);
     };
   }, [setCurrentTime, setDuration, setIsPlaying, nextTrack]);
 
@@ -80,78 +140,7 @@ export function EnhancedGlobalAudioPlayer() {
     }
   }, [volume, isMuted]);
 
-  // Initialize audio visualization (skip on mobile or reduced motion)
-  useEffect(() => {
-    if (!currentTrack || !audioRef.current || isMobile || prefersReducedMotion) return;
-
-    const initAudioContext = async () => {
-      try {
-        const context = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const source = context.createMediaElementSource(audioRef.current!);
-        const analyserNode = context.createAnalyser();
-        
-        analyserNode.fftSize = 256;
-        const bufferLength = analyserNode.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-
-        source.connect(analyserNode);
-        analyserNode.connect(context.destination);
-
-        setAudioContext(context);
-        setAnalyser(analyserNode);
-        setDataArray(dataArray);
-      } catch (error) {
-        console.error('Audio context initialization failed:', error);
-      }
-    };
-
-    initAudioContext();
-  }, [currentTrack, isMobile, prefersReducedMotion]);
-
-  // Waveform animation (disabled on mobile and reduced motion)
-  useEffect(() => {
-    if (!analyser || !dataArray || !canvasRef.current || isMobile || prefersReducedMotion) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const draw = () => {
-      analyser.getByteFrequencyData(dataArray);
-      
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const barWidth = (canvas.width / dataArray.length) * 2.5;
-      let barHeight;
-      let x = 0;
-
-      for (let i = 0; i < dataArray.length; i++) {
-        barHeight = (dataArray[i] / 255) * canvas.height * 0.8;
-
-        const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
-        gradient.addColorStop(0, '#8b5cf6'); // var(--accent-purple)
-        gradient.addColorStop(1, '#06b6d4'); // var(--accent-cyan)
-        
-        ctx.fillStyle = gradient;
-        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-
-        x += barWidth + 1;
-      }
-
-      animationRef.current = requestAnimationFrame(draw);
-    };
-
-    if (isPlaying) {
-      draw();
-    }
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [analyser, dataArray, isPlaying, isMobile, prefersReducedMotion]);
+  // Waveform animation disabled to fix AudioContext issues
 
   const handleSeek = (value: number[]) => {
     const audio = audioRef.current;
@@ -159,191 +148,127 @@ export function EnhancedGlobalAudioPlayer() {
       const newTime = (value[0] / 100) * duration;
       audio.currentTime = newTime;
       setCurrentTime(newTime);
-      trackAudioAction('seek', currentTrack?.id || '', newTime);
     }
   };
 
   const handleVolumeChange = (value: number[]) => {
     setVolume(value[0]);
-    trackAudioAction('volume_change', currentTrack?.id || '', currentTime);
   };
 
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
   if (!currentTrack) return null;
 
   return (
-    <div 
+    <div
       className={`
         fixed bottom-0 left-0 right-0 bg-[var(--dark-gray)] border-t border-[var(--medium-gray)] z-50 
         transition-all duration-300 safe-area-inset-bottom
-        ${isExpanded && !isMobile ? 'h-32' : isMobile ? 'h-16' : 'h-20'}
+        ${isExpanded && !isMobile ? "h-32" : isMobile ? "h-16" : "h-20"}
       `}
     >
       <audio ref={audioRef} crossOrigin="anonymous" />
-      
+
       <div className="max-w-7xl mx-auto p-2 sm:p-4">
-        {/* Waveform Visualization (desktop only, when expanded) */}
-        {isExpanded && !isMobile && !prefersReducedMotion && (
-          <div className="mb-4">
-            <canvas 
-              ref={canvasRef}
-              width={800}
-              height={60}
-              className="w-full h-15 bg-black/20 rounded-lg"
-            />
-          </div>
-        )}
-        
-        <div className={`flex items-center ${isMobile ? 'gap-2' : 'gap-4'}`}>
+        {/* Main Player Controls */}
+        <div className="flex items-center justify-between">
           {/* Track Info */}
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-            <img 
-              src={currentTrack.imageUrl || '/api/placeholder/64/64'} 
-              alt={currentTrack.title}
-              className={`${isMobile ? 'w-8 h-8' : 'w-12 h-12'} rounded-lg object-cover shadow-lg`}
-            />
-            <div className="min-w-0 flex-1">
-              <div className={`font-semibold text-white truncate ${isMobile ? 'text-sm' : ''}`}>
-                {currentTrack.title}
-              </div>
-              {!isMobile && (
-                <div className="text-sm text-gray-400 truncate">{currentTrack.artist}</div>
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="w-12 h-12 bg-zinc-800 rounded-lg flex-shrink-0">
+              {currentTrack.imageUrl && (
+                <img
+                  src={currentTrack.imageUrl}
+                  alt={currentTrack.title}
+                  className="w-full h-full object-cover rounded-lg"
+                />
               )}
             </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-white font-medium text-sm truncate">{currentTrack.title}</h4>
+              <p className="text-gray-400 text-xs truncate">{currentTrack.artist}</p>
+            </div>
           </div>
 
-          {/* Mobile Controls (condensed) */}
-          {isMobile ? (
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="text-white hover:bg-[var(--accent-purple)] bg-[var(--accent-purple)]/20 w-8 h-8 min-w-[44px] min-h-[44px]"
-              >
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={nextTrack}
-                className="text-white hover:bg-[var(--medium-gray)] hover:text-[var(--accent-purple)] w-8 h-8 min-w-[44px] min-h-[44px]"
-              >
-                <SkipForward className="w-4 h-4" />
-              </Button>
-            </div>
-          ) : (
-            /* Desktop Controls */
-            <>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={previousTrack}
-                  className="text-white hover:bg-[var(--medium-gray)] hover:text-[var(--accent-purple)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]"
-                >
-                  <SkipBack className="w-4 h-4" />
-                </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className="text-white hover:bg-[var(--accent-purple)] bg-[var(--accent-purple)]/20 w-12 h-12 focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]"
-                >
-                  {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-                </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={nextTrack}
-                  className="text-white hover:bg-[var(--medium-gray)] hover:text-[var(--accent-purple)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]"
-                >
-                  <SkipForward className="w-4 h-4" />
-                </Button>
-              </div>
+          {/* Playback Controls */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={previousTrack}
+              className="w-8 h-8 p-0 text-gray-400 hover:text-white"
+            >
+              <SkipBack className="w-4 h-4" />
+            </Button>
 
-              {/* Progress */}
-              <div className="flex items-center gap-2 flex-1 max-w-md">
-                <span className="text-xs text-gray-400 w-10 text-right">
-                  {formatTime(currentTime)}
-                </span>
-                <div className="flex-1 relative">
-                  <Slider
-                    value={[duration ? (currentTime / duration) * 100 : 0]}
-                    onValueChange={handleSeek}
-                    max={100}
-                    step={0.1}
-                    className="w-full"
-                  />
-                  {/* Progress indicator */}
-                  <div 
-                    className="absolute top-1/2 left-0 h-1 bg-gradient-to-r from-[var(--accent-purple)] to-[var(--accent-cyan)] rounded-full transform -translate-y-1/2 pointer-events-none"
-                    style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-                  />
-                </div>
-                <span className="text-xs text-gray-400 w-10">
-                  {formatTime(duration)}
-                </span>
-              </div>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setIsPlaying(!isPlaying)}
+              className="w-10 h-10 p-0 bg-[var(--accent-purple)] hover:bg-purple-600"
+            >
+              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+            </Button>
 
-              {/* Volume & Expand (desktop only) */}
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsMuted(!isMuted)}
-                  className="text-white hover:bg-[var(--medium-gray)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]"
-                >
-                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                </Button>
-                <Slider
-                  value={[volume]}
-                  onValueChange={handleVolumeChange}
-                  max={100}
-                  step={1}
-                  className="w-20"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  className="text-white hover:bg-[var(--medium-gray)] hover:text-[var(--accent-purple)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]"
-                >
-                  {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={nextTrack}
+              className="w-8 h-8 p-0 text-gray-400 hover:text-white"
+            >
+              <SkipForward className="w-4 h-4" />
+            </Button>
+          </div>
 
-        {/* Mobile Progress Bar (separate row) */}
-        {isMobile && (
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-xs text-gray-400 w-8 text-right">
-              {formatTime(currentTime)}
-            </span>
-            <div className="flex-1 relative">
+          {/* Progress Bar */}
+          <div className="flex-1 max-w-md mx-4">
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <span className="w-10 text-right">{formatTime(currentTime)}</span>
               <Slider
                 value={[duration ? (currentTime / duration) * 100 : 0]}
-                onValueChange={handleSeek}
                 max={100}
                 step={0.1}
-                className="w-full h-2"
+                onValueChange={handleSeek}
+                className="flex-1"
+              />
+              <span className="w-10">{formatTime(duration)}</span>
+            </div>
+          </div>
+
+          {/* Volume Controls */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsMuted(!isMuted)}
+              className="w-8 h-8 p-0 text-gray-400 hover:text-white"
+            >
+              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </Button>
+
+            <div className="w-20">
+              <Slider
+                value={[isMuted ? 0 : volume]}
+                max={100}
+                step={1}
+                onValueChange={handleVolumeChange}
               />
             </div>
-            <span className="text-xs text-gray-400 w-8">
-              {formatTime(duration)}
-            </span>
           </div>
-        )}
+
+          {/* Expand/Collapse Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="w-8 h-8 p-0 text-gray-400 hover:text-white"
+          >
+            {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </Button>
+        </div>
       </div>
     </div>
   );

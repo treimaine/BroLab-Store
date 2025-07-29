@@ -1,16 +1,18 @@
-import { useRef, useEffect, useState } from "react";
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { useAudioStore } from "@/store/useAudioStore";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { useAudioStore } from "@/store/useAudioStore";
+import { AnimatePresence, motion } from "framer-motion";
+import { Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 export function GlobalAudioPlayer() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [previousVolume, setPreviousVolume] = useState(0.8);
-  
+  const lastTrackRef = useRef<string | null>(null);
+  const lastPlayingRef = useRef<boolean>(false);
+
   const {
     currentTrack,
     isPlaying,
@@ -33,19 +35,25 @@ export function GlobalAudioPlayer() {
     if (audioRef.current && currentTrack) {
       audioRef.current.src = currentTrack.url;
       audioRef.current.load();
+      lastTrackRef.current = currentTrack.id;
     }
-  }, [currentTrack]);
+  }, [currentTrack?.id]);
 
-  // Handle play/pause
+  // Handle play/pause separately to avoid loops
   useEffect(() => {
-    if (audioRef.current) {
+    const audio = audioRef.current;
+    if (!audio || !currentTrack) return;
+
+    // Only update if state actually changed
+    if (lastPlayingRef.current !== isPlaying) {
       if (isPlaying) {
-        audioRef.current.play().catch(console.error);
+        audio.play().catch(console.error);
       } else {
-        audioRef.current.pause();
+        audio.pause();
       }
+      lastPlayingRef.current = isPlaying;
     }
-  }, [isPlaying]);
+  }, [isPlaying, currentTrack?.id]);
 
   // Handle volume changes
   useEffect(() => {
@@ -62,7 +70,7 @@ export function GlobalAudioPlayer() {
       setDuration(audioRef.current.duration);
     }
   };
-  
+
   const handleTimeUpdate = () => {
     if (audioRef.current) {
       setProgress(audioRef.current.currentTime);
@@ -156,21 +164,26 @@ export function GlobalAudioPlayer() {
           <div className="max-w-7xl mx-auto px-4 py-3">
             <div className="flex items-center gap-4">
               {/* Track Info */}
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                {currentTrack.artwork && (
-                  <img
-                    src={currentTrack.artwork}
-                    alt={currentTrack.title}
-                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-medium text-white truncate">
-                    {currentTrack.title}
-                  </h4>
-                  <p className="text-xs text-gray-400 truncate">
-                    {currentTrack.artist}
-                  </p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3">
+                  {/* Artwork */}
+                  <div className="w-12 h-12 bg-zinc-800 rounded-lg flex-shrink-0">
+                    {currentTrack.imageUrl && (
+                      <img
+                        src={currentTrack.imageUrl}
+                        alt={currentTrack.title}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    )}
+                  </div>
+
+                  {/* Track Details */}
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-white font-medium text-sm truncate">
+                      {currentTrack.title}
+                    </h4>
+                    <p className="text-gray-400 text-xs truncate">{currentTrack.artist}</p>
+                  </div>
                 </div>
               </div>
 
@@ -234,22 +247,20 @@ export function GlobalAudioPlayer() {
                   onClick={handleMuteToggle}
                   className="w-8 h-8 p-0 text-gray-400 hover:text-white"
                 >
-                  {isMuted || volume === 0 ? (
-                    <VolumeX className="w-4 h-4" />
-                  ) : (
-                    <Volume2 className="w-4 h-4" />
-                  )}
+                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </Button>
-                <Slider
-                  value={[volume]}
-                  max={1}
-                  step={0.01}
-                  onValueChange={handleVolumeChange}
-                  className="w-20"
-                />
+
+                <div className="w-20">
+                  <Slider
+                    value={[isMuted ? 0 : volume]}
+                    max={100}
+                    step={1}
+                    onValueChange={handleVolumeChange}
+                  />
+                </div>
               </div>
 
-              {/* Close */}
+              {/* Close Button */}
               <Button
                 variant="ghost"
                 size="sm"

@@ -17,6 +17,7 @@ describe('GET /api/subscription/status', () => {
 
     // Arrange: register and login user
     testUser = makeTestUser();
+    agent = request.agent(app);
 
     // Mock db helpers (après avoir défini testUser)
     (db.getSubscription as jest.Mock).mockResolvedValue(null);
@@ -45,9 +46,13 @@ describe('GET /api/subscription/status', () => {
       created_at: new Date().toISOString()
     }));
 
-    await request(app).post('/api/auth/register').send(testUser);
-    agent = request.agent(app);
-    await agent.post('/api/auth/login').send({ username: testUser.email, password: testUser.password });
+    await agent.post('/api/auth/register').send(testUser);
+    const loginRes = await agent.post('/api/auth/login').send({ username: testUser.username, password: testUser.password });
+    
+    // Verify login succeeded
+    if (loginRes.status !== 200) {
+      throw new Error(`Login failed: ${loginRes.status} ${JSON.stringify(loginRes.body)}`);
+    }
   });
 
   it('retourne status: none si pas d’abonnement', async () => {
@@ -219,7 +224,7 @@ describe('GET /api/subscription/status', () => {
       password: hashedPassword,
       created_at: new Date().toISOString()
     }));
-    const loginRes = await agent.post('/api/auth/login').send({ username: user.email, password: user.password });
+    const loginRes = await agent.post('/api/auth/login').send({ username: user.username, password: user.password });
     // Après le login, tous les appels à getUserById renvoient null
     (db.getUserById as jest.Mock).mockReset();
     (db.getUserById as jest.Mock).mockResolvedValue(null);
@@ -234,7 +239,7 @@ describe('GET /api/subscription/status', () => {
     const agent = request.agent(app);
     const user = makeTestUser();
     await request(app).post('/api/auth/register').send(user);
-    await agent.post('/api/auth/login').send({ username: user.email, password: user.password });
+    await agent.post('/api/auth/login').send({ username: user.username, password: user.password });
     const res = await agent.get('/api/subscription/status');
     expect(res.status).toBe(500);
     expect(res.body).toHaveProperty('error');

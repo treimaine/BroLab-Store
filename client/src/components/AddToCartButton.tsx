@@ -16,6 +16,7 @@ interface AddToCartButtonProps {
   className?: string;
   variant?: "default" | "outline" | "ghost";
   size?: "sm" | "md" | "lg";
+  showText?: boolean;
 }
 
 export function AddToCartButton({
@@ -24,6 +25,7 @@ export function AddToCartButton({
   className = "",
   variant = "default",
   size = "md",
+  showText = true,
 }: AddToCartButtonProps) {
   const { addItem: addToCart } = useCart();
   const [isAdding, setIsAdding] = useState(false);
@@ -49,12 +51,7 @@ export function AddToCartButton({
       });
 
       // Track the event
-      trackAddToCart(
-        String(product.id),
-        product.title ?? product.name,
-        product.price,
-        licenseType
-      );
+      trackAddToCart(String(product.id), product.title ?? product.name, product.price, licenseType);
 
       // Show success state
       setJustAdded(true);
@@ -99,7 +96,7 @@ export function AddToCartButton({
       `}
     >
       {buttonIcon()}
-      <span className="ml-2">{buttonText()}</span>
+      {showText && <span className="ml-2">{buttonText()}</span>}
     </Button>
   );
 }
