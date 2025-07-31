@@ -49,6 +49,12 @@ function LazyBeatCard({
             featured={beat.featured || false}
             downloads={beat.downloads || 0}
             duration={beat.duration || 0}
+            isFree={
+              beat.is_free ||
+              beat.tags?.some((tag: string) => tag.toLowerCase() === "free") ||
+              beat.price === 0 ||
+              false
+            }
             onViewDetails={() => onBeatClick?.(beat)}
           />
         ) : (

@@ -1,13 +1,19 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { StandardHero } from "@/components/ui/StandardHero";
-import { Calendar, Clock, Mic, User, Mail, Phone, MapPin, ArrowLeft } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { Calendar, Clock, Mail, MapPin, Mic, Phone, User } from "lucide-react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 
 interface BookingFormData {
@@ -38,7 +44,7 @@ export default function RecordingSessions() {
     preferredTime: "",
     location: "",
     message: "",
-    budget: ""
+    budget: "",
   });
 
   const handleInputChange = (field: keyof BookingFormData, value: string) => {
@@ -47,28 +53,52 @@ export default function RecordingSessions() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
-      const response = await fetch('/api/booking/recording', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+      // Convert form data to reservation format
+      const reservationData = {
+        service_type: "recording" as const,
+        details: {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          requirements: formData.message,
+        },
+        preferred_date: new Date(
+          `${formData.preferredDate}T${formData.preferredTime}`
+        ).toISOString(),
+        duration_minutes: parseInt(formData.duration) * 60, // Convert hours to minutes
+        total_price:
+          formData.budget === "300-500"
+            ? 40000 // $400 in cents
+            : formData.budget === "500-1000"
+            ? 75000 // $750 in cents
+            : formData.budget === "1000-2000"
+            ? 150000 // $1500 in cents
+            : 250000, // $2500+ in cents
+        notes: `Session Type: ${formData.sessionType}, Location: ${formData.location}, Budget: ${formData.budget}`,
+      };
+
+      const response = await fetch("/api/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reservationData),
       });
 
       if (response.ok) {
         toast({
-          title: "Booking Request Sent!",
-          description: "We'll contact you within 24 hours to confirm your recording session.",
+          title: "Recording Session Booked!",
+          description: "We'll contact you within 24 hours to confirm your session.",
         });
-        setLocation('/');
+        setLocation("/");
       } else {
-        throw new Error('Failed to submit booking');
+        throw new Error("Failed to submit booking");
       }
     } catch (error) {
       toast({
         title: "Booking Failed",
         description: "Please try again or contact us directly.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -79,9 +109,8 @@ export default function RecordingSessions() {
         title="Recording Sessions"
         subtitle="Professional studio recording with industry-standard equipment. Book your session today and bring your music to life."
       />
-      
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Service Info */}
           <div className="space-y-6">
@@ -98,16 +127,18 @@ export default function RecordingSessions() {
                   <p className="text-gray-300 text-sm mb-2">Individual artist recording sessions</p>
                   <p className="text-white font-bold">$150/hour</p>
                 </div>
-                
+
                 <div className="p-4 bg-blue-600/10 border border-blue-600/20 rounded-lg">
                   <h3 className="font-semibold text-blue-400 mb-2">Group Recording</h3>
                   <p className="text-gray-300 text-sm mb-2">Band or group recording sessions</p>
                   <p className="text-white font-bold">$200/hour</p>
                 </div>
-                
+
                 <div className="p-4 bg-green-600/10 border border-green-600/20 rounded-lg">
                   <h3 className="font-semibold text-green-400 mb-2">Full Production</h3>
-                  <p className="text-gray-300 text-sm mb-2">Complete song production from start to finish</p>
+                  <p className="text-gray-300 text-sm mb-2">
+                    Complete song production from start to finish
+                  </p>
                   <p className="text-white font-bold">$500-2000/song</p>
                 </div>
 
@@ -137,22 +168,26 @@ export default function RecordingSessions() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="name" className="text-gray-300">Full Name *</Label>
+                    <Label htmlFor="name" className="text-gray-300">
+                      Full Name *
+                    </Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                       <Input
                         id="name"
                         required
                         value={formData.name}
-                        onChange={(e) => handleInputChange('name', e.target.value)}
+                        onChange={e => handleInputChange("name", e.target.value)}
                         className="bg-gray-700 border-gray-600 text-white pl-10"
                         placeholder="Your full name"
                       />
                     </div>
                   </div>
-                  
+
                   <div>
-                    <Label htmlFor="email" className="text-gray-300">Email *</Label>
+                    <Label htmlFor="email" className="text-gray-300">
+                      Email *
+                    </Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                       <Input
@@ -160,7 +195,7 @@ export default function RecordingSessions() {
                         type="email"
                         required
                         value={formData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        onChange={e => handleInputChange("email", e.target.value)}
                         className="bg-gray-700 border-gray-600 text-white pl-10"
                         placeholder="your@email.com"
                       />
@@ -169,13 +204,15 @@ export default function RecordingSessions() {
                 </div>
 
                 <div>
-                  <Label htmlFor="phone" className="text-gray-300">Phone Number</Label>
+                  <Label htmlFor="phone" className="text-gray-300">
+                    Phone Number
+                  </Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <Input
                       id="phone"
                       value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      onChange={e => handleInputChange("phone", e.target.value)}
                       className="bg-gray-700 border-gray-600 text-white pl-10"
                       placeholder="(555) 123-4567"
                     />
@@ -183,8 +220,13 @@ export default function RecordingSessions() {
                 </div>
 
                 <div>
-                  <Label htmlFor="sessionType" className="text-gray-300">Session Type *</Label>
-                  <Select value={formData.sessionType} onValueChange={(value) => handleInputChange('sessionType', value)}>
+                  <Label htmlFor="sessionType" className="text-gray-300">
+                    Session Type *
+                  </Label>
+                  <Select
+                    value={formData.sessionType}
+                    onValueChange={value => handleInputChange("sessionType", value)}
+                  >
                     <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                       <SelectValue placeholder="Select session type" />
                     </SelectTrigger>
@@ -198,8 +240,13 @@ export default function RecordingSessions() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="duration" className="text-gray-300">Session Duration *</Label>
-                    <Select value={formData.duration} onValueChange={(value) => handleInputChange('duration', value)}>
+                    <Label htmlFor="duration" className="text-gray-300">
+                      Session Duration *
+                    </Label>
+                    <Select
+                      value={formData.duration}
+                      onValueChange={value => handleInputChange("duration", value)}
+                    >
                       <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                         <SelectValue placeholder="Select duration" />
                       </SelectTrigger>
@@ -214,8 +261,13 @@ export default function RecordingSessions() {
                   </div>
 
                   <div>
-                    <Label htmlFor="budget" className="text-gray-300">Budget Range</Label>
-                    <Select value={formData.budget} onValueChange={(value) => handleInputChange('budget', value)}>
+                    <Label htmlFor="budget" className="text-gray-300">
+                      Budget Range
+                    </Label>
+                    <Select
+                      value={formData.budget}
+                      onValueChange={value => handleInputChange("budget", value)}
+                    >
                       <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                         <SelectValue placeholder="Select budget" />
                       </SelectTrigger>
@@ -231,19 +283,23 @@ export default function RecordingSessions() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="preferredDate" className="text-gray-300">Preferred Date *</Label>
+                    <Label htmlFor="preferredDate" className="text-gray-300">
+                      Preferred Date *
+                    </Label>
                     <Input
                       id="preferredDate"
                       type="date"
                       required
                       value={formData.preferredDate}
-                      onChange={(e) => handleInputChange('preferredDate', e.target.value)}
+                      onChange={e => handleInputChange("preferredDate", e.target.value)}
                       className="bg-gray-700 border-gray-600 text-white"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="preferredTime" className="text-gray-300">Preferred Time *</Label>
+                    <Label htmlFor="preferredTime" className="text-gray-300">
+                      Preferred Time *
+                    </Label>
                     <div className="relative">
                       <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                       <Input
@@ -251,7 +307,7 @@ export default function RecordingSessions() {
                         type="time"
                         required
                         value={formData.preferredTime}
-                        onChange={(e) => handleInputChange('preferredTime', e.target.value)}
+                        onChange={e => handleInputChange("preferredTime", e.target.value)}
                         className="bg-gray-700 border-gray-600 text-white pl-10"
                       />
                     </div>
@@ -259,13 +315,15 @@ export default function RecordingSessions() {
                 </div>
 
                 <div>
-                  <Label htmlFor="location" className="text-gray-300">Preferred Location</Label>
+                  <Label htmlFor="location" className="text-gray-300">
+                    Preferred Location
+                  </Label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <Input
                       id="location"
                       value={formData.location}
-                      onChange={(e) => handleInputChange('location', e.target.value)}
+                      onChange={e => handleInputChange("location", e.target.value)}
                       className="bg-gray-700 border-gray-600 text-white pl-10"
                       placeholder="Our studio or your location"
                     />
@@ -273,21 +331,20 @@ export default function RecordingSessions() {
                 </div>
 
                 <div>
-                  <Label htmlFor="message" className="text-gray-300">Additional Details</Label>
+                  <Label htmlFor="message" className="text-gray-300">
+                    Additional Details
+                  </Label>
                   <Textarea
                     id="message"
                     value={formData.message}
-                    onChange={(e) => handleInputChange('message', e.target.value)}
+                    onChange={e => handleInputChange("message", e.target.value)}
                     className="bg-gray-700 border-gray-600 text-white"
                     placeholder="Tell us about your project, genre, number of songs, special requirements..."
                     rows={4}
                   />
                 </div>
 
-                <Button 
-                  type="submit" 
-                  className="w-full btn-primary text-lg py-4"
-                >
+                <Button type="submit" className="w-full btn-primary text-lg py-4">
                   Book Recording Session
                 </Button>
               </form>

@@ -17,7 +17,16 @@ export interface WooProduct {
 const extractKey = (_: WooProduct) => null;
 const extractDuration = (_: WooProduct) => null;
 const extractMood = (_: WooProduct) => null;
-const extractIsFree = (_: WooProduct) => false;
+const extractIsFree = (p: WooProduct) => {
+  // Check if product is free based on price, tags, or meta data
+  const price = Number(p.price) || 0;
+  const hasFreeTag = p.tags?.some(tag => tag.name.toLowerCase() === 'free') || false;
+  const isFreeInMeta = p.meta_data?.some(meta => 
+    meta.key === 'is_free' && meta.value === 'true'
+  ) || false;
+  
+  return price === 0 || hasFreeTag || isFreeInMeta;
+};
 
 export function mapWooProductToBeat(p: WooProduct): Beat {
   return {
@@ -32,8 +41,7 @@ export function mapWooProductToBeat(p: WooProduct): Beat {
     description: p.description || '',
     wordpress_id: 0, // Default, as Woo products are not WP posts
     created_at: p.date_created || new Date().toISOString(),
-    // Remove is_free and any other non-Beat fields
-    // Only map fields that exist in Beat type
+    is_free: extractIsFree(p), // Include is_free property
   };
 }
 

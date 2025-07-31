@@ -12,6 +12,7 @@ interface HoverPlayButtonProps {
   onPause?: () => void;
   productId?: string;
   productName?: string;
+  imageUrl?: string;
 }
 
 export function HoverPlayButton({
@@ -22,6 +23,7 @@ export function HoverPlayButton({
   onPause,
   productId = "",
   productName = "",
+  imageUrl = "",
 }: HoverPlayButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { currentTrack, isPlaying, setCurrentTrack, setIsPlaying } = useAudioStore();
@@ -59,7 +61,7 @@ export function HoverPlayButton({
           artist: "Producer",
           url: audioUrl ?? "",
           audioUrl: audioUrl ?? "",
-          imageUrl: "/api/placeholder/64/64",
+          imageUrl: imageUrl || "/api/placeholder/64/64",
         });
         setIsPlaying(true);
         trackPlayPreview(productId, productName);

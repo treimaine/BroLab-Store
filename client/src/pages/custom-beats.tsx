@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { CustomBeatRequest } from '@/components/CustomBeatRequest';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { StandardHero } from '@/components/ui/StandardHero';
-import { Music, Clock, Star, CheckCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { CustomBeatRequest } from "@/components/CustomBeatRequest";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StandardHero } from "@/components/ui/StandardHero";
+import { useToast } from "@/hooks/use-toast";
+import { CheckCircle, Clock, Music, Star } from "lucide-react";
+import { useState } from "react";
 
 interface BeatRequest {
   genre: string;
@@ -18,7 +18,7 @@ interface BeatRequest {
   budget: number;
   deadline: string;
   revisions: number;
-  priority: 'standard' | 'priority' | 'express';
+  priority: "standard" | "priority" | "express";
   additionalNotes?: string;
 }
 
@@ -29,26 +29,64 @@ export default function CustomBeats() {
 
   const handleSubmitRequest = async (request: BeatRequest) => {
     setIsSubmitting(true);
-    
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      setSubmittedRequests(prev => [...prev, request]);
-      
-      toast({
-        title: "Request Submitted Successfully!",
-        description: `Your custom beat request has been submitted. We'll get back to you within ${
-          request.priority === 'express' ? '24 hours' : 
-          request.priority === 'priority' ? '2-3 days' : 
-          '5-7 days'
-        }.`,
+      // Convert custom beat request to reservation format
+      const reservationData = {
+        service_type: "custom_beat" as const,
+        details: {
+          name: "Custom Beat Request", // Will be filled by user in form
+          email: "user@example.com", // Will be filled by user in form
+          phone: "+1234567890", // Will be filled by user in form
+          requirements: `Genre: ${request.genre}${request.subGenre ? ` (${request.subGenre})` : ""}
+BPM: ${request.bpm}
+Key: ${request.key}
+Mood: ${request.mood.join(", ")}
+Instruments: ${request.instruments.join(", ")}
+Duration: ${request.duration} seconds
+Description: ${request.description}
+Reference Track: ${request.referenceTrack || "None"}
+Priority: ${request.priority}
+Deadline: ${request.deadline}
+Revisions: ${request.revisions}
+Additional Notes: ${request.additionalNotes || "None"}`,
+        },
+        preferred_date: new Date().toISOString(), // Will be set by user
+        duration_minutes: 480, // 8 hours for custom beat production
+        total_price:
+          (request.budget +
+            (request.priority === "express" ? 100 : request.priority === "priority" ? 50 : 0)) *
+          100, // Convert to cents
+        notes: `Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadline}`,
+      };
+
+      const response = await fetch("/api/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reservationData),
       });
+
+      if (response.ok) {
+        setSubmittedRequests(prev => [...prev, request]);
+
+        toast({
+          title: "Custom Beat Request Submitted!",
+          description: `Your custom beat request has been submitted. We'll get back to you within ${
+            request.priority === "express"
+              ? "24 hours"
+              : request.priority === "priority"
+              ? "2-3 days"
+              : "5-7 days"
+          }.`,
+        });
+      } else {
+        throw new Error("Failed to submit request");
+      }
     } catch (error) {
       toast({
         title: "Submission Failed",
         description: "There was an error submitting your request. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -61,9 +99,8 @@ export default function CustomBeats() {
         title="Custom Beat Production"
         subtitle="Get a professionally produced beat tailored exactly to your vision. Our producers will create something unique just for you."
       />
-      
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Process Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <Card className="card-dark text-center">
@@ -101,10 +138,7 @@ export default function CustomBeats() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Request Form */}
           <div className="lg:col-span-2">
-            <CustomBeatRequest
-              onSubmit={handleSubmitRequest}
-              isSubmitting={isSubmitting}
-            />
+            <CustomBeatRequest onSubmit={handleSubmitRequest} isSubmitting={isSubmitting} />
           </div>
 
           {/* Sidebar */}
@@ -158,15 +192,20 @@ export default function CustomBeats() {
                     <div key={index} className="p-3 bg-[var(--medium-gray)] rounded-lg">
                       <div className="font-medium text-white">{request.genre} Beat</div>
                       <div className="text-sm text-gray-400">
-                        {request.bpm} BPM • {request.key} • ${request.budget + (
-                          request.priority === 'express' ? 100 : 
-                          request.priority === 'priority' ? 50 : 0
-                        )}
+                        {request.bpm} BPM • {request.key} • $
+                        {request.budget +
+                          (request.priority === "express"
+                            ? 100
+                            : request.priority === "priority"
+                            ? 50
+                            : 0)}
                       </div>
                       <div className="text-xs text-[var(--accent-purple)] mt-1">
-                        {request.priority === 'express' ? 'Express (1-2 days)' : 
-                         request.priority === 'priority' ? 'Priority (3-5 days)' : 
-                         'Standard (5-7 days)'}
+                        {request.priority === "express"
+                          ? "Express (1-2 days)"
+                          : request.priority === "priority"
+                          ? "Priority (3-5 days)"
+                          : "Standard (5-7 days)"}
                       </div>
                     </div>
                   ))}

@@ -1,13 +1,19 @@
-import { useState, useEffect } from 'react';
-import { Filter, X, RotateCcw, Music, Clock, Heart, Star } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Clock, Filter, Music, RotateCcw, Star, X } from "lucide-react";
+import { useState } from "react";
 
 interface AdvancedFilters {
   genres: string[];
@@ -37,48 +43,99 @@ export interface AdvancedBeatFiltersProps {
     producers: string[];
     tags: string[];
   };
+  bpmRange?: [number, number]; // Plage BPM dynamique
 }
 
 const musicalKeys = [
-  'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
-  'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'A#m', 'Bm'
+  "C",
+  "C#",
+  "D",
+  "D#",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "A#",
+  "B",
+  "Cm",
+  "C#m",
+  "Dm",
+  "D#m",
+  "Em",
+  "Fm",
+  "F#m",
+  "Gm",
+  "G#m",
+  "Am",
+  "A#m",
+  "Bm",
 ];
 
-const timeSignatures = ['4/4', '3/4', '6/8', '7/8', '5/4'];
+const timeSignatures = ["4/4", "3/4", "6/8", "7/8", "5/4"];
 
 const instruments = [
-  'Piano', 'Guitar', 'Bass', 'Strings', 'Brass', 'Woodwinds', 'Synthesizer',
-  'Drums', 'Percussion', 'Vocals', 'Saxophone', 'Trumpet', 'Violin', 'Cello'
+  "Piano",
+  "Guitar",
+  "Bass",
+  "Strings",
+  "Brass",
+  "Woodwinds",
+  "Synthesizer",
+  "Drums",
+  "Percussion",
+  "Vocals",
+  "Saxophone",
+  "Trumpet",
+  "Violin",
+  "Cello",
 ];
 
 const moods = [
-  'Energetic', 'Chill', 'Dark', 'Uplifting', 'Emotional', 'Aggressive',
-  'Romantic', 'Mysterious', 'Nostalgic', 'Motivational', 'Melancholic',
-  'Dreamy', 'Intense', 'Peaceful', 'Triumphant', 'Atmospheric'
+  "Energetic",
+  "Chill",
+  "Dark",
+  "Uplifting",
+  "Emotional",
+  "Aggressive",
+  "Romantic",
+  "Mysterious",
+  "Nostalgic",
+  "Motivational",
+  "Melancholic",
+  "Dreamy",
+  "Intense",
+  "Peaceful",
+  "Triumphant",
+  "Atmospheric",
 ];
 
 export default function AdvancedBeatFilters({
   filters,
   onFiltersChange,
   onClearAll,
-  availableOptions
+  availableOptions,
+  bpmRange = [60, 200],
 }: AdvancedBeatFiltersProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     genre: true,
     musical: false,
     production: false,
-    metadata: false
+    metadata: false,
   });
 
-  const updateFilter = <T extends keyof AdvancedFilters>(
-    key: T,
-    value: AdvancedFilters[T]
-  ) => {
+  const updateFilter = <T extends keyof AdvancedFilters>(key: T, value: AdvancedFilters[T]) => {
     onFiltersChange({ ...filters, [key]: value });
   };
 
-  const toggleArrayItem = <T extends keyof Pick<AdvancedFilters, 'genres' | 'moods' | 'keys' | 'timeSignature' | 'instruments' | 'producers' | 'tags'>>(
+  const toggleArrayItem = <
+    T extends keyof Pick<
+      AdvancedFilters,
+      "genres" | "moods" | "keys" | "timeSignature" | "instruments" | "producers" | "tags"
+    >
+  >(
     key: T,
     item: string
   ) => {
@@ -92,7 +149,7 @@ export default function AdvancedBeatFilters({
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
       ...prev,
-      [section]: !prev[section]
+      [section]: !prev[section],
     }));
   };
 
@@ -101,7 +158,7 @@ export default function AdvancedBeatFilters({
     if (filters.genres.length > 0) count++;
     if (filters.moods.length > 0) count++;
     if (filters.keys.length > 0) count++;
-    if (filters.bpmRange[0] !== 60 || filters.bpmRange[1] !== 200) count++;
+    if (filters.bpmRange[0] !== bpmRange[0] || filters.bpmRange[1] !== bpmRange[1]) count++;
     if (filters.timeSignature.length > 0) count++;
     if (filters.instruments.length > 0) count++;
     if (filters.producers.length > 0) count++;
@@ -109,7 +166,7 @@ export default function AdvancedBeatFilters({
     if (filters.duration[0] !== 60 || filters.duration[1] !== 300) count++;
     if (filters.priceRange[0] !== 0 || filters.priceRange[1] !== 500) count++;
     if (filters.releaseDate) count++;
-    if (filters.popularity !== 'all') count++;
+    if (filters.popularity !== "all") count++;
     if (filters.stems) count++;
     if (filters.hasVocals) count++;
     if (filters.isFree) count++;
@@ -120,9 +177,7 @@ export default function AdvancedBeatFilters({
     genre.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredMoods = moods.filter(mood =>
-    mood.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMoods = moods.filter(mood => mood.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <Card className="card-dark">
@@ -147,13 +202,13 @@ export default function AdvancedBeatFilters({
             Clear All
           </Button>
         </div>
-        
+
         {/* Search */}
         <div className="relative">
           <Input
             placeholder="Search filters..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={e => setSearchTerm(e.target.value)}
             className="form-input pl-8"
           />
           <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -162,15 +217,13 @@ export default function AdvancedBeatFilters({
 
       <CardContent className="space-y-6">
         {/* Genre & Style */}
-        <Collapsible open={expandedSections.genre} onOpenChange={() => toggleSection('genre')}>
+        <Collapsible open={expandedSections.genre} onOpenChange={() => toggleSection("genre")}>
           <CollapsibleTrigger className="flex items-center justify-between w-full text-left p-2 hover:bg-[var(--medium-gray)] rounded transition-colors">
             <h4 className="font-medium text-white flex items-center gap-2">
               <Music className="w-4 h-4" />
               Genre & Style
             </h4>
-            <div className="text-xl text-gray-400">
-              {expandedSections.genre ? '−' : '+'}
-            </div>
+            <div className="text-xl text-gray-400">{expandedSections.genre ? "−" : "+"}</div>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 mt-4">
             {/* Genres */}
@@ -183,10 +236,10 @@ export default function AdvancedBeatFilters({
                     variant={filters.genres.includes(genre) ? "default" : "outline"}
                     className={`cursor-pointer transition-colors ${
                       filters.genres.includes(genre)
-                        ? 'bg-[var(--accent-purple)] text-white'
-                        : 'border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]'
+                        ? "bg-[var(--accent-purple)] text-white"
+                        : "border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]"
                     }`}
-                    onClick={() => toggleArrayItem('genres', genre)}
+                    onClick={() => toggleArrayItem("genres", genre)}
                   >
                     {genre}
                   </Badge>
@@ -204,10 +257,10 @@ export default function AdvancedBeatFilters({
                     variant={filters.moods.includes(mood) ? "default" : "outline"}
                     className={`cursor-pointer transition-colors ${
                       filters.moods.includes(mood)
-                        ? 'bg-[var(--accent-cyan)] text-white'
-                        : 'border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]'
+                        ? "bg-[var(--accent-purple)] text-white"
+                        : "border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]"
                     }`}
-                    onClick={() => toggleArrayItem('moods', mood)}
+                    onClick={() => toggleArrayItem("moods", mood)}
                   >
                     {mood}
                   </Badge>
@@ -218,15 +271,13 @@ export default function AdvancedBeatFilters({
         </Collapsible>
 
         {/* Musical Elements */}
-        <Collapsible open={expandedSections.musical} onOpenChange={() => toggleSection('musical')}>
+        <Collapsible open={expandedSections.musical} onOpenChange={() => toggleSection("musical")}>
           <CollapsibleTrigger className="flex items-center justify-between w-full text-left p-2 hover:bg-[var(--medium-gray)] rounded transition-colors">
             <h4 className="font-medium text-white flex items-center gap-2">
               <Music className="w-4 h-4" />
               Musical Elements
             </h4>
-            <div className="text-xl text-gray-400">
-              {expandedSections.musical ? '−' : '+'}
-            </div>
+            <div className="text-xl text-gray-400">{expandedSections.musical ? "−" : "+"}</div>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 mt-4">
             {/* BPM Range */}
@@ -236,9 +287,9 @@ export default function AdvancedBeatFilters({
               </label>
               <Slider
                 value={filters.bpmRange}
-                onValueChange={(value) => updateFilter('bpmRange', value as [number, number])}
-                min={60}
-                max={200}
+                onValueChange={value => updateFilter("bpmRange", value as [number, number])}
+                min={bpmRange[0]}
+                max={bpmRange[1]}
                 step={1}
                 className="mt-2"
               />
@@ -254,10 +305,10 @@ export default function AdvancedBeatFilters({
                     variant={filters.keys.includes(key) ? "default" : "outline"}
                     className={`cursor-pointer transition-colors text-center ${
                       filters.keys.includes(key)
-                        ? 'bg-[var(--accent-purple)] text-white'
-                        : 'border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]'
+                        ? "bg-[var(--accent-purple)] text-white"
+                        : "border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]"
                     }`}
-                    onClick={() => toggleArrayItem('keys', key)}
+                    onClick={() => toggleArrayItem("keys", key)}
                   >
                     {key}
                   </Badge>
@@ -275,10 +326,10 @@ export default function AdvancedBeatFilters({
                     variant={filters.timeSignature.includes(sig) ? "default" : "outline"}
                     className={`cursor-pointer transition-colors ${
                       filters.timeSignature.includes(sig)
-                        ? 'bg-[var(--accent-cyan)] text-white'
-                        : 'border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]'
+                        ? "bg-[var(--accent-purple)] text-white"
+                        : "border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]"
                     }`}
-                    onClick={() => toggleArrayItem('timeSignature', sig)}
+                    onClick={() => toggleArrayItem("timeSignature", sig)}
                   >
                     {sig}
                   </Badge>
@@ -296,10 +347,10 @@ export default function AdvancedBeatFilters({
                     variant={filters.instruments.includes(instrument) ? "default" : "outline"}
                     className={`cursor-pointer transition-colors ${
                       filters.instruments.includes(instrument)
-                        ? 'bg-[var(--accent-purple)] text-white'
-                        : 'border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]'
+                        ? "bg-[var(--accent-purple)] text-white"
+                        : "border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]"
                     }`}
-                    onClick={() => toggleArrayItem('instruments', instrument)}
+                    onClick={() => toggleArrayItem("instruments", instrument)}
                   >
                     {instrument}
                   </Badge>
@@ -310,25 +361,29 @@ export default function AdvancedBeatFilters({
         </Collapsible>
 
         {/* Production Features */}
-        <Collapsible open={expandedSections.production} onOpenChange={() => toggleSection('production')}>
+        <Collapsible
+          open={expandedSections.production}
+          onOpenChange={() => toggleSection("production")}
+        >
           <CollapsibleTrigger className="flex items-center justify-between w-full text-left p-2 hover:bg-[var(--medium-gray)] rounded transition-colors">
             <h4 className="font-medium text-white flex items-center gap-2">
               <Star className="w-4 h-4" />
               Production Features
             </h4>
-            <div className="text-xl text-gray-400">
-              {expandedSections.production ? '−' : '+'}
-            </div>
+            <div className="text-xl text-gray-400">{expandedSections.production ? "−" : "+"}</div>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 mt-4">
             {/* Duration */}
             <div>
               <label className="form-label">
-                Duration: {Math.floor(filters.duration[0] / 60)}:{(filters.duration[0] % 60).toString().padStart(2, '0')} - {Math.floor(filters.duration[1] / 60)}:{(filters.duration[1] % 60).toString().padStart(2, '0')}
+                Duration: {Math.floor(filters.duration[0] / 60)}:
+                {(filters.duration[0] % 60).toString().padStart(2, "0")} -{" "}
+                {Math.floor(filters.duration[1] / 60)}:
+                {(filters.duration[1] % 60).toString().padStart(2, "0")}
               </label>
               <Slider
                 value={filters.duration}
-                onValueChange={(value) => updateFilter('duration', value as [number, number])}
+                onValueChange={value => updateFilter("duration", value as [number, number])}
                 min={60}
                 max={300}
                 step={15}
@@ -342,7 +397,7 @@ export default function AdvancedBeatFilters({
                 <Checkbox
                   id="stems"
                   checked={filters.stems}
-                  onCheckedChange={(checked) => updateFilter('stems', !!checked)}
+                  onCheckedChange={checked => updateFilter("stems", !!checked)}
                 />
                 <label htmlFor="stems" className="text-gray-300 text-sm cursor-pointer">
                   Stems Available
@@ -353,7 +408,7 @@ export default function AdvancedBeatFilters({
                 <Checkbox
                   id="vocals"
                   checked={filters.hasVocals}
-                  onCheckedChange={(checked) => updateFilter('hasVocals', !!checked)}
+                  onCheckedChange={checked => updateFilter("hasVocals", !!checked)}
                 />
                 <label htmlFor="vocals" className="text-gray-300 text-sm cursor-pointer">
                   Has Vocals
@@ -364,7 +419,7 @@ export default function AdvancedBeatFilters({
                 <Checkbox
                   id="free"
                   checked={filters.isFree}
-                  onCheckedChange={(checked) => updateFilter('isFree', !!checked)}
+                  onCheckedChange={checked => updateFilter("isFree", !!checked)}
                 />
                 <label htmlFor="free" className="text-gray-300 text-sm cursor-pointer">
                   Free Beats Only
@@ -382,10 +437,10 @@ export default function AdvancedBeatFilters({
                     variant={filters.producers.includes(producer) ? "default" : "outline"}
                     className={`cursor-pointer transition-colors ${
                       filters.producers.includes(producer)
-                        ? 'bg-[var(--accent-cyan)] text-white'
-                        : 'border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]'
+                        ? "bg-[var(--accent-purple)] text-white"
+                        : "border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]"
                     }`}
-                    onClick={() => toggleArrayItem('producers', producer)}
+                    onClick={() => toggleArrayItem("producers", producer)}
                   >
                     {producer}
                   </Badge>
@@ -396,15 +451,16 @@ export default function AdvancedBeatFilters({
         </Collapsible>
 
         {/* Metadata & Pricing */}
-        <Collapsible open={expandedSections.metadata} onOpenChange={() => toggleSection('metadata')}>
+        <Collapsible
+          open={expandedSections.metadata}
+          onOpenChange={() => toggleSection("metadata")}
+        >
           <CollapsibleTrigger className="flex items-center justify-between w-full text-left p-2 hover:bg-[var(--medium-gray)] rounded transition-colors">
             <h4 className="font-medium text-white flex items-center gap-2">
               <Clock className="w-4 h-4" />
               Metadata & Pricing
             </h4>
-            <div className="text-xl text-gray-400">
-              {expandedSections.metadata ? '−' : '+'}
-            </div>
+            <div className="text-xl text-gray-400">{expandedSections.metadata ? "−" : "+"}</div>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 mt-4">
             {/* Price Range */}
@@ -414,7 +470,7 @@ export default function AdvancedBeatFilters({
               </label>
               <Slider
                 value={filters.priceRange}
-                onValueChange={(value) => updateFilter('priceRange', value as [number, number])}
+                onValueChange={value => updateFilter("priceRange", value as [number, number])}
                 min={0}
                 max={500}
                 step={25}
@@ -425,7 +481,10 @@ export default function AdvancedBeatFilters({
             {/* Release Date */}
             <div>
               <label className="form-label">Release Date</label>
-              <Select value={filters.releaseDate} onValueChange={(value) => updateFilter('releaseDate', value)}>
+              <Select
+                value={filters.releaseDate}
+                onValueChange={value => updateFilter("releaseDate", value)}
+              >
                 <SelectTrigger className="form-input">
                   <SelectValue placeholder="Any time" />
                 </SelectTrigger>
@@ -443,7 +502,10 @@ export default function AdvancedBeatFilters({
             {/* Popularity */}
             <div>
               <label className="form-label">Popularity</label>
-              <Select value={filters.popularity} onValueChange={(value) => updateFilter('popularity', value)}>
+              <Select
+                value={filters.popularity}
+                onValueChange={value => updateFilter("popularity", value)}
+              >
                 <SelectTrigger className="form-input">
                   <SelectValue placeholder="Any popularity" />
                 </SelectTrigger>
@@ -467,10 +529,10 @@ export default function AdvancedBeatFilters({
                     variant={filters.tags.includes(tag) ? "default" : "outline"}
                     className={`cursor-pointer transition-colors ${
                       filters.tags.includes(tag)
-                        ? 'bg-[var(--accent-purple)] text-white'
-                        : 'border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]'
+                        ? "bg-[var(--accent-purple)] text-white"
+                        : "border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]"
                     }`}
-                    onClick={() => toggleArrayItem('tags', tag)}
+                    onClick={() => toggleArrayItem("tags", tag)}
                   >
                     #{tag}
                   </Badge>
@@ -490,7 +552,7 @@ export default function AdvancedBeatFilters({
                   {genre}
                   <X
                     className="w-3 h-3 ml-1 cursor-pointer"
-                    onClick={() => toggleArrayItem('genres', genre)}
+                    onClick={() => toggleArrayItem("genres", genre)}
                   />
                 </Badge>
               ))}
@@ -499,16 +561,16 @@ export default function AdvancedBeatFilters({
                   {mood}
                   <X
                     className="w-3 h-3 ml-1 cursor-pointer"
-                    onClick={() => toggleArrayItem('moods', mood)}
+                    onClick={() => toggleArrayItem("moods", mood)}
                   />
                 </Badge>
               ))}
-              {(filters.bpmRange[0] !== 60 || filters.bpmRange[1] !== 200) && (
+              {(filters.bpmRange[0] !== bpmRange[0] || filters.bpmRange[1] !== bpmRange[1]) && (
                 <Badge className="bg-gray-600 text-white">
                   BPM: {filters.bpmRange[0]}-{filters.bpmRange[1]}
                   <X
                     className="w-3 h-3 ml-1 cursor-pointer"
-                    onClick={() => updateFilter('bpmRange', [60, 200])}
+                    onClick={() => updateFilter("bpmRange", bpmRange)}
                   />
                 </Badge>
               )}

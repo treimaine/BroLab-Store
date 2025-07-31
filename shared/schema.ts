@@ -135,6 +135,7 @@ export type BeatProduct = {
   audio_url?: string | null;
   image_url?: string | null;
   image?: string; // Alias pour image_url (compatibilité WooCommerce)
+  images?: Array<{ src: string; alt?: string }>; // Images WooCommerce
   tags?: string[] | null;
   featured?: boolean;
   downloads?: number;
@@ -142,6 +143,7 @@ export type BeatProduct = {
   duration?: number;
   is_active?: boolean;
   isExclusive?: boolean; // Pour les règles d'accès
+  is_free?: boolean; // Indique si le produit est gratuit
   created_at?: string;
 };
 
