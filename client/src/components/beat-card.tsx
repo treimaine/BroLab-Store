@@ -147,7 +147,7 @@ export function BeatCard({
         {/* Wishlist Button */}
         <button
           onClick={handleWishlistToggle}
-          className={`absolute top-12 right-2 p-2 rounded-full transition-all duration-200 z-10 ${
+          className={`absolute top-12 right-2 p-2 rounded-full transition-all duration-200 z-30 ${
             isFavorite(id)
               ? "bg-red-500 text-white hover:bg-red-600"
               : "bg-black/70 text-white hover:bg-red-500 hover:text-white"
@@ -174,6 +174,7 @@ export function BeatCard({
               audioUrl={audioUrl}
               productId={id.toString()}
               productName={title}
+              imageUrl={imageUrl}
               size="lg"
               onPlay={handlePreviewAudio}
             />
@@ -221,7 +222,7 @@ export function BeatCard({
             onClick={isFree ? onViewDetails : handleAddToCart}
             className={
               isFree
-                ? "btn-primary bg-[var(--accent-cyan)] hover:bg-[var(--accent-cyan)]/80 text-black flex items-center gap-2 ml-[6px] mr-[6px] pl-[12px] pr-[12px] pt-[0px] pb-[0px]"
+                ? "btn-primary bg-[var(--accent-cyan)] hover:bg-[var(--accent-cyan)]/80 text-white font-bold flex items-center gap-2 ml-[6px] mr-[6px] pl-[12px] pr-[12px] pt-[0px] pb-[0px]"
                 : "btn-primary flex items-center gap-2 ml-[6px] mr-[6px] pl-[12px] pr-[12px] pt-[0px] pb-[0px]"
             }
           >

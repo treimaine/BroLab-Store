@@ -177,7 +177,13 @@ export default function WishlistPage() {
                   featured={beat.featured}
                   downloads={beat.total_sales || 0}
                   duration={beat.meta_data?.find((meta: any) => meta.key === "duration")?.value}
-                  isFree={beat.price === "0" || beat.price === 0}
+                  isFree={
+                    beat.is_free ||
+                    beat.tags?.some((tag: any) => tag.name.toLowerCase() === "free") ||
+                    beat.price === 0 ||
+                    beat.price === "0" ||
+                    false
+                  }
                   onViewDetails={() => setLocation(`/product/${beat.id}`)}
                 />
 

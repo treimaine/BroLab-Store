@@ -114,6 +114,7 @@ export const RecentlyViewedBeats: React.FC<RecentlyViewedBeatsProps> = ({
                 featured={beat.featured}
                 downloads={beat.downloads}
                 duration={beat.duration || undefined}
+                isFree={beat.price === 0}
               />
               <Button
                 variant="ghost"

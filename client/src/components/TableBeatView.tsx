@@ -2,6 +2,7 @@ import { AddToCartButton } from "@/components/AddToCartButton";
 import { HoverPlayButton } from "@/components/HoverPlayButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useWishlist } from "@/hooks/useWishlist";
 import { useAudioStore } from "@/store/useAudioStore";
 import { Clock, Heart, Music, Share2 } from "lucide-react";
 import { useState } from "react";
@@ -13,6 +14,7 @@ interface TableBeatViewProps {
 
 export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
   const { currentTrack, isPlaying } = useAudioStore();
+  const { isFavorite, addFavorite, removeFavorite } = useWishlist();
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
 
   const formatDuration = (seconds?: number) => {
@@ -23,23 +25,24 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
   };
 
   const getAudioUrl = (product: any) => {
-    return (
-      product.audio_url ||
-      product.meta_data?.find((meta: any) => meta.key === "audio_url")?.value ||
-      "/api/placeholder/audio.mp3"
-    );
+    const audioUrl =
+      product.audio_url || product.meta_data?.find((meta: any) => meta.key === "audio_url")?.value;
+
+    // Retourner null si aucun audio réel n'est trouvé
+    return audioUrl && audioUrl !== "/api/placeholder/audio.mp3" ? audioUrl : null;
   };
 
   const getBPM = (product: any) => {
     return (
       product.bpm ||
       product.attributes?.find((attr: any) => attr.name === "BPM")?.options?.[0] ||
-      120
+      product.meta_data?.find((meta: any) => meta.key === "bpm")?.value ||
+      null
     );
   };
 
   const getGenre = (product: any) => {
-    return product.categories?.[0]?.name || "Hip Hop";
+    return product.categories?.[0]?.name || "Unknown";
   };
 
   const getProducer = (product: any) => {
@@ -47,29 +50,45 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
   };
 
   const getInstruments = (product: any) => {
-    // Simuler des instruments basés sur le genre ou les tags
+    // Utiliser les données réelles de WooCommerce si disponibles
+    const instruments =
+      product.meta_data?.find((meta: any) => meta.key === "instruments")?.value ||
+      product.meta_data?.find((meta: any) => meta.key === "instruments")?.value ||
+      product.tags?.find((tag: any) => tag.name.toLowerCase().includes("instrument"))?.name;
+
+    if (instruments) return instruments;
+
+    // Fallback basé sur le genre si aucune donnée réelle
     const genre = getGenre(product);
-    const instruments = {
+    const genreInstruments = {
       "Hip Hop": "Drum, Bass, Synth, Piano",
       Trap: "808, Hi-Hat, Kick, Snare",
       "R&B": "Piano, Strings, Bass, Drums",
       Pop: "Guitar, Piano, Drums, Synth",
       Electronic: "Synth, Drum Machine, Bass",
     };
-    return instruments[genre as keyof typeof instruments] || "Drum, Bass, Piano";
+    return genreInstruments[genre as keyof typeof genreInstruments] || "Drum, Bass, Piano";
   };
 
   const getMood = (product: any) => {
-    // Simuler des moods basés sur le genre
+    // Utiliser les données réelles de WooCommerce si disponibles
+    const mood =
+      product.meta_data?.find((meta: any) => meta.key === "mood")?.value ||
+      product.meta_data?.find((meta: any) => meta.key === "Mood")?.value ||
+      product.tags?.find((tag: any) => tag.name.toLowerCase().includes("mood"))?.name;
+
+    if (mood) return mood;
+
+    // Fallback basé sur le genre si aucune donnée réelle
     const genre = getGenre(product);
-    const moods = {
+    const genreMoods = {
       "Hip Hop": "Energetic, Aggressive",
       Trap: "Dark, Heavy",
       "R&B": "Smooth, Emotional",
       Pop: "Uplifting, Catchy",
       Electronic: "Futuristic, Dynamic",
     };
-    return moods[genre as keyof typeof moods] || "Energetic, Dynamic";
+    return genreMoods[genre as keyof typeof genreMoods] || "Energetic, Dynamic";
   };
 
   return (
@@ -115,15 +134,18 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
                   alt={product.name}
                   className="w-12 h-12 rounded-lg object-cover"
                 />
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <HoverPlayButton
-                    audioUrl={audioUrl}
-                    productId={product.id.toString()}
-                    productName={product.name}
-                    size="sm"
-                    className="bg-black/70 hover:bg-[var(--accent-purple)]/80"
-                  />
-                </div>
+                {audioUrl && (
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <HoverPlayButton
+                      audioUrl={audioUrl}
+                      productId={product.id.toString()}
+                      productName={product.name}
+                      imageUrl={product.images?.[0]?.src || product.image_url || product.image}
+                      size="sm"
+                      className="bg-black/70 hover:bg-[var(--accent-purple)]/80"
+                    />
+                  </div>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-white font-medium text-sm truncate group-hover:text-[var(--accent-purple)] transition-colors">
@@ -194,8 +216,28 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
               </Button>
 
               {/* Wishlist Button - Taille normale */}
-              <Button variant="ghost" size="sm" className="p-1 h-8 w-8">
-                <Heart className="w-4 h-4 text-gray-400" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`p-1 h-8 w-8 ${
+                  isFavorite(product.id)
+                    ? "text-red-500 hover:text-red-600"
+                    : "text-gray-400 hover:text-red-500"
+                }`}
+                onClick={async e => {
+                  e.stopPropagation();
+                  try {
+                    if (isFavorite(product.id)) {
+                      await removeFavorite(product.id);
+                    } else {
+                      await addFavorite(product.id);
+                    }
+                  } catch (error) {
+                    console.error("Wishlist toggle error:", error);
+                  }
+                }}
+              >
+                <Heart className={`w-4 h-4 ${isFavorite(product.id) ? "fill-current" : ""}`} />
               </Button>
             </div>
           </div>

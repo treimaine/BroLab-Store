@@ -1,13 +1,19 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { StandardHero } from "@/components/ui/StandardHero";
-import { Calendar, MessageCircle, User, Mail, Phone, ArrowLeft, Clock, Video } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { Calendar, Clock, Mail, MessageCircle, Phone, User, Video } from "lucide-react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 
 interface ConsultationFormData {
@@ -42,7 +48,7 @@ export default function ProductionConsultation() {
     budget: "",
     goals: "",
     challenges: "",
-    message: ""
+    message: "",
   });
 
   const handleInputChange = (field: keyof ConsultationFormData, value: string) => {
@@ -51,12 +57,41 @@ export default function ProductionConsultation() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
-      const response = await fetch('/api/booking/production-consultation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+      // Convert form data to reservation format
+      const reservationData = {
+        service_type: "consultation" as const,
+        details: {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          requirements: `Experience Level: ${formData.experience}
+Project Type: ${formData.projectType}
+Consultation Type: ${formData.consultationType}
+Goals: ${formData.goals}
+Challenges: ${formData.challenges}
+Additional Message: ${formData.message}`,
+        },
+        preferred_date: new Date(
+          `${formData.preferredDate}T${formData.preferredTime}`
+        ).toISOString(),
+        duration_minutes: parseInt(formData.duration),
+        total_price:
+          formData.duration === "30"
+            ? 7500 // $75 in cents
+            : formData.duration === "60"
+            ? 15000 // $150 in cents
+            : formData.duration === "90"
+            ? 20000 // $200 in cents
+            : 40000, // $400 for monthly mentorship
+        notes: `Consultation Type: ${formData.consultationType}, Duration: ${formData.duration} minutes`,
+      };
+
+      const response = await fetch("/api/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reservationData),
       });
 
       if (response.ok) {
@@ -64,15 +99,15 @@ export default function ProductionConsultation() {
           title: "Consultation Booked!",
           description: "We'll contact you within 24 hours to confirm your consultation session.",
         });
-        setLocation('/');
+        setLocation("/");
       } else {
-        throw new Error('Failed to book consultation');
+        throw new Error("Failed to book consultation");
       }
     } catch (error) {
       toast({
         title: "Booking Failed",
         description: "Please try again or contact us directly.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -83,9 +118,8 @@ export default function ProductionConsultation() {
         title="Production Consultation"
         subtitle="Get expert guidance to take your music production to the next level. One-on-one sessions with industry professionals."
       />
-      
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Service Info */}
           <div className="space-y-6">
@@ -99,19 +133,23 @@ export default function ProductionConsultation() {
               <CardContent className="space-y-4">
                 <div className="p-4 bg-purple-600/10 border border-purple-600/20 rounded-lg">
                   <h3 className="font-semibold text-purple-400 mb-2">Quick Consultation</h3>
-                  <p className="text-gray-300 text-sm mb-2">30-minute session for specific questions</p>
+                  <p className="text-gray-300 text-sm mb-2">
+                    30-minute session for specific questions
+                  </p>
                   <p className="text-white font-bold">$75/session</p>
                 </div>
-                
+
                 <div className="p-4 bg-blue-600/10 border border-blue-600/20 rounded-lg">
                   <h3 className="font-semibold text-blue-400 mb-2">Standard Consultation</h3>
                   <p className="text-gray-300 text-sm mb-2">60-minute comprehensive session</p>
                   <p className="text-white font-bold">$150/session</p>
                 </div>
-                
+
                 <div className="p-4 bg-green-600/10 border border-green-600/20 rounded-lg">
                   <h3 className="font-semibold text-green-400 mb-2">Extended Consultation</h3>
-                  <p className="text-gray-300 text-sm mb-2">90-minute deep dive session with resources</p>
+                  <p className="text-gray-300 text-sm mb-2">
+                    90-minute deep dive session with resources
+                  </p>
                   <p className="text-white font-bold">$200/session</p>
                 </div>
 
@@ -148,22 +186,26 @@ export default function ProductionConsultation() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="name" className="text-gray-300">Full Name *</Label>
+                    <Label htmlFor="name" className="text-gray-300">
+                      Full Name *
+                    </Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                       <Input
                         id="name"
                         required
                         value={formData.name}
-                        onChange={(e) => handleInputChange('name', e.target.value)}
+                        onChange={e => handleInputChange("name", e.target.value)}
                         className="bg-gray-700 border-gray-600 text-white pl-10"
                         placeholder="Your full name"
                       />
                     </div>
                   </div>
-                  
+
                   <div>
-                    <Label htmlFor="email" className="text-gray-300">Email *</Label>
+                    <Label htmlFor="email" className="text-gray-300">
+                      Email *
+                    </Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                       <Input
@@ -171,7 +213,7 @@ export default function ProductionConsultation() {
                         type="email"
                         required
                         value={formData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        onChange={e => handleInputChange("email", e.target.value)}
                         className="bg-gray-700 border-gray-600 text-white pl-10"
                         placeholder="your@email.com"
                       />
@@ -180,13 +222,15 @@ export default function ProductionConsultation() {
                 </div>
 
                 <div>
-                  <Label htmlFor="phone" className="text-gray-300">Phone Number</Label>
+                  <Label htmlFor="phone" className="text-gray-300">
+                    Phone Number
+                  </Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <Input
                       id="phone"
                       value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      onChange={e => handleInputChange("phone", e.target.value)}
                       className="bg-gray-700 border-gray-600 text-white pl-10"
                       placeholder="(555) 123-4567"
                     />
@@ -195,8 +239,13 @@ export default function ProductionConsultation() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="experience" className="text-gray-300">Experience Level *</Label>
-                    <Select value={formData.experience} onValueChange={(value) => handleInputChange('experience', value)}>
+                    <Label htmlFor="experience" className="text-gray-300">
+                      Experience Level *
+                    </Label>
+                    <Select
+                      value={formData.experience}
+                      onValueChange={value => handleInputChange("experience", value)}
+                    >
                       <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                         <SelectValue placeholder="Select experience" />
                       </SelectTrigger>
@@ -210,8 +259,13 @@ export default function ProductionConsultation() {
                   </div>
 
                   <div>
-                    <Label htmlFor="projectType" className="text-gray-300">Project Type</Label>
-                    <Select value={formData.projectType} onValueChange={(value) => handleInputChange('projectType', value)}>
+                    <Label htmlFor="projectType" className="text-gray-300">
+                      Project Type
+                    </Label>
+                    <Select
+                      value={formData.projectType}
+                      onValueChange={value => handleInputChange("projectType", value)}
+                    >
                       <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                         <SelectValue placeholder="Select project type" />
                       </SelectTrigger>
@@ -229,10 +283,15 @@ export default function ProductionConsultation() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="consultationType" className="text-gray-300">Consultation Type *</Label>
+                    <Label htmlFor="consultationType" className="text-gray-300">
+                      Consultation Type *
+                    </Label>
                     <div className="relative">
                       <Video className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <Select value={formData.consultationType} onValueChange={(value) => handleInputChange('consultationType', value)}>
+                      <Select
+                        value={formData.consultationType}
+                        onValueChange={value => handleInputChange("consultationType", value)}
+                      >
                         <SelectTrigger className="bg-gray-700 border-gray-600 text-white pl-10">
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
@@ -246,10 +305,15 @@ export default function ProductionConsultation() {
                   </div>
 
                   <div>
-                    <Label htmlFor="duration" className="text-gray-300">Session Duration *</Label>
+                    <Label htmlFor="duration" className="text-gray-300">
+                      Session Duration *
+                    </Label>
                     <div className="relative">
                       <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <Select value={formData.duration} onValueChange={(value) => handleInputChange('duration', value)}>
+                      <Select
+                        value={formData.duration}
+                        onValueChange={value => handleInputChange("duration", value)}
+                      >
                         <SelectTrigger className="bg-gray-700 border-gray-600 text-white pl-10">
                           <SelectValue placeholder="Select duration" />
                         </SelectTrigger>
@@ -266,37 +330,43 @@ export default function ProductionConsultation() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="preferredDate" className="text-gray-300">Preferred Date *</Label>
+                    <Label htmlFor="preferredDate" className="text-gray-300">
+                      Preferred Date *
+                    </Label>
                     <Input
                       id="preferredDate"
                       type="date"
                       required
                       value={formData.preferredDate}
-                      onChange={(e) => handleInputChange('preferredDate', e.target.value)}
+                      onChange={e => handleInputChange("preferredDate", e.target.value)}
                       className="bg-gray-700 border-gray-600 text-white"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="preferredTime" className="text-gray-300">Preferred Time *</Label>
+                    <Label htmlFor="preferredTime" className="text-gray-300">
+                      Preferred Time *
+                    </Label>
                     <Input
                       id="preferredTime"
                       type="time"
                       required
                       value={formData.preferredTime}
-                      onChange={(e) => handleInputChange('preferredTime', e.target.value)}
+                      onChange={e => handleInputChange("preferredTime", e.target.value)}
                       className="bg-gray-700 border-gray-600 text-white"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <Label htmlFor="goals" className="text-gray-300">Your Goals *</Label>
+                  <Label htmlFor="goals" className="text-gray-300">
+                    Your Goals *
+                  </Label>
                   <Textarea
                     id="goals"
                     required
                     value={formData.goals}
-                    onChange={(e) => handleInputChange('goals', e.target.value)}
+                    onChange={e => handleInputChange("goals", e.target.value)}
                     className="bg-gray-700 border-gray-600 text-white"
                     placeholder="What do you want to achieve? (improve mixing, learn new techniques, career guidance, etc.)"
                     rows={3}
@@ -304,11 +374,13 @@ export default function ProductionConsultation() {
                 </div>
 
                 <div>
-                  <Label htmlFor="challenges" className="text-gray-300">Current Challenges</Label>
+                  <Label htmlFor="challenges" className="text-gray-300">
+                    Current Challenges
+                  </Label>
                   <Textarea
                     id="challenges"
                     value={formData.challenges}
-                    onChange={(e) => handleInputChange('challenges', e.target.value)}
+                    onChange={e => handleInputChange("challenges", e.target.value)}
                     className="bg-gray-700 border-gray-600 text-white"
                     placeholder="What specific challenges are you facing in your production journey?"
                     rows={3}
@@ -316,21 +388,20 @@ export default function ProductionConsultation() {
                 </div>
 
                 <div>
-                  <Label htmlFor="message" className="text-gray-300">Additional Information</Label>
+                  <Label htmlFor="message" className="text-gray-300">
+                    Additional Information
+                  </Label>
                   <Textarea
                     id="message"
                     value={formData.message}
-                    onChange={(e) => handleInputChange('message', e.target.value)}
+                    onChange={e => handleInputChange("message", e.target.value)}
                     className="bg-gray-700 border-gray-600 text-white"
                     placeholder="Any additional details about your project or specific topics you'd like to discuss..."
                     rows={3}
                   />
                 </div>
 
-                <Button 
-                  type="submit" 
-                  className="w-full btn-primary text-lg py-4"
-                >
+                <Button type="submit" className="w-full btn-primary text-lg py-4">
                   Book Consultation
                 </Button>
               </form>

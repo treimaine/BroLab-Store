@@ -12,6 +12,7 @@ import {
   SkipForward,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -26,6 +27,7 @@ export function EnhancedGlobalAudioPlayer() {
     setVolume,
     setCurrentTime,
     setDuration,
+    setCurrentTrack,
     nextTrack,
     previousTrack,
   } = useAudioStore();
@@ -155,6 +157,12 @@ export function EnhancedGlobalAudioPlayer() {
     setVolume(value[0]);
   };
 
+  const handleClose = () => {
+    setCurrentTrack(null);
+    setIsPlaying(false);
+    setCurrentTime(0);
+  };
+
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
@@ -267,6 +275,16 @@ export function EnhancedGlobalAudioPlayer() {
             className="w-8 h-8 p-0 text-gray-400 hover:text-white"
           >
             {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </Button>
+
+          {/* Close Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClose}
+            className="w-8 h-8 p-0 text-gray-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
           </Button>
         </div>
       </div>

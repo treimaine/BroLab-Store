@@ -2,17 +2,14 @@ import { BeatCard } from "@/components/beat-card";
 import { TableBeatView } from "@/components/TableBeatView";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { UnifiedFilterPanel } from "@/components/UnifiedFilterPanel";
-import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { useUnifiedFilters } from "@/hooks/useUnifiedFilters";
-import { Filter, Grid3X3, List, RotateCcw, Search, ShoppingCart } from "lucide-react";
-import { useCallback, useState } from "react";
-import { useLocation } from "wouter";
+import { Filter, Grid3X3, List, RotateCcw, Search } from "lucide-react";
+import { useState } from "react";
 
-export default function Shop() {
-  const [, setLocation] = useLocation();
+export function UnifiedFilterDemo() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [showFilters, setShowFilters] = useState(false);
 
@@ -38,47 +35,14 @@ export default function Shop() {
     pageSize: 12,
   });
 
-  const { useCategories } = useWooCommerce();
-  const { data: categories } = useCategories();
-
-  const handleSearch = useCallback((e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     // La recherche est maintenant gérée par le système unifié
-  }, []);
+  };
 
-  const handleClearFilters = useCallback(() => {
+  const handleClearFilters = () => {
     clearFilters();
-  }, [clearFilters]);
-
-  const handleToggleFilters = useCallback(() => {
-    setShowFilters(prev => !prev);
-  }, []);
-
-  const handleViewModeChange = useCallback((mode: "grid" | "table") => {
-    setViewMode(mode);
-  }, []);
-
-  const handleSortChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const [sortBy, sortOrder] = e.target.value.split("-") as [
-        "date" | "price" | "title" | "popularity",
-        "asc" | "desc"
-      ];
-      updateFilters({ sortBy, sortOrder });
-    },
-    [updateFilters]
-  );
-
-  const handleProductView = useCallback(
-    (productId: number) => {
-      setLocation(`/product/${productId}`);
-    },
-    [setLocation]
-  );
-
-  const handleCartView = useCallback(() => {
-    setLocation("/cart");
-  }, [setLocation]);
+  };
 
   if (error) {
     return (
@@ -103,11 +67,11 @@ export default function Shop() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* En-tête avec recherche et filtres */}
+      {/* En-tête avec statistiques */}
       <div className="mb-8">
         <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between mb-6">
           <div className="flex-1">
-            <h1 className="text-3xl font-bold mb-2">Boutique</h1>
+            <h1 className="text-3xl font-bold mb-2">🎵 Système de Filtrage Unifié</h1>
             <p className="text-muted-foreground">
               {stats.totalProducts} produits disponibles
               {hasActiveFilters && ` • ${stats.filteredProducts} résultats filtrés`}
@@ -117,7 +81,7 @@ export default function Shop() {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={handleToggleFilters}
+              onClick={() => setShowFilters(!showFilters)}
               className="flex items-center gap-2"
             >
               <Filter className="w-4 h-4" />
@@ -127,11 +91,6 @@ export default function Shop() {
                   {stats.filteredProducts}
                 </Badge>
               )}
-            </Button>
-
-            <Button variant="outline" onClick={handleCartView} className="flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4" />
-              Panier
             </Button>
           </div>
         </div>
@@ -156,14 +115,14 @@ export default function Shop() {
             <Button
               variant={viewMode === "grid" ? "default" : "outline"}
               size="sm"
-              onClick={() => handleViewModeChange("grid")}
+              onClick={() => setViewMode("grid")}
             >
               <Grid3X3 className="w-4 h-4" />
             </Button>
             <Button
               variant={viewMode === "table" ? "default" : "outline"}
               size="sm"
-              onClick={() => handleViewModeChange("table")}
+              onClick={() => setViewMode("table")}
             >
               <List className="w-4 h-4" />
             </Button>
@@ -172,7 +131,13 @@ export default function Shop() {
           <div className="flex items-center gap-4">
             <select
               value={`${filters.sortBy}-${filters.sortOrder}`}
-              onChange={handleSortChange}
+              onChange={e => {
+                const [sortBy, sortOrder] = e.target.value.split("-") as [
+                  "date" | "price" | "title" | "popularity",
+                  "asc" | "desc"
+                ];
+                updateFilters({ sortBy, sortOrder });
+              }}
               className="bg-background border border-input rounded-md px-3 py-2 text-sm"
             >
               <option value="date-desc">Plus récents</option>
@@ -240,34 +205,25 @@ export default function Shop() {
             {/* Affichage des produits */}
             {viewMode === "grid" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {products.map(product => {
-                  // Logique pour déterminer si le produit est gratuit
-                  const isProductFree =
-                    product.is_free ||
-                    product.tags?.some((tag: any) => tag.name.toLowerCase() === "free") ||
-                    product.price === 0 ||
-                    (typeof product.price === "string" && product.price === "0") ||
-                    (typeof product.price === "string" && parseFloat(product.price) === 0) ||
-                    (typeof product.price === "number" && product.price === 0);
-
-                  return (
-                    <BeatCard
-                      key={product.id}
-                      id={product.id}
-                      title={product.title || product.name || ""}
-                      genre={product.genre || "Unknown"}
-                      bpm={product.bpm || 0}
-                      price={product.price || 0}
-                      imageUrl={product.images?.[0]?.src || product.image_url || product.image}
-                      audioUrl={product.audio_url || ""}
-                      isFree={isProductFree}
-                      onViewDetails={() => handleProductView(product.id)}
-                    />
-                  );
-                })}
+                {products.map(product => (
+                  <BeatCard
+                    key={product.id}
+                    id={product.id}
+                    title={product.title || product.name || ""}
+                    genre={product.genre || "Unknown"}
+                    bpm={product.bpm || 0}
+                    price={product.price || 0}
+                    imageUrl={product.image_url || product.image}
+                    audioUrl={product.audio_url || ""}
+                    isFree={product.is_free || false}
+                  />
+                ))}
               </div>
             ) : (
-              <TableBeatView products={products} onViewDetails={handleProductView} />
+              <TableBeatView
+                products={products}
+                onViewDetails={productId => console.log("View product:", productId)}
+              />
             )}
 
             {/* Pagination */}
@@ -299,6 +255,35 @@ export default function Shop() {
           </>
         )}
       </div>
+
+      {/* Informations sur le système unifié */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>ℹ️ Système de Filtrage Unifié - Fonctionnalités</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h4 className="font-semibold mb-2">✅ Avantages</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>• Séparation claire : Filtres côté serveur vs côté client</li>
+                <li>• Extraction automatique : Métadonnées WooCommerce → Filtres</li>
+                <li>• Cohérence : Tous les filtres utilisent la même logique</li>
+                <li>• Performance : Optimisation côté serveur quand possible</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2">🎯 Fonctionnalités</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>• Gestion d'état centralisée</li>
+                <li>• Requêtes optimisées</li>
+                <li>• Calcul dynamique des plages</li>
+                <li>• Cache intelligent</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

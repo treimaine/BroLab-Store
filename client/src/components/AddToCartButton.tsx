@@ -47,7 +47,7 @@ export function AddToCartButton({
         licenseType: licenseType as any,
         quantity: 1,
         imageUrl: product.image,
-        genre: (product as any).genre ?? "Unknown",
+        genre: (product as any).genre ?? (product as any).categories?.[0]?.name ?? "Unknown",
       });
 
       // Track the event

@@ -24,17 +24,17 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 // Import advanced payment features
 import { generateInvoice, getInvoice, sendReceipt } from './invoice-system';
 import {
-  createCryptoPaymentIntent,
-  getCustomerPaymentMethods,
-  getGooglePayConfig,
-  savePaymentMethod,
-  verifyApplePayDomain
+    createCryptoPaymentIntent,
+    getCustomerPaymentMethods,
+    getGooglePayConfig,
+    savePaymentMethod,
+    verifyApplePayDomain
 } from './payment-methods';
 import {
-  calculatePaymentPlan,
-  cancelPaymentPlan,
-  createPaymentPlan,
-  getPaymentPlanStatus
+    calculatePaymentPlan,
+    cancelPaymentPlan,
+    createPaymentPlan,
+    getPaymentPlanStatus
 } from './payment-plans';
 import { calculateTax, getTaxInfo } from './tax-calculator';
 
@@ -101,6 +101,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('✅ Uploads routes registered successfully');
   } catch (error) {
     console.warn('Uploads router not available:', error);
+  }
+
+  // Register schema markup routes
+  try {
+    const schemaRouter = await import('./routes/schema');
+    app.use('/api/schema', schemaRouter.default);
+    console.log('✅ Schema markup routes registered successfully');
+  } catch (error) {
+    console.warn('Schema router not available:', error);
   }
 
   // Stripe payment endpoints
@@ -236,63 +245,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Additional service booking endpoints
-  app.post("/api/booking/recording", async (req, res) => {
-    try {
-      const bookingData = req.body;
-      console.log('Recording session booking received:', bookingData);
-      
-      res.json({ 
-        success: true, 
-        message: "Recording session booking received successfully",
-        bookingId: `rs_${Date.now()}`
-      });
-    } catch (error: any) {
-      console.error('Recording booking error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: "Failed to process recording session booking" 
-      });
-    }
-  });
-
-  app.post("/api/booking/custom-beats", async (req, res) => {
-    try {
-      const bookingData = req.body;
-      console.log('Custom beat request received:', bookingData);
-      
-      res.json({ 
-        success: true, 
-        message: "Custom beat request received successfully",
-        bookingId: `cb_${Date.now()}`
-      });
-    } catch (error: any) {
-      console.error('Custom beat booking error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: "Failed to process custom beat request" 
-      });
-    }
-  });
-
-  app.post("/api/booking/production-consultation", async (req, res) => {
-    try {
-      const bookingData = req.body;
-      console.log('Production consultation booking received:', bookingData);
-      
-      res.json({ 
-        success: true, 
-        message: "Production consultation booking received successfully",
-        bookingId: `pc_${Date.now()}`
-      });
-    } catch (error: any) {
-      console.error('Consultation booking error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: "Failed to process consultation booking" 
-      });
-    }
-  });
+  // All booking services now use the unified /api/reservations endpoint
+  // The old /api/booking/* endpoints have been removed and replaced with:
+  // - /api/reservations (unified system with validation, persistence, and notifications)
 
   // Download endpoints for purchased beats
   app.get("/api/download/:licenseType/:beatName", async (req, res) => {

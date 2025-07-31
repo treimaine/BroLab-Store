@@ -2,16 +2,16 @@ import { BeatSimilarityRecommendations } from "@/components/BeatSimilarityRecomm
 import { BeatStemsDelivery } from "@/components/BeatStemsDelivery";
 import { useCartContext } from "@/components/cart-provider";
 import { LicensePreviewModal } from "@/components/LicensePreviewModal";
+import { OpenGraphMeta } from "@/components/OpenGraphMeta";
+import { SchemaMarkup } from "@/components/SchemaMarkup";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { WaveformAudioPlayer } from "@/components/WaveformAudioPlayer";
 import { useToast } from "@/hooks/use-toast";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { useWishlist } from "@/hooks/useWishlist";
-import { useAudioStore } from "@/store/useAudioStore";
 import { LicensePricing, LicenseTypeEnum } from "@shared/schema";
-import { ArrowLeft, FileText, Heart, Music, Pause, Play, ShoppingCart } from "lucide-react";
+import { ArrowLeft, FileText, Heart, Music, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import { useRoute } from "wouter";
 
@@ -25,24 +25,6 @@ export default function Product() {
   const { data: product, isLoading, error } = useProduct(productId.toString());
   const { addItem } = useCartContext();
   const { toast } = useToast();
-  const { setCurrentTrack, setIsPlaying, currentTrack, isPlaying } = useAudioStore();
-
-  const handlePreviewAudio = () => {
-    if (product && audioUrl) {
-      setCurrentTrack({
-        id: product.id.toString(),
-        title: product.name,
-        artist: "BroLab",
-        url: audioUrl,
-        audioUrl: audioUrl,
-        imageUrl: product.images?.[0]?.src || "",
-      });
-      setIsPlaying(true);
-    }
-  };
-
-  const isCurrentTrack = currentTrack?.id === productId.toString();
-  const isCurrentlyPlaying = isCurrentTrack && isPlaying;
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -94,6 +76,8 @@ export default function Product() {
   if (isLoading) {
     return (
       <div className="pt-16 bg-[var(--dark-gray)] min-h-screen">
+        <SchemaMarkup type="beat" beatId={productId} />
+        <OpenGraphMeta type="beat" beatId={productId} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="animate-pulse">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -117,6 +101,8 @@ export default function Product() {
   if (!product || error || productId === 0 || isNaN(productId)) {
     return (
       <div className="pt-16 bg-[var(--dark-gray)] min-h-screen">
+        <SchemaMarkup type="beat" beatId={productId} />
+        <OpenGraphMeta type="beat" beatId={productId} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white mb-4">Beat not found</h1>
@@ -184,6 +170,8 @@ export default function Product() {
         />
       )}
       <div className="pt-16 bg-[var(--dark-gray)] min-h-screen">
+        <SchemaMarkup type="beat" beatId={productId} />
+        <OpenGraphMeta type="beat" beatId={productId} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Button
             onClick={() => window.history.back()}
@@ -206,41 +194,6 @@ export default function Product() {
                   />
                 ) : (
                   <Music className="w-24 h-24 text-white/20" />
-                )}
-
-                {/* Hover Play Button */}
-                {audioUrl && (
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-                    <button
-                      onClick={handlePreviewAudio}
-                      className="w-20 h-20 bg-white/90 hover:bg-white rounded-full flex items-center justify-center transition-all duration-200 shadow-lg"
-                    >
-                      {isCurrentlyPlaying ? (
-                        <Pause className="w-8 h-8 text-gray-800" />
-                      ) : (
-                        <Play className="w-8 h-8 text-gray-800 ml-1" />
-                      )}
-                    </button>
-                  </div>
-                )}
-
-                {/* Audio Preview Overlay */}
-                {audioUrl && (
-                  <div className="absolute inset-0 bg-black/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
-                    <div className="bg-[var(--medium-gray)] rounded-lg p-4">
-                      <h3 className="text-white font-medium text-lg mb-2">Audio Preview</h3>
-                      <p className="text-gray-300 text-sm mb-4">BY BROLAB</p>
-                      <WaveformAudioPlayer
-                        src={audioUrl}
-                        title={product.name}
-                        artist="BroLab"
-                        previewOnly={true}
-                        showControls={true}
-                        showWaveform={true}
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
                 )}
               </div>
             </div>
@@ -442,7 +395,10 @@ export default function Product() {
                   title: product?.name || "",
                   price: 99.99,
                   image: product?.images?.[0]?.src || "/api/placeholder/400/400",
-                  bpm: product?.bpm || 120,
+                  bpm:
+                    product?.bpm ||
+                    product?.meta_data?.find((meta: any) => meta.key === "bpm")?.value ||
+                    null,
                   genre: product?.categories?.[0]?.name || "Unknown",
                   mood: "Dark",
                   key: "Am",

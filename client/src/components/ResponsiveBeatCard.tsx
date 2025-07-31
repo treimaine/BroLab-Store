@@ -101,7 +101,7 @@ export function ResponsiveBeatCard({
         <button
           onClick={handleLike}
           className={cn(
-            "absolute top-3 right-3 p-2 rounded-full transition-all duration-200",
+            "absolute top-3 right-3 p-2 rounded-full transition-all duration-200 z-30",
             "bg-black/70 hover:bg-black/90 focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]",
             "min-w-[44px] min-h-[44px] flex items-center justify-center"
           )}
@@ -134,7 +134,18 @@ export function ResponsiveBeatCard({
             {/* Price and Cart */}
             <div className="flex items-center justify-between pt-4 mt-4 border-t border-gray-700">
               <div className="text-xl font-bold text-[var(--accent-purple)]">
-                ${(beat.price / 100).toFixed(2)}
+                {(() => {
+                  const isFree =
+                    beat.is_free ||
+                    beat.tags?.some((tag: string) => tag.toLowerCase() === "free") ||
+                    beat.price === 0 ||
+                    false;
+                  return isFree ? (
+                    <span className="text-[var(--accent-cyan)]">FREE</span>
+                  ) : (
+                    `$${(beat.price / 100).toFixed(2)}`
+                  );
+                })()}
               </div>
               <AddToCartButton
                 product={{
@@ -169,7 +180,18 @@ export function ResponsiveBeatCard({
 
               <div className="text-right">
                 <div className="text-xl font-bold text-[var(--accent-purple)]">
-                  ${(beat.price / 100).toFixed(2)}
+                  {(() => {
+                    const isFree =
+                      beat.is_free ||
+                      beat.tags?.some((tag: string) => tag.toLowerCase() === "free") ||
+                      beat.price === 0 ||
+                      false;
+                    return isFree ? (
+                      <span className="text-[var(--accent-cyan)]">FREE</span>
+                    ) : (
+                      `$${(beat.price / 100).toFixed(2)}`
+                    );
+                  })()}
                 </div>
               </div>
             </div>
