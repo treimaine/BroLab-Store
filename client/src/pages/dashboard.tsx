@@ -117,51 +117,52 @@ export default function Dashboard() {
   const { data: invoiceData } = useOrderInvoice(selectedOrderId || 0);
   const downloadInvoice = useDownloadInvoice(selectedOrderId || 0);
 
-  // Type guard for user object
+  // Type guard for user object with enriched data
   const typedUser = (user as any)?.user as {
     id?: number;
     username?: string;
     email?: string;
-    avatar?: string;
+    avatar_url?: string | null;
     name?: string;
-    subscription?: string;
-    memberSince?: string;
+    subscription_status?: string;
+    subscription_plan?: string | null;
+    subscription_period_end?: string | null;
+    member_since?: string;
+    created_at?: string;
+    // User statistics from API
+    total_purchases?: number;
+    total_spent?: number;
+    favorite_genre?: string | null;
+    loyalty_points?: number;
+    download_count?: number;
+    wishlist_count?: number;
+    recent_genres?: string[];
   } | null;
 
-  // Calculate real stats from orders data
-  const calculateStats = (): UserStats => {
-    const orders = ordersData?.orders || [];
-    const totalPurchases = orders.length;
-    const totalSpent = orders.reduce((sum: number, order: any) => sum + (order.total || 0), 0);
-
-    // Calculate favorite genre from orders
-    const genreCounts: { [key: string]: number } = {};
-    orders.forEach((order: any) => {
-      if (order.items) {
-        order.items.forEach((item: any) => {
-          if (item.genre) {
-            genreCounts[item.genre] = (genreCounts[item.genre] || 0) + 1;
-          }
-        });
-      }
-    });
-
-    const favoriteGenre =
-      Object.keys(genreCounts).length > 0
-        ? Object.entries(genreCounts).sort(([, a], [, b]) => b - a)[0][0]
-        : "Hip Hop";
+  // Use real stats from API instead of calculating locally
+  const getStatsFromAPI = (): UserStats => {
+    if (!typedUser) {
+      return {
+        totalPurchases: 0,
+        totalSpent: 0,
+        favoriteGenre: "Aucun genre", 
+        joinDate: new Date().toLocaleDateString('fr-FR'),
+        loyaltyPoints: 0,
+        nextRewardAt: 500,
+      };
+    }
 
     return {
-      totalPurchases,
-      totalSpent: totalSpent / 100, // Convert from cents
-      favoriteGenre,
-      joinDate: typedUser?.memberSince || "2023-03-15",
-      loyaltyPoints: Math.floor(totalSpent / 10), // 1 point per $10 spent
-      nextRewardAt: 500,
+      totalPurchases: typedUser.total_purchases || 0,
+      totalSpent: (typedUser.total_spent || 0) / 100, // Convert from cents to euros
+      favoriteGenre: typedUser.favorite_genre || "Aucun genre",
+      joinDate: typedUser.member_since || new Date(typedUser.created_at || '').toLocaleDateString('fr-FR'),
+      loyaltyPoints: typedUser.loyalty_points || 0,
+      nextRewardAt: 500, // TODO: Make this dynamic based on loyalty program
     };
   };
 
-  const stats = calculateStats();
+  const stats = getStatsFromAPI();
 
   // Generate real activity from orders and favorites
   const generateActivity = (): RecentActivity[] => {
@@ -175,7 +176,7 @@ export default function Dashboard() {
           type: "purchase",
           beatTitle: order.items?.[0]?.name || "Unknown Beat",
           date: order.created_at,
-          amount: order.total / 100,
+          amount: (order.total || 0) / 100, // Convert from cents to euros
         });
       });
     }
@@ -486,7 +487,7 @@ export default function Dashboard() {
         <div className="mb-8">
           <div className="flex items-center space-x-4 mb-4">
             <img
-              src={typedUser?.avatar || "/api/placeholder/64/64"}
+              src={typedUser?.avatar_url || "/api/placeholder/64/64"}
               alt={typedUser?.username || "User"}
               className="w-16 h-16 rounded-full object-cover border-2 border-[var(--accent-purple)]"
             />
@@ -495,8 +496,10 @@ export default function Dashboard() {
                 Welcome back, {typedUser?.username || "User"}
               </h1>
               <p className="text-gray-300">
-                {typedUser?.subscription || "Free"} Member since{" "}
-                {typedUser?.memberSince || "Recently"}
+                {typedUser?.subscription_plan 
+                  ? `${typedUser.subscription_plan.charAt(0).toUpperCase() + typedUser.subscription_plan.slice(1)} Plan` 
+                  : (typedUser?.subscription_status === 'active' ? 'Active Plan' : 'Free Plan')
+                } • Member since {typedUser?.member_since || "Recently"}
               </p>
             </div>
           </div>
@@ -558,7 +561,7 @@ export default function Dashboard() {
                     <div>
                       <p className="text-gray-400 text-sm">Total Spent</p>
                       <p className="text-2xl font-bold text-white">
-                        ${stats.totalSpent.toFixed(2)}
+                        €{stats.totalSpent.toFixed(2)}
                       </p>
                     </div>
                     <TrendingUp className="w-8 h-8 text-[var(--accent-green)]" />
@@ -660,7 +663,7 @@ export default function Dashboard() {
                           <p className="text-white font-medium">{activity.beatTitle}</p>
                           <p className="text-gray-400 text-sm">
                             {activity.type.charAt(0).toUpperCase() + activity.type.slice(1)}
-                            {activity.amount && ` - $${activity.amount}`}
+                            {activity.amount && ` - €${activity.amount.toFixed(2)}`}
                           </p>
                         </div>
                       </div>
@@ -704,7 +707,7 @@ export default function Dashboard() {
                           <p className="text-white font-medium">{activity.beatTitle}</p>
                           <p className="text-gray-400 text-sm">
                             {activity.type.charAt(0).toUpperCase() + activity.type.slice(1)}
-                            {activity.amount && ` - $${activity.amount}`}
+                            {activity.amount && ` - €${activity.amount.toFixed(2)}`}
                           </p>
                         </div>
                       </div>
@@ -712,7 +715,7 @@ export default function Dashboard() {
                         <p className="text-gray-400 text-sm">{formatDate(activity.date)}</p>
                         {activity.amount && (
                           <p className="text-[var(--accent-green)] font-medium">
-                            ${activity.amount}
+                            €{activity.amount.toFixed(2)}
                           </p>
                         )}
                       </div>
@@ -811,14 +814,19 @@ export default function Dashboard() {
                   <div>
                     <label className="text-gray-400 text-sm block mb-2">Email</label>
                     <div className="text-white bg-[var(--dark-gray)] p-3 rounded-lg">
-                      {typedUser?.email || "user@example.com"}
+                      {typedUser?.email || "Non disponible"}
                     </div>
                   </div>
 
                   <div>
                     <label className="text-gray-400 text-sm block mb-2">Subscription</label>
                     <div className="flex items-center justify-between bg-[var(--dark-gray)] p-3 rounded-lg">
-                      <span className="text-white">{typedUser?.subscription || "Free"} Plan</span>
+                        <span className="text-white">
+                          {typedUser?.subscription_plan 
+                            ? `${typedUser.subscription_plan.charAt(0).toUpperCase() + typedUser.subscription_plan.slice(1)} Plan` 
+                            : (typedUser?.subscription_status === 'active' ? 'Active Plan' : 'Free Plan')
+                          }
+                        </span>
                       <Button
                         size="sm"
                         variant="outline"
