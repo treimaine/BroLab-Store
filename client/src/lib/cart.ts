@@ -1,5 +1,5 @@
 // Cart utilities and types
-import { LicensePricing } from '@shared/schema';
+import { LicensePricing } from '@/../../shared/schema';
 export interface CartItem {
   beatId: number;
   title: string;

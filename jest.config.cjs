@@ -19,7 +19,7 @@ module.exports = {
   ],
   transform: {
     '^.+\\.ts$': ['ts-jest', {
-      tsconfig: 'tsconfig.test.json',
+      tsconfig: 'tsconfig.json',
     }],
   },
   moduleNameMapper: {

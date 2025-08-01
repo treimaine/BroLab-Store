@@ -16,17 +16,7 @@ NC='\033[0m' # No Color
 check_typescript() {
     echo -e "\n📝 Vérification TypeScript..."
     
-    # Essayer d'abord notre vérificateur personnalisé (plus rapide)
-    if [ -f "scripts/check-typescript-errors.cjs" ]; then
-        if node scripts/check-typescript-errors.cjs; then
-            echo -e "${GREEN}✅ TypeScript: Aucune erreur critique détectée${NC}"
-            return 0
-        else
-            echo -e "${RED}❌ TypeScript: Erreurs détectées par le vérificateur personnalisé${NC}"
-            return 1
-        fi
-    # Sinon utiliser tsc si disponible
-    elif [ -f "node_modules/.bin/tsc" ]; then
+    if [ -f "node_modules/.bin/tsc" ]; then
         if node_modules/.bin/tsc --noEmit; then
             echo -e "${GREEN}✅ TypeScript: Compilation réussie${NC}"
             return 0
@@ -35,7 +25,7 @@ check_typescript() {
             return 1
         fi
     else
-        echo -e "${YELLOW}⚠️  TypeScript: Skippé (tsc non disponible)${NC}"
+        echo -e "${YELLOW}⚠️  TypeScript: Skipped - dépendances non installées${NC}"
         return 0
     fi
 }

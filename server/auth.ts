@@ -149,58 +149,12 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ error: "Not authenticated" });
       }
       const typedUser = user as User;
-      
-      // Get user statistics
-      const { getUserStats, getSubscription, subscriptionStatusHelper } = await import('./lib/db');
-      const stats = await getUserStats(typedUser.id);
-      
-      // Get subscription information
-      let subscription = null;
-      let subscriptionStatus = 'none';
-      let subscriptionPlan = null;
-      let subscriptionPeriodEnd = null;
-      
-      try {
-        subscription = await getSubscription(typedUser.id);
-        subscriptionStatus = await subscriptionStatusHelper(typedUser.id);
-        if (subscription) {
-          subscriptionPlan = subscription.plan;
-          subscriptionPeriodEnd = subscription.current_period_end;
-        }
-      } catch (error) {
-        console.warn('Error fetching subscription data:', error);
-        // Continue with default values
-      }
-      
-      // Format member since date
-      const memberSince = new Date(typedUser.created_at).toLocaleDateString('fr-FR', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-      
       res.json({
         user: {
           id: typedUser.id,
           username: typedUser.username,
           email: typedUser.email,
-          created_at: typedUser.created_at,
-          
-          // Enriched user data
-          avatar_url: null, // TODO: Add avatar support later
-          subscription_status: subscriptionStatus,
-          subscription_plan: subscriptionPlan,
-          subscription_period_end: subscriptionPeriodEnd,
-          member_since: memberSince,
-          
-          // User statistics
-          total_purchases: stats.totalPurchases,
-          total_spent: stats.totalSpent,
-          favorite_genre: stats.favoriteGenre,
-          loyalty_points: stats.loyaltyPoints,
-          download_count: stats.downloadCount,
-          wishlist_count: stats.wishlistCount,
-          recent_genres: stats.recentGenres
+          created_at: typedUser.created_at
         }
       });
     } catch (error: any) {
