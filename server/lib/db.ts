@@ -380,3 +380,115 @@ export async function getReservationsByDateRange(
   if (error) throw error;
   return data as Reservation[];
 }
+
+// Get comprehensive user statistics for dashboard
+export async function getUserStats(userId: number): Promise<{
+  totalPurchases: number;
+  totalSpent: number;
+  favoriteGenre: string | null;
+  loyaltyPoints: number;
+  downloadCount: number;
+  wishlistCount: number;
+  recentGenres: string[];
+}> {
+  try {
+    // Get orders data
+    const { data: orders, error: ordersError } = await supabaseAdmin
+      .from('orders')
+      .select('*, cart_items(*)')
+      .eq('user_id', userId)
+      .eq('status', 'completed');
+    
+    if (ordersError) throw ordersError;
+
+    // Get downloads count
+    const { data: downloads, error: downloadsError } = await supabaseAdmin
+      .from('downloads')
+      .select('download_count')
+      .eq('user_id', userId);
+    
+    if (downloadsError) throw downloadsError;
+
+    // Get wishlist count
+    const { data: wishlist, error: wishlistError } = await supabaseAdmin
+      .from('wishlist')
+      .select('id')
+      .eq('user_id', userId);
+    
+    if (wishlistError) throw wishlistError;
+
+    // Calculate basic stats
+    const totalPurchases = orders?.length || 0;
+    const totalSpent = orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
+    
+    // Calculate favorite genre - prioritize wishlist over orders
+    const genreCounts: { [key: string]: number } = {};
+    const recentGenresSet = new Set<string>();
+    
+    // First, analyze wishlist (priority)
+    const { data: wishlistItems } = await supabaseAdmin
+      .from('wishlist')
+      .select('genre')
+      .eq('user_id', userId)
+      .not('genre', 'is', null);
+    
+    wishlistItems?.forEach(item => {
+      if (item.genre) {
+        genreCounts[item.genre] = (genreCounts[item.genre] || 0) + 2; // Give wishlist items more weight
+        recentGenresSet.add(item.genre);
+      }
+    });
+
+    // Then add orders data as secondary influence
+    orders?.forEach(order => {
+      if (order.cart_items && Array.isArray(order.cart_items)) {
+        order.cart_items.forEach((item: any) => {
+          if (item.genre) {
+            genreCounts[item.genre] = (genreCounts[item.genre] || 0) + 1;
+            recentGenresSet.add(item.genre);
+          }
+        });
+      }
+      // Also check items in the order JSON field as fallback
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach((item: any) => {
+          if (item.genre) {
+            genreCounts[item.genre] = (genreCounts[item.genre] || 0) + 1;
+            recentGenresSet.add(item.genre);
+          }
+        });
+      }
+    });
+
+    const favoriteGenre = Object.keys(genreCounts).length > 0
+      ? Object.entries(genreCounts).sort(([, a], [, b]) => b - a)[0][0]
+      : null;
+
+    const downloadCount = downloads?.reduce((sum, d) => sum + (d.download_count || 0), 0) || 0;
+    const wishlistCount = wishlist?.length || 0;
+    const loyaltyPoints = Math.floor(totalSpent / 1000); // 1 point per 10€ (since totalSpent is in cents)
+    const recentGenres = Array.from(recentGenresSet).slice(0, 5);
+
+    return {
+      totalPurchases,
+      totalSpent,
+      favoriteGenre,
+      loyaltyPoints,
+      downloadCount,
+      wishlistCount,
+      recentGenres
+    };
+  } catch (error) {
+    console.error('Error calculating user stats:', error);
+    // Return default stats if error
+    return {
+      totalPurchases: 0,
+      totalSpent: 0,
+      favoriteGenre: null,
+      loyaltyPoints: 0,
+      downloadCount: 0,
+      wishlistCount: 0,
+      recentGenres: []
+    };
+  }
+}
