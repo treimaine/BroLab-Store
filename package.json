@@ -11,7 +11,10 @@
     "check": "tsc",
     "setup": "npm install",
     "clean": "rimraf node_modules dist .cache && npm install",
-    "test": "jest"
+    "test": "jest",
+    "validate": "./scripts/validate-config.sh",
+    "check-ts": "tsc --noEmit",
+    "check-all": "npm run check-ts && npm test"
   },
   "dependencies": {
     "@esbuild/win32-x64": "^0.25.8",
