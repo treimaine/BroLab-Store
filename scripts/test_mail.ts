@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { sendMail } from '../server/services/mail.js';
+import { sendMail } from '../server/services/mail';
 import { config } from 'dotenv';
 
 // Load environment variables

@@ -14,7 +14,8 @@
     "test": "jest",
     "validate": "./scripts/validate-config.sh",
     "check-ts": "tsc --noEmit",
-    "check-all": "npm run check-ts && npm test"
+    "check-all": "npm run check-ts && npm test",
+    "check-types": "node scripts/check-typescript-errors.cjs"
   },
   "dependencies": {
     "@esbuild/win32-x64": "^0.25.8",
