@@ -417,14 +417,29 @@ export async function getUserStats(userId: number): Promise<{
     
     if (wishlistError) throw wishlistError;
 
-    // Calculate stats
+    // Calculate basic stats
     const totalPurchases = orders?.length || 0;
     const totalSpent = orders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
     
-    // Calculate favorite genre from orders and cart items
+    // Calculate favorite genre - prioritize wishlist over orders
     const genreCounts: { [key: string]: number } = {};
     const recentGenresSet = new Set<string>();
     
+    // First, analyze wishlist (priority)
+    const { data: wishlistItems } = await supabaseAdmin
+      .from('wishlist')
+      .select('genre')
+      .eq('user_id', userId)
+      .not('genre', 'is', null);
+    
+    wishlistItems?.forEach(item => {
+      if (item.genre) {
+        genreCounts[item.genre] = (genreCounts[item.genre] || 0) + 2; // Give wishlist items more weight
+        recentGenresSet.add(item.genre);
+      }
+    });
+
+    // Then add orders data as secondary influence
     orders?.forEach(order => {
       if (order.cart_items && Array.isArray(order.cart_items)) {
         order.cart_items.forEach((item: any) => {
@@ -444,22 +459,6 @@ export async function getUserStats(userId: number): Promise<{
         });
       }
     });
-
-    // If no genre from orders, try to get from wishlist
-    if (Object.keys(genreCounts).length === 0) {
-      const { data: wishlistItems } = await supabaseAdmin
-        .from('wishlist')
-        .select('genre')
-        .eq('user_id', userId)
-        .not('genre', 'is', null);
-      
-      wishlistItems?.forEach(item => {
-        if (item.genre) {
-          genreCounts[item.genre] = (genreCounts[item.genre] || 0) + 1;
-          recentGenresSet.add(item.genre);
-        }
-      });
-    }
 
     const favoriteGenre = Object.keys(genreCounts).length > 0
       ? Object.entries(genreCounts).sort(([, a], [, b]) => b - a)[0][0]
