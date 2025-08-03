@@ -1,5 +1,6 @@
 import express from 'express';
 import { registerAuthRoutes, setupAuth } from './auth';
+import avatarRouter from './routes/avatar';
 import downloadsRouter from './routes/downloads';
 import openGraphRouter from './routes/openGraph';
 import ordersRouter from './routes/orders';
@@ -20,6 +21,7 @@ app.use('/api/service-orders', serviceOrdersRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/opengraph', openGraphRouter);
 app.use('/api/reservations', reservationsRouter);
+app.use('/api/avatar', avatarRouter);
 app.use('/api/schema', schemaRouter);
 app.use('/', sitemapRouter);
 

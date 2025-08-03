@@ -25,5 +25,6 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/client/src/$1',
     '^@shared/(.*)$': '<rootDir>/shared/$1',
+    '^file-type$': '<rootDir>/__tests__/mocks/file-type.mock.js',
   },
 };

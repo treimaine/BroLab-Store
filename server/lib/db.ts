@@ -380,3 +380,13 @@ export async function getReservationsByDateRange(
   if (error) throw error;
   return data as Reservation[];
 }
+
+// Update user avatar
+export async function updateUserAvatar(userId: number, avatarUrl: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({ avatar: avatarUrl })
+    .eq('id', userId);
+  
+  if (error) throw error;
+}
