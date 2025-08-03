@@ -1,5 +1,6 @@
 import { OrderList } from "@/components/orders/OrderList";
 import { RecentlyViewedBeats } from "@/components/RecentlyViewedBeats";
+import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useDownloadInvoice, useOrder, useOrderInvoice } from "@/hooks/useOrders";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Clock,
   Download,
@@ -60,6 +61,7 @@ export default function Dashboard() {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Check if user is authenticated
   const {
@@ -416,6 +418,16 @@ export default function Dashboard() {
     });
   };
 
+  const handleAvatarUpload = async (url: string) => {
+    // Invalider le cache utilisateur pour forcer le rechargement
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+
+    toast({
+      title: "Succès",
+      description: "Avatar mis à jour avec succès",
+    });
+  };
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!isLoading && (error || !typedUser)) {
@@ -485,10 +497,12 @@ export default function Dashboard() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center space-x-4 mb-4">
-            <img
-              src={typedUser?.avatar || "/api/placeholder/64/64"}
+            <Avatar
+              src={typedUser?.avatar}
               alt={typedUser?.username || "User"}
-              className="w-16 h-16 rounded-full object-cover border-2 border-[var(--accent-purple)]"
+              size="lg"
+              editable={true}
+              onUpload={handleAvatarUpload}
             />
             <div>
               <h1 className="text-3xl font-bold text-white">

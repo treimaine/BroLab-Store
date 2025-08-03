@@ -3,12 +3,12 @@
 // Purpose: Security management and RLS administration routes
 
 import { Router } from "express";
-import { 
-  initializeRLSSecurity, 
-  applyRLSPolicies, 
-  verifyRLSPolicies,
-  requireAuthentication 
-} from "../lib/rlsSecurity.js";
+import {
+    applyRLSPolicies,
+    initializeRLSSecurity,
+    requireAuthentication,
+    verifyRLSPolicies
+} from "../lib/rlsSecurity";
 
 const router = Router();
 

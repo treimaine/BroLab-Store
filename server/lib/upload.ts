@@ -1,7 +1,6 @@
-import { z } from 'zod';
-import * as fileType from 'file-type';
+import { fileTypeFromBuffer } from 'file-type';
 import { supabaseAdmin } from './supabaseAdmin';
-import { validateFileUpload, fileUploadValidation } from './validation';
+import { validateFileUpload } from './validation';
 
 // Configuration des types de fichiers autorisés
 const ALLOWED_MIME_TYPES = {
@@ -36,7 +35,7 @@ export async function validateFile(
 
   // Détection du type de fichier réel
   const fileBuffer = file.buffer;
-  const detectedType = await fileType.fileTypeFromBuffer(fileBuffer);
+  const detectedType = await fileTypeFromBuffer(fileBuffer);
 
   // Vérification du type MIME
   const category = options.category || 'audio';
