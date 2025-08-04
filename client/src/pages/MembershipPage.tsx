@@ -10,6 +10,7 @@ import { stripePromise } from "@/lib/stripe";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { Check, Crown, Download, Music, Star, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
 import { trackSubscriptionCheckoutStarted } from "@/utils/tracking";
 
@@ -171,6 +172,21 @@ export default function MembershipPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<PricingPlan | null>(null);
   const { toast } = useToast();
+  const [location] = useLocation();
+
+  // Vérifier si l'utilisateur vient d'annuler un paiement
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const canceled = urlParams.get("canceled");
+
+    if (canceled === "true") {
+      toast({
+        title: "Payment Canceled",
+        description: "Your subscription payment was canceled. You can try again anytime.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
   useEffect(() => {
     window.scrollTo(0, 0);

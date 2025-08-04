@@ -10,7 +10,7 @@ function makeUniqueTestUser() {
   return {
     username: `testuser_${rand}`,
     email: `testuser_${rand}@example.com`,
-    password: 'testpassword',
+    password: 'TestPassword123',
   };
 }
 
@@ -27,11 +27,17 @@ afterAll(async () => {
 beforeEach(async () => {
   // Nettoie tous les utilisateurs de test avant chaque test
   await supabaseAdmin.from('users').delete().like('email', 'testuser%');
+  // Nettoie aussi les sessions si possible
+  jest.clearAllMocks();
+  // Petit délai pour s'assurer que le nettoyage est terminé
+  await new Promise(resolve => setTimeout(resolve, 100));
 });
 
 afterEach(async () => {
   // Nettoie tous les utilisateurs de test après chaque test
   await supabaseAdmin.from('users').delete().like('email', 'testuser%');
+  // Petit délai pour s'assurer que le nettoyage est terminé
+  await new Promise(resolve => setTimeout(resolve, 100));
 });
 
 describe('POST /api/auth/login', () => {
@@ -101,7 +107,12 @@ describe('POST /api/auth/register', () => {
     // Deuxième register avec même email
     const res2 = await request(app)
       .post('/api/auth/register')
-      .send(user);
+      .send({
+        username: 'different_username',
+        email: user.email, // Même email
+        password: 'DifferentPassword123',
+        confirmPassword: 'DifferentPassword123'
+      });
     expect(res2.status).toBe(400);
     expect(res2.body.error).toMatch(/already registered/i);
   });
@@ -127,9 +138,11 @@ describe('POST /api/auth/logout', () => {
 describe('GET /api/auth/user', () => {
   it('retourne le user courant si connecté', async () => {
     const user = makeTestUser();
-    await request(app).post('/api/auth/register').send(user);
+    // Tout avec le même agent
     const agent = request.agent(app);
+    await agent.post('/api/auth/register').send(user);
     const loginRes = await agent.post('/api/auth/login').send({ username: user.username, password: user.password });
+    expect(loginRes.status).toBe(200);
     const res = await agent.get('/api/auth/user');
     expect(res.status).toBe(200);
     expect(res.body.user).toBeDefined();

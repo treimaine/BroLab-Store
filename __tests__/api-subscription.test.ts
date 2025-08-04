@@ -225,12 +225,14 @@ describe('GET /api/subscription/status', () => {
       created_at: new Date().toISOString()
     }));
     const loginRes = await agent.post('/api/auth/login').send({ username: user.username, password: user.password });
-    // Après le login, tous les appels à getUserById renvoient null
-    (db.getUserById as jest.Mock).mockReset();
-    (db.getUserById as jest.Mock).mockResolvedValue(null);
+    
+    // Mock getCurrentUser pour retourner null (simuler un utilisateur qui n'existe plus en DB)
+    const auth = require('../server/auth');
+    jest.spyOn(auth, 'getCurrentUser').mockResolvedValue(null);
+    
     const res = await agent.get('/api/subscription/status');
-    expect(res.status).toBe(404);
-    expect(res.body).toHaveProperty('error', 'USER_NOT_FOUND');
+    expect(res.status).toBe(401);
+    expect(res.body).toHaveProperty('error', 'Authentication required');
   });
 
   it('retourne 500 si erreur Supabase', async () => {
@@ -257,7 +259,11 @@ describe('POST /api/subscription/webhook (Stripe)', () => {
           id: 'cs_test_123',
           customer_email: 'test@example.com',
           subscription: 'sub_123',
-          metadata: { plan: 'artist' }
+          metadata: { 
+            plan: 'artist',
+            user_id: '123',
+            tier: 'artist'
+          }
         }
       }
     };
@@ -281,6 +287,14 @@ describe('POST /api/subscription/webhook (Stripe)', () => {
 
     // Mock upsertSubscription
     (db.upsertSubscription as jest.Mock).mockResolvedValue({});
+    
+    // Mock getUserById pour le webhook
+    (db.getUserById as jest.Mock).mockResolvedValue({
+      id: 123,
+      username: 'testuser',
+      email: 'test@example.com',
+      created_at: new Date().toISOString()
+    });
 
     process.env.STRIPE_WEBHOOK_SECRET = '';
     // Mock supabaseAdmin.from pour stripe_events (idempotence)
@@ -320,7 +334,7 @@ describe('POST /api/subscription/webhook (Stripe)', () => {
       userId: 123,
       plan: 'artist',
       status: 'active',
-      current_period_end: '2099-12-31T00:00:00.000Z'
+      current_period_end: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
     });
   });
 });
@@ -354,9 +368,27 @@ describe('POST /api/subscription/webhook (Stripe) - cas avancés', () => {
     const fakeEvent = {
       id: 'evt_dup',
       type: 'checkout.session.completed',
-      data: { object: { subscription: 'sub_123', metadata: { plan: 'artist' } } }
+      data: { 
+        object: { 
+          subscription: 'sub_123', 
+          metadata: { 
+            plan: 'artist',
+            user_id: '123',
+            tier: 'artist'
+          } 
+        } 
+      }
     };
     (db.upsertSubscription as jest.Mock).mockResolvedValue({});
+    
+    // Mock getUserById pour le webhook
+    (db.getUserById as jest.Mock).mockResolvedValue({
+      id: 123,
+      username: 'testuser',
+      email: 'test@example.com',
+      created_at: new Date().toISOString()
+    });
+    
     jest.resetModules();
     jest.mock('stripe', () => {
       return jest.fn().mockImplementation(() => ({

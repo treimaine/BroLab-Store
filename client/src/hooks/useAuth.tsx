@@ -5,6 +5,7 @@ interface User {
   id: number;
   email: string;
   username: string;
+  created_at: string;
   subscription?: {
     tier: "basic" | "pro" | "unlimited";
     status: "active" | "inactive" | "canceled";

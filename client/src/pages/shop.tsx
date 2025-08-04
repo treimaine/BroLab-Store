@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { UnifiedFilterPanel } from "@/components/UnifiedFilterPanel";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { useUnifiedFilters } from "@/hooks/useUnifiedFilters";
-import { Filter, Grid3X3, List, RotateCcw, Search, ShoppingCart } from "lucide-react";
+import { Filter, Grid3X3, List, RotateCcw, Search } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -76,10 +76,6 @@ export default function Shop() {
     [setLocation]
   );
 
-  const handleCartView = useCallback(() => {
-    setLocation("/cart");
-  }, [setLocation]);
-
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -102,7 +98,7 @@ export default function Shop() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="pt-16 md:pt-20 lg:pt-24 container mx-auto px-4 py-8">
       {/* En-tête avec recherche et filtres */}
       <div className="mb-8">
         <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between mb-6">
@@ -127,11 +123,6 @@ export default function Shop() {
                   {stats.filteredProducts}
                 </Badge>
               )}
-            </Button>
-
-            <Button variant="outline" onClick={handleCartView} className="flex items-center gap-2">
-              <ShoppingCart className="w-4 h-4" />
-              Panier
             </Button>
           </div>
         </div>
@@ -255,7 +246,7 @@ export default function Shop() {
                       key={product.id}
                       id={product.id}
                       title={product.title || product.name || ""}
-                      genre={product.genre || "Unknown"}
+                      genre={(product as any).categories?.[0]?.name || product.genre || ""}
                       bpm={product.bpm || 0}
                       price={product.price || 0}
                       imageUrl={product.images?.[0]?.src || product.image_url || product.image}

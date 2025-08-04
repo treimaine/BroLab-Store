@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { useWishlist } from "@/hooks/useWishlist";
 import { LicensePricing, LicenseTypeEnum } from "@shared/schema";
-import { ArrowLeft, FileText, Heart, Music, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Download, FileText, Heart, Music, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import { useRoute } from "wouter";
 
@@ -21,8 +21,16 @@ export default function Product() {
   const [selectedLicense, setSelectedLicense] = useState<LicenseTypeEnum>("basic");
   const [showLicensePreview, setShowLicensePreview] = useState(false);
 
-  const { useProduct } = useWooCommerce();
+  const { useProduct, useSimilarProducts } = useWooCommerce();
   const { data: product, isLoading, error } = useProduct(productId.toString());
+
+  // Récupérer les recommandations de produits similaires
+  const genre = product?.categories?.[0]?.name;
+  const { data: similarProducts, isLoading: isLoadingSimilar } = useSimilarProducts(
+    productId.toString(),
+    genre
+  );
+
   const { addItem } = useCartContext();
   const { toast } = useToast();
 
@@ -36,11 +44,33 @@ export default function Product() {
       imageUrl: product.images?.[0]?.src,
       licenseType: selectedLicense,
       quantity: 1,
+      isFree: isFree, // Ajouter le paramètre isFree
     });
 
     toast({
       title: "Added to Cart",
       description: `${product.name} (${selectedLicense} license) has been added to your cart.`,
+    });
+  };
+
+  // Fonction pour télécharger directement les produits gratuits
+  const handleFreeDownload = () => {
+    if (!product) return;
+
+    // Créer un lien de téléchargement temporaire
+    const downloadUrl = product.audio_url || `/api/downloads/file/${product.id}/free`;
+
+    // Créer un élément <a> temporaire pour déclencher le téléchargement
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = `${product.name}.mp3`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Download Started",
+      description: `${product.name} is being downloaded.`,
     });
   };
 
@@ -205,6 +235,14 @@ export default function Product() {
                 <p className="text-gray-300 text-lg">
                   {product.categories?.[0]?.name || "Unknown"}
                 </p>
+                {/* Afficher le prix ou FREE */}
+                <div className="mt-2">
+                  {isFree ? (
+                    <span className="text-2xl font-bold text-[var(--accent-green)]">FREE</span>
+                  ) : (
+                    <span className="text-2xl font-bold text-white">${product.price}</span>
+                  )}
+                </div>
               </div>
 
               {/* Description */}
@@ -253,14 +291,17 @@ export default function Product() {
                 </div>
               )}
 
-              {/* Add to Cart */}
+              {/* Action Buttons */}
               <div className="space-y-4">
                 {isFree ? (
-                  // Free product - Single download button
+                  // Free product - Direct download button
                   <div className="flex space-x-4">
-                    <Button onClick={handleAddToCart} className="flex-1 btn-primary text-lg py-4">
-                      <ShoppingCart className="w-5 h-5 mr-2" />
-                      Free Download
+                    <Button
+                      onClick={handleFreeDownload}
+                      className="flex-1 btn-primary text-lg py-4"
+                    >
+                      <Download className="w-5 h-5 mr-2" />
+                      Download Now
                     </Button>
                     <Button
                       onClick={handleAddToWishlist}
@@ -312,7 +353,7 @@ export default function Product() {
             </div>
           </div>
 
-          {/* Advanced Beat Features */}
+          {/* Advanced Beat Features - Only for paid products */}
           {!isFree && (
             <div className="mt-12 space-y-8">
               {/* Beat Stems Delivery - Only for unlimited license */}
@@ -350,24 +391,8 @@ export default function Product() {
                       id: "4",
                       name: "Melody",
                       type: "melody",
-                      size: "4.1MB",
+                      size: "2.1MB",
                       downloadUrl: "/downloads/melody.wav",
-                      isReady: true,
-                    },
-                    {
-                      id: "5",
-                      name: "Vocals",
-                      type: "vocals",
-                      size: "3.7MB",
-                      downloadUrl: "/downloads/vocals.wav",
-                      isReady: false,
-                    },
-                    {
-                      id: "6",
-                      name: "FX",
-                      type: "fx",
-                      size: "1.9MB",
-                      downloadUrl: "/downloads/fx.wav",
                       isReady: true,
                     },
                   ]}
@@ -388,63 +413,42 @@ export default function Product() {
                 />
               )}
 
-              {/* Beat Similarity Recommendations */}
+              {/* Similar Beats */}
               <BeatSimilarityRecommendations
                 currentBeat={{
                   id: Number(product?.id) || 1,
                   title: product?.name || "",
-                  price: 99.99,
+                  price: product?.price || 0,
                   image: product?.images?.[0]?.src || "/api/placeholder/400/400",
-                  bpm:
-                    product?.bpm ||
-                    product?.meta_data?.find((meta: any) => meta.key === "bpm")?.value ||
-                    null,
+                  bpm: product?.bpm || null,
                   genre: product?.categories?.[0]?.name || "Unknown",
-                  mood: "Dark",
-                  key: "Am",
-                  tags: ["dark", "heavy", "trap"],
+                  mood: product?.meta_data?.find((meta: any) => meta.key === "mood")?.value || null,
+                  key: product?.meta_data?.find((meta: any) => meta.key === "key")?.value || null,
+                  tags: product?.tags?.map((tag: any) => tag.name) || [],
                 }}
-                recommendations={[
-                  {
-                    id: 2,
-                    title: "Midnight Vibes",
-                    price: 89.99,
-                    image: "/api/placeholder/400/400",
-                    bpm: 135,
-                    genre: product?.categories?.[0]?.name || "Trap",
-                    mood: "Dark",
-                    key: "Dm",
-                    tags: ["dark", "moody"],
-                  },
-                  {
-                    id: 3,
-                    title: "Shadow Work",
-                    price: 79.99,
-                    image: "/api/placeholder/400/400",
-                    bpm: 142,
-                    genre: product?.categories?.[0]?.name || "Trap",
-                    mood: "Aggressive",
-                    key: "Am",
-                    tags: ["heavy", "intense"],
-                  },
-                  {
-                    id: 4,
-                    title: "Urban Legend",
-                    price: 119.99,
-                    image: "/api/placeholder/400/400",
-                    bpm: 138,
-                    genre: "Hip Hop",
-                    mood: "Dark",
-                    key: "Fm",
-                    tags: ["street", "raw"],
-                  },
-                ]}
+                recommendations={
+                  similarProducts?.map((similarProduct: any) => ({
+                    id: similarProduct.id,
+                    title: similarProduct.name,
+                    price: similarProduct.price,
+                    image: similarProduct.images?.[0]?.src || "/api/placeholder/400/400",
+                    bpm: similarProduct.bpm || null,
+                    genre: similarProduct.categories?.[0]?.name || "Unknown",
+                    mood:
+                      similarProduct.meta_data?.find((meta: any) => meta.key === "mood")?.value ||
+                      null,
+                    key:
+                      similarProduct.meta_data?.find((meta: any) => meta.key === "key")?.value ||
+                      null,
+                    tags: similarProduct.tags?.map((tag: any) => tag.name) || [],
+                  })) || []
+                }
                 onBeatSelect={beat => {
                   console.log("Beat selected:", beat);
                   // Navigate to the selected beat
                   window.location.href = `/product/${beat.id}`;
                 }}
-                isLoading={false}
+                isLoading={isLoadingSimilar}
               />
             </div>
           )}

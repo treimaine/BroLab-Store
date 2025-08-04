@@ -1,4 +1,5 @@
-import { OrderList } from "@/components/orders/OrderList";
+import { AlertBanner } from "@/components/AlertBanner";
+import { DashboardContentSkeleton, DashboardTabsSkeleton } from "@/components/DashboardSkeleton";
 import { RecentlyViewedBeats } from "@/components/RecentlyViewedBeats";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useDownloadsProgress } from "@/hooks/useDownloadsProgress";
 import { useDownloadInvoice, useOrder, useOrderInvoice } from "@/hooks/useOrders";
+import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Clock,
@@ -17,15 +20,19 @@ import {
   Gift,
   Heart,
   Music,
-  Package,
-  Settings,
   ShoppingCart,
   TrendingUp,
   Trophy,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useLocation } from "wouter";
+
+// Lazy load non-critical tab components
+const ActivityTab = lazy(() => import("@/components/dashboard/ActivityTab"));
+const OrdersTab = lazy(() => import("@/components/dashboard/OrdersTab"));
+const RecommendationsTab = lazy(() => import("@/components/dashboard/RecommendationsTab"));
+const SettingsTab = lazy(() => import("@/components/dashboard/SettingsTab"));
 
 interface UserStats {
   totalPurchases: number;
@@ -71,7 +78,24 @@ export default function Dashboard() {
   } = useQuery({
     queryKey: ["/api/auth/user"],
     retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes (300,000 ms)
   });
+
+  // Type guard for user object
+  const typedUser = (user as any)?.user as {
+    id?: number;
+    username?: string;
+    email?: string;
+    avatar?: string;
+    name?: string;
+    subscription?: string;
+    memberSince?: string;
+    downloads_used?: number;
+    quota?: number;
+  } | null;
+
+  // Get subscription status
+  const { status: subscriptionStatus, isLoading: subscriptionLoading } = useSubscriptionStatus();
 
   // Fetch user orders for stats
   const {
@@ -103,6 +127,11 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  // Calculate download progress
+  const downloadsUsed = typedUser?.downloads_used || 0;
+  const quota = typedUser?.quota || 10; // Default quota for free users
+  const { progress, remaining } = useDownloadsProgress(downloadsUsed, quota);
+
   // Fetch all products for recommendations
   const { data: allProducts } = useQuery({
     queryKey: ["products", "recommendations"],
@@ -118,17 +147,6 @@ export default function Dashboard() {
   const { data: orderData, isLoading: isLoadingOrder } = useOrder(selectedOrderId || 0);
   const { data: invoiceData } = useOrderInvoice(selectedOrderId || 0);
   const downloadInvoice = useDownloadInvoice(selectedOrderId || 0);
-
-  // Type guard for user object
-  const typedUser = (user as any)?.user as {
-    id?: number;
-    username?: string;
-    email?: string;
-    avatar?: string;
-    name?: string;
-    subscription?: string;
-    memberSince?: string;
-  } | null;
 
   // Calculate real stats from orders data
   const calculateStats = (): UserStats => {
@@ -491,6 +509,11 @@ export default function Dashboard() {
     }
   };
 
+  // Show skeleton while loading
+  if (isLoading || subscriptionLoading) {
+    return <DashboardContentSkeleton />;
+  }
+
   return (
     <div className="pt-16 bg-[var(--dark-gray)] min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -504,16 +527,74 @@ export default function Dashboard() {
               editable={true}
               onUpload={handleAvatarUpload}
             />
-            <div>
-              <h1 className="text-3xl font-bold text-white">
-                Welcome back, {typedUser?.username || "User"}
-              </h1>
+            <div className="flex-1">
+              <div className="flex items-center space-x-3 mb-2">
+                <h1 className="text-3xl font-bold text-white">
+                  Welcome back, {typedUser?.username || "User"}
+                </h1>
+                {/* Subscription Badge */}
+                {!subscriptionLoading && (
+                  <Badge
+                    variant={
+                      subscriptionStatus === "active" || subscriptionStatus === "trialing"
+                        ? "default"
+                        : subscriptionStatus === "pending"
+                        ? "secondary"
+                        : subscriptionStatus === "canceled"
+                        ? "destructive"
+                        : "outline"
+                    }
+                    className={
+                      subscriptionStatus === "active" || subscriptionStatus === "trialing"
+                        ? "bg-green-600 hover:bg-green-700"
+                        : subscriptionStatus === "pending"
+                        ? "bg-yellow-600 hover:bg-yellow-700"
+                        : subscriptionStatus === "canceled"
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-gray-600 hover:bg-gray-700"
+                    }
+                  >
+                    {subscriptionStatus === "active" || subscriptionStatus === "trialing"
+                      ? "Premium"
+                      : subscriptionStatus === "pending"
+                      ? "Pending"
+                      : subscriptionStatus === "canceled"
+                      ? "Canceled"
+                      : "Free"}
+                  </Badge>
+                )}
+              </div>
               <p className="text-gray-300">
-                {typedUser?.subscription || "Free"} Member since{" "}
-                {typedUser?.memberSince || "Recently"}
+                {subscriptionStatus === "pending" ? (
+                  <span className="flex items-center">
+                    <span className="inline-block w-2 h-2 bg-yellow-400 rounded-full mr-2 animate-pulse"></span>
+                    Pending Subscription
+                  </span>
+                ) : (
+                  `${
+                    subscriptionStatus === "active" || subscriptionStatus === "trialing"
+                      ? "Premium"
+                      : "Free"
+                  } Member since ${typedUser?.memberSince || "Recently"}`
+                )}
               </p>
             </div>
           </div>
+
+          {/* Download Progress */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-300">Download Quota</span>
+              <span className="text-sm text-gray-400">
+                {downloadsUsed} / {quota} used
+              </span>
+            </div>
+            <Progress value={progress} className="h-2" />
+            <p className="text-xs text-gray-400 mt-1">{remaining} downloads remaining this month</p>
+          </div>
+
+          {/* Alert Banner for quota limit */}
+          <AlertBanner downloadsRemaining={remaining} />
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -701,199 +782,38 @@ export default function Dashboard() {
 
           {/* Activity Tab */}
           <TabsContent value="activity" className="space-y-6">
-            <Card className="bg-[var(--medium-gray)] border-[var(--medium-gray)]">
-              <CardHeader>
-                <CardTitle className="text-white">Complete Activity History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {recentActivity.map(activity => (
-                    <div
-                      key={activity.id}
-                      className="flex items-center justify-between p-4 bg-[var(--dark-gray)] rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                      <div className="flex items-center space-x-4">
-                        {getActivityIcon(activity.type)}
-                        <div>
-                          <p className="text-white font-medium">{activity.beatTitle}</p>
-                          <p className="text-gray-400 text-sm">
-                            {activity.type.charAt(0).toUpperCase() + activity.type.slice(1)}
-                            {activity.amount && ` - $${activity.amount}`}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-gray-400 text-sm">{formatDate(activity.date)}</p>
-                        {activity.amount && (
-                          <p className="text-[var(--accent-green)] font-medium">
-                            ${activity.amount}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <Suspense fallback={<DashboardTabsSkeleton />}>
+              <ActivityTab activities={recentActivity} />
+            </Suspense>
           </TabsContent>
 
           {/* Orders Tab */}
           <TabsContent value="orders" className="space-y-6">
-            <Card className="bg-[var(--medium-gray)] border-[var(--medium-gray)]">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Package className="w-5 h-5 mr-2 text-[var(--accent-purple)]" />
-                  Historique des commandes
-                </CardTitle>
-                <p className="text-gray-400">Consultez et gérez vos commandes passées</p>
-              </CardHeader>
-              <CardContent>
-                <OrderList
-                  page={1}
-                  limit={10}
-                  onPageChange={() => {}}
-                  onOrderClick={handleOrderClick}
-                />
-              </CardContent>
-            </Card>
+            <Suspense fallback={<DashboardTabsSkeleton />}>
+              <OrdersTab
+                ordersData={ordersData}
+                ordersLoading={ordersLoading}
+                ordersError={ordersError}
+                onOrderClick={handleOrderClick}
+              />
+            </Suspense>
           </TabsContent>
 
           {/* Recommendations Tab */}
           <TabsContent value="recommendations" className="space-y-6">
-            <Card className="bg-[var(--medium-gray)] border-[var(--medium-gray)]">
-              <CardHeader>
-                <CardTitle className="text-white">Personalized Recommendations</CardTitle>
-                <p className="text-gray-400">Based on your listening history and preferences</p>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {recommendations.map(beat => (
-                    <div
-                      key={beat.id}
-                      className="bg-[var(--dark-gray)] rounded-lg p-4 hover:bg-gray-700 transition-colors"
-                    >
-                      <div className="aspect-square bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
-                        <img
-                          src={beat.imageUrl}
-                          alt={beat.title}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-white font-bold truncate">{beat.title}</h3>
-                          <Badge className="bg-[var(--accent-green)]">
-                            {beat.matchScore}% match
-                          </Badge>
-                        </div>
-
-                        <p className="text-gray-400 text-sm">by {beat.artist}</p>
-                        <p className="text-gray-400 text-xs">{beat.reason}</p>
-
-                        <div className="flex items-center justify-between pt-2">
-                          <span className="text-[var(--accent-purple)] font-bold">
-                            ${beat.price}
-                          </span>
-                          <Button
-                            size="sm"
-                            className="btn-primary"
-                            onClick={() => handleRecommendationClick(beat)}
-                          >
-                            Listen
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <Suspense fallback={<DashboardTabsSkeleton />}>
+              <RecommendationsTab
+                recommendations={recommendations}
+                onRecommendationClick={handleRecommendationClick}
+              />
+            </Suspense>
           </TabsContent>
 
           {/* Settings Tab */}
           <TabsContent value="settings" className="space-y-6">
-            <Card className="bg-[var(--medium-gray)] border-[var(--medium-gray)]">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Settings className="w-5 h-5 mr-2 text-[var(--accent-purple)]" />
-                  Account Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-gray-400 text-sm block mb-2">Email</label>
-                    <div className="text-white bg-[var(--dark-gray)] p-3 rounded-lg">
-                      {typedUser?.email || "user@example.com"}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-gray-400 text-sm block mb-2">Subscription</label>
-                    <div className="flex items-center justify-between bg-[var(--dark-gray)] p-3 rounded-lg">
-                      <span className="text-white">{typedUser?.subscription || "Free"} Plan</span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-[var(--accent-purple)] text-[var(--accent-purple)]"
-                        onClick={() => setLocation("/membership")}
-                      >
-                        Manage
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-gray-400 text-sm block mb-2">Notifications</label>
-                    <div className="bg-[var(--dark-gray)] p-3 rounded-lg space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-white">New releases</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-[var(--medium-gray)] text-white"
-                        >
-                          Enabled
-                        </Button>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-white">Personalized recommendations</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-[var(--medium-gray)] text-white"
-                        >
-                          Enabled
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-gray-400 text-sm block mb-2">Quick Actions</label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <Button
-                        variant="outline"
-                        className="border-[var(--medium-gray)] text-white hover:bg-[var(--accent-purple)]"
-                        onClick={() => setLocation("/wishlist")}
-                      >
-                        <Heart className="w-4 h-4 mr-2" />
-                        My Wishlist
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="border-[var(--medium-gray)] text-white hover:bg-[var(--accent-purple)]"
-                        onClick={() => setLocation("/cart")}
-                      >
-                        <ShoppingCart className="w-4 h-4 mr-2" />
-                        My Cart
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <Suspense fallback={<DashboardTabsSkeleton />}>
+              <SettingsTab subscriptionStatus={subscriptionStatus} />
+            </Suspense>
           </TabsContent>
         </Tabs>
       </div>

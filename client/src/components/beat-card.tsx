@@ -5,7 +5,7 @@ import { useRecentlyViewedBeats } from "@/hooks/useRecentlyViewedBeats";
 import { useWishlist } from "@/hooks/useWishlist";
 import { useAudioStore } from "@/store/useAudioStore";
 import { LicenseTypeEnum } from "@shared/schema";
-import { Heart, Music, ShoppingCart } from "lucide-react";
+import { Download, Heart, Music, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import { useCartContext } from "./cart-provider";
 
@@ -77,6 +77,7 @@ export function BeatCard({
       imageUrl,
       licenseType: "basic" as LicenseTypeEnum,
       quantity: 1,
+      isFree: isFree, // Ajouter le paramètre isFree
     });
 
     toast({
@@ -99,42 +100,49 @@ export function BeatCard({
       featured,
       downloads,
       duration,
-      is_active: true,
-      wordpress_id: id,
-      description: null,
-      key: null,
-      mood: null,
-      created_at: new Date().toISOString(),
     });
 
-    // Appeler le callback original
-    onViewDetails?.();
+    // Naviguer vers la page du produit
+    if (onViewDetails) {
+      onViewDetails();
+    } else {
+      window.location.href = `/product/${id}`;
+    }
   };
 
   const handleWishlistToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
-
     try {
       if (isFavorite(id)) {
         await removeFavorite(id);
+        toast({
+          title: "Removed from Wishlist",
+          description: "This beat has been removed from your wishlist.",
+        });
       } else {
         await addFavorite(id);
+        toast({
+          title: "Added to Wishlist",
+          description: "This beat has been added to your wishlist.",
+        });
       }
     } catch (error) {
-      console.error("Wishlist toggle error:", error);
+      console.error("Wishlist error:", error);
     }
   };
 
   const formatDuration = (seconds?: number) => {
     if (!seconds) return "";
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
   return (
     <div
-      className={`beat-card cursor-pointer fade-in group ${className}`}
+      className={`card-dark overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer ${
+        featured ? "ring-2 ring-[var(--accent-purple)]" : ""
+      } ${className}`}
       onClick={handleViewDetails}
     >
       {/* Product Image */}
@@ -142,7 +150,7 @@ export function BeatCard({
         className="relative aspect-square bg-gradient-to-br from-purple-600 to-blue-600 rounded-t-xl overflow-hidden group cursor-pointer"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        onClick={onViewDetails}
+        onClick={handleViewDetails}
       >
         {/* Wishlist Button */}
         <button
@@ -219,14 +227,14 @@ export function BeatCard({
           </div>
 
           <Button
-            onClick={isFree ? onViewDetails : handleAddToCart}
+            onClick={isFree ? handleViewDetails : handleAddToCart}
             className={
               isFree
                 ? "btn-primary bg-[var(--accent-cyan)] hover:bg-[var(--accent-cyan)]/80 text-white font-bold flex items-center gap-2 ml-[6px] mr-[6px] pl-[12px] pr-[12px] pt-[0px] pb-[0px]"
                 : "btn-primary flex items-center gap-2 ml-[6px] mr-[6px] pl-[12px] pr-[12px] pt-[0px] pb-[0px]"
             }
           >
-            <ShoppingCart className="w-4 h-4" />
+            {isFree ? <Download className="w-4 h-4" /> : <ShoppingCart className="w-4 h-4" />}
             {isFree ? "Free Download" : "Add to Cart"}
           </Button>
         </div>

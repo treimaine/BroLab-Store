@@ -4,7 +4,8 @@ export function makeTestUser(overrides = {}) {
   return {
     username: `testuser_${rand}`,
     email: `testuser_${rand}@example.com`,
-    password: 'testpassword',
+    password: 'TestPassword123',
+    confirmPassword: 'TestPassword123',
     ...overrides
   };
 } 

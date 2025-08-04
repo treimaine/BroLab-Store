@@ -18,7 +18,7 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
 
   const formatDuration = (seconds?: number) => {
-    if (!seconds) return "3:17";
+    if (!seconds) return "";
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
@@ -26,69 +26,84 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
 
   const getAudioUrl = (product: any) => {
     const audioUrl =
-      product.audio_url || product.meta_data?.find((meta: any) => meta.key === "audio_url")?.value;
+      product.audio_url ||
+      product.meta_data?.find((meta: any) => meta.key === "audio_url")?.value ||
+      product.meta_data?.find((meta: any) => meta.key === "audio")?.value;
 
     // Retourner null si aucun audio réel n'est trouvé
     return audioUrl && audioUrl !== "/api/placeholder/audio.mp3" ? audioUrl : null;
   };
 
   const getBPM = (product: any) => {
-    return (
+    const bpm =
       product.bpm ||
       product.attributes?.find((attr: any) => attr.name === "BPM")?.options?.[0] ||
       product.meta_data?.find((meta: any) => meta.key === "bpm")?.value ||
-      null
-    );
+      product.meta_data?.find((meta: any) => meta.key === "BPM")?.value;
+
+    return bpm || "";
   };
 
   const getGenre = (product: any) => {
-    return product.categories?.[0]?.name || "Unknown";
+    // Essayer plusieurs sources pour récupérer le genre/catégorie
+    const genre =
+      // Catégories WooCommerce
+      product.categories?.[0]?.name ||
+      product.categories?.find((cat: any) => cat.name)?.name ||
+      // Meta data pour le genre
+      product.meta_data?.find((meta: any) => meta.key === "genre")?.value ||
+      product.meta_data?.find((meta: any) => meta.key === "category")?.value ||
+      product.meta_data?.find((meta: any) => meta.key === "style")?.value ||
+      // Tags qui pourraient contenir le genre
+      product.tags?.find(
+        (tag: any) =>
+          tag.name.toLowerCase().includes("hip") ||
+          tag.name.toLowerCase().includes("trap") ||
+          tag.name.toLowerCase().includes("r&b") ||
+          tag.name.toLowerCase().includes("pop") ||
+          tag.name.toLowerCase().includes("electronic")
+      )?.name ||
+      // Attributs WooCommerce
+      product.attributes?.find((attr: any) => attr.name === "Genre")?.options?.[0] ||
+      product.attributes?.find((attr: any) => attr.name === "Style")?.options?.[0] ||
+      // Fallback sur le nom de la catégorie principale
+      product.category?.name ||
+      product.primary_category?.name ||
+      // Si rien n'est trouvé, retourner une chaîne vide au lieu de "Unknown"
+      "";
+
+    return genre;
   };
 
   const getProducer = (product: any) => {
-    return product.meta_data?.find((meta: any) => meta.key === "producer")?.value || "BroLab";
+    return (
+      product.meta_data?.find((meta: any) => meta.key === "producer")?.value ||
+      product.meta_data?.find((meta: any) => meta.key === "artist")?.value ||
+      product.meta_data?.find((meta: any) => meta.key === "author")?.value ||
+      ""
+    );
   };
 
   const getInstruments = (product: any) => {
-    // Utiliser les données réelles de WooCommerce si disponibles
+    // Utiliser uniquement les données réelles de WooCommerce
     const instruments =
       product.meta_data?.find((meta: any) => meta.key === "instruments")?.value ||
-      product.meta_data?.find((meta: any) => meta.key === "instruments")?.value ||
+      product.meta_data?.find((meta: any) => meta.key === "instruments_used")?.value ||
+      product.meta_data?.find((meta: any) => meta.key === "tools")?.value ||
       product.tags?.find((tag: any) => tag.name.toLowerCase().includes("instrument"))?.name;
 
-    if (instruments) return instruments;
-
-    // Fallback basé sur le genre si aucune donnée réelle
-    const genre = getGenre(product);
-    const genreInstruments = {
-      "Hip Hop": "Drum, Bass, Synth, Piano",
-      Trap: "808, Hi-Hat, Kick, Snare",
-      "R&B": "Piano, Strings, Bass, Drums",
-      Pop: "Guitar, Piano, Drums, Synth",
-      Electronic: "Synth, Drum Machine, Bass",
-    };
-    return genreInstruments[genre as keyof typeof genreInstruments] || "Drum, Bass, Piano";
+    return instruments || "";
   };
 
   const getMood = (product: any) => {
-    // Utiliser les données réelles de WooCommerce si disponibles
+    // Utiliser uniquement les données réelles de WooCommerce
     const mood =
       product.meta_data?.find((meta: any) => meta.key === "mood")?.value ||
       product.meta_data?.find((meta: any) => meta.key === "Mood")?.value ||
+      product.meta_data?.find((meta: any) => meta.key === "feeling")?.value ||
       product.tags?.find((tag: any) => tag.name.toLowerCase().includes("mood"))?.name;
 
-    if (mood) return mood;
-
-    // Fallback basé sur le genre si aucune donnée réelle
-    const genre = getGenre(product);
-    const genreMoods = {
-      "Hip Hop": "Energetic, Aggressive",
-      Trap: "Dark, Heavy",
-      "R&B": "Smooth, Emotional",
-      Pop: "Uplifting, Catchy",
-      Electronic: "Futuristic, Dynamic",
-    };
-    return genreMoods[genre as keyof typeof genreMoods] || "Energetic, Dynamic";
+    return mood || "";
   };
 
   return (
@@ -151,11 +166,13 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
                 <h3 className="text-white font-medium text-sm truncate group-hover:text-[var(--accent-purple)] transition-colors">
                   {product.name}
                 </h3>
-                <p className="text-gray-400 text-xs truncate">By {producer}</p>
+                <p className="text-gray-400 text-xs truncate">{producer ? `By ${producer}` : ""}</p>
                 <div className="flex items-center space-x-2 mt-1">
-                  <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                    {genre}
-                  </Badge>
+                  {genre && (
+                    <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                      {genre}
+                    </Badge>
+                  )}
                   {product.featured && (
                     <Badge className="bg-[var(--accent-purple)] text-xs px-2 py-0.5">
                       Featured
@@ -169,13 +186,13 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
             <div className="col-span-3">
               <div className="flex items-center space-x-2">
                 <Music className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span className="text-gray-300 text-sm truncate">{instruments}</span>
+                <span className="text-gray-300 text-sm truncate">{instruments || "—"}</span>
               </div>
             </div>
 
             {/* MOOD Column */}
             <div className="col-span-2">
-              <span className="text-gray-300 text-sm truncate">{mood}</span>
+              <span className="text-gray-300 text-sm truncate">{mood || "—"}</span>
             </div>
 
             {/* DURATION Column - Espacement proportionnel */}
@@ -183,14 +200,16 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
               <div className="flex items-center space-x-1">
                 <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
                 <span className="text-gray-300 text-sm font-mono whitespace-nowrap">
-                  {formatDuration(product.duration)}
+                  {formatDuration(product.duration) || "—"}
                 </span>
               </div>
             </div>
 
             {/* BPM Column - Espacement proportionnel */}
             <div className="col-span-1">
-              <span className="text-gray-300 text-sm font-mono whitespace-nowrap">{bpm}</span>
+              <span className="text-gray-300 text-sm font-mono whitespace-nowrap">
+                {bpm || "—"}
+              </span>
             </div>
 
             {/* ACTIONS Column - Espacement proportionnel */}

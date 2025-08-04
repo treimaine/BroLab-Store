@@ -1,5 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 
 // WooCommerce API integration hook
 export function useWooCommerce() {
@@ -81,11 +82,56 @@ export function useWooCommerce() {
     });
   };
 
+  // Hook pour récupérer les recommandations de produits similaires
+  const useSimilarProducts = (productId: string, genre?: string) => {
+    const [data, setData] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+      if (!productId) return;
+
+      const fetchSimilarProducts = async () => {
+        setIsLoading(true);
+        setError(null);
+        
+        try {
+          // Construire les paramètres de recherche
+          const params = new URLSearchParams();
+          if (genre) {
+            params.append('category', genre);
+          }
+          params.append('exclude', productId);
+          params.append('per_page', '6'); // Limiter à 6 recommandations
+          
+          const response = await fetch(`/api/woocommerce/products?${params.toString()}`);
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch similar products');
+          }
+          
+          const products = await response.json();
+          setData(products);
+        } catch (err: any) {
+          console.error('Error fetching similar products:', err);
+          setError(err.message);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchSimilarProducts();
+    }, [productId, genre]);
+
+    return { data, isLoading, error };
+  };
+
   return {
     useProducts,
     useProduct,
     useCategories,
     useCreateOrder,
     useCreateCustomer,
+    useSimilarProducts, // Nouvelle fonction
   };
 }
