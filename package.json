@@ -11,7 +11,10 @@
     "check": "tsc",
     "setup": "npm install",
     "clean": "rimraf node_modules dist .cache && npm install",
-    "test": "jest"
+    "test": "jest",
+    "clean:all": "node scripts/clean-all.js",
+    "clean:logs": "node scripts/clear-logs.js",
+    "clean:db": "node scripts/clear-database-final.js"
   },
   "dependencies": {
     "@esbuild/win32-x64": "^0.25.8",
@@ -71,6 +74,7 @@
     "dotenv": "^17.2.0",
     "embla-carousel-react": "^8.6.0",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.0.1",
     "express-session": "^1.18.2",
     "fast-glob": "^3.3.3",
     "file-type": "^21.0.0",

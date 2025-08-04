@@ -8,6 +8,7 @@ export interface CartItem {
   licenseType: 'basic' | 'premium' | 'unlimited';
   quantity: number;
   price?: number;
+  isFree?: boolean; // Nouveau champ pour détecter les produits gratuits
 }
 
 export interface License {
@@ -116,9 +117,15 @@ class CartManager {
     localStorage.setItem(CartManager.STORAGE_KEY, JSON.stringify(items));
   }
 
-  addItem(newItem: Omit<CartItem, 'price'>): void {
+  addItem(newItem: Omit<CartItem, 'price'>) {
     const cart = this.getCart();
     const price = getLicensePrice(newItem.licenseType);
+    
+    // Empêcher l'ajout de produits gratuits au panier
+    if (newItem.isFree || price === 0) {
+      console.warn('🚨 Tentative d\'ajout d\'un produit gratuit au panier:', newItem.title);
+      throw new Error('Les produits gratuits ne peuvent pas être ajoutés au panier. Utilisez le bouton "Download" directement.');
+    }
     
     // CRITICAL: Validate pricing before adding to cart
     if (price < 29.99) {

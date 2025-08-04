@@ -3,7 +3,10 @@ import cookieParser from "cookie-parser";
 import type { Express, NextFunction, Request, Response } from "express";
 import session from "express-session";
 import type { User } from '../shared/schema';
+import { loginSchema, registerSchema } from '../shared/validation';
+import { auditLogger } from './lib/audit';
 import { getUserByEmail, getUserById, getUserByUsername, upsertUser } from "./lib/db";
+import { authLimiter, registrationLimiter } from './middleware/rateLimit';
 
 // Extend session to include userId
 declare module 'express-session' {
@@ -20,11 +23,12 @@ export function setupAuth(app: Express) {
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // Always false for tests
       httpOnly: true,
-      sameSite: process.env.NODE_ENV === 'test' ? 'lax' : 'strict',
+      sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000
-    }
+    },
+    store: process.env.NODE_ENV === 'test' ? new session.MemoryStore() : undefined
   }));
 }
 
@@ -47,18 +51,18 @@ export async function getCurrentUser(req: Request) {
 // Authentication routes
 export function registerAuthRoutes(app: Express) {
   // Register new user
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", registrationLimiter, async (req, res) => {
     try {
-      const { username, email, password } = req.body;
-      
-      // Validate input
-      if (!username || !email || !password) {
-        return res.status(400).json({ error: "All fields are required" });
+      // Client-side validation
+      const clientValidation = registerSchema.safeParse(req.body);
+      if (!clientValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data",
+          details: clientValidation.error.errors 
+        });
       }
-      
-      if (password.length < 6) {
-        return res.status(400).json({ error: "Password must be at least 6 characters" });
-      }
+
+      const { username, email, password } = clientValidation.data;
       
       // Check if user already exists
       const existingUser = await getUserByEmail(email);
@@ -66,15 +70,32 @@ export function registerAuthRoutes(app: Express) {
         return res.status(400).json({ error: "Email already registered" });
       }
       
+      // Check if username already exists
+      const existingUsername = await getUserByUsername(username);
+      if (existingUsername) {
+        return res.status(400).json({ error: "Username already taken" });
+      }
+      
       // Hash password
       const saltRounds = 10;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
       
       // Create user
-      const newUser = await upsertUser({ username, email, password: hashedPassword });
+      const newUser = await upsertUser({ 
+        username, 
+        email, 
+        password: hashedPassword
+      });
       
       // Create session
       req.session.userId = newUser.id;
+      
+      // Log successful registration
+      await auditLogger.logRegistration(
+        newUser.id,
+        req.ip,
+        req.headers['user-agent']
+      );
       
       res.status(201).json({
         user: {
@@ -91,13 +112,18 @@ export function registerAuthRoutes(app: Express) {
   });
   
   // Login user
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", authLimiter, async (req, res) => {
     try {
-      const { username, password } = req.body;
-      
-      if (!username || !password) {
-        return res.status(400).json({ error: "Username and password are required" });
+      // Client-side validation
+      const clientValidation = loginSchema.safeParse(req.body);
+      if (!clientValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data",
+          details: clientValidation.error.errors 
+        });
       }
+
+      const { username, password } = clientValidation.data;
       
       // Find user by username first, then by email if not found
       let user: User | null = await getUserByUsername(username);
@@ -107,15 +133,37 @@ export function registerAuthRoutes(app: Express) {
       }
       
       if (!user || typeof user !== 'object' || !('id' in user)) {
+        // Log failed login attempt
+        await auditLogger.logFailedLogin(
+          username,
+          req.ip,
+          req.headers['user-agent']
+        );
         return res.status(401).json({ error: "Invalid credentials" });
       }
+      
       // Vérifier le mot de passe
       const passwordMatch = await bcrypt.compare(password, user.password);
       if (!passwordMatch) {
+        // Log failed login attempt
+        await auditLogger.logFailedLogin(
+          username,
+          req.ip,
+          req.headers['user-agent']
+        );
         return res.status(401).json({ error: "Invalid credentials" });
       }
+      
       const typedUser: User = user as User;
       req.session.userId = typedUser.id;
+      
+      // Log successful login
+      await auditLogger.logLogin(
+        typedUser.id,
+        req.ip,
+        req.headers['user-agent']
+      );
+      
       res.json({
         user: {
           id: typedUser.id,
@@ -162,4 +210,5 @@ export function registerAuthRoutes(app: Express) {
       res.status(500).json({ error: "Failed to get user" });
     }
   });
+
 }

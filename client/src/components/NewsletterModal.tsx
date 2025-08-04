@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { X, Mail, Gift } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
+import { Gift, Mail, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface NewsletterModalProps {
   isOpen: boolean;
@@ -8,34 +8,34 @@ interface NewsletterModalProps {
 }
 
 export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps) {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email) return;
-    
+
     setIsSubmitting(true);
-    
+
     try {
       // Replace with actual Mailchimp or newsletter service integration
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      
+
       setIsSubmitted(true);
-      
+
       // Store that user has signed up
-      localStorage.setItem('brolab-newsletter-signup', 'true');
-      
+      localStorage.setItem("brolab-newsletter-signup", "true");
+
       // Close modal after success message
       setTimeout(() => {
         onClose();
         setIsSubmitted(false);
-        setEmail('');
+        setEmail("");
       }, 2000);
     } catch (error) {
-      console.error('Newsletter signup error:', error);
+      console.error("Newsletter signup error:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -46,11 +46,8 @@ export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+
       {/* Modal */}
       <div className="relative bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-2xl p-8 max-w-md w-full mx-4 animate-fadeIn">
         {/* Close button */}
@@ -68,11 +65,10 @@ export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps) {
               <div className="w-16 h-16 bg-[var(--accent-purple)]/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Gift className="w-8 h-8 text-[var(--accent-purple)]" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">
-                Get Your Free Beat Pack!
-              </h2>
+              <h2 className="text-2xl font-bold text-white mb-2">Get Your Free Beat Pack!</h2>
               <p className="text-gray-300">
-                Join our newsletter and receive 3 exclusive beats + producer tips straight to your inbox.
+                Join our newsletter and receive 3 exclusive beats + producer tips straight to your
+                inbox.
               </p>
             </div>
 
@@ -83,13 +79,13 @@ export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps) {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={e => setEmail(e.target.value)}
                   placeholder="Enter your email address"
                   required
                   className="w-full pl-11 pr-4 py-3 bg-[var(--deep-black)] border border-[var(--medium-gray)] rounded-lg text-white placeholder-gray-400 focus:border-[var(--accent-purple)] focus:outline-none transition-colors"
                 />
               </div>
-              
+
               <Button
                 type="submit"
                 disabled={isSubmitting || !email}
@@ -101,7 +97,7 @@ export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps) {
                     Signing up...
                   </div>
                 ) : (
-                  'Get My Free Beats'
+                  "Get My Free Beats"
                 )}
               </Button>
             </form>
@@ -117,9 +113,7 @@ export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps) {
             <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Gift className="w-8 h-8 text-green-400" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Welcome to the family!
-            </h2>
+            <h2 className="text-2xl font-bold text-white mb-2">Welcome to the family!</h2>
             <p className="text-gray-300 mb-4">
               Check your email for your free beat pack and exclusive producer content.
             </p>
@@ -137,8 +131,8 @@ export function useNewsletterModal() {
 
   useEffect(() => {
     // Check if user has already signed up
-    const hasSignedUp = localStorage.getItem('brolab-newsletter-signup');
-    
+    const hasSignedUp = localStorage.getItem("brolab-newsletter-signup");
+
     if (!hasSignedUp) {
       // Show modal after a delay on first visit
       const timer = setTimeout(() => {
@@ -155,7 +149,7 @@ export function useNewsletterModal() {
   return {
     isOpen,
     openModal,
-    closeModal
+    closeModal,
   };
 }
 

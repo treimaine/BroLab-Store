@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Sparkles, Target, TrendingUp } from "lucide-react";
+import { Sparkles, Target } from "lucide-react";
 import { useState } from "react";
 
 import type { BeatProduct as Beat } from "@shared/schema";
@@ -332,41 +332,6 @@ export function BeatSimilarityRecommendations({
               <Button className="btn-secondary">Load More Recommendations</Button>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Trending Similar Beats */}
-      <Card className="card-dark">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            Trending in {currentBeat.genre}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {sortedRecommendations
-              .filter(beat => beat.genre === currentBeat.genre)
-              .slice(0, 4)
-              .map(beat => (
-                <div
-                  key={`trending-${beat.id}`}
-                  className="flex items-center space-x-3 p-3 bg-[var(--medium-gray)] rounded-lg cursor-pointer hover:bg-[var(--medium-gray)]/80 transition-colors"
-                  onClick={() => onBeatSelect(beat)}
-                >
-                  <img
-                    src={beat.image || "/api/placeholder/400/400"}
-                    alt={beat.title}
-                    className="w-12 h-12 rounded object-cover"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-white truncate">{beat.title}</div>
-                    <div className="text-sm text-gray-400">BroLab</div>
-                  </div>
-                  <div className="text-[var(--accent-purple)] font-bold">${beat.price}</div>
-                </div>
-              ))}
-          </div>
         </CardContent>
       </Card>
     </div>

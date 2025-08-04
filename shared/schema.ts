@@ -40,6 +40,11 @@ export type User = {
   stripeCustomerId?: string | null; // Stripe customer ID (optionnel)
   stripe_customer_id?: string | null; // Snake case version for Supabase compatibility
   created_at: string; // aligné sur la colonne Supabase
+  downloads_used?: number; // Number of downloads used this month
+  quota?: number; // Monthly download quota
+  avatar?: string | null; // User avatar URL
+  subscription?: string | null; // Subscription status
+  memberSince?: string; // Member since date
 };
 
 export const insertUserSchema = z.object({
@@ -313,7 +318,7 @@ export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
 // Download type for logging downloads
 export interface Download {
   id: string; // uuid
-  user_id: number;
+  user_id?: number | null; // Peut être null pour les téléchargements gratuits
   product_id: number;
   license: string;
   downloaded_at: string; // ISO timestamp
@@ -322,7 +327,7 @@ export interface Download {
 
 export const insertDownloadSchema = z.object({
   productId: z.number().positive('Product ID must be a positive number'),
-  license: z.enum(LicenseType, { errorMap: () => ({ message: 'License must be basic, premium, or unlimited' }) })
+  license: z.enum(LicenseType, { errorMap: () => ({ message: 'License must be basic, premium, or unlimited' }) }),
 });
 export type InsertDownload = z.infer<typeof insertDownloadSchema>;
 
@@ -334,7 +339,7 @@ export type InsertDownload = z.infer<typeof insertDownloadSchema>;
 
 export type ActivityLog = {
   id: number;
-  user_id: number;
+  user_id?: number | null; // Peut être null pour les activités anonymes (téléchargements gratuits)
   event_type: string;
   details?: any;
   timestamp: string;
@@ -342,7 +347,7 @@ export type ActivityLog = {
 };
 
 export const insertActivityLogSchema = z.object({
-  user_id: z.number(),
+  user_id: z.number().optional().nullable(),
   event_type: z.string(),
   details: z.any().optional(),
   timestamp: z.string().optional(),

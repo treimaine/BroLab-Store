@@ -31,9 +31,22 @@ export async function getUserByUsername(username: string): Promise<User | null> 
 
 // Upsert user
 export async function upsertUser(user: Partial<User>): Promise<User> {
+  // If user has an ID, it's an update
+  if (user.id) {
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .update(user)
+      .eq('id', user.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as User;
+  }
+  
+  // Otherwise, it's an insert
   const { data, error } = await supabaseAdmin
     .from('users')
-    .upsert(user, { onConflict: 'email' }) // string, pas tableau
+    .insert(user)
     .select()
     .single();
   if (error) throw error;
@@ -182,10 +195,36 @@ export async function getSubscription(userId: number): Promise<any> {
 export async function subscriptionStatusHelper(userId: number): Promise<string> {
   const sub = await getSubscription(userId);
   if (!sub) return 'none';
-  if (sub.status === 'active' && new Date(sub.current_period_end) > new Date()) {
-    return 'active';
+  
+  // Gérer les différents statuts
+  switch (sub.status) {
+    case 'active':
+      // Vérifier si l'abonnement n'a pas expiré
+      if (new Date(sub.current_period_end) > new Date()) {
+        // Si cancel_at_period_end est true, c'est un statut canceled_pending
+        if (sub.cancel_at_period_end) {
+          return 'canceled_pending';
+        }
+        return 'active';
+      } else {
+        return 'inactive';
+      }
+    case 'pending':
+      // Vérifier si le pending n'a pas expiré (24h)
+      const pendingExpiry = new Date(sub.created_at);
+      pendingExpiry.setHours(pendingExpiry.getHours() + 24);
+      if (new Date() < pendingExpiry) {
+        return 'pending';
+      } else {
+        return 'inactive';
+      }
+    case 'canceled':
+      return 'canceled';
+    case 'trialing':
+      return 'trialing';
+    default:
+      return sub.status || 'inactive';
   }
-  return sub.status || 'inactive';
 }
 
 // File management helpers

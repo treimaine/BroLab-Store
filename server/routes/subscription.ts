@@ -1,7 +1,11 @@
 import express from 'express';
 import Stripe from 'stripe';
+import { createSubscriptionSchema, serverCreateSubscriptionSchema } from '../../shared/validation';
+import { getCurrentUser, isAuthenticated } from '../auth';
+import { auditLogger } from '../lib/audit';
 import { getSubscription, getUserById, subscriptionStatusHelper, upsertSubscription } from '../lib/db';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
+import { subscriptionLimiter } from '../middleware/rateLimit';
 
 const router = express.Router();
 
@@ -87,9 +91,51 @@ router.get('/plans', async (req, res) => {
 });
 
 // Create subscription checkout session
-router.post('/create-subscription', async (req, res) => {
+router.post('/create-subscription', isAuthenticated, subscriptionLimiter, async (req, res) => {
   try {
-    const { priceId, billingInterval } = req.body;
+    // Client-side validation
+    const clientValidation = createSubscriptionSchema.safeParse(req.body);
+    if (!clientValidation.success) {
+      return res.status(400).json({ 
+        error: 'Invalid request data',
+        details: clientValidation.error.errors 
+      });
+    }
+
+    // Server-side validation with additional security checks
+    const serverValidation = serverCreateSubscriptionSchema.safeParse({
+      ...req.body,
+      userAgent: req.headers['user-agent'],
+      ipAddress: req.ip,
+      timestamp: Date.now()
+    });
+    
+    if (!serverValidation.success) {
+      // Log security event for failed validation
+      await auditLogger.logSecurityEvent(
+        req.user?.id || 0,
+        'subscription_validation_failed',
+        { 
+          errors: serverValidation.error.errors,
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent']
+        },
+        req.ip,
+        req.headers['user-agent']
+      );
+      
+      return res.status(400).json({ 
+        error: 'Invalid request data',
+        details: serverValidation.error.errors 
+      });
+    }
+
+    const { priceId, billingInterval } = serverValidation.data;
+    
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
 
     // Map frontend tier IDs to Stripe price IDs
     const priceMapping: Record<string, { monthly: string; annual: string }> = {
@@ -113,6 +159,7 @@ router.post('/create-subscription', async (req, res) => {
       return res.status(400).json({ error: 'Invalid price ID or billing interval' });
     }
 
+    // Créer la session Stripe
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -123,12 +170,31 @@ router.post('/create-subscription', async (req, res) => {
         },
       ],
       success_url: `${req.headers.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.origin}/membership`,
+      cancel_url: `${req.headers.origin}/membership?canceled=true`,
       metadata: {
         tier: priceId,
-        billing_interval: billingInterval
+        billing_interval: billingInterval,
+        user_id: user.id.toString()
       }
     });
+
+    // Créer l'enregistrement "pending" en base
+    await upsertSubscription({
+      stripeSubId: session.id, // Utiliser session.id comme identifiant temporaire
+      userId: user.id,
+      plan: priceId,
+      status: 'pending',
+      current_period_end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24h pour expiration
+    });
+
+    // Log successful subscription creation
+    await auditLogger.logSubscriptionCreated(
+      user.id,
+      priceId,
+      billingInterval,
+      req.ip,
+      req.headers['user-agent']
+    );
 
     res.json({ url: session.url });
   } catch (error: any) {
@@ -172,28 +238,115 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   switch (event.type) {
     case 'checkout.session.completed':
       const session = event.data.object;
-      // Update user subscription in database
+      
+      // Récupérer l'userId depuis les metadata
+      const userId = parseInt(session.metadata?.user_id || '0');
+      if (!userId) {
+        console.error('No user_id found in session metadata');
+        return res.status(400).json({ error: 'Invalid session metadata' });
+      }
+
+      // Vérifier que l'utilisateur existe
+      const user = await getUserById(userId);
+      if (!user) {
+        console.error(`User ${userId} not found`);
+        return res.status(400).json({ error: 'User not found' });
+      }
+
+      // Mettre à jour le statut vers "active"
       await upsertSubscription({
         stripeSubId: session.subscription,
-        userId: 123, // TODO: retrouver l'userId à partir de l'email ou customer_email
-        plan: session.metadata?.plan || 'unknown',
+        userId: userId,
+        plan: session.metadata?.tier || 'unknown',
         status: 'active',
-        current_period_end: '2099-12-31T00:00:00.000Z'
+        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 jours
       });
+
+      console.log(`Subscription activated for user ${userId}`);
+      
+      // Invalider le cache pour forcer la mise à jour du dashboard
+      // Note: En production, vous pourriez utiliser un système de cache distribué
       break;
       
     case 'customer.subscription.updated':
       const subscription = event.data.object;
-      console.log('Subscription updated:', subscription);
+      
+      // Récupérer l'utilisateur par customer_id
+      const { data: users, error: userError } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('stripe_customer_id', subscription.customer)
+        .single();
+
+      if (userError || !users) {
+        console.error(`No user found for customer ${subscription.customer}`);
+        break;
+      }
+
+      // Mettre à jour le statut
+      await upsertSubscription({
+        stripeSubId: subscription.id,
+        userId: users.id,
+        plan: subscription.metadata?.tier || 'unknown',
+        status: subscription.status,
+        current_period_end: new Date(subscription.current_period_end * 1000).toISOString()
+      });
+
+      console.log(`Subscription updated for user ${users.id}: ${subscription.status}`);
       break;
       
     case 'customer.subscription.deleted':
       const deletedSubscription = event.data.object;
-      console.log('Subscription canceled:', deletedSubscription);
       
-      // TODO: Update user subscription status to inactive
-      // await deactivateUserSubscription(deletedSubscription.customer);
+      // Récupérer l'utilisateur par customer_id
+      const { data: deletedUsers, error: deletedUserError } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('stripe_customer_id', deletedSubscription.customer)
+        .single();
+
+      if (deletedUserError || !deletedUsers) {
+        console.error(`No user found for customer ${deletedSubscription.customer}`);
+        break;
+      }
+
+      // Mettre à jour le statut vers "canceled"
+      await upsertSubscription({
+        stripeSubId: deletedSubscription.id,
+        userId: deletedUsers.id,
+        plan: deletedSubscription.metadata?.tier || 'unknown',
+        status: 'canceled',
+        current_period_end: new Date(deletedSubscription.current_period_end * 1000).toISOString()
+      });
+
+      console.log(`Subscription canceled for user ${deletedUsers.id}`);
+      break;
+
+    case 'invoice.payment_failed':
+      const failedInvoice = event.data.object;
       
+      // Récupérer l'utilisateur par customer_id
+      const { data: failedUsers, error: failedUserError } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('stripe_customer_id', failedInvoice.customer)
+        .single();
+
+      if (failedUserError || !failedUsers) {
+        console.error(`No user found for customer ${failedInvoice.customer}`);
+        break;
+      }
+
+      // Mettre à jour le statut vers "canceled" en cas d'échec de paiement
+      await upsertSubscription({
+        stripeSubId: failedInvoice.subscription,
+        userId: failedUsers.id,
+        plan: 'unknown',
+        status: 'canceled',
+        current_period_end: new Date().toISOString()
+      });
+
+      console.log(`Subscription canceled due to payment failure for user ${failedUsers.id}`);
       break;
       
     default:
@@ -211,23 +364,30 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   res.json({ received: true });
 });
 
-
-
 // Get current user's subscription status
-router.get('/status', async (req, res) => {
+router.get('/status', isAuthenticated, async (req, res) => {
   try {
-    if (!req.session?.userId) {
-      return res.status(401).json({ error: 'Not authenticated' });
+    const user = await getCurrentUser(req);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
-    const user = await getUserById(req.session.userId);
-    if (user === null) {
-      // If we ever prefer 200 + {status:'none'}, flip this block
-      return res.status(404).json({ error: 'USER_NOT_FOUND' });
-    }
-    const status = await subscriptionStatusHelper(user.id);
+
     const subscription = await getSubscription(user.id);
-    res.json({ status, subscription });
+    const status = await subscriptionStatusHelper(user.id);
+
+    res.json({
+      subscription: subscription ? {
+        id: subscription.id,
+        plan: subscription.plan,
+        status: subscription.status, // Retourner le statut original de la DB
+        current_period_end: subscription.current_period_end,
+        created_at: subscription.created_at,
+        cancel_at_period_end: subscription.cancel_at_period_end
+      } : null,
+      status: status // Le statut calculé
+    });
   } catch (error: any) {
+    console.error('Subscription status error:', error);
     res.status(500).json({ error: error.message });
   }
 });
