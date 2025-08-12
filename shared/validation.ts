@@ -4,7 +4,7 @@ import { z } from "zod";
 // CLIENT-SIDE VALIDATION SCHEMAS
 // ================================
 
-// User registration validation
+// User registration validation (client-side with confirmPassword)
 export const registerSchema = z.object({
   username: z.string()
     .min(3, "Username must be at least 3 characters")
@@ -21,6 +21,21 @@ export const registerSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
+});
+
+// Server-side registration validation (without confirmPassword)
+export const serverRegisterSchema = z.object({
+  username: z.string()
+    .min(3, "Username must be at least 3 characters")
+    .max(30, "Username must be less than 30 characters")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens"),
+  email: z.string()
+    .email("Please enter a valid email address")
+    .max(255, "Email is too long"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .max(128, "Password is too long")
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain at least one lowercase letter, one uppercase letter, and one number"),
 });
 
 // User login validation

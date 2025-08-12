@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { CartItem } from "@/lib/cart";
 import {
   AlertTriangle,
   CheckCircle,
@@ -20,7 +21,7 @@ interface PaymentStep {
 }
 
 export const CompletePaymentFlow: React.FC = () => {
-  const { cart, clearCart } = useCartContext();
+  const { cart, clearCart, addItem } = useCartContext();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -313,13 +314,12 @@ export const CompletePaymentFlow: React.FC = () => {
                   quantity: 1,
                 };
                 // Add test item with proper cart manager
-                const { addToCart } = useCartContext();
-                addToCart({
+                addItem({
                   beatId: testItem.beatId,
                   title: testItem.title,
                   genre: testItem.artist ?? "",
                   imageUrl: undefined,
-                  licenseType: "premium",
+                  licenseType: "premium" as const,
                   quantity: 1,
                 });
                 toast({
@@ -388,4 +388,18 @@ export const CompletePaymentFlow: React.FC = () => {
       </Card>
     </div>
   );
+};
+
+// Dans la fonction de traitement des éléments du panier
+const processCartItems = (items: CartItem[]) => {
+  return items.map(item => ({
+    beatId: item.beatId,
+    title: item.title,
+    genre: item.genre,
+    imageUrl: item.imageUrl, // Utilisation cohérente
+    licenseType: item.licenseType,
+    quantity: item.quantity,
+    price: item.price,
+    isFree: item.isFree
+  }));
 };

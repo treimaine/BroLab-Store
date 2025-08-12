@@ -182,11 +182,11 @@ export function FeaturedBeatsCarousel({
                     genre={beat.genre}
                     bpm={beat.bpm}
                     price={beat.price}
-                    imageUrl={beat.imageUrl}
-                    audioUrl={beat.audioUrl}
-                    tags={beat.tags}
-                    featured={beat.featured}
-                    downloads={beat.downloads}
+                    imageUrl={beat.imageUrl || ""}
+                    audioUrl={beat.audioUrl || ""}
+                    tags={beat.tags || []}
+                    featured={beat.featured || false}
+                    downloads={beat.downloads || 0}
                     duration={beat.duration || 0}
                     className="h-full"
                   />
@@ -240,11 +240,11 @@ export function FeaturedBeatsCarousel({
                   genre={beat.genre}
                   bpm={beat.bpm}
                   price={beat.price}
-                  imageUrl={beat.imageUrl}
-                  audioUrl={beat.audioUrl}
-                  tags={beat.tags}
-                  featured={beat.featured}
-                  downloads={beat.downloads}
+                  imageUrl={beat.imageUrl || ""}
+                  audioUrl={beat.audioUrl || ""}
+                  tags={beat.tags || []}
+                  featured={beat.featured || false}
+                  downloads={beat.downloads || 0}
                   duration={beat.duration || 0}
                   className={cn(
                     "transform transition-transform duration-200",

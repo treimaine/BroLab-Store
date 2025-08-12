@@ -39,12 +39,12 @@ function LazyBeatCard({
         viewMode === "grid" ? (
           <BeatCard
             id={beat.id}
-            title={beat.title}
+            title={beat.title || beat.name || "Untitled"}
             genre={beat.genre || "Unknown"}
             bpm={beat.bpm || 0}
             price={beat.price}
-            imageUrl={beat.image_url || beat.image || undefined}
-            audioUrl={beat.audio_url || undefined}
+            imageUrl={beat.image_url || beat.image || beat.images?.[0]?.src || ""}
+            audioUrl={beat.audio_url || ""}
             tags={beat.tags || []}
             featured={beat.featured || false}
             downloads={beat.downloads || 0}
@@ -62,8 +62,11 @@ function LazyBeatCard({
             beat={{
               ...beat,
               id: beat.id,
-              name: beat.title || "Untitled",
-              image: beat.image_url || beat.image || "/api/placeholder/400/400",
+              title: beat.title || beat.name || "Untitled",
+              name: beat.title || beat.name || "Untitled",
+              image: beat.image_url || beat.image || beat.images?.[0]?.src || "/api/placeholder/400/400",
+              image_url: beat.image_url || beat.image || beat.images?.[0]?.src || "/api/placeholder/400/400",
+                audio_url: beat.audio_url || "",
             }}
           />
         )

@@ -62,7 +62,7 @@ export default function Shop() {
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const [sortBy, sortOrder] = e.target.value.split("-") as [
         "date" | "price" | "title" | "popularity",
-        "asc" | "desc"
+        "asc" | "desc",
       ];
       updateFilters({ sortBy, sortOrder });
     },
@@ -98,196 +98,236 @@ export default function Shop() {
   }
 
   return (
-    <div className="pt-16 md:pt-20 lg:pt-24 container mx-auto px-4 py-8">
-      {/* En-tête avec recherche et filtres */}
-      <div className="mb-8">
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between mb-6">
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold mb-2">Boutique</h1>
-            <p className="text-muted-foreground">
-              {stats.totalProducts} produits disponibles
-              {hasActiveFilters && ` • ${stats.filteredProducts} résultats filtrés`}
+    <div className="min-h-screen bg-[var(--deep-black)] pt-16 sm:pt-20">
+      {/* Header */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
+              BroLab Beats Store
+            </h1>
+            <p className="text-gray-400 text-sm sm:text-base">
+              Discover professional beats for your next project
             </p>
           </div>
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleToggleFilters}
-              className="flex items-center gap-2"
-            >
-              <Filter className="w-4 h-4" />
-              Filtres
-              {hasActiveFilters && (
-                <Badge variant="secondary" className="ml-1">
-                  {stats.filteredProducts}
-                </Badge>
-              )}
-            </Button>
+          {/* Stats */}
+          <div className="flex flex-wrap gap-4 sm:gap-6">
+            {stats && (
+              <>
+                <div className="text-center">
+                  <div className="text-xl sm:text-2xl font-bold text-[var(--accent-purple)]">
+                    {stats.totalProducts}
+                  </div>
+                  <div className="text-xs sm:text-sm text-gray-400">Beats</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl sm:text-2xl font-bold text-[var(--accent-cyan)]">
+                    {stats.totalDownloads}
+                  </div>
+                  <div className="text-xs sm:text-sm text-gray-400">Downloads</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl sm:text-2xl font-bold text-[var(--color-gold)]">
+                    {stats.totalFavorites}
+                  </div>
+                  <div className="text-xs sm:text-sm text-gray-400">Favorites</div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Barre de recherche */}
-        <form onSubmit={handleSearch} className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <Input
-              type="text"
-              placeholder="Rechercher des beats..."
-              value={filters.search || ""}
-              onChange={e => updateFilter("search", e.target.value)}
-              className="pl-10"
-            />
+        {/* Search and Filters Bar */}
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mb-6">
+          {/* Search */}
+          <div className="flex-1">
+            <form onSubmit={handleSearch} className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
+              <Input
+                type="search"
+                placeholder="Search beats by title, genre, BPM..."
+                className="pl-10 pr-4 py-2 sm:py-3 form-input w-full"
+                value={filters.search || ""}
+                onChange={e => updateFilter("search", e.target.value)}
+              />
+            </form>
           </div>
-        </form>
 
-        {/* Contrôles de vue et tri */}
-        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+          {/* View Mode Toggle */}
           <div className="flex items-center gap-2">
             <Button
               variant={viewMode === "grid" ? "default" : "outline"}
               size="sm"
               onClick={() => handleViewModeChange("grid")}
+              className="flex items-center gap-2"
             >
               <Grid3X3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Grid</span>
             </Button>
             <Button
               variant={viewMode === "table" ? "default" : "outline"}
               size="sm"
               onClick={() => handleViewModeChange("table")}
+              className="flex items-center gap-2"
             >
               <List className="w-4 h-4" />
+              <span className="hidden sm:inline">Table</span>
             </Button>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Filters Toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleToggleFilters}
+            className="flex items-center gap-2"
+          >
+            <Filter className="w-4 h-4" />
+            <span className="hidden sm:inline">Filters</span>
+          </Button>
+        </div>
+
+        {/* Active Filters */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <span className="text-sm text-gray-400">Active filters:</span>
+            {Object.entries(filters).map(([key, value]) => {
+              if (!value || key === "search") return null;
+              return (
+                <Badge
+                  key={key}
+                  variant="secondary"
+                  className="bg-[var(--accent-purple)]/20 text-[var(--accent-purple)] border-[var(--accent-purple)]/30"
+                >
+                  {key}: {Array.isArray(value) ? value.join(", ") : value}
+                  <button onClick={() => updateFilter(key, "")} className="ml-2 hover:text-white">
+                    ×
+                  </button>
+                </Badge>
+              );
+            })}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearFilters}
+              className="text-gray-400 hover:text-white"
+            >
+              <RotateCcw className="w-4 h-4 mr-1" />
+              Clear all
+            </Button>
+          </div>
+        )}
+
+        {/* Filters Panel */}
+        {showFilters && (
+          <div className="mb-6">
+            <UnifiedFilterPanel
+              filters={filters}
+              availableOptions={availableOptions}
+              availableRanges={availableRanges}
+              onFilterChange={updateFilter}
+              onFiltersChange={updateFilters}
+              onClearFilters={clearFilters}
+            />
+          </div>
+        )}
+
+        {/* Sort and Results */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div className="text-sm text-gray-400">
+            {isLoading
+              ? "Loading..."
+              : `Showing ${products.length} of ${stats?.totalProducts || 0} beats`}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="sort" className="text-sm text-gray-400">
+              Sort by:
+            </label>
             <select
+              id="sort"
               value={`${filters.sortBy}-${filters.sortOrder}`}
               onChange={handleSortChange}
-              className="bg-background border border-input rounded-md px-3 py-2 text-sm"
+              className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] text-white rounded-lg px-3 py-2 text-sm focus:border-[var(--accent-purple)] focus:ring-1 focus:ring-[var(--accent-purple)] outline-none"
             >
-              <option value="date-desc">Plus récents</option>
-              <option value="date-asc">Plus anciens</option>
-              <option value="price-asc">Prix croissant</option>
-              <option value="price-desc">Prix décroissant</option>
-              <option value="title-asc">A-Z</option>
-              <option value="title-desc">Z-A</option>
+              <option value="date-desc">Newest First</option>
+              <option value="date-asc">Oldest First</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+              <option value="title-asc">Title: A to Z</option>
+              <option value="title-desc">Title: Z to A</option>
+              <option value="popularity-desc">Most Popular</option>
             </select>
-
-            {hasActiveFilters && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleClearFilters}
-                className="flex items-center gap-2"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Effacer
-              </Button>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Panneau de filtres */}
-      {showFilters && (
-        <div className="mb-6">
-          <UnifiedFilterPanel
-            filters={filters}
-            onFiltersChange={updateFilters}
-            onClearAll={clearFilters}
-            availableOptions={availableOptions}
-            availableRanges={availableRanges}
-            stats={stats}
-          />
-        </div>
-      )}
-
-      {/* Contenu principal */}
-      <div className="space-y-6">
-        {isLoading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Chargement des produits...</p>
+      {/* Products Grid/Table */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+        {viewMode === "grid" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+            {isLoading
+              ? // Loading skeletons
+                Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="card-dark p-4 sm:p-6 animate-pulse">
+                    <div className="w-full h-48 bg-[var(--medium-gray)] rounded-lg mb-4"></div>
+                    <div className="h-4 bg-[var(--medium-gray)] rounded mb-2"></div>
+                    <div className="h-3 bg-[var(--medium-gray)] rounded w-2/3"></div>
+                  </div>
+                ))
+              : products.map(product => (
+                  <BeatCard
+                    key={product.id}
+                    id={product.id}
+                    title={product.name}
+                    genre={product.genre || "Unknown"}
+                    bpm={product.bpm}
+                    price={product.price}
+                    imageUrl={product.images?.[0]?.src || ""}
+                    audioUrl={product.audio_url || ""}
+                    tags={product.tags?.map((tag: any) => tag.name) || []}
+                    featured={product.featured}
+                    downloads={product.download_count || 0}
+                    duration={product.duration}
+                    isFree={product.price === "0" || product.price === 0}
+                    onViewDetails={() => handleProductView(product.id)}
+                  />
+                ))}
           </div>
-        ) : products.length === 0 ? (
-          <Card className="card-dark">
-            <CardContent className="p-12 text-center">
-              <h3 className="text-xl font-semibold mb-2">Aucun produit trouvé</h3>
-              <p className="text-muted-foreground mb-4">
-                {hasActiveFilters
-                  ? "Aucun produit ne correspond à vos critères de recherche."
-                  : "Aucun produit n'est disponible pour le moment."}
-              </p>
-              {hasActiveFilters && (
-                <Button onClick={handleClearFilters} variant="outline">
-                  Effacer tous les filtres
-                </Button>
-              )}
-            </CardContent>
-          </Card>
         ) : (
-          <>
-            {/* Affichage des produits */}
-            {viewMode === "grid" ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {products.map(product => {
-                  // Logique pour déterminer si le produit est gratuit
-                  const isProductFree =
-                    product.is_free ||
-                    product.tags?.some((tag: any) => tag.name.toLowerCase() === "free") ||
-                    product.price === 0 ||
-                    (typeof product.price === "string" && product.price === "0") ||
-                    (typeof product.price === "string" && parseFloat(product.price) === 0) ||
-                    (typeof product.price === "number" && product.price === 0);
+          <div className="overflow-x-auto">
+            <TableBeatView
+              products={products}
+              isLoading={isLoading}
+              onProductView={handleProductView}
+            />
+          </div>
+        )}
 
-                  return (
-                    <BeatCard
-                      key={product.id}
-                      id={product.id}
-                      title={product.title || product.name || ""}
-                      genre={(product as any).categories?.[0]?.name || product.genre || ""}
-                      bpm={product.bpm || 0}
-                      price={product.price || 0}
-                      imageUrl={product.images?.[0]?.src || product.image_url || product.image}
-                      audioUrl={product.audio_url || ""}
-                      isFree={isProductFree}
-                      onViewDetails={() => handleProductView(product.id)}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <TableBeatView products={products} onViewDetails={handleProductView} />
-            )}
-
-            {/* Pagination */}
-            {stats.totalProducts > 12 && (
-              <div className="flex justify-center mt-8">
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentPage(Math.max(1, (stats.currentPage || 1) - 1))}
-                    disabled={(stats.currentPage || 1) <= 1}
-                  >
-                    Précédent
-                  </Button>
-                  <span className="flex items-center px-4 py-2 text-sm">
-                    Page {stats.currentPage || 1} sur {Math.ceil((stats.totalProducts || 0) / 12)}
-                  </span>
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentPage((stats.currentPage || 1) + 1)}
-                    disabled={
-                      (stats.currentPage || 1) >= Math.ceil((stats.totalProducts || 0) / 12)
-                    }
-                  >
-                    Suivant
-                  </Button>
-                </div>
-              </div>
-            )}
-          </>
+        {/* Pagination */}
+        {!isLoading && products.length > 0 && (
+          <div className="flex justify-center mt-8">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, (filters.page || 1) - 1))}
+                disabled={filters.page === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-gray-400 px-4">Page {filters.page || 1}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((filters.page || 1) + 1)}
+                disabled={products.length < 12}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>

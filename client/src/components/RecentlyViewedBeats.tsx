@@ -81,21 +81,21 @@ export const RecentlyViewedBeats: React.FC<RecentlyViewedBeatsProps> = ({
           const beat = {
             id: recentBeat.id,
             title: recentBeat.title,
-            genre: recentBeat.genre,
-            price: recentBeat.price,
-            image_url: recentBeat.image_url,
-            audio_url: recentBeat.audio_url,
+            genre: recentBeat.genre || "Unknown",
+            price: recentBeat.price || 0,
+            imageUrl: recentBeat.image_url || "",
+            audioUrl: recentBeat.audio_url || "",
             // Valeurs par défaut pour les champs requis
             wordpress_id: recentBeat.id,
             bpm: 0,
             description: null,
             key: null,
             mood: null,
-            tags: null,
+            tags: [],
             featured: false,
             downloads: 0,
             views: 0,
-            duration: null,
+            duration: 0,
             is_active: true,
             created_at: new Date().toISOString(),
           };
@@ -108,9 +108,9 @@ export const RecentlyViewedBeats: React.FC<RecentlyViewedBeatsProps> = ({
                 genre={beat.genre}
                 bpm={beat.bpm}
                 price={beat.price}
-                imageUrl={beat.image_url || undefined}
-                audioUrl={beat.audio_url || undefined}
-                tags={beat.tags || undefined}
+                imageUrl={beat.imageUrl || ""}
+                audioUrl={beat.audioUrl || ""}
+                tags={beat.tags || []}
                 featured={beat.featured}
                 downloads={beat.downloads}
                 duration={beat.duration || undefined}

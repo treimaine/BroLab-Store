@@ -1,0 +1,884 @@
+---
+alwaysApply: true
+---
+
+# Phase 4 - Plan de Nettoyage & Optimisation BroLab
+
+_Finalisation Reconstruction - Janvier 2025_
+
+## 🎯 Objectifs Phase 4
+
+Finaliser la reconstruction de BroLab Entertainment en supprimant les fichiers obsolètes, optimisant les performances, et préparant le déploiement sur o2switch.
+
+## 📋 État des Lieux Pré-Phase 4
+
+### ✅ Phases Précédentes Complétées
+
+- **Phase 1** : Migration Supabase → Convex (100%)
+- **Phase 2** : Reconstruction Dashboard + Clerk Auth (95%)
+- **Phase 3** : Système Paiement Clerk Billing (En cours)
+
+### 🔍 Analyse Actuelle du Projet
+
+#### Fichiers Obsolètes Identifiés
+
+```
+📁 Fichiers à Supprimer :
+├── drizzle.config.ts (Migration Neon obsolète)
+├── dump.sql (Données de test obsolètes)
+├── server/db.ts (Ancienne config DB)
+├── server/lib/dbUser.ts (Helpers Supabase obsolètes)
+├── cookies.txt (Fichier de debug)
+├── nul (Fichier vide)
+├── bash.exe.stackdump (Erreur Windows)
+├── create-test-user.js (Script de test obsolète)
+├── test-*.js (Scripts de debug temporaires)
+└── attached_assets/*.txt (Fichiers temporaires)
+```
+
+#### Rapports de Migration à Archiver
+
+```
+📁 Rapports à Archiver :
+├── SUPABASE_*.md (Rapports migration)
+├── PHASE_*.md (Rapports de phases)
+├── MIGRATION_*.md (Documentation migration)
+├── CLERK_*.md (Guides setup temporaires)
+└── *_REPORT.md (Rapports de progression)
+```
+
+## 1. Nettoyage Fichiers Obsolètes
+
+### 1.1 Suppression Sécurisée
+
+#### Script de Nettoyage Automatisé
+
+```bash
+#!/bin/bash
+# scripts/cleanup-phase4.sh
+
+echo "🧹 Phase 4 - Nettoyage BroLab"
+echo "=============================="
+
+# Backup avant suppression
+echo "📦 Création backup..."
+mkdir -p .backup/phase4-cleanup
+cp -r . .backup/phase4-cleanup/ 2>/dev/null || true
+
+# Suppression fichiers obsolètes
+echo "🗑️ Suppression fichiers obsolètes..."
+rm -f drizzle.config.ts
+rm -f dump.sql
+rm -f cookies.txt
+rm -f nul
+rm -f bash.exe.stackdump
+rm -f create-test-user.js
+rm -f test-*.js
+rm -f product_test.json
+rm -f products_debug.json
+
+# Nettoyage attached_assets
+echo "📎 Nettoyage assets temporaires..."
+find attached_assets -name "*.txt" -delete
+find attached_assets -name "Pasted-*" -delete
+
+# Archivage rapports
+echo "📚 Archivage rapports..."
+mkdir -p docs/archive/migration-reports
+mv *_REPORT.md docs/archive/migration-reports/ 2>/dev/null || true
+mv SUPABASE_*.md docs/archive/migration-reports/ 2>/dev/null || true
+mv MIGRATION_*.md docs/archive/migration-reports/ 2>/dev/null || true
+mv CLERK_*.md docs/archive/migration-reports/ 2>/dev/null || true
+
+echo "✅ Nettoyage terminé"
+```
+
+### 1.2 Restructuration Dossiers
+
+#### Organisation Finale
+
+```
+📁 Structure Optimisée :
+├── client/                 # Frontend React
+├── server/                 # Backend Express (minimal)
+├── convex/                 # Base de données Convex
+├── shared/                 # Types partagés
+├── scripts/                # Scripts utilitaires
+├── docs/                   # Documentation
+│   ├── deployment/         # Guides déploiement
+│   ├── api/               # Documentation API
+│   └── archive/           # Archives migration
+├── .trae/documents/       # Documentation produit
+└── __tests__/             # Tests
+```
+
+## 2. Optimisation Performance
+
+### 2.1 Bundle Optimization
+
+#### Configuration Vite Optimisée
+
+```typescript
+// vite.config.ts - Configuration finale
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import { visualizer } from "rollup-plugin-visualizer";
+
+export default defineConfig({
+  plugins: [
+    react(),
+    visualizer({
+      filename: "dist/stats.html",
+      open: true,
+      gzipSize: true,
+    }),
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./client/src"),
+    },
+  },
+  build: {
+    target: "es2020",
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          clerk: ["@clerk/clerk-react"],
+          convex: ["convex/react"],
+          ui: ["framer-motion", "lucide-react"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  },
+  server: {
+    port: 5173,
+    host: true,
+  },
+  preview: {
+    port: 4173,
+    host: true,
+  },
+});
+```
+
+### 2.2 Code Splitting Avancé
+
+#### Lazy Loading Optimisé
+
+```typescript
+// client/src/utils/lazyComponents.ts
+import { lazy } from "react";
+
+// Pages principales
+export const Dashboard = lazy(() => import("@/pages/dashboard"));
+export const Store = lazy(() => import("@/pages/store"));
+export const Profile = lazy(() => import("@/pages/profile"));
+export const Membership = lazy(() => import("@/pages/membership"));
+
+// Composants lourds
+export const DataExportManager = lazy(() => import("@/components/DataExportManager"));
+export const AudioPlayer = lazy(() => import("@/components/AudioPlayer"));
+export const ChartComponents = lazy(() => import("@/components/charts"));
+
+// Composants conditionnels
+export const AdminDashboard = lazy(() => import("@/components/admin/Dashboard"));
+export const AnalyticsPanel = lazy(() => import("@/components/analytics/Panel"));
+```
+
+#### Route-based Code Splitting
+
+```typescript
+// client/src/App.tsx - Optimisé
+import { Suspense } from 'react';
+import { Route, Switch } from 'wouter';
+import { ClerkProvider } from '@clerk/clerk-react';
+import { ConvexProvider, ConvexReactClient } from 'convex/react';
+import { LoadingSpinner } from '@/components/ui/loading';
+import * as Pages from '@/utils/lazyComponents';
+
+const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL!);
+
+function App() {
+  return (
+    <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY!}>
+      <ConvexProvider client={convex}>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Switch>
+            <Route path="/" component={Pages.Dashboard} />
+            <Route path="/store" component={Pages.Store} />
+            <Route path="/profile" component={Pages.Profile} />
+            <Route path="/membership" component={Pages.Membership} />
+            <Route>404 - Page non trouvée</Route>
+          </Switch>
+        </Suspense>
+      </ConvexProvider>
+    </ClerkProvider>
+  );
+}
+
+export default App;
+```
+
+### 2.3 Optimisation Images
+
+#### Configuration Assets
+
+```typescript
+// client/src/utils/imageOptimization.ts
+export const optimizeImage = (url: string, width?: number, quality = 80) => {
+  if (!url) return '';
+
+  // Pour les images Convex File Storage
+  if (url.includes('convex.cloud')) {
+    const params = new URLSearchParams();
+    if (width) params.set('width', width.toString());
+    params.set('quality', quality.toString());
+    params.set('format', 'webp');
+
+    return `${url}?${params.toString()}`;
+  }
+
+  return url;
+};
+
+// Composant Image optimisé
+export function OptimizedImage({
+  src,
+  alt,
+  width,
+  height,
+  className = '',
+  quality = 80
+}: {
+  src: string;
+  alt: string;
+  width?: number;
+  height?: number;
+  className?: string;
+  quality?: number;
+}) {
+  return (
+    <img
+      src={optimizeImage(src, width, quality)}
+      alt={alt}
+      width={width}
+      height={height}
+      className={className}
+      loading="lazy"
+      decoding="async"
+    />
+  );
+}
+```
+
+## 3. Optimisation Base de Données
+
+### 3.1 Index Convex Optimisés
+
+```typescript
+// convex/schema.ts - Index finaux optimisés
+export default defineSchema({
+  // Users avec index optimisés
+  users: defineTable({
+    clerkId: v.string(),
+    email: v.string(),
+    username: v.optional(v.string()),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    role: v.optional(v.string()),
+    isActive: v.optional(v.boolean()),
+    lastLoginAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_clerk_id", ["clerkId"]) // Index principal
+    .index("by_email", ["email"]) // Recherche par email
+    .index("by_active", ["isActive"]) // Filtrage utilisateurs actifs
+    .index("by_role", ["role"]) // Filtrage par rôle
+    .index("by_last_login", ["lastLoginAt"]), // Tri par dernière connexion
+
+  // Products avec index de performance
+  products: defineTable({
+    wordpressId: v.optional(v.number()),
+    title: v.string(),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    price: v.number(),
+    salePrice: v.optional(v.number()),
+    genre: v.optional(v.string()),
+    bpm: v.optional(v.number()),
+    key: v.optional(v.string()),
+    mood: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    audioUrl: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    featured: v.optional(v.boolean()),
+    downloads: v.optional(v.number()),
+    views: v.optional(v.number()),
+    duration: v.optional(v.number()),
+    isActive: v.optional(v.boolean()),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_wordpress_id", ["wordpressId"])
+    .index("by_slug", ["slug"])
+    .index("by_genre", ["genre"]) // Filtrage par genre
+    .index("by_bpm", ["bpm"]) // Filtrage par BPM
+    .index("by_featured", ["featured"]) // Produits mis en avant
+    .index("by_active", ["isActive"]) // Produits actifs
+    .index("by_price", ["price"]) // Tri par prix
+    .index("by_downloads", ["downloads"]) // Tri par popularité
+    .index("by_created", ["createdAt"]) // Tri par date
+    .index("by_genre_bpm", ["genre", "bpm"]) // Index composé pour filtres
+    .index("by_featured_active", ["featured", "isActive"]), // Index composé optimisé
+
+  // Orders avec index de requête
+  orders: defineTable({
+    userId: v.optional(v.string()),
+    clerkUserId: v.optional(v.string()),
+    items: v.array(v.any()),
+    amount: v.number(),
+    currency: v.string(),
+    status: v.string(),
+    paymentMethod: v.optional(v.string()),
+    paymentIntentId: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_clerk_user", ["clerkUserId"])
+    .index("by_status", ["status"]) // Filtrage par statut
+    .index("by_amount", ["amount"]) // Tri par montant
+    .index("by_created", ["createdAt"]) // Tri chronologique
+    .index("by_user_status", ["userId", "status"]) // Index composé
+    .index("by_user_created", ["userId", "createdAt"]), // Historique utilisateur
+
+  // Autres tables avec index optimisés...
+});
+```
+
+### 3.2 Requêtes Optimisées
+
+```typescript
+// convex/products/optimized.ts
+import { query } from "../_generated/server";
+import { v } from "convex/values";
+
+// Requête optimisée pour le store
+export const getStoreProducts = query({
+  args: {
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+    genre: v.optional(v.string()),
+    minBpm: v.optional(v.number()),
+    maxBpm: v.optional(v.number()),
+    featured: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const { limit = 20, offset = 0, genre, minBpm, maxBpm, featured } = args;
+
+    let query = ctx.db.query("products");
+
+    // Utiliser les index optimisés
+    if (featured !== undefined) {
+      query = query.withIndex("by_featured_active", q =>
+        q.eq("featured", featured).eq("isActive", true)
+      );
+    } else if (genre) {
+      query = query.withIndex("by_genre", q => q.eq("genre", genre));
+    } else {
+      query = query.withIndex("by_active", q => q.eq("isActive", true));
+    }
+
+    let products = await query.collect();
+
+    // Filtrage BPM en mémoire (plus efficace pour les ranges)
+    if (minBpm !== undefined || maxBpm !== undefined) {
+      products = products.filter(product => {
+        if (!product.bpm) return false;
+        if (minBpm !== undefined && product.bpm < minBpm) return false;
+        if (maxBpm !== undefined && product.bpm > maxBpm) return false;
+        return true;
+      });
+    }
+
+    // Pagination
+    const total = products.length;
+    const paginatedProducts = products.slice(offset, offset + limit);
+
+    return {
+      products: paginatedProducts,
+      total,
+      hasMore: offset + limit < total,
+    };
+  },
+});
+
+// Requête dashboard optimisée
+export const getDashboardData = query({
+  args: {},
+  handler: async ctx => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const userId = identity.subject;
+
+    // Requêtes parallèles pour optimiser les performances
+    const [user, recentOrders, recentDownloads, favorites] = await Promise.all([
+      ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", q => q.eq("clerkId", userId))
+        .first(),
+      ctx.db
+        .query("orders")
+        .withIndex("by_user_created", q => q.eq("userId", userId))
+        .order("desc")
+        .take(10),
+      ctx.db
+        .query("downloads")
+        .withIndex("by_user", q => q.eq("userId", userId))
+        .order("desc")
+        .take(20),
+      ctx.db
+        .query("favorites")
+        .withIndex("by_user", q => q.eq("userId", userId))
+        .take(50),
+    ]);
+
+    // Calculs de statistiques
+    const stats = {
+      totalOrders: recentOrders.length,
+      totalDownloads: recentDownloads.length,
+      totalFavorites: favorites.length,
+      totalSpent: recentOrders.reduce((sum, order) => sum + order.amount, 0),
+    };
+
+    return {
+      user,
+      stats,
+      recentOrders,
+      recentDownloads,
+      favorites: favorites.slice(0, 10), // Limiter pour l'affichage
+    };
+  },
+});
+```
+
+## 4. Tests & Validation
+
+### 4.1 Suite de Tests Complète
+
+```typescript
+// __tests__/integration/phase4-validation.test.ts
+import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
+import { ConvexTestingHelper } from "convex/testing";
+import { api } from "../../convex/_generated/api";
+
+describe("Phase 4 - Validation Complète", () => {
+  let convex: ConvexTestingHelper;
+
+  beforeAll(async () => {
+    convex = new ConvexTestingHelper();
+    await convex.start();
+  });
+
+  afterAll(async () => {
+    await convex.stop();
+  });
+
+  describe("Performance Tests", () => {
+    it("should load dashboard data in under 500ms", async () => {
+      const start = Date.now();
+      const data = await convex.query(api.dashboard.getDashboardData);
+      const duration = Date.now() - start;
+
+      expect(duration).toBeLessThan(500);
+      expect(data).toBeDefined();
+    });
+
+    it("should handle store pagination efficiently", async () => {
+      const start = Date.now();
+      const products = await convex.query(api.products.getStoreProducts, {
+        limit: 20,
+        offset: 0,
+      });
+      const duration = Date.now() - start;
+
+      expect(duration).toBeLessThan(300);
+      expect(products.products).toHaveLength(20);
+    });
+  });
+
+  describe("Data Integrity", () => {
+    it("should have no orphaned records", async () => {
+      const analysis = await convex.query(api.migrations.analyzeDataIntegrity);
+
+      expect(analysis.orphanedOrders).toBe(0);
+      expect(analysis.orphanedDownloads).toBe(0);
+      expect(analysis.orphanedFavorites).toBe(0);
+    });
+
+    it("should have all required indexes", async () => {
+      const indexes = await convex.query(api.admin.getIndexStatus);
+
+      expect(indexes.users.by_clerk_id).toBe(true);
+      expect(indexes.products.by_featured_active).toBe(true);
+      expect(indexes.orders.by_user_created).toBe(true);
+    });
+  });
+
+  describe("Security Validation", () => {
+    it("should protect sensitive endpoints", async () => {
+      // Test sans authentification
+      await expect(convex.query(api.admin.getUserList)).rejects.toThrow("Unauthorized");
+    });
+
+    it("should validate user permissions", async () => {
+      // Test avec utilisateur normal
+      const result = await convex.query(api.users.getCurrentUser);
+      expect(result.role).not.toBe("admin");
+    });
+  });
+});
+```
+
+### 4.2 Tests de Performance
+
+```typescript
+// __tests__/performance/bundle-size.test.ts
+import { describe, it, expect } from "@jest/globals";
+import { readFileSync, statSync } from "fs";
+import { join } from "path";
+
+describe("Bundle Performance", () => {
+  const distPath = join(process.cwd(), "dist");
+
+  it("should have main bundle under 1MB", () => {
+    const files = readFileSync(join(distPath, "index.html"), "utf-8");
+    const jsFiles = files.match(/assets\/index-[a-f0-9]+\.js/g) || [];
+
+    jsFiles.forEach(file => {
+      const filePath = join(distPath, file);
+      const stats = statSync(filePath);
+      const sizeInMB = stats.size / (1024 * 1024);
+
+      expect(sizeInMB).toBeLessThan(1);
+    });
+  });
+
+  it("should have vendor chunks properly split", () => {
+    const files = readFileSync(join(distPath, "index.html"), "utf-8");
+
+    expect(files).toMatch(/vendor-[a-f0-9]+\.js/);
+    expect(files).toMatch(/clerk-[a-f0-9]+\.js/);
+    expect(files).toMatch(/convex-[a-f0-9]+\.js/);
+  });
+});
+```
+
+## 5. Préparation Déploiement o2switch
+
+### 5.1 Configuration Production
+
+```typescript
+// vite.config.production.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./client/src"),
+    },
+  },
+  build: {
+    target: "es2020",
+    minify: "terser",
+    sourcemap: false, // Pas de sourcemaps en production
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        pure_funcs: ["console.log", "console.info"],
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          clerk: ["@clerk/clerk-react"],
+          convex: ["convex/react"],
+          ui: ["framer-motion", "lucide-react"],
+        },
+        assetFileNames: "assets/[name]-[hash][extname]",
+        chunkFileNames: "assets/[name]-[hash].js",
+        entryFileNames: "assets/[name]-[hash].js",
+      },
+    },
+  },
+  base: "/", // Ajuster selon le sous-dossier o2switch
+  server: {
+    port: 5173,
+  },
+});
+```
+
+### 5.2 Scripts de Déploiement
+
+```bash
+#!/bin/bash
+# scripts/deploy-o2switch.sh
+
+echo "🚀 Déploiement BroLab sur o2switch"
+echo "==================================="
+
+# Variables
+PROD_ENV=".env.production"
+BUILD_DIR="dist"
+DEPLOY_DIR="/path/to/o2switch/public_html"
+
+# Vérifications pré-déploiement
+echo "🔍 Vérifications pré-déploiement..."
+if [ ! -f "$PROD_ENV" ]; then
+  echo "❌ Fichier $PROD_ENV manquant"
+  exit 1
+fi
+
+# Build production
+echo "🏗️ Build production..."
+npm run build:production
+
+if [ $? -ne 0 ]; then
+  echo "❌ Échec du build"
+  exit 1
+fi
+
+# Tests pré-déploiement
+echo "🧪 Tests pré-déploiement..."
+npm run test:production
+
+if [ $? -ne 0 ]; then
+  echo "❌ Tests échoués"
+  exit 1
+fi
+
+# Optimisation finale
+echo "⚡ Optimisation finale..."
+# Compression gzip
+find $BUILD_DIR -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' \) -exec gzip -9 -k {} \;
+
+# Upload vers o2switch (à adapter selon la méthode)
+echo "📤 Upload vers o2switch..."
+# rsync -avz --delete $BUILD_DIR/ user@server:$DEPLOY_DIR/
+
+echo "✅ Déploiement terminé"
+echo "🌐 Site disponible sur: https://brolab-entertainment.com"
+```
+
+### 5.3 Configuration .htaccess
+
+```apache
+# public/.htaccess - Configuration o2switch
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Gestion SPA (Single Page Application)
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# Compression GZIP
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/plain
+  AddOutputFilterByType DEFLATE text/html
+  AddOutputFilterByType DEFLATE text/xml
+  AddOutputFilterByType DEFLATE text/css
+  AddOutputFilterByType DEFLATE application/xml
+  AddOutputFilterByType DEFLATE application/xhtml+xml
+  AddOutputFilterByType DEFLATE application/rss+xml
+  AddOutputFilterByType DEFLATE application/javascript
+  AddOutputFilterByType DEFLATE application/x-javascript
+</IfModule>
+
+# Cache Headers
+<IfModule mod_expires.c>
+  ExpiresActive on
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/jpg "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/gif "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+</IfModule>
+
+# Security Headers
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options nosniff
+  Header always set X-Frame-Options DENY
+  Header always set X-XSS-Protection "1; mode=block"
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
+```
+
+## 6. Monitoring & Maintenance
+
+### 6.1 Health Checks
+
+```typescript
+// client/src/utils/healthCheck.ts
+export class HealthMonitor {
+  static async checkServices() {
+    const results = {
+      convex: false,
+      clerk: false,
+      frontend: true,
+    };
+
+    try {
+      // Test Convex
+      const convexResponse = await fetch(`${import.meta.env.VITE_CONVEX_URL}/api/health`);
+      results.convex = convexResponse.ok;
+    } catch {
+      results.convex = false;
+    }
+
+    try {
+      // Test Clerk
+      const clerkResponse = await fetch("https://api.clerk.dev/v1/health");
+      results.clerk = clerkResponse.ok;
+    } catch {
+      results.clerk = false;
+    }
+
+    return results;
+  }
+
+  static async reportMetrics() {
+    const performance = {
+      loadTime: performance.timing.loadEventEnd - performance.timing.navigationStart,
+      domReady: performance.timing.domContentLoadedEventEnd - performance.timing.navigationStart,
+      firstPaint: performance.getEntriesByName("first-paint")[0]?.startTime || 0,
+    };
+
+    console.log("📊 Performance Metrics:", performance);
+    return performance;
+  }
+}
+```
+
+### 6.2 Error Tracking
+
+```typescript
+// client/src/utils/errorTracking.ts
+export class ErrorTracker {
+  static init() {
+    window.addEventListener("error", this.handleError);
+    window.addEventListener("unhandledrejection", this.handlePromiseRejection);
+  }
+
+  static handleError(event: ErrorEvent) {
+    const error = {
+      message: event.message,
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      stack: event.error?.stack,
+      timestamp: Date.now(),
+      userAgent: navigator.userAgent,
+      url: window.location.href,
+    };
+
+    this.reportError(error);
+  }
+
+  static handlePromiseRejection(event: PromiseRejectionEvent) {
+    const error = {
+      reason: event.reason,
+      timestamp: Date.now(),
+      userAgent: navigator.userAgent,
+      url: window.location.href,
+    };
+
+    this.reportError(error);
+  }
+
+  static reportError(error: any) {
+    // En production, envoyer vers un service de monitoring
+    if (import.meta.env.PROD) {
+      // Sentry, LogRocket, ou service custom
+      console.error("🚨 Error reported:", error);
+    } else {
+      console.error("🐛 Development Error:", error);
+    }
+  }
+}
+```
+
+## 7. Checklist Final Phase 4
+
+### 🧹 Nettoyage
+
+- [ ] Suppression fichiers obsolètes
+- [ ] Archivage rapports migration
+- [ ] Restructuration dossiers
+- [ ] Nettoyage dependencies inutiles
+
+### ⚡ Optimisation
+
+- [ ] Bundle size < 2MB
+- [ ] Code splitting implémenté
+- [ ] Images optimisées
+- [ ] Index Convex optimisés
+- [ ] Requêtes optimisées
+
+### 🧪 Tests
+
+- [ ] Tests performance passants
+- [ ] Tests intégrité données
+- [ ] Tests sécurité validés
+- [ ] Tests e2e complets
+
+### 🚀 Déploiement
+
+- [ ] Configuration production
+- [ ] Scripts déploiement
+- [ ] Configuration o2switch
+- [ ] Monitoring actif
+
+### 📊 Métriques Cibles
+
+- [ ] Temps chargement < 3s
+- [ ] Score Lighthouse > 90
+- [ ] 0 erreur TypeScript
+- [ ] 100% tests passants
+- [ ] Bundle optimisé
+
+## 8. Conclusion Phase 4
+
+La Phase 4 finalise la reconstruction complète de BroLab Entertainment avec :
+
+✅ **Architecture moderne** : React + Convex + Clerk
+✅ **Performance optimisée** : Bundle < 2MB, chargement < 3s
+✅ **Code propre** : 0 erreur TypeScript, tests complets
+✅ **Déploiement prêt** : Configuration o2switch optimisée
+✅ **Monitoring actif** : Health checks et error tracking
+
+**Résultat** : Application production-ready avec architecture scalable et performances optimales.

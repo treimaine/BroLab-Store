@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { SubscriptionBilling } from '@/components/payment/SubscriptionBilling';
+// SubscriptionBilling component removed - now handled by Clerk/Convex
 import { PaymentPlanSelector } from '@/components/payment/PaymentPlanSelector';
 import { 
   CreditCard, 
@@ -135,7 +135,17 @@ export default function PaymentDashboard() {
           </TabsList>
 
           <TabsContent value="billing" className="space-y-6">
-            <SubscriptionBilling />
+            <Card className="border-gray-600 bg-gray-800/50">
+              <CardHeader>
+                <CardTitle className="text-white">Subscription Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-400">Subscription billing is now handled by Clerk. Visit your Clerk dashboard to manage subscriptions.</p>
+                <Button className="mt-4 bg-purple-600 hover:bg-purple-700">
+                  Open Clerk Dashboard
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="plans" className="space-y-6">

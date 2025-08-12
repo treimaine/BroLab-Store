@@ -60,18 +60,10 @@ export const LICENSES: License[] = [
 
 ];
 
+// Ligne 53 - S'assurer que le prix est un nombre
 export const getLicensePrice = (licenseType: string): number => {
-  // Ensure we always return correct pricing
-  switch (licenseType) {
-    case 'basic':
-      return 29.99;
-    case 'premium':
-      return 49.99;
-    case 'unlimited':
-      return 149.99;
-    default:
-      return 29.99; // Default to basic pricing
-  }
+  const license = LICENSES.find(l => l.type === licenseType);
+  return license ? Number(license.price) : 0; // Conversion explicite en nombre
 };
 
 export const formatPrice = (price: number): string => {

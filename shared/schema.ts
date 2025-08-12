@@ -318,7 +318,7 @@ export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
 // Download type for logging downloads
 export interface Download {
   id: string; // uuid
-  user_id?: number | null; // Peut être null pour les téléchargements gratuits
+  user_id: number; // Always required - all downloads must be linked to a user
   product_id: number;
   license: string;
   downloaded_at: string; // ISO timestamp
@@ -328,6 +328,8 @@ export interface Download {
 export const insertDownloadSchema = z.object({
   productId: z.number().positive('Product ID must be a positive number'),
   license: z.enum(LicenseType, { errorMap: () => ({ message: 'License must be basic, premium, or unlimited' }) }),
+  price: z.number().min(0).optional(), // Price in cents, optional for free downloads
+  productName: z.string().optional(), // Optional product name for order creation
 });
 export type InsertDownload = z.infer<typeof insertDownloadSchema>;
 
@@ -339,16 +341,15 @@ export type InsertDownload = z.infer<typeof insertDownloadSchema>;
 
 export type ActivityLog = {
   id: number;
-  user_id?: number | null; // Peut être null pour les activités anonymes (téléchargements gratuits)
-  event_type: string;
+  user_id?: number | null;
+  action: string; // Real column name in Supabase
   details?: any;
   timestamp: string;
-  created_at: string;
 };
 
 export const insertActivityLogSchema = z.object({
   user_id: z.number().optional().nullable(),
-  event_type: z.string(),
+  action: z.string(),
   details: z.any().optional(),
   timestamp: z.string().optional(),
 });
