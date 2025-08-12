@@ -44,7 +44,8 @@ export function useWooCommerce() {
       queryFn: async () => {
         const response = await fetch(`/api/woocommerce/products/${id}`);
         if (!response.ok) throw new Error('Failed to fetch product');
-        return response.json();
+        const data = await response.json();
+        return data;
       },
     });
   };

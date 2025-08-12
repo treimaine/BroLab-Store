@@ -1,10 +1,13 @@
+import { ClerkProvider, useAuth } from "@clerk/clerk-react";
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+import React, { Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
-import { preloadCriticalResources, optimizeScrolling } from "./utils/performance";
-import { initPerformanceMonitoring } from "./utils/performanceMonitoring";
 import { initializePerformanceMonitoring } from "./lib/performanceMonitoring";
 import { optimizeImageLoading } from "./utils/clsOptimization";
+import { optimizeScrolling, preloadCriticalResources } from "./utils/performance";
+import { initPerformanceMonitoring } from "./utils/performanceMonitoring";
 
 // Initialize performance optimizations
 preloadCriticalResources();
@@ -13,4 +16,41 @@ initPerformanceMonitoring();
 initializePerformanceMonitoring(); // PHASE 4 advanced monitoring
 optimizeImageLoading();
 
-createRoot(document.getElementById("root")!).render(<App />);
+// Simple Convex initialization
+import { ConvexReactClient } from "convex/react";
+const convexUrl = import.meta.env.VITE_CONVEX_URL;
+if (!convexUrl) {
+  throw new Error("Missing Convex URL");
+}
+const convex = new ConvexReactClient(convexUrl);
+
+// Clerk configuration
+const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+if (!clerkPublishableKey) {
+  throw new Error("Missing Clerk Publishable Key");
+}
+
+console.log("🚀 Starting React application...");
+console.log("📡 Convex URL:", convexUrl);
+console.log("🔐 Clerk configured");
+
+// Loading component for Suspense boundaries
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center min-h-screen bg-[var(--deep-black)]">
+    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--accent-purple)]"></div>
+  </div>
+);
+
+createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <Suspense fallback={<LoadingSpinner />}>
+      <ClerkProvider publishableKey={clerkPublishableKey}>
+        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+          <Suspense fallback={<LoadingSpinner />}>
+            <App />
+          </Suspense>
+        </ConvexProviderWithClerk>
+      </ClerkProvider>
+    </Suspense>
+  </React.StrictMode>
+);

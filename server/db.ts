@@ -1,13 +1,11 @@
-
-// Supabase database configuration
+// Convex database configuration
 // This file exports common database utilities for the application
 
-// Re-export Supabase clients
-export { supabaseAdmin } from './lib/supabaseAdmin';
-export { supabaseClient } from './lib/supabaseClient';
+// Note: This replaces the previous Supabase configuration
+// All database operations now use Convex
 
 // Re-export all database helpers
-export * from './lib/db';
+export * from "./lib/db";
 
-// Note: This replaces the previous Neon/Drizzle configuration
-// All database operations now use Supabase PostgreSQL via admin client
+// Note: Database operations are now handled by Convex functions
+// See convex/ directory for all database operations

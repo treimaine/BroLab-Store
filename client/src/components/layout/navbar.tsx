@@ -2,8 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/useBreakpoint";
-import { apiRequest } from "@/lib/queryClient";
-import { useQuery } from "@tanstack/react-query";
+import { SignOutButton, useUser } from "@clerk/clerk-react";
 import { LogOut, Menu, ShoppingCart, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -18,38 +17,8 @@ export function Navbar() {
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  // Check if user is authenticated with refetch on window focus
-  const { data: user, refetch } = useQuery({
-    queryKey: ["/api/auth/user"],
-    retry: false,
-    refetchOnWindowFocus: true,
-    staleTime: 0, // Always refetch
-  });
-
-  // Refetch user data when location changes
-  useEffect(() => {
-    refetch();
-  }, [location, refetch]);
-
-  const handleLogout = async () => {
-    try {
-      await apiRequest("POST", "/api/auth/logout", {});
-      toast({
-        title: "Logged out successfully",
-        description: "You have been logged out of your account",
-      });
-      // Redirect to home page
-      setLocation("/");
-      // Reload to clear any cached data
-      window.location.reload();
-    } catch (error) {
-      toast({
-        title: "Logout failed",
-        description: "There was an error logging out",
-        variant: "destructive",
-      });
-    }
-  };
+  // Use Clerk for authentication
+  const { user, isSignedIn } = useUser();
 
   useEffect(() => {
     if (!isHomePage) return;
@@ -65,7 +34,8 @@ export function Navbar() {
     { href: "/membership", label: "Membership" },
     { href: "/mixing-mastering", label: "Services" },
     { href: "/about", label: "About" },
-    { href: "/dashboard", label: "Dashboard" },
+    // Si non connecté, le lien Dashboard envoie vers /login
+    { href: isSignedIn ? "/dashboard" : "/login", label: "Dashboard" },
     { href: "/contact", label: "Contact" },
     { href: "/faq", label: "FAQ" },
   ];
@@ -98,25 +68,25 @@ export function Navbar() {
       }
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 md:h-20 lg:h-24">
+        <div className="flex items-center justify-between h-14 sm:h-16 md:h-20 lg:h-24">
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center" aria-label="Brolab Home">
               <img
                 src="/attached_assets/Brolab logo trans_1752780961016.png"
                 alt="BroLab Entertainment"
-                className="h-10 w-auto md:h-14 lg:h-16"
+                className="h-8 w-auto sm:h-10 md:h-14 lg:h-16"
               />
             </Link>
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
             {navItems.map(item => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`nav-link ${isActive(item.href) ? "text-[var(--accent-purple)]" : ""}`}
+                className={`nav-link text-sm lg:text-base ${isActive(item.href) ? "text-[var(--accent-purple)]" : ""}`}
               >
                 {item.label}
               </Link>
@@ -124,38 +94,36 @@ export function Navbar() {
           </div>
 
           {/* Cart & User Actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <Link
               href="/cart"
               className="relative p-2 text-white hover:text-[var(--accent-purple)] transition-colors"
             >
-              <ShoppingCart className="w-6 h-6" />
+              <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" />
               {itemCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-[var(--accent-purple)] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-[var(--accent-purple)] text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
                   {itemCount}
                 </span>
               )}
             </Link>
 
-            {user ? (
+            {isSignedIn ? (
               <div className="hidden md:flex items-center space-x-4">
-                <span className="text-white text-sm">
-                  Welcome, {(user as any)?.user?.username || "User"}
+                <span className="text-white text-sm lg:text-base">
+                  Welcome, {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || "User"}
                 </span>
-                <Button
-                  onClick={handleLogout}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </Button>
+                <SignOutButton>
+                  <Button variant="outline" className="flex items-center gap-2 text-sm">
+                    <LogOut className="w-4 h-4" />
+                    <span className="hidden lg:inline">Logout</span>
+                  </Button>
+                </SignOutButton>
               </div>
             ) : (
               <Link href="/login">
-                <Button className="hidden md:flex items-center gap-2 btn-primary">
+                <Button className="hidden md:flex items-center gap-2 btn-primary text-sm">
                   <User className="w-4 h-4" />
-                  Login
+                  <span className="hidden lg:inline">Login</span>
                 </Button>
               </Link>
             )}
@@ -167,7 +135,7 @@ export function Navbar() {
                   size="icon"
                   className="md:hidden text-white hover:bg-[var(--medium-gray)] min-w-[44px] min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]"
                 >
-                  <Menu className="w-6 h-6" />
+                  <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
                   <span className="sr-only">Open navigation menu</span>
                 </Button>
               </SheetTrigger>
@@ -176,23 +144,23 @@ export function Navbar() {
                 className="w-full sm:w-80 bg-[var(--dark-gray)] border-l border-[var(--medium-gray)] h-[90vh] overflow-y-auto"
               >
                 <div className="flex flex-col h-full">
-                  <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center justify-between mb-6 sm:mb-8">
                     <img
                       src="/attached_assets/Brolab logo trans_1752780961016.png"
                       alt="BroLab Entertainment"
-                      className="h-12 w-auto"
+                      className="h-10 w-auto sm:h-12"
                     />
                   </div>
 
                   {/* Navigation Links */}
                   <nav className="flex-1">
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       {navItems.map(item => (
                         <Link
                           key={item.href}
                           href={item.href}
                           className={`
-                            block px-4 py-3 text-lg font-medium rounded-lg transition-colors
+                            block px-4 py-3 text-base sm:text-lg font-medium rounded-lg transition-colors
                             ${
                               isActive(item.href)
                                 ? "text-[var(--accent-purple)] bg-[var(--accent-purple)]/10"
@@ -208,7 +176,7 @@ export function Navbar() {
                   </nav>
 
                   {/* User Actions */}
-                  <div className="border-t border-[var(--medium-gray)] pt-6 space-y-4">
+                  <div className="border-t border-[var(--medium-gray)] pt-4 sm:pt-6 space-y-3 sm:space-y-4">
                     <Link
                       href="/cart"
                       className="flex items-center gap-3 px-4 py-3 text-white hover:text-[var(--accent-purple)] hover:bg-[var(--medium-gray)] rounded-lg transition-colors"
@@ -218,22 +186,22 @@ export function Navbar() {
                       <span>Cart ({getItemCount()})</span>
                     </Link>
 
-                    {user ? (
+                    {isSignedIn ? (
                       <div className="space-y-2">
                         <div className="px-4 py-2 text-sm text-gray-400">
-                          Welcome, {(user as any)?.user?.username || "User"}
+                          Welcome,{" "}
+                          {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || "User"}
                         </div>
-                        <Button
-                          onClick={() => {
-                            handleLogout();
-                            setIsMobileMenuOpen(false);
-                          }}
-                          variant="outline"
-                          className="w-full justify-start gap-2"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          Logout
-                        </Button>
+                        <SignOutButton>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start gap-2"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <LogOut className="w-4 h-4" />
+                            Logout
+                          </Button>
+                        </SignOutButton>
                       </div>
                     ) : (
                       <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
@@ -270,22 +238,21 @@ export function Navbar() {
 
             {/* Mobile Auth Section */}
             <div className="border-t border-[var(--medium-gray)] pt-2 mt-2">
-              {user ? (
+              {isSignedIn ? (
                 <div className="space-y-2">
                   <div className="py-2 text-white text-sm">
-                    Welcome, {(user as any)?.user?.username || "User"}
+                    Welcome, {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || "User"}
                   </div>
-                  <Button
-                    onClick={() => {
-                      handleLogout();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    variant="outline"
-                    className="w-full flex items-center gap-2"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Logout
-                  </Button>
+                  <SignOutButton>
+                    <Button
+                      variant="outline"
+                      className="w-full flex items-center gap-2"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Logout
+                    </Button>
+                  </SignOutButton>
                 </div>
               ) : (
                 <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>

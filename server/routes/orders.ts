@@ -1,12 +1,43 @@
 import { Router } from 'express';
+import { insertOrderSchema } from '../../shared/schema';
 import { isAuthenticated } from '../auth';
-import { getOrderInvoiceData, getUserById, listUserOrders } from '../lib/db';
+import { createOrder, getOrderInvoiceData, getUserById, listUserOrders } from '../lib/db';
 import { ensureInvoicePdf } from '../lib/invoices';
 import { BrandConfig, buildInvoicePdfStream } from '../lib/pdf';
 
 const ordersRouter = Router();
 
 ordersRouter.use(isAuthenticated);
+
+// POST /api/orders - Create a new order
+ordersRouter.post('/', async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Validate the order data
+    const parseResult = insertOrderSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        error: 'Invalid order data', 
+        details: parseResult.error.errors 
+      });
+    }
+
+    // Create the order
+    const order = await createOrder({
+      ...parseResult.data,
+      user_id: userId
+    });
+
+    res.status(201).json(order);
+  } catch (error: any) {
+    console.error('Create order error:', error);
+    res.status(500).json({ error: 'Failed to create order' });
+  }
+});
 
 // GET /api/orders/me
 ordersRouter.get('/me', async (req, res) => {
@@ -16,11 +47,15 @@ ordersRouter.get('/me', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
     
+    console.log(`🔧 Fetching orders for user ${userId}`);
+    
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = (page - 1) * limit;
     
     const orders = await listUserOrders(userId);
+    
+    console.log(`🔧 Found ${orders.length} orders for user ${userId}`);
     
     // Toujours retourner une structure valide
     const total = orders.length;
@@ -34,6 +69,7 @@ ordersRouter.get('/me', async (req, res) => {
       totalPages,
     });
   } catch (error: any) {
+    console.error('🚨 Error fetching orders:', error);
     res.status(500).json({ error: 'Failed to fetch orders' });
   }
 });

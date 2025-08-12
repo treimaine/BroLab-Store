@@ -11,7 +11,9 @@ interface OrderListProps {
 }
 
 export function OrderList({ page = 1, limit = 10, onPageChange, onOrderClick }: OrderListProps) {
-  const { data, isLoading, error } = useOrders(page, limit);
+  const { orders, isLoading } = useOrders();
+  const data = { orders, totalPages: 1 } as const;
+  const error = null;
 
   if (isLoading) {
     return (
@@ -49,8 +51,23 @@ export function OrderList({ page = 1, limit = 10, onPageChange, onOrderClick }: 
   return (
     <div className="space-y-6">
       <div className="grid gap-4">
-        {data.orders.map(order => (
-          <OrderCard key={order.id} order={order} onOrderClick={onOrderClick} />
+        {data.orders.map((order: any) => (
+          <OrderCard
+            key={(order.id || order._id) as any}
+            order={
+              {
+                id: (order.id || order._id) as any,
+                created_at: new Date(order._creationTime || Date.now()).toISOString(),
+                email: order.email || "",
+                items: order.items || [],
+                invoice_pdf_url: undefined,
+                invoice_number: undefined,
+                status: order.status || "pending",
+                total: order.total || 0,
+              } as any
+            }
+            onOrderClick={onOrderClick}
+          />
         ))}
       </div>
 

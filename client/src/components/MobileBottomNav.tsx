@@ -1,12 +1,12 @@
-import { Home, Music, Headphones, User, ShoppingCart } from "lucide-react";
-import { Link, useLocation } from "wouter";
 import { useCartContext } from "@/components/cart-provider";
-import { useQuery } from '@tanstack/react-query';
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect } from "react";
 import { useIsMobile } from "@/hooks/useBreakpoint";
+import { cn } from "@/lib/utils";
 import { useAudioStore } from "@/store/useAudioStore";
+import { useQuery } from "@tanstack/react-query";
+import { Headphones, Home, Music, ShoppingCart, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
 
 const navItems = [
   {
@@ -47,10 +47,10 @@ export function MobileBottomNav() {
 
   // Check if user is authenticated
   const { data: user } = useQuery({
-    queryKey: ['/api/auth/user'],
+    queryKey: ["/api/auth/user"],
     retry: false,
   });
-  
+
   const cartItemCount = getItemCount();
 
   // Detect if keyboard is open on mobile
@@ -97,18 +97,19 @@ export function MobileBottomNav() {
   }
 
   return (
-    <div 
+    <div
       className={`
         fixed left-0 right-0 z-40 bg-[var(--dark-gray)] border-t border-[var(--medium-gray)] md:hidden
         safe-area-inset-bottom transition-all duration-300
-        ${currentTrack ? 'bottom-16' : 'bottom-0'}
+        ${currentTrack ? "bottom-16" : "bottom-0"}
       `}
     >
-      <nav className="flex justify-around items-center py-2 px-4">
-        {navItems.map((item) => {
+      <nav className="flex justify-around items-center py-2 px-2 sm:px-4">
+        {navItems.map(item => {
           const Icon = item.icon;
-          const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
-          
+          const isActive =
+            location === item.href || (item.href !== "/" && location.startsWith(item.href));
+
           // Hide auth-required items if not logged in
           if (item.requiresAuth && !user) {
             return null;
@@ -119,25 +120,23 @@ export function MobileBottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center space-y-1 py-2 px-3 min-w-[60px] relative transition-colors",
+                "flex flex-col items-center space-y-1 py-2 px-2 sm:px-3 min-w-[50px] sm:min-w-[60px] relative transition-colors",
                 "min-h-[48px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)] rounded-lg",
-                isActive 
-                  ? "text-[var(--accent-purple)]" 
-                  : "text-gray-400 hover:text-white"
+                isActive ? "text-[var(--accent-purple)]" : "text-gray-400 hover:text-white"
               )}
             >
               <div className="relative">
-                <Icon className="w-5 h-5" />
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                 {item.showBadge && cartItemCount > 0 && (
-                  <Badge 
-                    variant="secondary" 
-                    className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center text-xs bg-[var(--accent-purple)] text-white border-0"
+                  <Badge
+                    variant="secondary"
+                    className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-xs bg-[var(--accent-purple)] text-white border-0"
                   >
                     {cartItemCount}
                   </Badge>
                 )}
               </div>
-              <span className="text-xs font-medium">{item.label}</span>
+              <span className="text-xs font-medium leading-tight">{item.label}</span>
             </Link>
           );
         })}

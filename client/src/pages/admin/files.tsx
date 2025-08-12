@@ -1,28 +1,33 @@
-import FileManager from '@/components/admin/FileManager';
-import { useAuth } from '@/hooks/useAuth';
-import { useLocation } from 'wouter';
+import FileManager from "@/components/admin/FileManager";
+import { useUser } from "@clerk/clerk-react";
+import { useLocation } from "wouter";
 
 export default function AdminFilesPage() {
-  const { user, isLoading } = useAuth();
+  const { user: clerkUser, isLoaded } = useUser();
   const [, navigate] = useLocation();
 
-  if (isLoading) {
+  if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" aria-label="Loading"/>
+        <div
+          className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"
+          aria-label="Loading"
+        />
       </div>
     );
   }
 
   // Check if user is authenticated and admin
-  if (!user) {
-    navigate('/login');
+  if (!clerkUser) {
+    navigate("/login");
     return null;
   }
 
   // Simple admin check - in production, use proper role-based access
-  const isAdmin = user.email === 'admin@brolabentertainment.com' || user.username === 'admin';
-  
+  const isAdmin =
+    clerkUser.emailAddresses[0]?.emailAddress === "admin@brolabentertainment.com" ||
+    clerkUser.username === "admin";
+
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">

@@ -13,12 +13,8 @@ export const loadHeavyFeatures = {
 
   // Load payment components only during checkout
   async paymentProcessing() {
-    const [stripeModule, paypalModule] = await Promise.all([
-      import('@/components/StripeCheckoutForm'),
-      import('@/components/PayPalButton')
-    ]);
+    const paypalModule = await import('@/components/PayPalButton');
     return {
-      StripeCheckoutForm: stripeModule.StripeCheckoutForm,
       PayPalButton: paypalModule.default
     };
   },
@@ -110,7 +106,7 @@ export const splitStrategies = {
   // Feature-based splitting
   featureBased: {
     audio: ['WaveformAudioPlayer', 'EnhancedWaveformPlayer'],
-    payment: ['StripeCheckoutForm', 'PayPalButton'],
+    payment: ['PayPalButton'],
     advanced: ['AdvancedBeatFilters', 'CustomBeatRequest'],
     services: ['GeolocationProvider', 'CurrencyLanguageProvider']
   },
@@ -119,8 +115,7 @@ export const splitStrategies = {
   vendorBased: {
     react: ['react', 'react-dom'],
     ui: ['@radix-ui/*'],
-    audio: ['wavesurfer.js'],
-    payment: ['@stripe/*']
+    audio: ['wavesurfer.js']
   }
 };
 

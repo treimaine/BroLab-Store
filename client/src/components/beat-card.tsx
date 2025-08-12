@@ -1,22 +1,21 @@
 import { HoverPlayButton } from "@/components/HoverPlayButton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useFavorites } from "@/hooks/useFavorites";
 import { useRecentlyViewedBeats } from "@/hooks/useRecentlyViewedBeats";
-import { useWishlist } from "@/hooks/useWishlist";
 import { useAudioStore } from "@/store/useAudioStore";
-import { LicenseTypeEnum } from "@shared/schema";
 import { Download, Heart, Music, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import { useCartContext } from "./cart-provider";
 
 interface BeatCardProps {
-  id: number;
+  id: string | number;
   title: string;
   genre: string;
-  bpm: number;
-  price: number;
-  imageUrl?: string;
-  audioUrl?: string;
+  bpm?: number;
+  price: number | string;
+  imageUrl: string;
+  audioUrl: string;
   tags?: string[];
   featured?: boolean;
   downloads?: number;
@@ -43,7 +42,11 @@ export function BeatCard({
   onViewDetails,
 }: BeatCardProps) {
   const { addItem } = useCartContext();
-  const { isFavorite, addFavorite, removeFavorite } = useWishlist();
+  const { favorites, addToFavorites, removeFromFavorites } = useFavorites();
+
+  const isFavorite = (beatId: number): boolean => {
+    return favorites.some((fav: any) => fav.beatId === beatId);
+  };
   const { addBeat } = useRecentlyViewedBeats();
   const { toast } = useToast();
   const { setCurrentTrack, setIsPlaying, currentTrack, isPlaying } = useAudioStore();
@@ -70,14 +73,16 @@ export function BeatCard({
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
+    const beatId = typeof id === "string" ? parseInt(id) : id;
+
     addItem({
-      beatId: id,
+      beatId,
       title,
       genre,
       imageUrl,
-      licenseType: "basic" as LicenseTypeEnum,
+      licenseType: "basic" as const,
       quantity: 1,
-      isFree: isFree, // Ajouter le paramètre isFree
+      isFree: isFree,
     });
 
     toast({
@@ -89,11 +94,11 @@ export function BeatCard({
   const handleViewDetails = () => {
     // Ajouter le beat à l'historique des beats vus récemment
     addBeat({
-      id,
+      id: typeof id === "string" ? parseInt(id) : id,
       title,
       genre,
       bpm,
-      price,
+      price: typeof price === "string" ? parseFloat(price) || 0 : price,
       image_url: imageUrl,
       audio_url: audioUrl,
       tags,
@@ -113,14 +118,15 @@ export function BeatCard({
   const handleWishlistToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      if (isFavorite(id)) {
-        await removeFavorite(id);
+      const beatId = typeof id === "string" ? parseInt(id) : id;
+      if (isFavorite(beatId)) {
+        await removeFromFavorites(beatId);
         toast({
           title: "Removed from Wishlist",
           description: "This beat has been removed from your wishlist.",
         });
       } else {
-        await addFavorite(id);
+        await addToFavorites(beatId);
         toast({
           title: "Added to Wishlist",
           description: "This beat has been added to your wishlist.",
@@ -155,23 +161,36 @@ export function BeatCard({
         {/* Wishlist Button */}
         <button
           onClick={handleWishlistToggle}
-          className={`absolute top-12 right-2 p-2 rounded-full transition-all duration-200 z-30 ${
-            isFavorite(id)
+          className={`absolute top-2 right-2 sm:top-3 sm:right-3 p-1.5 sm:p-2 rounded-full transition-all duration-200 z-30 ${
+            isFavorite(typeof id === "string" ? parseInt(id) : id)
               ? "bg-red-500 text-white hover:bg-red-600"
               : "bg-black/70 text-white hover:bg-red-500 hover:text-white"
           }`}
-          title={isFavorite(id) ? "Remove from wishlist" : "Add to wishlist"}
+          title={
+            isFavorite(typeof id === "string" ? parseInt(id) : id)
+              ? "Remove from wishlist"
+              : "Add to wishlist"
+          }
         >
-          <Heart className={`w-4 h-4 ${isFavorite(id) ? "fill-current" : ""}`} />
+          <Heart
+            className={`w-3 h-3 sm:w-4 sm:h-4 ${isFavorite(typeof id === "string" ? parseInt(id) : id) ? "fill-current" : ""}`}
+          />
         </button>
-        {imageUrl ? (
+        {imageUrl && imageUrl !== "" && imageUrl !== "/api/placeholder/200/200" ? (
           <img
             src={imageUrl}
             alt={title}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+            onError={e => {
+              console.log("❌ Erreur de chargement image:", imageUrl);
+              e.currentTarget.style.display = "none";
+            }}
+            onLoad={() => {
+              console.log("✅ Image chargée avec succès:", imageUrl);
+            }}
           />
         ) : (
-          <Music className="w-16 h-16 text-white/20" />
+          <Music className="w-12 h-12 sm:w-16 sm:h-16 text-white/20" />
         )}
         <div className="absolute inset-0 bg-black/20" />
 
@@ -191,20 +210,20 @@ export function BeatCard({
       </div>
 
       {/* Beat Info */}
-      <div className="p-6 space-y-4">
+      <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4">
         <div>
-          <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
-          <div className="flex items-center gap-4 text-sm text-gray-400 mb-3">
-            <span className="bg-gray-700 px-2 py-1 rounded">{genre}</span>
+          <h3 className="text-lg sm:text-xl font-bold text-white mb-2 line-clamp-2">{title}</h3>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-400 mb-2 sm:mb-3">
+            <span className="bg-gray-700 px-2 py-1 rounded text-xs">{genre}</span>
             {downloads > 0 && (
-              <span className="text-[var(--color-gold)]">{downloads} downloads</span>
+              <span className="text-[var(--color-gold)] text-xs">{downloads} downloads</span>
             )}
           </div>
 
           {/* Tags */}
           {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-4">
-              {tags.slice(0, 3).map((tag, index) => (
+            <div className="flex flex-wrap gap-1 mb-3 sm:mb-4">
+              {tags.slice(0, 2).map((tag, index) => (
                 <span
                   key={index}
                   className="text-xs bg-[var(--accent-purple)]/20 text-[var(--accent-purple)] px-2 py-1 rounded-full"
@@ -217,12 +236,12 @@ export function BeatCard({
         </div>
 
         {/* Price and Actions */}
-        <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-700">
-          <div className="text-2xl font-bold text-[var(--accent-purple)]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 sm:pt-6 mt-4 sm:mt-6 border-t border-gray-700">
+          <div className="text-xl sm:text-2xl font-bold text-[var(--accent-purple)]">
             {isFree ? (
               <span className="text-[var(--accent-cyan)]">FREE</span>
             ) : (
-              `$${price > 0 ? price.toFixed(2) : "0.00"}`
+              `$${Number(price) > 0 ? Number(price).toFixed(2) : "0.00"}`
             )}
           </div>
 
@@ -230,12 +249,13 @@ export function BeatCard({
             onClick={isFree ? handleViewDetails : handleAddToCart}
             className={
               isFree
-                ? "btn-primary bg-[var(--accent-cyan)] hover:bg-[var(--accent-cyan)]/80 text-white font-bold flex items-center gap-2 ml-[6px] mr-[6px] pl-[12px] pr-[12px] pt-[0px] pb-[0px]"
-                : "btn-primary flex items-center gap-2 ml-[6px] mr-[6px] pl-[12px] pr-[12px] pt-[0px] pb-[0px]"
+                ? "btn-primary bg-[var(--accent-cyan)] hover:bg-[var(--accent-cyan)]/80 text-white font-bold flex items-center gap-2 w-full sm:w-auto justify-center"
+                : "btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
             }
           >
             {isFree ? <Download className="w-4 h-4" /> : <ShoppingCart className="w-4 h-4" />}
-            {isFree ? "Free Download" : "Add to Cart"}
+            <span className="hidden sm:inline">{isFree ? "Free Download" : "Add to Cart"}</span>
+            <span className="sm:hidden">{isFree ? "Download" : "Add"}</span>
           </Button>
         </div>
       </div>
