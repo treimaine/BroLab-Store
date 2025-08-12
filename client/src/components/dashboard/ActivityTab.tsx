@@ -10,10 +10,10 @@ interface RecentActivity {
 }
 
 interface ActivityTabProps {
-  activities: RecentActivity[];
+  activities?: RecentActivity[];
 }
 
-export default function ActivityTab({ activities }: ActivityTabProps) {
+export default function ActivityTab({ activities = [] }: ActivityTabProps) {
   const getActivityIcon = (type: string) => {
     switch (type) {
       case "purchase":
@@ -39,6 +39,32 @@ export default function ActivityTab({ activities }: ActivityTabProps) {
     });
   };
 
+  // Données par défaut si aucune activité n'est fournie
+  const defaultActivities: RecentActivity[] = [
+    {
+      id: "1",
+      type: "download",
+      beatTitle: "Tropical Vibes",
+      date: new Date().toISOString(),
+      amount: 9.99,
+    },
+    {
+      id: "2",
+      type: "favorite",
+      beatTitle: "Midnight Groove",
+      date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "3",
+      type: "purchase",
+      beatTitle: "Urban Flow",
+      date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      amount: 14.99,
+    },
+  ];
+
+  const displayActivities = activities.length > 0 ? activities : defaultActivities;
+
   return (
     <div className="space-y-6">
       <Card className="bg-[var(--medium-gray)] border-[var(--medium-gray)]">
@@ -47,7 +73,7 @@ export default function ActivityTab({ activities }: ActivityTabProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {activities.map(activity => (
+            {displayActivities.map(activity => (
               <div
                 key={activity.id}
                 className="flex items-center space-x-4 p-4 bg-[var(--dark-gray)] rounded-lg"

@@ -1,17 +1,20 @@
-import { useCart } from "@/components/cart-provider";
+import { useCartContext } from "@/components/cart-provider";
 import { Button } from "@/components/ui/button";
 import { trackAddToCart } from "@/utils/tracking";
+import { getLicensePrice } from "@/lib/cart";
 import { Check, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 
 type ProductLike = {
-  id: number | string;
+  beatId: number;
   title: string;
-  price: number;
-  image?: string;
+  genre: string;
+  imageUrl?: string;
+  price?: number;
 };
+
 interface AddToCartButtonProps {
-  product: ProductLike & { name?: string };
+  product: ProductLike;
   licenseType?: string;
   className?: string;
   variant?: "default" | "outline" | "ghost";
@@ -27,39 +30,40 @@ export function AddToCartButton({
   size = "md",
   showText = true,
 }: AddToCartButtonProps) {
-  const { addItem: addToCart } = useCart();
+  const { addItem: addToCart } = useCartContext();
   const [isAdding, setIsAdding] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
-  const handleAddToCart = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-
-    if (isAdding || justAdded) return;
+  const handleAddToCart = async () => {
+    if (!product || isAdding) return;
 
     setIsAdding(true);
-
     try {
-      // Add to cart
-      addToCart({
-        beatId: Number(product.id),
-        title: product.title ?? product.name,
-        licenseType: licenseType as any,
+      const selectedLicense = licenseType as 'basic' | 'premium' | 'unlimited';
+      const price = getLicensePrice(selectedLicense);
+      
+      await addToCart({
+        beatId: product.beatId,
+        title: product.title,
+        licenseType: selectedLicense,
         quantity: 1,
-        imageUrl: product.image,
-        genre: (product as any).genre ?? (product as any).categories?.[0]?.name ?? "Unknown",
+        imageUrl: product.imageUrl,
+        genre: product.genre,
+        isFree: price === 0
       });
-
-      // Track the event
-      trackAddToCart(String(product.id), product.title ?? product.name, product.price, licenseType);
-
-      // Show success state
+      
+      // Track the add to cart event
+      trackAddToCart(
+        product.beatId.toString(),
+        product.title,
+        price,
+        selectedLicense
+      );
+      
       setJustAdded(true);
-      setTimeout(() => {
-        setJustAdded(false);
-      }, 2000);
+      setTimeout(() => setJustAdded(false), 2000);
     } catch (error) {
-      console.error("Failed to add to cart:", error);
+      console.error('Error adding to cart:', error);
     } finally {
       setIsAdding(false);
     }

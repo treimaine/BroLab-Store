@@ -49,8 +49,8 @@ export function ResponsiveBeatCard({
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden">
         <img
-          src={beat.image || "/api/placeholder/400/400"}
-          alt={beat.name}
+          src={beat.image || beat.image_url || "/api/placeholder/400/400"}
+          alt={beat.title || beat.name}
           className={cn(
             "w-full h-full object-cover transition-transform duration-300",
             !prefersReducedMotion && !isMobile && "group-hover:scale-110"
@@ -77,7 +77,7 @@ export function ResponsiveBeatCard({
             <div className="bg-black/80 backdrop-blur-sm rounded-lg p-4 w-full max-w-xs">
               <LazyWaveformAudioPlayer
                 src={beat.audio_url || "/api/placeholder/audio.mp3"}
-                title={beat.name}
+                title={beat.title || beat.name}
                 artist="BroLab"
                 showControls={false}
                 showWaveform={true}
@@ -149,12 +149,12 @@ export function ResponsiveBeatCard({
               </div>
               <AddToCartButton
                 product={{
-                  id: beat.id,
-                  title: beat.title,
-                  name: beat.title,
-                  price: beat.price,
-                  image: beat.image || beat.image_url || undefined,
-                }}
+                    beatId: beat.id,
+                    title: beat.title || beat.name || "Untitled",
+                    genre: beat.genre || "Unknown",
+                    imageUrl: beat.image || beat.image_url || "",
+                    price: beat.price || 0,
+                  }}
                 size="sm"
                 className="px-3 ml-[6px] mr-[6px] pl-[12px] pr-[12px] pt-[0px] pb-[0px]"
               />
@@ -206,11 +206,11 @@ export function ResponsiveBeatCard({
               <div className="flex gap-2 pt-2">
                 <AddToCartButton
                   product={{
-                    id: beat.id,
-                    title: beat.title,
-                    name: beat.title,
-                    price: beat.price,
-                    image: beat.image || beat.image_url || undefined,
+                    beatId: beat.id,
+                    title: beat.title || beat.name || "Untitled",
+                    genre: beat.genre || "Unknown",
+                    imageUrl: beat.image || beat.image_url || "",
+                    price: beat.price || 0,
                   }}
                   size="sm"
                   className="flex-1 text-xs"

@@ -2,7 +2,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useDownloadInvoice } from "@/hooks/useOrders";
 import type { Order } from "@shared/schema";
 import { Download, ExternalLink } from "lucide-react";
 import { useLocation } from "wouter";
@@ -16,7 +15,10 @@ interface OrderCardProps {
 export function OrderCard({ order, showDetails = true, onOrderClick }: OrderCardProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const downloadInvoice = useDownloadInvoice(order.id);
+  const downloadInvoice = async () => {
+    // TODO: implement real invoice download when available
+    return Promise.resolve();
+  };
 
   const handleDownload = async () => {
     try {

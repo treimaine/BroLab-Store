@@ -9,10 +9,13 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
+import { useClerkBilling } from "@/hooks/useClerkBilling";
+import { useClerkSync } from "@/hooks/useClerkSync";
+import { useDownloads } from "@/hooks/useDownloads";
 import { useWishlist } from "@/hooks/useWishlist";
 import { LicensePricing, LicenseTypeEnum } from "@shared/schema";
 import { ArrowLeft, Download, FileText, Heart, Music, ShoppingCart } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRoute } from "wouter";
 
 export default function Product() {
@@ -22,7 +25,14 @@ export default function Product() {
   const [showLicensePreview, setShowLicensePreview] = useState(false);
 
   const { useProduct, useSimilarProducts } = useWooCommerce();
-  const { data: product, isLoading, error } = useProduct(productId.toString());
+  const { data: product, isLoading, error, refetch } = useProduct(productId.toString());
+
+  // Forcer le rechargement des données au montage du composant
+  useEffect(() => {
+    if (productId) {
+      refetch();
+    }
+  }, [productId, refetch]);
 
   // Récupérer les recommandations de produits similaires
   const genre = product?.categories?.[0]?.name;
@@ -33,6 +43,9 @@ export default function Product() {
 
   const { addItem } = useCartContext();
   const { toast } = useToast();
+  const { logDownload } = useDownloads();
+  const { canDownload, hasPlan } = useClerkBilling();
+  const { syncUser } = useClerkSync();
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -54,24 +67,69 @@ export default function Product() {
   };
 
   // Fonction pour télécharger directement les produits gratuits
-  const handleFreeDownload = () => {
+  const handleFreeDownload = async () => {
     if (!product) return;
 
-    // Créer un lien de téléchargement temporaire
-    const downloadUrl = product.audio_url || `/api/downloads/file/${product.id}/free`;
+    // Vérifier les permissions de téléchargement
+    if (!canDownload(selectedLicense)) {
+      toast({
+        title: "Download Permission Required",
+        description: `You need a ${selectedLicense} plan or higher to download this product.`,
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // Créer un élément <a> temporaire pour déclencher le téléchargement
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = `${product.name}.mp3`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      // Synchroniser l'utilisateur si nécessaire
+      await syncUser();
 
-    toast({
-      title: "Download Started",
-      description: `${product.name} is being downloaded.`,
-    });
+      // Logger le téléchargement via Convex
+      await logDownload({
+        productId: product.id,
+        productName: product.name,
+        license: selectedLicense,
+        price: 0, // Gratuit
+      });
+
+      // Trigger download success event for dashboard refresh
+      window.dispatchEvent(new CustomEvent("download-success"));
+
+      // Ensuite télécharger le fichier
+      const downloadUrl = product.audio_url || `/api/downloads/file/${product.id}/free`;
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `${product.name}.mp3`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Download Started",
+        description: `${product.name} is being downloaded and tracked.`,
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+
+      // Check if it's an authentication error
+      if (error instanceof Error && error.message === "AUTHENTICATION_REQUIRED") {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to download this beat.",
+          variant: "destructive",
+        });
+        // Optionally redirect to login page
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 2000);
+      } else {
+        toast({
+          title: "Download Error",
+          description: "There was an error processing your download.",
+          variant: "destructive",
+        });
+      }
+    }
   };
 
   const { addFavorite, removeFavorite, isFavorite } = useWishlist();

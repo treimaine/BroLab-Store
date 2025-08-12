@@ -1,6 +1,6 @@
-import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
@@ -9,6 +9,7 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      "@convex": path.resolve(import.meta.dirname, "convex"),
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
@@ -19,13 +20,16 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
-    port: 3000,
+    port: 5000,
+    hmr: {
+      port: 5000,
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],
     },
   },
   optimizeDeps: {
-    include: ["react", "react-dom", "@stripe/stripe-js"],
+    include: ["react", "react-dom"],
   },
 });

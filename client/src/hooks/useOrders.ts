@@ -1,101 +1,54 @@
-import type { Order } from '@shared/schema';
-import { useQuery } from '@tanstack/react-query';
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useConvexAuth,
+  useMutation as useConvexMutation,
+  useQuery as useConvexQuery,
+} from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
-interface OrdersResponse {
-  orders: Order[];
+export interface OrderItem {
+  productId: number;
+  name: string;
+  price: number;
+  license: string;
+  quantity: number;
+}
+
+export interface CreateOrderData {
+  items: OrderItem[];
   total: number;
-  page: number;
-  totalPages: number;
+  email: string;
+  status?: string;
 }
 
-interface OrderResponse {
-  order: Order;
-  items: Array<{
-    name: string;
-    quantity: number;
-    price: number;
-    total: number;
-  }>;
-}
+export function useOrders() {
+  const { isAuthenticated } = useConvexAuth();
+  const queryClient = useQueryClient();
 
-interface InvoiceResponse {
-  url: string;
-}
+  // Lister les commandes avec Convex
+  const orders = useConvexQuery(api.orders.listOrders, {});
 
-/**
- * Hook pour récupérer la liste paginée des commandes
- */
-export function useOrders(page = 1, limit = 10) {
-  return useQuery<OrdersResponse>({
-    queryKey: ['orders', page, limit],
-    queryFn: async () => {
-      const response = await fetch(`/api/orders/me?page=${page}&limit=${limit}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch orders');
-      }
-      
-      return response.json();
+  // Créer une commande avec Convex
+  const createOrderMutation = useConvexMutation(api.orders.createOrder);
+
+  const createOrder = async (orderData: CreateOrderData) => {
+    if (!isAuthenticated) {
+      throw new Error("Vous devez être connecté pour créer une commande");
     }
-  });
-}
 
-/**
- * Hook pour récupérer les détails d'une commande spécifique
- */
-export function useOrder(id: number) {
-  return useQuery<OrderResponse>({
-    queryKey: ['orders', id],
-    queryFn: async () => {
-      const response = await fetch(`/api/orders/${id}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch order details');
-      }
-      return response.json();
-    },
-    enabled: Boolean(id)
-  });
-}
-
-/**
- * Hook pour récupérer l'URL de la facture PDF
- */
-export function useOrderInvoice(id: number) {
-  return useQuery<InvoiceResponse>({
-    queryKey: ['orders', id, 'invoice'],
-    queryFn: async () => {
-      const response = await fetch(`/api/orders/${id}/invoice`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch invoice');
-      }
-      return response.json();
-    },
-    enabled: Boolean(id)
-  });
-}
-
-/**
- * Hook pour télécharger une facture
- */
-export function useDownloadInvoice(id: number) {
-  return async () => {
     try {
-      const response = await fetch(`/api/orders/${id}/invoice/download`);
-      if (!response.ok) {
-        throw new Error('Failed to download invoice');
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `invoice-${id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const result = await createOrderMutation(orderData);
+      return result;
     } catch (error) {
-      console.error('Error downloading invoice:', error);
+      console.error("Erreur lors de la création de la commande:", error);
       throw error;
     }
+  };
+
+  return {
+    orders: orders || [],
+    isLoading: orders === undefined,
+    createOrder,
+    isAuthenticated,
   };
 }

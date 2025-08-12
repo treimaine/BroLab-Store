@@ -1,11 +1,11 @@
+import { useUser } from "@clerk/clerk-react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "./useAuth";
 
 interface SubscriptionStatus {
   isActive: boolean;
   plan: string | null;
   renewalDate: string | null;
-  status: 'active' | 'canceled' | 'past_due' | 'unpaid' | null;
+  status: "active" | "canceled" | "past_due" | "unpaid" | null;
 }
 
 interface WooCommerceCustomer {
@@ -24,13 +24,13 @@ interface CurrentUser {
   id: number;
   email: string;
   username: string;
-  
+
   // WooCommerce customer data
   wooCustomer: WooCommerceCustomer | null;
-  
+
   // Subscription data
   subscription: SubscriptionStatus;
-  
+
   // Computed properties
   displayName: string;
   isSubscribed: boolean;
@@ -43,11 +43,11 @@ async function fetchSubscriptionStatus(email: string): Promise<SubscriptionStatu
   try {
     const response = await fetch(`/api/subscription/status?email=${encodeURIComponent(email)}`);
     if (!response.ok) {
-      throw new Error('Failed to fetch subscription status');
+      throw new Error("Failed to fetch subscription status");
     }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching subscription status:', error);
+    console.error("Error fetching subscription status:", error);
     return {
       isActive: false,
       plan: null,
@@ -64,27 +64,27 @@ async function fetchWooCustomer(email: string): Promise<WooCommerceCustomer | nu
       if (response.status === 404) {
         return null; // Customer not found in WooCommerce
       }
-      throw new Error('Failed to fetch WooCommerce customer');
+      throw new Error("Failed to fetch WooCommerce customer");
     }
     const customers = await response.json();
     return customers.length > 0 ? customers[0] : null;
   } catch (error) {
-    console.error('Error fetching WooCommerce customer:', error);
+    console.error("Error fetching WooCommerce customer:", error);
     return null;
   }
 }
 
 export function useCurrentUser() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user: clerkUser, isLoaded: authLoading } = useUser();
 
   const {
     data: subscription,
     isLoading: subscriptionLoading,
     error: subscriptionError,
   } = useQuery({
-    queryKey: ['subscription', user?.email],
-    queryFn: () => fetchSubscriptionStatus(user!.email),
-    enabled: !!user?.email,
+    queryKey: ["subscription", clerkUser?.emailAddresses[0]?.emailAddress],
+    queryFn: () => fetchSubscriptionStatus(clerkUser!.emailAddresses[0]!.emailAddress),
+    enabled: !!clerkUser?.emailAddresses[0]?.emailAddress,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -93,31 +93,31 @@ export function useCurrentUser() {
     isLoading: customerLoading,
     error: customerError,
   } = useQuery({
-    queryKey: ['woo-customer', user?.email],
-    queryFn: () => fetchWooCustomer(user!.email),
-    enabled: !!user?.email,
+    queryKey: ["woo-customer", clerkUser?.emailAddresses[0]?.emailAddress],
+    queryFn: () => fetchWooCustomer(clerkUser!.emailAddresses[0]!.emailAddress),
+    enabled: !!clerkUser?.emailAddresses[0]?.emailAddress,
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  const isLoading = authLoading || subscriptionLoading || customerLoading;
+  const isLoading = !authLoading || subscriptionLoading || customerLoading;
 
-  if (!user) {
+  if (!clerkUser) {
     return {
       user: null,
-      isLoading: authLoading,
+      isLoading: !authLoading,
       error: null,
     };
   }
 
   const currentUser: CurrentUser = {
     // Auth data
-    id: user.id,
-    email: user.email,
-    username: user.username,
-    
+    id: parseInt(clerkUser.id) || 0,
+    email: clerkUser.emailAddresses[0]?.emailAddress || "",
+    username: clerkUser.username || clerkUser.emailAddresses[0]?.emailAddress || "",
+
     // WooCommerce customer data
     wooCustomer: wooCustomer || null,
-    
+
     // Subscription data
     subscription: subscription || {
       isActive: false,
@@ -125,13 +125,13 @@ export function useCurrentUser() {
       renewalDate: null,
       status: null,
     },
-    
+
     // Computed properties
-    displayName: wooCustomer?.first_name 
-      ? `${wooCustomer.first_name} ${wooCustomer.last_name || ''}`.trim()
-      : user.username,
+    displayName: wooCustomer?.first_name
+      ? `${wooCustomer.first_name} ${wooCustomer.last_name || ""}`.trim()
+      : clerkUser.username || clerkUser.emailAddresses[0]?.emailAddress || "",
     isSubscribed: subscription?.isActive || false,
-    isPremium: subscription?.plan === 'premium' || subscription?.plan === 'vip' || false,
+    isPremium: subscription?.plan === "premium" || subscription?.plan === "vip" || false,
     totalSpent: wooCustomer ? parseFloat(wooCustomer.total_spent) : 0,
     ordersCount: wooCustomer?.orders_count || 0,
   };
@@ -140,7 +140,7 @@ export function useCurrentUser() {
     user: currentUser,
     isLoading,
     error: subscriptionError || customerError,
-    
+
     // Utility functions
     refreshData: () => {
       // This would trigger a refetch of all queries

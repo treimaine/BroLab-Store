@@ -213,9 +213,9 @@ export function UnifiedFilterDemo() {
                     genre={product.genre || "Unknown"}
                     bpm={product.bpm || 0}
                     price={product.price || 0}
-                    imageUrl={product.image_url || product.image}
+                    imageUrl={product.image_url || product.image || product.images?.[0]?.src || ""}
                     audioUrl={product.audio_url || ""}
-                    isFree={product.is_free || false}
+                    isFree={product.is_free || product.price === 0 || false}
                   />
                 ))}
               </div>

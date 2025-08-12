@@ -2,7 +2,7 @@ import { AddToCartButton } from "@/components/AddToCartButton";
 import { HoverPlayButton } from "@/components/HoverPlayButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useWishlist } from "@/hooks/useWishlist";
+import { useFavorites } from "@/hooks/useFavorites";
 import { useAudioStore } from "@/store/useAudioStore";
 import { Clock, Heart, Music, Share2 } from "lucide-react";
 import { useState } from "react";
@@ -14,7 +14,7 @@ interface TableBeatViewProps {
 
 export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
   const { currentTrack, isPlaying } = useAudioStore();
-  const { isFavorite, addFavorite, removeFavorite } = useWishlist();
+  const { isFavorite, addToFavorites, removeFromFavorites } = useFavorites();
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
 
   const formatDuration = (seconds?: number) => {
@@ -155,7 +155,7 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
                       audioUrl={audioUrl}
                       productId={product.id.toString()}
                       productName={product.name}
-                      imageUrl={product.images?.[0]?.src || product.image_url || product.image}
+                      imageUrl={product.images?.[0]?.src || product.imageUrl || product.image}
                       size="sm"
                       className="bg-black/70 hover:bg-[var(--accent-purple)]/80"
                     />
@@ -217,11 +217,11 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
               {/* Add to Cart - Icône seulement */}
               <AddToCartButton
                 product={{
-                  id: product.id,
-                  title: product.name,
-                  name: product.name,
-                  price: product.price / 100,
-                  image: product.images?.[0]?.src,
+                  beatId: product.id,
+                  title: product.name || "Untitled",
+                  genre: getGenre(product) || "Unknown",
+                  imageUrl: product.images?.[0]?.src || "",
+                  price: (product.price || 0) / 100,
                 }}
                 variant="default"
                 size="sm"
@@ -247,9 +247,9 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
                   e.stopPropagation();
                   try {
                     if (isFavorite(product.id)) {
-                      await removeFavorite(product.id);
+                      await removeFromFavorites(product.id);
                     } else {
-                      await addFavorite(product.id);
+                      await addToFavorites(product.id);
                     }
                   } catch (error) {
                     console.error("Wishlist toggle error:", error);
