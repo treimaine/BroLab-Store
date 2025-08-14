@@ -45,7 +45,7 @@ import RecordingSessions from "@/pages/recording-sessions";
 import ResetPasswordPage from "@/pages/reset-password";
 import VerifyEmailPage from "@/pages/verify-email";
 
-import { PaymentTestComponent } from "@/components/PaymentTestComponent";
+// PaymentTestComponent removed - using Clerk native interface
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -55,7 +55,7 @@ function Router() {
       <Route path="/shop" component={Shop} />
       <Route path="/product/:id" component={Product} />
       <Route path="/cart" component={Cart} />
-      <Route path="/checkout" component={lazy(() => import("./pages/checkout"))} />
+      <Route path="/clerk-checkout" component={lazy(() => import("./pages/clerk-checkout"))} />
       <Route path="/order-confirmation" component={OrderConfirmation} />
 
       <Route path="/contact" component={Contact} />
@@ -73,6 +73,9 @@ function Router() {
       <Route path="/wishlist" component={WishlistPage} />
 
       <Route path="/mixing-mastering" component={MixingMastering} />
+      <Route path="/checkout" component={lazy(() => import("./pages/checkout"))} />
+      <Route path="/payment/success" component={lazy(() => import("./pages/payment-success"))} />
+      <Route path="/payment/cancel" component={lazy(() => import("./pages/payment-cancel"))} />
       <Route path="/premium-downloads" component={PremiumDownloads} />
       <Route path="/recording-sessions" component={RecordingSessions} />
       <Route path="/custom-beats" component={CustomBeats} />
@@ -81,7 +84,7 @@ function Router() {
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/admin/files" component={lazy(() => import("./pages/admin/files"))} />
-      <Route path="/test-payment" component={PaymentTestComponent} />
+      {/* PaymentTestComponent removed - using Clerk native interface */}
 
       <Route component={NotFound} />
     </Switch>

@@ -140,16 +140,80 @@ export default defineSchema({
     .index("by_priority", ["priority"])
     .index("by_status_date", ["status", "preferredDate"]),
 
-  // Subscriptions (remplace Supabase subscriptions)
+  // Subscriptions (remplace Supabase subscriptions) - Étendu pour Clerk Billing
   subscriptions: defineTable({
     userId: v.id("users"),
-    plan: v.string(),
-    status: v.string(),
-    currentPeriodEnd: v.string(),
-    cancelAtPeriodEnd: v.optional(v.boolean()),
+    clerkSubscriptionId: v.string(), // ID abonnement Clerk Billing
+    planId: v.string(), // 'basic', 'artist', 'ultimate'
+    status: v.string(), // 'active', 'cancelled', 'past_due', 'unpaid'
+    currentPeriodStart: v.number(), // Timestamp début période
+    currentPeriodEnd: v.number(), // Timestamp fin période
+    cancelAtPeriodEnd: v.optional(v.boolean()), // Annulation programmée
+    trialEnd: v.optional(v.number()), // Fin de période d'essai
+    features: v.array(v.string()), // Fonctionnalités incluses
+    downloadQuota: v.number(), // Quota téléchargements
+    downloadUsed: v.number(), // Téléchargements utilisés
+    metadata: v.optional(v.any()), // Métadonnées additionnelles
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_clerk_id", ["clerkSubscriptionId"])
+    .index("by_status", ["status"])
+    .index("by_plan", ["planId"]),
+
+  // Invoices - Nouvelle table pour la facturation Clerk
+  invoices: defineTable({
+    subscriptionId: v.id("subscriptions"), // Référence vers subscriptions
+    clerkInvoiceId: v.string(), // ID Clerk Billing
+    amount: v.number(), // Montant en centimes
+    currency: v.string(), // 'eur', 'usd', etc.
+    status: v.string(), // 'paid', 'open', 'void', 'uncollectible'
+    description: v.optional(v.string()),
+    dueDate: v.number(), // Date d'échéance
+    paidAt: v.optional(v.number()), // Date de paiement
+    attemptCount: v.optional(v.number()), // Nombre de tentatives
+    nextPaymentAttempt: v.optional(v.number()), // Prochaine tentative
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_subscription", ["subscriptionId"])
+    .index("by_clerk_id", ["clerkInvoiceId"])
+    .index("by_status", ["status"])
+    .index("by_due_date", ["dueDate"]),
+
+  // Quotas - Nouvelle table pour la gestion des quotas
+  quotas: defineTable({
+    userId: v.id("users"), // Référence vers users
+    subscriptionId: v.optional(v.id("subscriptions")), // Référence vers subscriptions
+    quotaType: v.string(), // 'downloads', 'storage', 'api_calls'
+    limit: v.number(), // Limite autorisée
+    used: v.number(), // Quantité utilisée
+    resetAt: v.number(), // Timestamp de reset (mensuel)
+    resetPeriod: v.string(), // 'monthly', 'daily', 'yearly'
+    isActive: v.boolean(), // Quota actif
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_subscription", ["subscriptionId"])
+    .index("by_type", ["quotaType"])
+    .index("by_reset", ["resetAt"]),
+
+  // Quota Usage - Nouvelle table pour le suivi de l'utilisation
+  quotaUsage: defineTable({
+    quotaId: v.id("quotas"), // Référence vers quotas
+    resourceId: v.string(), // ID de la ressource utilisée
+    resourceType: v.string(), // 'download', 'upload', 'api_call'
+    amount: v.number(), // Quantité consommée
+    description: v.optional(v.string()),
+    metadata: v.optional(v.any()), // Données additionnelles
+    createdAt: v.number(),
+  })
+    .index("by_quota", ["quotaId"])
+    .index("by_resource", ["resourceId"])
+    .index("by_type", ["resourceType"])
+    .index("by_date", ["createdAt"]),
 
   // Activity Log (remplace Supabase activity_log)
   activityLog: defineTable({

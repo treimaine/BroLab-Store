@@ -1,78 +1,83 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { CompletePaymentFlow } from '@/components/CompletePaymentFlow';
-import { CurrencyLanguageProvider, CurrencyLanguageSwitcher } from '@/components/CurrencyLanguageProvider';
-import { EnhancedErrorProvider } from '@/components/EnhancedErrorHandling';
-import { PerformanceDashboard, OptimizedSuspense } from '@/components/PerformanceOptimizations';
-import { 
-  CheckCircle2, 
-  CreditCard, 
-  Globe, 
-  Languages, 
-  AlertTriangle, 
-  Zap,
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react";
+// CompletePaymentFlow supprimé - utilisation de l'interface Clerk native
+import {
+  CurrencyLanguageProvider,
+  CurrencyLanguageSwitcher,
+} from "@/components/CurrencyLanguageProvider";
+import { EnhancedErrorProvider } from "@/components/EnhancedErrorHandling";
+import { OptimizedSuspense, PerformanceDashboard } from "@/components/PerformanceOptimizations";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  CreditCard,
+  Globe,
+  Languages,
   TestTube,
-  ArrowRight
-} from 'lucide-react';
+  Zap,
+} from "lucide-react";
 
 export default function ImmediateStepsDemo() {
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
 
   const steps = [
     {
-      id: 'payment-flow',
-      title: 'Complete Payment Flow Testing',
-      description: 'End-to-end testing from cart to download with proper error handling',
+      id: "payment-flow",
+      title: "Complete Payment Flow Testing",
+      description: "End-to-end testing from cart to download with proper error handling",
       icon: <CreditCard className="w-6 h-6" />,
-      status: 'completed'
+      status: "completed",
     },
     {
-      id: 'currency-conversion',
-      title: 'Currency Conversion System',
-      description: 'Geolocation-based automatic currency detection and conversion',
+      id: "currency-conversion",
+      title: "Currency Conversion System",
+      description: "Geolocation-based automatic currency detection and conversion",
       icon: <Globe className="w-6 h-6" />,
-      status: 'completed'
+      status: "completed",
     },
     {
-      id: 'language-switching',
-      title: 'Multi-Language Interface',
-      description: 'Automatic language detection with manual switching options',
+      id: "language-switching",
+      title: "Multi-Language Interface",
+      description: "Automatic language detection with manual switching options",
       icon: <Languages className="w-6 h-6" />,
-      status: 'completed'
+      status: "completed",
     },
     {
-      id: 'error-handling',
-      title: 'Enhanced Error Handling',
-      description: 'Comprehensive error management with user-friendly feedback',
+      id: "error-handling",
+      title: "Enhanced Error Handling",
+      description: "Comprehensive error management with user-friendly feedback",
       icon: <AlertTriangle className="w-6 h-6" />,
-      status: 'completed'
+      status: "completed",
     },
     {
-      id: 'performance',
-      title: 'Performance Optimization',
-      description: 'Lazy loading, caching, virtual scrolling, and CDN integration',
+      id: "performance",
+      title: "Performance Optimization",
+      description: "Lazy loading, caching, virtual scrolling, and CDN integration",
       icon: <Zap className="w-6 h-6" />,
-      status: 'completed'
-    }
+      status: "completed",
+    },
   ];
 
   const toggleStepCompletion = (stepId: string) => {
-    setCompletedSteps(prev => 
-      prev.includes(stepId) 
-        ? prev.filter(id => id !== stepId)
-        : [...prev, stepId]
+    setCompletedSteps(prev =>
+      prev.includes(stepId) ? prev.filter(id => id !== stepId) : [...prev, stepId]
     );
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-500';
-      case 'in-progress': return 'bg-orange-500';
-      case 'pending': return 'bg-gray-500';
-      default: return 'bg-gray-500';
+      case "completed":
+        return "bg-green-500";
+      case "in-progress":
+        return "bg-orange-500";
+      case "pending":
+        return "bg-gray-500";
+      default:
+        return "bg-gray-500";
     }
   };
 
@@ -87,8 +92,9 @@ export default function ImmediateStepsDemo() {
                 Immediate Next Steps - All Implemented
               </h1>
               <p className="text-gray-400 text-lg max-w-3xl mx-auto">
-                Complete implementation of all immediate next steps from MISSING_FEATURES.md including 
-                payment flow testing, currency conversion, language switching, error handling, and performance optimization.
+                Complete implementation of all immediate next steps from MISSING_FEATURES.md
+                including payment flow testing, currency conversion, language switching, error
+                handling, and performance optimization.
               </p>
             </div>
 
@@ -105,25 +111,17 @@ export default function ImmediateStepsDemo() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                  {steps.map((step) => (
+                  {steps.map(step => (
                     <div
                       key={step.id}
                       className="p-4 border border-gray-600 rounded-lg hover:border-purple-500 transition-colors"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-purple-400">
-                          {step.icon}
-                        </div>
-                        <Badge className={getStatusColor(step.status)}>
-                          {step.status}
-                        </Badge>
+                        <div className="text-purple-400">{step.icon}</div>
+                        <Badge className={getStatusColor(step.status)}>{step.status}</Badge>
                       </div>
-                      <h3 className="font-semibold text-white text-sm mb-1">
-                        {step.title}
-                      </h3>
-                      <p className="text-gray-400 text-xs">
-                        {step.description}
-                      </p>
+                      <h3 className="font-semibold text-white text-sm mb-1">{step.title}</h3>
+                      <p className="text-gray-400 text-xs">{step.description}</p>
                     </div>
                   ))}
                 </div>
@@ -160,9 +158,17 @@ export default function ImmediateStepsDemo() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <OptimizedSuspense>
-                      <CompletePaymentFlow />
-                    </OptimizedSuspense>
+                    <div className="text-center p-8">
+                      <h3 className="text-xl font-semibold text-white mb-4">
+                        Interface Clerk Native
+                      </h3>
+                      <p className="text-gray-400 mb-4">
+                        Utilisez l'interface Clerk native pour gérer vos abonnements et paiements.
+                      </p>
+                      <p className="text-gray-500 text-sm">
+                        Cliquez sur votre photo de profil dans le Dashboard.
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -216,13 +222,13 @@ export default function ImmediateStepsDemo() {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       {[
-                        { code: 'en', name: 'English', flag: '🇺🇸' },
-                        { code: 'es', name: 'Español', flag: '🇪🇸' },
-                        { code: 'fr', name: 'Français', flag: '🇫🇷' },
-                        { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-                        { code: 'ja', name: '日本語', flag: '🇯🇵' },
-                        { code: 'zh', name: '中文', flag: '🇨🇳' }
-                      ].map((lang) => (
+                        { code: "en", name: "English", flag: "🇺🇸" },
+                        { code: "es", name: "Español", flag: "🇪🇸" },
+                        { code: "fr", name: "Français", flag: "🇫🇷" },
+                        { code: "de", name: "Deutsch", flag: "🇩🇪" },
+                        { code: "ja", name: "日本語", flag: "🇯🇵" },
+                        { code: "zh", name: "中文", flag: "🇨🇳" },
+                      ].map(lang => (
                         <div key={lang.code} className="p-3 bg-gray-700/50 rounded-lg text-center">
                           <div className="text-2xl mb-1">{lang.flag}</div>
                           <div className="text-white font-medium">{lang.name}</div>
@@ -286,26 +292,30 @@ export default function ImmediateStepsDemo() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-green-200">
-                  All 5 immediate next steps from MISSING_FEATURES.md have been successfully implemented:
+                  All 5 immediate next steps from MISSING_FEATURES.md have been successfully
+                  implemented:
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-                  {steps.map((step) => (
-                    <div key={step.id} className="flex items-center space-x-2 p-2 bg-green-800/20 rounded">
+                  {steps.map(step => (
+                    <div
+                      key={step.id}
+                      className="flex items-center space-x-2 p-2 bg-green-800/20 rounded"
+                    >
                       <CheckCircle2 className="w-4 h-4 text-green-400" />
                       <span className="text-green-300 text-sm">{step.title}</span>
                     </div>
                   ))}
                 </div>
                 <div className="flex space-x-3 pt-4">
-                  <Button 
-                    onClick={() => window.location.href = '/checkout'}
+                  <Button
+                    onClick={() => (window.location.href = "/checkout")}
                     className="bg-green-600 hover:bg-green-700"
                   >
                     Test Complete Flow
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
-                  <Button 
-                    onClick={() => window.location.href = '/payment-dashboard'}
+                  <Button
+                    onClick={() => (window.location.href = "/payment-dashboard")}
                     variant="outline"
                     className="border-green-600 text-green-300 hover:bg-green-600 hover:text-white"
                   >

@@ -46,6 +46,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
     lastName: "",
     username: "",
   });
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Statistiques utilisateur (placeholder soft) – affichage non trompeur
   const userStats: UserStats = {
@@ -81,6 +83,37 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
       });
     }
   }, [user]);
+
+  const handlePhotoUpload = useCallback(
+    async (file: File) => {
+      if (!user) return;
+
+      setIsUploadingPhoto(true);
+      try {
+        // Vérifier le type de fichier
+        if (!file.type.startsWith("image/")) {
+          toast.error("Veuillez sélectionner une image valide");
+          return;
+        }
+
+        // Vérifier la taille (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error("L'image doit faire moins de 5MB");
+          return;
+        }
+
+        // Mettre à jour la photo de profil via Clerk
+        await user.setProfileImage({ file });
+        toast.success("Photo de profil mise à jour avec succès");
+      } catch (error) {
+        console.error("Erreur lors de l'upload de la photo:", error);
+        toast.error("Erreur lors de l'upload de la photo");
+      } finally {
+        setIsUploadingPhoto(false);
+      }
+    },
+    [user]
+  );
 
   const handleSave = useCallback(async () => {
     if (!user) return;
@@ -174,11 +207,31 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full p-0"
-                  onClick={() => openUserProfile()}
+                  className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full p-0 hover:bg-purple-600 hover:text-white transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Modifier la photo de profil"
+                  disabled={isUploadingPhoto}
                 >
-                  <Camera className="w-3 h-3" />
+                  {isUploadingPhoto ? (
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                  ) : (
+                    <Camera className="w-3 h-3" />
+                  )}
                 </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handlePhotoUpload(file);
+                      // Reset l'input pour permettre la sélection du même fichier
+                      e.target.value = "";
+                    }
+                  }}
+                />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center space-x-2">
@@ -243,9 +296,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
         <CardContent className="space-y-6">
           {/* Informations personnelles */}
           <div className="space-y-4">
-            <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Informations personnelles
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                Informations personnelles
+              </h4>
+              <div className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                💡 Cliquez sur l'icône appareil photo pour uploader une nouvelle photo
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">Prénom</Label>

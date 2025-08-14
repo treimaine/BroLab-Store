@@ -25,7 +25,7 @@ export const getSubscription = query({
 
     // Retourner les informations d'abonnement
     return {
-      plan: subscription.plan,
+      plan: subscription.planId,
       status: subscription.status,
       currentPeriodEnd: subscription.currentPeriodEnd,
       cancelAtPeriodEnd: subscription.cancelAtPeriodEnd || false,
@@ -44,7 +44,7 @@ export const getCurrentUserSubscription = query({
       .query("users")
       .withIndex("by_clerk_id", q => q.eq("clerkId", args.clerkId))
       .first();
-    
+
     if (!user) return null;
 
     // Récupérer l'abonnement de l'utilisateur
@@ -66,7 +66,7 @@ export const getCurrentUserSubscription = query({
 
     // Retourner les informations d'abonnement
     return {
-      plan: subscription.plan,
+      plan: subscription.planId,
       status: subscription.status,
       currentPeriodEnd: subscription.currentPeriodEnd,
       cancelAtPeriodEnd: subscription.cancelAtPeriodEnd || false,

@@ -1,6 +1,13 @@
 import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
-import { useConvexAuth } from "convex/react";
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 interface User {
   id: number;
@@ -22,6 +29,8 @@ interface AuthContextType {
   checkSubscription: () => boolean;
   hasFeature: (feature: string) => boolean;
   hasPlan: (plan: string) => boolean;
+  getAuthToken: () => Promise<string | null>;
+  getAuthHeaders: () => Promise<HeadersInit>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,30 +41,27 @@ interface AuthProviderProps {
 
 // Hook personnalisé qui utilise useConvexAuth() comme recommandé dans la documentation
 export function useConvexAuthWrapper() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
   const { user: clerkUser } = useUser();
-  const { has } = useClerkAuth();
+  const { has, getToken } = useClerkAuth();
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Convertir les données Clerk en format compatible avec votre application
-  const user: User | null = clerkUser
-    ? {
-        id: parseInt(clerkUser.id) || 0,
-        username: clerkUser.username || clerkUser.emailAddresses[0]?.emailAddress || "",
-        email: clerkUser.emailAddresses[0]?.emailAddress || "",
-        avatar: clerkUser.imageUrl,
-        name: `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || undefined,
-        meta: {
-          subscriber:
-            (has &&
-              (has({ plan: "basic" }) || has({ plan: "artist" }) || has({ plan: "ultimate" }))) ||
-            false,
-        },
-      }
-    : null;
+  // Vérifier si l'utilisateur a un abonnement actif
+  const hasSubscription = useMemo(() => {
+    return (
+      (has && (has({ plan: "basic" }) || has({ plan: "artist" }) || has({ plan: "ultimate" }))) ||
+      false
+    );
+  }, [has]);
+
+  // Vérifier si l'utilisateur a une fonctionnalité spécifique
+  const hasFeature = useCallback((feature: string) => (has && has({ feature })) || false, [has]);
+
+  // Vérifier si l'utilisateur a un plan spécifique
+  const hasPlan = useCallback((plan: string) => (has && has({ plan })) || false, [has]);
 
   return {
-    user,
-    isAuthenticated,
+    user: clerkUser,
+    isAuthenticated: !!clerkUser,
     isLoading,
     // Ces fonctions peuvent être adaptées selon vos besoins
     login: async () => {
@@ -66,14 +72,33 @@ export function useConvexAuthWrapper() {
       // Clerk gère automatiquement la déconnexion
       console.log("Logout handled by Clerk");
     },
-    checkSubscription: () => {
-      return (
-        (has && (has({ plan: "basic" }) || has({ plan: "artist" }) || has({ plan: "ultimate" }))) ||
-        false
-      );
+    checkSubscription: () => hasSubscription,
+    hasFeature,
+    hasPlan,
+    getAuthToken: async () => {
+      try {
+        // Utiliser getToken directement depuis le hook
+        return await getToken();
+      } catch (error) {
+        console.error("Erreur lors de la récupération du token:", error);
+        return null;
+      }
     },
-    hasFeature: (feature: string) => (has && has({ feature })) || false,
-    hasPlan: (plan: string) => (has && has({ plan })) || false,
+    getAuthHeaders: async () => {
+      try {
+        const token = await getToken();
+        if (!token) {
+          throw new Error("No authentication token available");
+        }
+        return {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        };
+      } catch (error) {
+        console.error("Erreur lors de la création des headers:", error);
+        throw new Error("Failed to create authentication headers");
+      }
+    },
   };
 }
 
@@ -134,13 +159,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const authValue: AuthContextType = {
     user,
-    isAuthenticated: Boolean(user),
+    isAuthenticated: !!clerkUser,
     isLoading,
     login,
     logout,
     checkSubscription,
     hasFeature,
     hasPlan,
+    getAuthToken: async () => {
+      try {
+        // Utiliser useClerkAuth pour récupérer le token
+        const { getToken } = useClerkAuth();
+        return await getToken();
+      } catch (error) {
+        console.error("Erreur lors de la récupération du token:", error);
+        return null;
+      }
+    },
+    getAuthHeaders: async () => {
+      try {
+        const { getToken } = useClerkAuth();
+        const token = await getToken();
+        return {
+          "Content-Type": "application/json",
+          ...(token && { Authorization: `Bearer ${token}` }),
+        };
+      } catch (error) {
+        console.error("Erreur lors de la récupération des headers:", error);
+        return {
+          "Content-Type": "application/json",
+        };
+      }
+    },
   };
 
   return <AuthContext.Provider value={authValue}>{children}</AuthContext.Provider>;

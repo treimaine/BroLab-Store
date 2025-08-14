@@ -1,21 +1,21 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react";
 // SubscriptionBilling component removed - now handled by Clerk/Convex
-import { PaymentPlanSelector } from '@/components/payment/PaymentPlanSelector';
-import { 
-  CreditCard, 
-  Smartphone, 
-  Calculator, 
-  Receipt, 
+// PaymentPlanSelector supprimé - utilisation de l'interface Clerk native
+import {
+  Calculator,
   Calendar,
+  CreditCard,
   DollarSign,
   Globe,
+  Receipt,
   Shield,
-  Zap
-} from 'lucide-react';
+  Smartphone,
+  Zap,
+} from "lucide-react";
 
 export default function PaymentDashboard() {
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -25,50 +25,50 @@ export default function PaymentDashboard() {
       icon: <CreditCard className="w-6 h-6" />,
       title: "Multiple Payment Methods",
       description: "Accept credit cards, Apple Pay, Google Pay, and cryptocurrency",
-      status: "active"
+      status: "active",
     },
     {
       icon: <Calculator className="w-6 h-6" />,
       title: "Smart Tax Calculation",
       description: "Automatic tax calculation based on customer location",
-      status: "active"
+      status: "active",
     },
     {
       icon: <Receipt className="w-6 h-6" />,
       title: "Automated Invoicing",
       description: "Generate and email professional invoices automatically",
-      status: "active"
+      status: "active",
     },
     {
       icon: <Calendar className="w-6 h-6" />,
       title: "Payment Plans",
       description: "Installment options for high-value purchases",
-      status: "active"
+      status: "active",
     },
     {
       icon: <Zap className="w-6 h-6" />,
       title: "Subscription Billing",
       description: "Recurring billing with automatic renewals",
-      status: "active"
+      status: "active",
     },
     {
       icon: <Globe className="w-6 h-6" />,
       title: "Multi-Currency Support",
       description: "15+ currencies with real-time exchange rates",
-      status: "active"
+      status: "active",
     },
     {
       icon: <Smartphone className="w-6 h-6" />,
       title: "Mobile Wallets",
       description: "One-touch payments with Apple Pay and Google Pay",
-      status: "active"
+      status: "active",
     },
     {
       icon: <Shield className="w-6 h-6" />,
       title: "Fraud Protection",
       description: "Advanced security with Stripe's fraud detection",
-      status: "active"
-    }
+      status: "active",
+    },
   ];
 
   return (
@@ -80,38 +80,35 @@ export default function PaymentDashboard() {
             Advanced Payment System
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Complete payment infrastructure with support for multiple payment methods, 
-            tax calculation, invoicing, and subscription billing.
+            Complete payment infrastructure with support for multiple payment methods, tax
+            calculation, invoicing, and subscription billing.
           </p>
         </div>
 
         {/* Feature Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((feature, index) => (
-            <Card key={index} className="border-gray-600 bg-gray-800/50 hover:bg-gray-800/70 transition-colors">
+            <Card
+              key={index}
+              className="border-gray-600 bg-gray-800/50 hover:bg-gray-800/70 transition-colors"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <div className="text-purple-400">
-                    {feature.icon}
-                  </div>
-                  <Badge 
+                  <div className="text-purple-400">{feature.icon}</div>
+                  <Badge
                     className={
-                      feature.status === 'active' 
-                        ? 'bg-green-500/20 text-green-300 border-green-500/30' 
-                        : 'bg-orange-500/20 text-orange-300 border-orange-500/30'
+                      feature.status === "active"
+                        ? "bg-green-500/20 text-green-300 border-green-500/30"
+                        : "bg-orange-500/20 text-orange-300 border-orange-500/30"
                     }
                   >
                     {feature.status}
                   </Badge>
                 </div>
-                <CardTitle className="text-white text-lg">
-                  {feature.title}
-                </CardTitle>
+                <CardTitle className="text-white text-lg">{feature.title}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-400 text-sm">
-                  {feature.description}
-                </p>
+                <p className="text-gray-400 text-sm">{feature.description}</p>
               </CardContent>
             </Card>
           ))}
@@ -140,7 +137,10 @@ export default function PaymentDashboard() {
                 <CardTitle className="text-white">Subscription Management</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-400">Subscription billing is now handled by Clerk. Visit your Clerk dashboard to manage subscriptions.</p>
+                <p className="text-gray-400">
+                  Subscription billing is now handled by Clerk. Visit your Clerk dashboard to manage
+                  subscriptions.
+                </p>
                 <Button className="mt-4 bg-purple-600 hover:bg-purple-700">
                   Open Clerk Dashboard
                 </Button>
@@ -154,10 +154,17 @@ export default function PaymentDashboard() {
                 <CardTitle className="text-white">Payment Plan Demo</CardTitle>
               </CardHeader>
               <CardContent>
-                <PaymentPlanSelector
-                  totalAmount={499.99}
-                  onPlanSelected={(plan: any) => setSelectedPlan(plan)}
-                />
+                <div className="text-center p-8">
+                  <h3 className="text-xl font-semibold text-white mb-4">
+                    Gestion des Plans via Clerk
+                  </h3>
+                  <p className="text-gray-400 mb-4">
+                    Utilisez l'interface Clerk native pour gérer vos abonnements.
+                  </p>
+                  <p className="text-gray-500 text-sm">
+                    Cliquez sur votre photo de profil dans le Dashboard.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -262,21 +269,21 @@ export default function PaymentDashboard() {
 
         {/* Quick Actions */}
         <div className="flex flex-wrap gap-4 justify-center">
-          <Button 
-            onClick={() => window.location.href = '/checkout'}
+          <Button
+            onClick={() => (window.location.href = "/checkout")}
             className="bg-purple-600 hover:bg-purple-700"
           >
             Test Checkout Flow
           </Button>
-          <Button 
-            onClick={() => window.location.href = '/subscribe'}
+          <Button
+            onClick={() => (window.location.href = "/subscribe")}
             variant="outline"
             className="border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white"
           >
             View Subscription Plans
           </Button>
-          <Button 
-            onClick={() => window.location.href = '/dashboard'}
+          <Button
+            onClick={() => (window.location.href = "/dashboard")}
             variant="outline"
             className="border-gray-600 text-gray-300 hover:bg-gray-600 hover:text-white"
           >
