@@ -2,8 +2,8 @@ import cookieParser from "cookie-parser";
 import type { Express, NextFunction, Response } from "express";
 import session from "express-session";
 import type { User } from "../shared/schema";
-// Imports pour Convex et Clerk
-import { ClerkRequest, getCurrentClerkUser, isClerkAuthenticated } from "./middleware/clerkAuth";
+// Imports pour Convex et Clerk - NOUVEAU SDK
+import { clerkMiddleware, getAuth } from "@clerk/express";
 import { getUserByClerkId, upsertUser } from "./lib/convex";
 
 // Extend session to include userId
@@ -30,36 +30,89 @@ export function setupAuth(app: Express) {
       store: process.env.NODE_ENV === "test" ? new session.MemoryStore() : undefined,
     })
   );
+
+  // Ajouter le middleware Clerk à toutes les requêtes - NOUVEAU SDK
+  app.use(clerkMiddleware());
 }
 
 // Middleware to check if user is authenticated
 // Middleware hybride pour l'authentification (Clerk en priorité, puis session)
-export const isAuthenticated = (req: ClerkRequest, res: Response, next: NextFunction) => {
-  // Vérifier d'abord l'authentification Clerk
-  if (isClerkAuthenticated(req)) {
-    return next();
-  }
+export const isAuthenticated = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    // Vérifier d'abord l'authentification Clerk - NOUVEAU SDK
+    const { userId, sessionId, sessionClaims } = getAuth(req);
 
-  // Fallback vers l'authentification par session
-  if (req.session?.userId) {
-    return next();
-  }
+    if (userId) {
+      // Récupérer l'utilisateur Clerk et le définir dans req.user
+      const clerkUser = {
+        id: userId,
+        sessionId: sessionId,
+        sessionClaims: sessionClaims,
+      };
 
-  return res.status(401).json({ error: "Non autorisé" });
+      if (clerkUser) {
+        // Récupérer l'utilisateur depuis Convex
+        let user = await getUserByClerkId(clerkUser.id);
+
+        if (!user) {
+          // Créer l'utilisateur dans Convex s'il n'existe pas
+          user = await upsertUser({
+            clerkId: clerkUser.id,
+            email: "", // Sera mis à jour côté client
+            username: `user_${clerkUser.id.slice(-8)}`,
+          });
+        }
+
+        if (user) {
+          // Définir req.user pour la compatibilité avec les routes existantes
+          (req as any).user = {
+            id: user._id.toString(),
+            clerkId: user.clerkId,
+            username: user.username || `user_${clerkUser.id.slice(-8)}`,
+            email: user.email || "",
+            role: user.role || "user",
+          };
+          return next();
+        }
+      }
+    }
+
+    // Fallback vers l'authentification par session (pour compatibilité)
+    if (req.session?.userId) {
+      (req as any).user = {
+        id: req.session.userId.toString(),
+        username: `session_user_${req.session.userId}`,
+        email: "",
+        role: "user",
+      };
+      return next();
+    }
+
+    return res.status(401).json({ error: "Non autorisé" });
+  } catch (error) {
+    console.error("Erreur lors de l'authentification:", error);
+    return res.status(500).json({ error: "Erreur d'authentification" });
+  }
 };
 
 // Fonction pour obtenir l'utilisateur actuel (Clerk + Convex)
-export const getCurrentUser = async (req: ClerkRequest): Promise<User | null> => {
+export const getCurrentUser = async (req: any): Promise<User | null> => {
   try {
-    // Priorité à l'authentification Clerk
-    const clerkUser = getCurrentClerkUser(req);
-    if (clerkUser) {
+    // Priorité à l'authentification Clerk - NOUVEAU SDK
+    const { userId, sessionId, sessionClaims } = getAuth(req);
+
+    if (userId) {
+      const clerkUser = {
+        id: userId,
+        sessionId: sessionId,
+        sessionClaims: sessionClaims,
+      };
+
       // Récupérer l'utilisateur depuis Convex
       let user = await getUserByClerkId(clerkUser.id);
-      
+
       if (!user) {
         // Créer l'utilisateur dans Convex s'il n'existe pas
-        // Note: Les données complètes de l'utilisateur seront récupérées côté client
         user = await upsertUser({
           clerkId: clerkUser.id,
           email: "", // Sera mis à jour côté client
@@ -75,20 +128,12 @@ export const getCurrentUser = async (req: ClerkRequest): Promise<User | null> =>
           username: user.username || `user_${clerkUser.id.slice(-8)}`,
           email: user.email || "",
           password: "", // Pas de mot de passe avec Clerk
-          created_at: user._creationTime ? new Date(user._creationTime).toISOString() : new Date().toISOString(),
+          created_at: user._creationTime
+            ? new Date(user._creationTime).toISOString()
+            : new Date().toISOString(),
+          avatar: user.imageUrl || user.avatar,
         };
       }
-    }
-
-    // Fallback vers l'authentification par session (pour compatibilité)
-    if (req.session?.userId) {
-      return {
-        id: req.session.userId,
-        username: `session_user_${req.session.userId}`,
-        email: "",
-        password: "",
-        created_at: new Date().toISOString(),
-      };
     }
 
     return null;

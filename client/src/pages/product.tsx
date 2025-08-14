@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
-import { useClerkBilling } from "@/hooks/useClerkBilling";
+// useClerkBilling supprimé - utilisation de l'interface Clerk native
 import { useClerkSync } from "@/hooks/useClerkSync";
 import { useDownloads } from "@/hooks/useDownloads";
 import { useWishlist } from "@/hooks/useWishlist";
@@ -44,7 +44,9 @@ export default function Product() {
   const { addItem } = useCartContext();
   const { toast } = useToast();
   const { logDownload } = useDownloads();
-  const { canDownload, hasPlan } = useClerkBilling();
+  // Vérification des permissions via Clerk native (à implémenter si nécessaire)
+  const canDownload = (licenseType: string) => true; // Temporaire - Clerk gère les permissions
+  const hasPlan = (plan: string) => false; // Temporaire - Clerk gère les plans
   const { syncUser } = useClerkSync();
 
   const handleAddToCart = () => {

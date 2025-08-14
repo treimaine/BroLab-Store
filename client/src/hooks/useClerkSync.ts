@@ -15,7 +15,10 @@ export function useClerkSync() {
   const [error, setError] = useState<string | null>(null);
   const syncInProgress = useRef(false);
   const hasAttemptedSync = useRef(false);
-  const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser);
+
+  // Utiliser any pour éviter l'erreur TypeScript TS2589
+  // @ts-ignore - Ignorer l'erreur de type instantiation excessive
+  const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser as any);
 
   const syncUser = useCallback(async () => {
     if (!clerkLoaded || !clerkUser || !isAuthenticated) {

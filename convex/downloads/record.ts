@@ -71,7 +71,7 @@ export const getUserDownloadQuota = query({
       .first();
 
     // Determine license type and quota
-    const licenseType = subscription?.plan || "basic";
+    const licenseType = subscription?.planId || "basic";
     const quota =
       licenseType === "basic"
         ? 10

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { UnifiedFilterPanel } from "@/components/UnifiedFilterPanel";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { useUnifiedFilters } from "@/hooks/useUnifiedFilters";
+import { UnifiedFilters } from "@/lib/unifiedFilters";
 import { Filter, Grid3X3, List, RotateCcw, Search } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useLocation } from "wouter";
@@ -110,32 +111,6 @@ export default function Shop() {
               Discover professional beats for your next project
             </p>
           </div>
-
-          {/* Stats */}
-          <div className="flex flex-wrap gap-4 sm:gap-6">
-            {stats && (
-              <>
-                <div className="text-center">
-                  <div className="text-xl sm:text-2xl font-bold text-[var(--accent-purple)]">
-                    {stats.totalProducts}
-                  </div>
-                  <div className="text-xs sm:text-sm text-gray-400">Beats</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl sm:text-2xl font-bold text-[var(--accent-cyan)]">
-                    {stats.totalDownloads}
-                  </div>
-                  <div className="text-xs sm:text-sm text-gray-400">Downloads</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl sm:text-2xl font-bold text-[var(--color-gold)]">
-                    {stats.totalFavorites}
-                  </div>
-                  <div className="text-xs sm:text-sm text-gray-400">Favorites</div>
-                </div>
-              </>
-            )}
-          </div>
         </div>
 
         {/* Search and Filters Bar */}
@@ -194,18 +169,43 @@ export default function Shop() {
             <span className="text-sm text-gray-400">Active filters:</span>
             {Object.entries(filters).map(([key, value]) => {
               if (!value || key === "search") return null;
-              return (
-                <Badge
-                  key={key}
-                  variant="secondary"
-                  className="bg-[var(--accent-purple)]/20 text-[var(--accent-purple)] border-[var(--accent-purple)]/30"
-                >
-                  {key}: {Array.isArray(value) ? value.join(", ") : value}
-                  <button onClick={() => updateFilter(key, "")} className="ml-2 hover:text-white">
-                    ×
-                  </button>
-                </Badge>
-              );
+
+              // Vérifier que la clé est une clé valide de UnifiedFilters
+              if (
+                key === "search" ||
+                key === "categories" ||
+                key === "priceRange" ||
+                key === "sortBy" ||
+                key === "sortOrder" ||
+                key === "bpmRange" ||
+                key === "keys" ||
+                key === "moods" ||
+                key === "instruments" ||
+                key === "producers" ||
+                key === "tags" ||
+                key === "timeSignature" ||
+                key === "duration" ||
+                key === "isFree" ||
+                key === "hasVocals" ||
+                key === "stems"
+              ) {
+                return (
+                  <Badge
+                    key={key}
+                    variant="secondary"
+                    className="bg-[var(--accent-purple)]/20 text-[var(--accent-purple)] border-[var(--accent-purple)]/30"
+                  >
+                    {key}: {Array.isArray(value) ? value.join(", ") : value}
+                    <button
+                      onClick={() => updateFilter(key as keyof UnifiedFilters, "")}
+                      className="ml-2 hover:text-white"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                );
+              }
+              return null;
             })}
             <Button
               variant="ghost"
@@ -226,9 +226,13 @@ export default function Shop() {
               filters={filters}
               availableOptions={availableOptions}
               availableRanges={availableRanges}
-              onFilterChange={updateFilter}
               onFiltersChange={updateFilters}
-              onClearFilters={clearFilters}
+              onClearAll={clearFilters}
+              stats={{
+                totalProducts: stats?.totalProducts || 0,
+                filteredProducts: products.length,
+                hasActiveFilters: hasActiveFilters,
+              }}
             />
           </div>
         )}
@@ -280,7 +284,7 @@ export default function Shop() {
                   <BeatCard
                     key={product.id}
                     id={product.id}
-                    title={product.name}
+                    title={product.name || "Untitled"}
                     genre={product.genre || "Unknown"}
                     bpm={product.bpm}
                     price={product.price}
@@ -288,20 +292,20 @@ export default function Shop() {
                     audioUrl={product.audio_url || ""}
                     tags={product.tags?.map((tag: any) => tag.name) || []}
                     featured={product.featured}
-                    downloads={product.download_count || 0}
+                    downloads={product.downloads || 0}
                     duration={product.duration}
-                    isFree={product.price === "0" || product.price === 0}
+                    isFree={
+                      typeof product.price === "string"
+                        ? product.price === "0"
+                        : product.price === 0
+                    }
                     onViewDetails={() => handleProductView(product.id)}
                   />
                 ))}
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <TableBeatView
-              products={products}
-              isLoading={isLoading}
-              onProductView={handleProductView}
-            />
+            <TableBeatView products={products} onViewDetails={handleProductView} />
           </div>
         )}
 
@@ -312,16 +316,16 @@ export default function Shop() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(Math.max(1, (filters.page || 1) - 1))}
-                disabled={filters.page === 1}
+                onClick={() => setCurrentPage(Math.max(1, (stats?.currentPage || 1) - 1))}
+                disabled={stats?.currentPage === 1}
               >
                 Previous
               </Button>
-              <span className="text-sm text-gray-400 px-4">Page {filters.page || 1}</span>
+              <span className="text-sm text-gray-400 px-4">Page {stats?.currentPage || 1}</span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage((filters.page || 1) + 1)}
+                onClick={() => setCurrentPage((stats?.currentPage || 1) + 1)}
                 disabled={products.length < 12}
               >
                 Next
