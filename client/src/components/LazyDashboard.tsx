@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile, useIsTablet } from "@/hooks/useBreakpoint";
 import { useDashboardDataOptimized } from "@/hooks/useDashboardDataOptimized";
-import { useUser } from "@clerk/clerk-react";
+import { useClerk, useUser } from "@clerk/clerk-react";
 import { motion } from "framer-motion";
 import {
   Activity,
@@ -31,8 +31,10 @@ const TrendCharts = lazy(() =>
   import("@/components/dashboard/TrendCharts").then(m => ({ default: m.TrendCharts }))
 );
 const OrdersTab = lazy(() => import("@/components/dashboard/OrdersTab"));
+const ReservationsTab = lazy(() => import("@/components/dashboard/ReservationsTab"));
 const DownloadsTable = lazy(() => import("@/components/DownloadsTable"));
 const UserProfile = lazy(() => import("@/components/UserProfile"));
+// SubscriptionManager supprimé - gestion via interface Clerk native
 
 // Types locaux simplifiés (éviter les conflits avec les hooks)
 type DashboardFavorite = {
@@ -156,6 +158,7 @@ function ChartsSkeleton() {
 // Composant principal du Dashboard
 export function LazyDashboard() {
   const { user } = useUser();
+  const { openUserProfile } = useClerk();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const {
@@ -323,6 +326,13 @@ export function LazyDashboard() {
                     Téléchargements
                   </TabsTrigger>
                   <TabsTrigger
+                    value="reservations"
+                    className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
+                  >
+                    <Star className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    Réservations
+                  </TabsTrigger>
+                  <TabsTrigger
                     value="profile"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
@@ -333,7 +343,7 @@ export function LazyDashboard() {
                     value="settings"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
-                    <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
                     Paramètres
                   </TabsTrigger>
                 </TabsList>
@@ -427,6 +437,12 @@ export function LazyDashboard() {
                 />
               </TabsContent>
 
+              <TabsContent value="reservations" className="space-y-4 sm:space-y-6">
+                <Suspense fallback={<ActivitySkeleton />}>
+                  <ReservationsTab reservations={[]} />
+                </Suspense>
+              </TabsContent>
+
               <TabsContent value="profile" className="space-y-4 sm:space-y-6">
                 <Suspense fallback={<ActivitySkeleton />}>
                   <UserProfile className="max-w-4xl mx-auto" />
@@ -459,7 +475,13 @@ export function LazyDashboard() {
                           </p>
                         </div>
                       </div>
-                      <Button className="w-full bg-purple-600 hover:bg-purple-700 text-xs sm:text-sm">
+                      <Button
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-xs sm:text-sm"
+                        onClick={() => {
+                          // Ouvrir l'interface Clerk pour modifier le profil
+                          openUserProfile();
+                        }}
+                      >
                         Modifier le profil
                       </Button>
                     </CardContent>

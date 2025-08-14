@@ -19,8 +19,7 @@ declare global {
 }
 
 // Import advanced features
-import { generateInvoice, getInvoice, sendReceipt } from "./invoice-system";
-import { calculateTax, getTaxInfo } from "./tax-calculator";
+// Invoice and Tax systems removed - handled by Clerk Billing
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication middleware
@@ -204,15 +203,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // === ADVANCED PAYMENT FEATURES ===
   // Note: Payment processing now handled by Clerk/Convex
+  // Tax and Invoice systems removed - handled by Clerk Billing
 
-  // Tax Calculation Routes
-  app.post("/api/tax/calculate", calculateTax);
-  app.get("/api/tax/info", getTaxInfo);
+  // Clerk Checkout Session for Reservations - Now handled by /api/clerk/create-checkout-session
 
-  // Invoice System Routes
-  app.post("/api/invoice/generate", generateInvoice);
-  app.get("/api/invoice/:invoiceNumber", getInvoice);
-  app.post("/api/invoice/send-receipt", sendReceipt);
+  // Clerk One-Time Payment Session for Services - REMOVED
+  // Using existing /api/reservations endpoint instead
 
   // Payment Plan Routes now handled by Clerk/Convex
 
