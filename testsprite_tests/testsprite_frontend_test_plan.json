@@ -1,0 +1,662 @@
+[
+  {
+    "id": "TC001",
+    "title": "User Registration via Clerk Authentication",
+    "description": "Verify that a new user can register successfully using Clerk authentication and that user data syncs to the Convex database.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the registration page."
+      },
+      {
+        "type": "action",
+        "description": "Fill in valid registration information (email, password, etc.)."
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm user registration success message is displayed."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that the new user record is synchronized in the Convex database."
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Login Success with Valid Credentials",
+    "description": "Check that a registered user can login successfully using Clerk authentication.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page."
+      },
+      {
+        "type": "action",
+        "description": "Input valid registered user email and password."
+      },
+      {
+        "type": "action",
+        "description": "Click the login button."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure the user is redirected to the homepage or user dashboard."
+      },
+      {
+        "type": "assertion",
+        "description": "Check that authentication tokens are set and persisted."
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Login Failure with Incorrect Credentials",
+    "description": "Ensure login fails gracefully when incorrect username/email or password is provided.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page."
+      },
+      {
+        "type": "action",
+        "description": "Enter invalid user email or password."
+      },
+      {
+        "type": "action",
+        "description": "Click the login button."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that a descriptive login error message is shown."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm user is not authenticated and remains on login page."
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Password Reset Workflow",
+    "description": "Validate the password reset flow allowing users to request reset, receive email, and set new password.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the reset password page."
+      },
+      {
+        "type": "action",
+        "description": "Submit registered email for password reset."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify confirmation message that reset email has been sent."
+      },
+      {
+        "type": "action",
+        "description": "Use reset link from email to navigate to new password page."
+      },
+      {
+        "type": "action",
+        "description": "Input and confirm a new valid password."
+      },
+      {
+        "type": "action",
+        "description": "Submit new password form."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure password reset success message is displayed."
+      },
+      {
+        "type": "action",
+        "description": "Login using the updated password to confirm update."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify login success with new password."
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Multi-language Support and UI Localization",
+    "description": "Verify that the UI displays correctly and translates based on selected languages via i18next integration.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to homepage."
+      },
+      {
+        "type": "action",
+        "description": "Switch language to each supported language (e.g., English, Spanish, French)."
+      },
+      {
+        "type": "assertion",
+        "description": "Check all major UI texts are translated correctly."
+      },
+      {
+        "type": "action",
+        "description": "Verify currency localization changes correspondingly."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm no UI layout breaks or overlaps occur with different languages."
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Beat Catalog Filtering and Search Operations",
+    "description": "Test filtering by genre, BPM, price, and search to return accurate and consistent beat listings.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open the beats marketplace page."
+      },
+      {
+        "type": "action",
+        "description": "Apply a filter for a specific genre."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the displayed beats match the selected genre."
+      },
+      {
+        "type": "action",
+        "description": "Apply a BPM filter range."
+      },
+      {
+        "type": "assertion",
+        "description": "Check displayed beats fall within the BPM range."
+      },
+      {
+        "type": "action",
+        "description": "Apply a price filter."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure only beats within the price filter are shown."
+      },
+      {
+        "type": "action",
+        "description": "Use search input to query beats by keyword."
+      },
+      {
+        "type": "assertion",
+        "description": "Validate that search results are relevant to the query."
+      },
+      {
+        "type": "action",
+        "description": "Combine multiple filters and search."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm results reflect all filter criteria correctly."
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Audio Player Waveform Playback Controls",
+    "description": "Validate audio waveform player supports playback, pause, seeking, volume control, and persistent playback across navigation.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to a beat's details page."
+      },
+      {
+        "type": "action",
+        "description": "Start playback using waveform player controls."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify audio plays and waveform animation is visible."
+      },
+      {
+        "type": "action",
+        "description": "Pause the audio and confirm playback halts."
+      },
+      {
+        "type": "action",
+        "description": "Seek to a different position in the waveform by clicking/dragging."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify audio resumes from the seeked position."
+      },
+      {
+        "type": "action",
+        "description": "Adjust the volume and check volume changes accordingly."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to another page while audio is playing."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure playback persists continuously with global audio player controls present."
+      },
+      {
+        "type": "action",
+        "description": "Test audio playback controls on mobile devices using touch gestures."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm responsive touch controls work without lag or errors."
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Add Beat to Cart and Cart Persistence",
+    "description": "Verify users can add beats to the shopping cart, update quantities, and that the cart persists across sessions.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "From a beat's product page, select license options if applicable."
+      },
+      {
+        "type": "action",
+        "description": "Click 'Add to Cart' button."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm beat is added to the cart with correct license and price."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the cart page."
+      },
+      {
+        "type": "action",
+        "description": "Update the quantity of the beat."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that the cart updates totals and quantities correctly."
+      },
+      {
+        "type": "action",
+        "description": "Close browser/tab, reopen, and log back into the account."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure the cart contents persist after session restore."
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Checkout Process for Guest and Authenticated Users",
+    "description": "Test the end-to-end checkout flow for both guest users and logged-in users including payment processing and order confirmation.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "As a guest user, add one or more beats to the cart."
+      },
+      {
+        "type": "action",
+        "description": "Proceed to checkout."
+      },
+      {
+        "type": "action",
+        "description": "Input required billing and shipping information."
+      },
+      {
+        "type": "action",
+        "description": "Complete payment using Clerk Billing system."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify payment success page is shown and order confirmation is sent."
+      },
+      {
+        "type": "action",
+        "description": "Repeat steps as an authenticated user."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm order appears in user dashboard order history."
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Subscription Plans Activation and Quota Management",
+    "description": "Validate subscription plans can be activated, billing is processed correctly, and usage quotas reflect subscription level.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as a registered user."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to subscription management page."
+      },
+      {
+        "type": "action",
+        "description": "Select and subscribe to a Basic, Artist, or Ultimate plan."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify payment is processed and subscription status updates to active."
+      },
+      {
+        "type": "action",
+        "description": "Check usage quotas and benefits in the user dashboard."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm quotas correspond accurately to the subscribed plan."
+      },
+      {
+        "type": "action",
+        "description": "Simulate quota limits reached and verify correct UI warnings."
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Service Booking Form Submission",
+    "description": "Ensure users can book mixing, mastering, recording sessions, and custom beats requests successfully with validation and confirmation.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the service booking page (mixing/mastering/recording/custom beats)."
+      },
+      {
+        "type": "action",
+        "description": "Fill out booking form with valid inputs including date, time, and service details."
+      },
+      {
+        "type": "action",
+        "description": "Submit the booking form."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm that a booking confirmation message and email are received."
+      },
+      {
+        "type": "action",
+        "description": "Submit form with invalid or missing required fields."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify validation errors are displayed and form submission is prevented."
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Favorites and Wishlist Management",
+    "description": "Verify that users can add and remove beats from favorites and wishlist, and that recently viewed beats are tracked and displayed.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "As a logged-in user, navigate to a beat’s page and click 'Add to Favorites'."
+      },
+      {
+        "type": "assertion",
+        "description": "Check that beat appears in Favorites list."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to Wishlist page and add/remove beats."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify wishlist updates accordingly."
+      },
+      {
+        "type": "action",
+        "description": "View several beats sequentially."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm recently viewed beats display updates in correct order."
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Responsive Layout Across Devices",
+    "description": "Check that the entire application UI renders and functions correctly across breakpoints from 320px up to 2560px resolution.",
+    "category": "ui",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open the app on various device widths or resize browser window (mobile, tablet, desktop, ultrawide)."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify navigation menus adapt (e.g., hamburger menu on mobile)."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure that all UI components scale and reorganize appropriately without overlap or truncation."
+      },
+      {
+        "type": "assertion",
+        "description": "Test critical user flows (e.g., adding to cart, playing audio) function correctly at all breakpoints."
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Accessibility Compliance Validation",
+    "description": "Perform automated and manual testing to verify WCAG 2.1 AA standards compliance across the application.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Run automated accessibility scans (e.g., axe-core) on key pages: homepage, beat product, checkout, dashboard."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm no critical or high severity accessibility violations exist."
+      },
+      {
+        "type": "action",
+        "description": "Manually test keyboard navigation of all interactive elements."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure logical tab order and focus visible on all focusable elements."
+      },
+      {
+        "type": "action",
+        "description": "Check screen reader output for meaningful labels and roles on important UI."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify all informative images and icons have alt text or are marked decorative."
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Security - Cross-Site Scripting (XSS) Prevention",
+    "description": "Verify that no user input or dynamic content leads to JavaScript injection vulnerabilities.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Attempt to input JavaScript payloads into common input fields such as search, booking forms, profile updates."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm that scripts are sanitized or rendered as plain text with no execution."
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Security - Cross-Site Request Forgery (CSRF) Protection",
+    "description": "Validate that protected endpoints require valid tokens and reject unauthorized requests.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Make POST requests to protected APIs without CSRF tokens."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that requests are denied with an appropriate error."
+      },
+      {
+        "type": "action",
+        "description": "Repeat with valid CSRF tokens."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm requests succeed as expected."
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Performance Benchmark - Page Load and Interaction",
+    "description": "Test key pages meet performance targets: Lighthouse score >90, First Contentful Paint <2 seconds, and UI maintains 60fps.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Load homepage, beats shop, and product detail pages on standard network and device conditions."
+      },
+      {
+        "type": "assertion",
+        "description": "Using Lighthouse or equivalent tools, verify performance score is at least 90."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm First Contentful Paint time is under 2 seconds."
+      },
+      {
+        "type": "action",
+        "description": "Interact with UI elements and scroll continuously."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify animations and interactions run smoothly at 60fps."
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Error Handling on Payment Failure",
+    "description": "Ensure that payment failures are handled gracefully with clear user feedback and no unhandled errors.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Attempt checkout with Clerk Billing and simulate payment failure (e.g., card declined)."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify payment error page or modal is displayed with appropriate error message."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure the user can retry or return to cart without app crashes."
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Admin Panel - Content and User Management",
+    "description": "Verify admin users can access the admin panel to manage users and content, and that changes persist correctly.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as an admin user."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the admin dashboard."
+      },
+      {
+        "type": "action",
+        "description": "Edit user records and content files."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm changes are saved and reflected in the system."
+      },
+      {
+        "type": "action",
+        "description": "Test synchronization dashboard functionality."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify no unhandled errors occur during sync."
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Loyalty and Rewards Program Transaction History",
+    "description": "Validate that loyalty points and rewards transaction histories are accurately tracked and displayed to users.",
+    "category": "functional",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as a user who has loyalty program activity."
+      },
+      {
+        "type": "action",
+        "description": "Access the loyalty rewards page or section."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify all transactions are correctly listed with accurate point values and timestamps."
+      },
+      {
+        "type": "action",
+        "description": "Redeem points or rewards if applicable."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm reward redemption updates transaction history accordingly."
+      }
+    ]
+  }
+]

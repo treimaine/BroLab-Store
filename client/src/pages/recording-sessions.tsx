@@ -13,8 +13,10 @@ import { StandardHero } from "@/components/ui/StandardHero";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, Mail, MapPin, Mic, Phone, User } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useUser } from "@clerk/clerk-react";
+import { nanoid } from "nanoid";
 
 interface BookingFormData {
   name: string;
@@ -33,6 +35,7 @@ interface BookingFormData {
 export default function RecordingSessions() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user, isSignedIn } = useUser();
   const [formData, setFormData] = useState<BookingFormData>({
     name: "",
     email: "",
@@ -46,6 +49,17 @@ export default function RecordingSessions() {
     message: "",
     budget: "",
   });
+
+  // Auto-fill form with user data from Clerk
+  useEffect(() => {
+    if (isSignedIn && user) {
+      setFormData(prev => ({
+        ...prev,
+        name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        email: user.primaryEmailAddress?.emailAddress || '',
+      }));
+    }
+  }, [isSignedIn, user]);
 
   const handleInputChange = (field: keyof BookingFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -86,28 +100,55 @@ export default function RecordingSessions() {
       });
 
       if (response.ok) {
+        const reservation = await response.json();
+        
+        // Create pending payment for checkout
+        const pendingPayment = {
+          service: 'recording',
+          serviceName: 'Recording Session',
+          serviceDetails: `${formData.sessionType} - ${formData.duration} hour${parseInt(formData.duration) > 1 ? 's' : ''} (${formData.location})`,
+          reservationId: reservation.id,
+          price: reservationData.total_price / 100, // Convert cents to dollars
+          quantity: 1,
+        };
+        
+        // Add to existing services array
+        const existingServices = JSON.parse(sessionStorage.getItem('pendingServices') || '[]');
+        const updatedServices = [...existingServices, pendingPayment];
+        sessionStorage.setItem('pendingServices', JSON.stringify(updatedServices));
+        
         toast({
-          title: "Recording Session Booked!",
-          description: "We'll contact you within 24 hours to confirm your session.",
+          title: "Recording Session Reserved!",
+          description: "Complete your payment to confirm the booking.",
         });
-        setLocation("/");
+        
+        // Redirect to checkout
+        setLocation("/checkout");
       } else {
-        throw new Error("Failed to submit booking");
+        const error = await response.json();
+        console.error("Error creating reservation:", error);
+        toast({
+          title: "Booking Failed",
+          description: error.error || "Please try again later.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
+      console.error("Error submitting form:", error);
       toast({
         title: "Booking Failed",
-        description: "Please try again or contact us directly.",
+        description: "Please try again later.",
         variant: "destructive",
       });
     }
   };
 
   return (
-    <div className="min-h-screen bg-[var(--deep-black)] text-white">
+    <>
       <StandardHero
         title="Recording Sessions"
-        subtitle="Professional studio recording with industry-standard equipment. Book your session today and bring your music to life."
+        subtitle="Professional studio recordings with state-of-the-art equipment"
+        description="Book your recording session with our experienced sound engineers and capture your music in pristine quality."
       />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -118,7 +159,7 @@ export default function RecordingSessions() {
               <CardHeader>
                 <CardTitle className="text-white flex items-center">
                   <Mic className="w-5 h-5 mr-2" />
-                  Recording Session Services
+                  Recording Services
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -131,15 +172,13 @@ export default function RecordingSessions() {
                 <div className="p-4 bg-blue-600/10 border border-blue-600/20 rounded-lg">
                   <h3 className="font-semibold text-blue-400 mb-2">Group Recording</h3>
                   <p className="text-gray-300 text-sm mb-2">Band or group recording sessions</p>
-                  <p className="text-white font-bold">$200/hour</p>
+                  <p className="text-white font-bold">$250/hour</p>
                 </div>
 
                 <div className="p-4 bg-green-600/10 border border-green-600/20 rounded-lg">
                   <h3 className="font-semibold text-green-400 mb-2">Full Production</h3>
-                  <p className="text-gray-300 text-sm mb-2">
-                    Complete song production from start to finish
-                  </p>
-                  <p className="text-white font-bold">$500-2000/song</p>
+                  <p className="text-gray-300 text-sm mb-2">Complete recording, mixing, and mastering</p>
+                  <p className="text-white font-bold">$500/session</p>
                 </div>
 
                 <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
@@ -254,8 +293,7 @@ export default function RecordingSessions() {
                         <SelectItem value="2">2 hours</SelectItem>
                         <SelectItem value="4">4 hours</SelectItem>
                         <SelectItem value="6">6 hours</SelectItem>
-                        <SelectItem value="8">8 hours (Full Day)</SelectItem>
-                        <SelectItem value="custom">Custom Duration</SelectItem>
+                        <SelectItem value="8">8 hours (full day)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -273,9 +311,9 @@ export default function RecordingSessions() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="300-500">$300 - $500</SelectItem>
-                        <SelectItem value="500-1000">$500 - $1,000</SelectItem>
-                        <SelectItem value="1000-2000">$1,000 - $2,000</SelectItem>
-                        <SelectItem value="2000+">$2,000+</SelectItem>
+                        <SelectItem value="500-1000">$500 - $1000</SelectItem>
+                        <SelectItem value="1000-2000">$1000 - $2000</SelectItem>
+                        <SelectItem value="2000+">$2000+</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -286,14 +324,18 @@ export default function RecordingSessions() {
                     <Label htmlFor="preferredDate" className="text-gray-300">
                       Preferred Date *
                     </Label>
-                    <Input
-                      id="preferredDate"
-                      type="date"
-                      required
-                      value={formData.preferredDate}
-                      onChange={e => handleInputChange("preferredDate", e.target.value)}
-                      className="bg-gray-700 border-gray-600 text-white"
-                    />
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <Input
+                        id="preferredDate"
+                        type="date"
+                        required
+                        value={formData.preferredDate}
+                        onChange={e => handleInputChange("preferredDate", e.target.value)}
+                        className="bg-gray-700 border-gray-600 text-white pl-10"
+                        min={new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -338,13 +380,13 @@ export default function RecordingSessions() {
                     id="message"
                     value={formData.message}
                     onChange={e => handleInputChange("message", e.target.value)}
-                    className="bg-gray-700 border-gray-600 text-white"
-                    placeholder="Tell us about your project, genre, number of songs, special requirements..."
-                    rows={4}
+                    className="bg-gray-700 border-gray-600 text-white min-h-[120px]"
+                    placeholder="Tell us about your project, instruments needed, special requirements, etc."
                   />
                 </div>
 
-                <Button type="submit" className="w-full btn-primary text-lg py-4">
+                <Button type="submit" className="w-full btn-primary text-lg py-6">
+                  <Calendar className="w-5 h-5 mr-2" />
                   Book Recording Session
                 </Button>
               </form>
@@ -352,6 +394,6 @@ export default function RecordingSessions() {
           </Card>
         </div>
       </div>
-    </div>
+    </>
   );
 }

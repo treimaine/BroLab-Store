@@ -1,0 +1,28 @@
+Warning: BeatCard: &#x60;key&#x60; is not a prop. Trying to access it will result in &#x60;undefined&#x60; being returned. If you need to access the same value within the child component, you should pass it as a different prop. (https://reactjs.org/link/special-props)
+    at BeatCard (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/src/components/beat-card.tsx:28:3)
+    at div
+    at div
+    at div
+    at Shop (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/src/pages/shop.tsx:32:27)
+    at Route (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b81917da:206:16)
+    at Switch (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=b81917da:262:17)
+    at Router
+    at Suspense
+    at ErrorBoundary (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/src/components/ErrorBoundary.tsx:10:5)
+    at main
+    at div
+    at CartProvider (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/src/components/cart-provider.tsx:21:32)
+    at Provider (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-CGAJ5YBJ.js?v=b81917da:38:15)
+    at TooltipProvider (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=b81917da:64:5)
+    at _a (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/react-helmet-async.js?v=b81917da:624:5)
+    at QueryClientProvider (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=b81917da:2934:3)
+    at App (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/src/App.tsx?v=dL5-GO2eg7pLa0Q7DshvR:225:34)
+    at ConvexProvider (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-KA4WSHN7.js?v=b81917da:3066:25)
+    at ConvexProviderWithAuth (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-KA4WSHN7.js?v=b81917da:3161:3)
+    at ConvexProviderWithClerk (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/convex_react-clerk.js?v=b81917da:16:3)
+    at __experimental_CheckoutProvider (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@clerk_clerk-react.js?v=b81917da:2330:42)
+    at SWRConfig (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@clerk_clerk-react.js?v=b81917da:1197:11)
+    at OrganizationProvider (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@clerk_clerk-react.js?v=b81917da:2335:3)
+    at ClerkContextProvider (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@clerk_clerk-react.js?v=b81917da:6751:11)
+    at ClerkProviderBase (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@clerk_clerk-react.js?v=b81917da:6841:11)
+    at Hoc (https://35938aab-21b0-47bc-b75c-8c4eac5a0e0b-00-6zjd71s5plo4.worf.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@clerk_clerk-react.js?v=b81917da:4128:5)

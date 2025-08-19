@@ -1,6 +1,6 @@
 import { CartProvider } from "@/components/cart-provider";
 import { ClerkSyncProvider } from "@/components/ClerkSyncProvider";
-import { EnhancedGlobalAudioPlayer } from "@/components/EnhancedGlobalAudioPlayer";
+import { SimpleAudioPlayer } from "@/components/SimpleAudioPlayer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
@@ -11,7 +11,7 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { AuthLoading } from "convex/react";
+// AuthLoading removed to fix infinite loading issues
 import { lazy, Suspense } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Route, Switch } from "wouter";
@@ -31,7 +31,7 @@ import Dashboard from "@/pages/dashboard";
 import FAQ from "@/pages/faq";
 import Licensing from "@/pages/licensing";
 import Login from "@/pages/login";
-import MembershipPage from "@/pages/MembershipPage";
+import MembershipPage from "@/pages/MembershipPageFixed";
 import Privacy from "@/pages/privacy";
 import Refund from "@/pages/refund";
 import Terms from "@/pages/terms";
@@ -74,6 +74,7 @@ function Router() {
 
       <Route path="/mixing-mastering" component={MixingMastering} />
       <Route path="/checkout" component={lazy(() => import("./pages/checkout"))} />
+      <Route path="/checkout-success" component={lazy(() => import("./pages/checkout-success"))} />
       <Route path="/payment/success" component={lazy(() => import("./pages/payment-success"))} />
       <Route path="/payment/cancel" component={lazy(() => import("./pages/payment-cancel"))} />
       <Route path="/premium-downloads" component={PremiumDownloads} />
@@ -101,48 +102,41 @@ function App() {
       <HelmetProvider>
         <TooltipProvider>
           <CartProvider>
-            <ClerkSyncProvider>
-              <ScrollToTop />
-              <div className="min-h-screen bg-[var(--deep-black)] text-white">
-                <a
-                  href="#main-content"
-                  className="skip-to-content sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[var(--color-accent)] text-white px-4 py-2 rounded-lg z-50"
-                  aria-label="Skip to main content"
-                >
-                  Skip to content
-                </a>
+            <ScrollToTop />
+            <div className="min-h-screen bg-[var(--deep-black)] text-white">
+              <a
+                href="#main-content"
+                className="skip-to-content sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[var(--color-accent)] text-white px-4 py-2 rounded-lg z-50"
+                aria-label="Skip to main content"
+              >
+                Skip to content
+              </a>
 
-                {/* Navbar always visible */}
-                <Navbar />
+              {/* Navbar always visible */}
+              <Navbar />
 
-                {/* Loading state */}
-                <AuthLoading>
-                  <LoadingFallback message="Loading BroLab..." />
-                </AuthLoading>
+              <main id="main-content" role="main">
+                <ErrorBoundary>
+                  <Suspense fallback={<LoadingFallback message="Loading page..." />}>
+                    <Router />
+                  </Suspense>
+                </ErrorBoundary>
+              </main>
 
-                <main id="main-content" role="main">
-                  <ErrorBoundary>
-                    <Suspense fallback={<LoadingFallback message="Loading page..." />}>
-                      <Router />
-                    </Suspense>
-                  </ErrorBoundary>
-                </main>
+              <Footer />
 
-                <Footer />
+              {/* Mobile bottom navigation */}
+              <MobileBottomNav />
 
-                {/* Mobile bottom navigation */}
-                <MobileBottomNav />
+              {/* Global audio player */}
+              <SimpleAudioPlayer />
 
-                {/* Global audio player */}
-                <EnhancedGlobalAudioPlayer />
+              {/* Newsletter modal */}
+              <NewsletterModal isOpen={isOpen} onClose={closeModal} />
 
-                {/* Newsletter modal */}
-                <NewsletterModal isOpen={isOpen} onClose={closeModal} />
-
-                {/* Toaster for notifications */}
-                <Toaster />
-              </div>
-            </ClerkSyncProvider>
+              {/* Toaster for notifications */}
+              <Toaster />
+            </div>
           </CartProvider>
         </TooltipProvider>
       </HelmetProvider>

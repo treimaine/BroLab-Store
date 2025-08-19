@@ -1,0 +1,394 @@
+{
+  "tech_stack": [
+    "TypeScript",
+    "Node.js",
+    "Express.js",
+    "Convex",
+    "Clerk",
+    "WooCommerce",
+    "PayPal",
+    "React",
+    "Vite",
+    "Tailwind CSS"
+  ],
+  "features": [
+    {
+      "name": "User Authentication",
+      "description": "Clerk-based authentication system with user management",
+      "files": ["server/auth.ts", "server/routes/activity.ts", "server/routes/avatar.ts"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab Authentication API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/test-auth": {
+            "get": {
+              "summary": "Test authentication endpoint",
+              "responses": {
+                "200": {
+                  "description": "Authentication status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Product Management",
+      "description": "WooCommerce integration for beat products and inventory",
+      "files": ["server/routes/woo.ts", "server/routes/wp.ts", "server/wordpress.ts"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab Product API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/products": {
+            "get": {
+              "summary": "Get all products",
+              "responses": {
+                "200": {
+                  "description": "List of products"
+                }
+              }
+            }
+          },
+          "/api/woo/products": {
+            "get": {
+              "summary": "Get WooCommerce products",
+              "responses": {
+                "200": {
+                  "description": "WooCommerce products"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Order Management",
+      "description": "Complete order processing and management system",
+      "files": [
+        "server/routes/orders.ts",
+        "server/routes/serviceOrders.ts",
+        "server/routes/payments.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab Order API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/orders": {
+            "get": {
+              "summary": "Get user orders",
+              "responses": {
+                "200": {
+                  "description": "User orders"
+                }
+              }
+            },
+            "post": {
+              "summary": "Create new order",
+              "responses": {
+                "201": {
+                  "description": "Order created"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Payment Processing",
+      "description": "PayPal and Clerk billing integration for payments",
+      "files": ["server/routes/paypal.ts", "server/routes/payments.ts"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab Payment API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/payment/paypal": {
+            "post": {
+              "summary": "Process PayPal payment",
+              "responses": {
+                "200": {
+                  "description": "Payment processed"
+                }
+              }
+            }
+          },
+          "/api/paypal-test/create-order": {
+            "post": {
+              "summary": "Create PayPal test order",
+              "responses": {
+                "200": {
+                  "description": "Test order created"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Download Management",
+      "description": "Beat download tracking and license management",
+      "files": ["server/routes/downloads.ts"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab Download API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/downloads": {
+            "get": {
+              "summary": "Get user downloads",
+              "responses": {
+                "200": {
+                  "description": "User downloads"
+                }
+              }
+            },
+            "post": {
+              "summary": "Create download record",
+              "responses": {
+                "201": {
+                  "description": "Download recorded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Reservation System",
+      "description": "Studio booking and service reservation management",
+      "files": ["server/routes/reservations.ts"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab Reservation API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/reservations": {
+            "get": {
+              "summary": "Get user reservations",
+              "responses": {
+                "200": {
+                  "description": "User reservations"
+                }
+              }
+            },
+            "post": {
+              "summary": "Create reservation",
+              "responses": {
+                "201": {
+                  "description": "Reservation created"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Wishlist Management",
+      "description": "User favorites and wishlist functionality",
+      "files": ["server/routes/wishlist.ts"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab Wishlist API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/wishlist": {
+            "get": {
+              "summary": "Get user wishlist",
+              "responses": {
+                "200": {
+                  "description": "User wishlist"
+                }
+              }
+            },
+            "post": {
+              "summary": "Add to wishlist",
+              "responses": {
+                "201": {
+                  "description": "Item added to wishlist"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "File Storage",
+      "description": "File upload and storage management",
+      "files": ["server/routes/storage.ts", "server/routes/uploads.ts", "server/storage.ts"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab Storage API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/storage": {
+            "post": {
+              "summary": "Upload file",
+              "responses": {
+                "200": {
+                  "description": "File uploaded"
+                }
+              }
+            }
+          },
+          "/api/uploads": {
+            "post": {
+              "summary": "Upload file",
+              "responses": {
+                "200": {
+                  "description": "File uploaded"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Email Services",
+      "description": "Email notification and communication system",
+      "files": ["server/routes/email.ts"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab Email API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/email": {
+            "post": {
+              "summary": "Send email",
+              "responses": {
+                "200": {
+                  "description": "Email sent"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Monitoring & Security",
+      "description": "System monitoring, security, and health checks",
+      "files": ["server/routes/monitoring.ts", "server/routes/security.ts"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab Monitoring API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/monitoring": {
+            "get": {
+              "summary": "System health check",
+              "responses": {
+                "200": {
+                  "description": "System status"
+                }
+              }
+            }
+          },
+          "/api/security": {
+            "get": {
+              "summary": "Security status",
+              "responses": {
+                "200": {
+                  "description": "Security information"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Data Synchronization",
+      "description": "Convex database sync and data management",
+      "files": ["server/routes/sync.ts", "convex/schema.ts"],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab Sync API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/sync": {
+            "post": {
+              "summary": "Sync data",
+              "responses": {
+                "200": {
+                  "description": "Data synced"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "SEO & Meta",
+      "description": "OpenGraph, sitemap, and SEO optimization",
+      "files": [
+        "server/routes/openGraph.ts",
+        "server/routes/sitemap.ts",
+        "server/routes/schema.ts"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BroLab SEO API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/opengraph": {
+            "get": {
+              "summary": "Generate OpenGraph data",
+              "responses": {
+                "200": {
+                  "description": "OpenGraph data"
+                }
+              }
+            }
+          },
+          "/sitemap.xml": {
+            "get": {
+              "summary": "Get sitemap",
+              "responses": {
+                "200": {
+                  "description": "XML sitemap"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

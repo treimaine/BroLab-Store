@@ -1,5 +1,5 @@
 import express from "express";
-import { registerAuthRoutes } from "./auth";
+import { registerAuthRoutes, setupAuth } from "./auth";
 import activityRouter from "./routes/activity";
 import avatarRouter from "./routes/avatar";
 // Clerk router removed - using native components
@@ -12,6 +12,7 @@ import paymentsRouter from "./routes/payments";
 import paypalRouter from "./routes/paypal";
 import reservationsRouter from "./routes/reservations";
 import schemaRouter from "./routes/schema";
+import stripeRouter from "./routes/stripe";
 import securityRouter from "./routes/security";
 import serviceOrdersRouter from "./routes/serviceOrders";
 import sitemapRouter from "./routes/sitemap";
@@ -37,7 +38,7 @@ console.log("  - CLERK_SECRET_KEY:", process.env.CLERK_SECRET_KEY ? "✅ Configu
 console.log("  - NODE_ENV:", process.env.NODE_ENV);
 
 // Configuration de l'authentification (inclut le middleware Clerk)
-// setupAuth(app); // TEMPORAIRE: Middleware Clerk désactivé pour test PayPal
+setupAuth(app); // Middleware Clerk réactivé
 registerAuthRoutes(app);
 
 // API Routes
@@ -50,6 +51,7 @@ app.use("/api/monitoring", monitoringRouter);
 app.use("/api/opengraph", openGraphRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/payment/paypal", paypalRouter);
+app.use("/api/payment/stripe", stripeRouter);
 app.use("/api/payments", paymentsRouter);
 app.use("/api/reservations", reservationsRouter);
 app.use("/api/schema", schemaRouter);

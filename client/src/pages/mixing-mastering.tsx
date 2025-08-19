@@ -19,6 +19,7 @@ import { useUser } from "@clerk/clerk-react";
 import { useQuery } from "convex/react";
 import { CheckCircle, Clock, Mail, Phone, Upload, User } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
 const services = [
   {
@@ -71,6 +72,7 @@ const services = [
 const timeSlots = ["9:00 AM", "10:00 AM", "11:00 AM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM"];
 
 export default function MixingMastering() {
+  const [, setLocation] = useLocation();
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const convexUser = useQuery(
     api.users.getUserByClerkId,
@@ -128,37 +130,63 @@ export default function MixingMastering() {
     setIsSubmitting(true);
 
     try {
-      const response = await apiRequest("POST", "/api/reservations", {
+      // Create reservation first
+      const reservationResponse = await apiRequest("POST", "/api/reservations", {
         service: selectedService,
         ...formData,
         price: selectedServiceData?.price,
-        clerkUserId: clerkUser?.id, // Ajouter l'ID Clerk pour la traçabilité
-        convexUserId: convexUser?._id, // Ajouter l'ID Convex pour la liaison
+        clerkUserId: clerkUser?.id,
+        convexUserId: convexUser?._id,
       });
 
-      if (response.ok) {
-        toast({
-          title: "Reservation Submitted!",
-          description: "We'll contact you within 24 hours to confirm your booking.",
+      if (reservationResponse.ok) {
+        const reservationData = await reservationResponse.json();
+        
+        // Create payment intent for the service
+        const paymentResponse = await apiRequest("POST", "/api/payment/stripe/create-payment-intent", {
+          amount: selectedServiceData?.price || 0,
+          currency: "usd",
+          metadata: {
+            reservationId: reservationData.id,
+            service: selectedService,
+            customerName: formData.name,
+            customerEmail: formData.email,
+          },
         });
 
-        // Reset form
-        setFormData({
-          name: "",
-          email: "",
-          phone: "",
-          preferredDate: "",
-          timeSlot: "",
-          projectDetails: "",
-          trackCount: "",
-          genre: "",
-          reference: "",
-          specialRequests: "",
-        });
+        if (paymentResponse.ok) {
+          const paymentData = await paymentResponse.json();
+          
+          // Store payment info in multi-services format
+          const pendingPayment = {
+            clientSecret: paymentData.clientSecret,
+            service: selectedService,
+            serviceName: selectedServiceData?.name || 'Mixing & Mastering',
+            serviceDetails: formData.projectDetails,
+            price: selectedServiceData?.price || 0,
+            quantity: 1,
+            reservationId: reservationData.id,
+          };
+
+          // Add to existing services array
+          const existingServices = JSON.parse(sessionStorage.getItem('pendingServices') || '[]');
+          const updatedServices = [...existingServices, pendingPayment];
+          sessionStorage.setItem('pendingServices', JSON.stringify(updatedServices));
+          
+          toast({
+            title: "Service Added!",
+            description: "Your mixing & mastering service has been added to checkout.",
+          });
+          
+          setLocation("/checkout");
+        } else {
+          throw new Error("Failed to create payment intent");
+        }
       } else {
-        throw new Error("Failed to submit reservation");
+        throw new Error("Failed to create reservation");
       }
     } catch (error) {
+      console.error("Submission error:", error);
       toast({
         title: "Submission Failed",
         description: "Please try again or contact support.",

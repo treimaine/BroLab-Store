@@ -1,12 +1,14 @@
+import React from "react";
 import { HoverPlayButton } from "@/components/HoverPlayButton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useRecentlyViewedBeats } from "@/hooks/useRecentlyViewedBeats";
 import { useAudioStore } from "@/store/useAudioStore";
-import { Download, Heart, Music, ShoppingCart } from "lucide-react";
+import { Download, Heart, Music, ShoppingCart, Clock, Hash } from "lucide-react";
 import { useState } from "react";
 import { useCartContext } from "./cart-provider";
+import { Badge } from "@/components/ui/badge";
 
 interface BeatCardProps {
   id: string | number;
@@ -23,6 +25,7 @@ interface BeatCardProps {
   className?: string;
   isFree?: boolean;
   onViewDetails?: () => void;
+  categories?: { name: string }[]; // Added categories prop as it's used in the change
 }
 
 export function BeatCard({
@@ -40,12 +43,15 @@ export function BeatCard({
   className = "",
   isFree = false,
   onViewDetails,
+  categories, // Destructure categories prop
 }: BeatCardProps) {
   const { addItem } = useCartContext();
   const { favorites, addToFavorites, removeFromFavorites } = useFavorites();
 
-  const isFavorite = (beatId: number): boolean => {
-    return favorites.some((fav: any) => fav.beatId === beatId);
+  const isFavorite = (beatId: number | string): boolean => {
+    // Ensure beatId is consistently a string for comparison if needed, or handle types appropriately
+    const idAsString = typeof beatId === 'number' ? beatId.toString() : beatId;
+    return favorites.some((fav: any) => fav.beatId === idAsString);
   };
   const { addBeat } = useRecentlyViewedBeats();
   const { toast } = useToast();
@@ -144,6 +150,8 @@ export function BeatCard({
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
+
+
   return (
     <div
       className={`card-dark overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer ${
@@ -220,6 +228,8 @@ export function BeatCard({
             )}
           </div>
 
+
+
           {/* Tags */}
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-3 sm:mb-4">
@@ -241,7 +251,7 @@ export function BeatCard({
             {isFree ? (
               <span className="text-[var(--accent-cyan)]">FREE</span>
             ) : (
-              `$${Number(price) > 0 ? Number(price).toFixed(2) : "0.00"}`
+              `$${typeof price === "string" ? parseFloat(price) : price}`
             )}
           </div>
 

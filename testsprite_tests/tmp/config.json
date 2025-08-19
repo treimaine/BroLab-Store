@@ -1,0 +1,18 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:5000",
+  "loginUser": "slemba2@yahoo.fr",
+  "loginPassword": "Trust!NoOne93",
+  "executionArgs": {
+    "projectName": "BroLab",
+    "projectPath": "C:/Users/TREIGUA/Desktop/WEBSITE/Replit BroLab/BroLab",
+    "testIds": [],
+    "additionalInstruction": "Focus on testing the main user flows: authentication, beat browsing, audio playback, cart functionality, and dashboard features. Ensure responsive design works on mobile devices.",
+    "envs": {
+      "API_KEY": "sk-user-6mETGwkJI10L8ozJ-1Es6vFpAPUXe5d7StLxwZJgHVa4GsCRFNynmyagV6-2mHPa7SS9RN0E-sxK3bBQHZJ6RZCT6MfSPjEoJjDJ0JEJCvh0tTKdAG7QBmnOPy48fxRu7Lw"
+    }
+  },
+  "proxy": "http://4e86dccc-2b43-4dbe-bdc7-702d06125ad7:dsc0hAz2nArIfTNzN6kbAnvaDYBy6LD6@tun.testsprite.com:8080"
+}

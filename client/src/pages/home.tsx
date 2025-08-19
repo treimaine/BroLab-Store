@@ -185,7 +185,16 @@ export default function Home() {
                     <div className="p-6">
                       <h3 className="text-xl font-bold text-white mb-2">{beat.name}</h3>
                       <p className="text-gray-400 mb-4">
-                        {beat.categories?.[0]?.name || "Unknown"}
+                        {
+                          beat.categories?.[0]?.name ||
+                          beat.categories?.find((cat: any) => cat.name)?.name ||
+                          beat.meta_data?.find((meta: any) => meta.key === "genre")?.value ||
+                          beat.meta_data?.find((meta: any) => meta.key === "category")?.value ||
+                          beat.meta_data?.find((meta: any) => meta.key === "style")?.value ||
+                          beat.attributes?.find((attr: any) => attr.name === "Genre")?.options?.[0] ||
+                          beat.attributes?.find((attr: any) => attr.name === "Style")?.options?.[0] ||
+                          ""
+                        }
                       </p>
                       <div className="flex items-center justify-between">
                         <span className="text-2xl font-bold text-[var(--accent-purple)]">
@@ -305,7 +314,16 @@ export default function Home() {
                         <div className="flex-1 min-w-0">
                           <h4 className="font-bold text-white truncate">{beat.name}</h4>
                           <p className="text-sm text-gray-400">
-                            {beat.categories?.[0]?.name || "Unknown"}
+                            {
+                              beat.categories?.[0]?.name ||
+                              beat.categories?.find((cat: any) => cat.name)?.name ||
+                              beat.meta_data?.find((meta: any) => meta.key === "genre")?.value ||
+                              beat.meta_data?.find((meta: any) => meta.key === "category")?.value ||
+                              beat.meta_data?.find((meta: any) => meta.key === "style")?.value ||
+                              beat.attributes?.find((attr: any) => attr.name === "Genre")?.options?.[0] ||
+                              beat.attributes?.find((attr: any) => attr.name === "Style")?.options?.[0] ||
+                              ""
+                            }
                           </p>
                           <div className="flex items-center justify-between mt-2">
                             <span className="text-[var(--accent-purple)] font-bold">
