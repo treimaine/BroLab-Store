@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useIntersectionObserver } from "@/utils/virtualScrolling";
 import type { BeatProduct as Beat } from "@shared/schema";
 import React, { useCallback, useRef, useState } from "react";
+import { Music, Clock, Hash } from "lucide-react";
 
 interface OptimizedBeatGridProps {
   beats: Beat[];
@@ -40,7 +41,7 @@ function LazyBeatCard({
           <BeatCard
             id={beat.id}
             title={beat.title || beat.name || "Untitled"}
-            genre={beat.genre || "Unknown"}
+            genre={beat.genre || beat.categories?.[0]?.name || ""}
             bpm={beat.bpm || 0}
             price={beat.price}
             imageUrl={beat.image_url || beat.image || beat.images?.[0]?.src || ""}

@@ -323,7 +323,7 @@ export default function Product() {
                   <RadioGroup
                     value={selectedLicense}
                     onValueChange={(value: string) =>
-                      setSelectedLicense(value as "basic" | "premium" | "unlimited")
+                      setSelectedLicense(value as LicenseTypeEnum)
                     }
                   >
                     <div className="space-y-3">
@@ -416,62 +416,7 @@ export default function Product() {
           {/* Advanced Beat Features - Only for paid products */}
           {!isFree && (
             <div className="mt-12 space-y-8">
-              {/* Beat Stems Delivery - Only for unlimited license */}
-              {selectedLicense === "unlimited" && (
-                <BeatStemsDelivery
-                  beatId={product?.id.toString() || ""}
-                  beatTitle={product?.name || ""}
-                  licenseType="unlimited"
-                  stems={[
-                    {
-                      id: "1",
-                      name: "Master Mix",
-                      type: "master",
-                      size: "8.5MB",
-                      downloadUrl: "/downloads/master.wav",
-                      isReady: true,
-                    },
-                    {
-                      id: "2",
-                      name: "Drums",
-                      type: "drums",
-                      size: "3.2MB",
-                      downloadUrl: "/downloads/drums.wav",
-                      isReady: true,
-                    },
-                    {
-                      id: "3",
-                      name: "Bass",
-                      type: "bass",
-                      size: "2.8MB",
-                      downloadUrl: "/downloads/bass.wav",
-                      isReady: true,
-                    },
-                    {
-                      id: "4",
-                      name: "Melody",
-                      type: "melody",
-                      size: "2.1MB",
-                      downloadUrl: "/downloads/melody.wav",
-                      isReady: true,
-                    },
-                  ]}
-                  onDownload={stemId => {
-                    console.log("Downloading stem:", stemId);
-                    toast({
-                      title: "Download Started",
-                      description: "Your stem file download has begun.",
-                    });
-                  }}
-                  onDownloadAll={() => {
-                    console.log("Downloading all stems");
-                    toast({
-                      title: "Download Started",
-                      description: "All stem files are being downloaded.",
-                    });
-                  }}
-                />
-              )}
+              {/* Beat Stems Delivery section removed per user request */}
 
               {/* Similar Beats */}
               <BeatSimilarityRecommendations

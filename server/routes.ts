@@ -52,6 +52,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.warn("PayPal router not available:", error);
   }
 
+  // Register Stripe routes
+  try {
+    const stripeRouter = await import("./routes/stripe");
+    console.log("📦 Stripe router imported:", typeof stripeRouter.default);
+    app.use("/api/payment/stripe", stripeRouter.default);
+    console.log("✅ Stripe routes registered successfully at /api/payment/stripe");
+  } catch (error) {
+    console.error("❌ Stripe router not available:", error);
+  }
+
   // Register downloads routes - PATCH: Fix downloads endpoint routing
   try {
     const downloadsRouter = await import("./routes/downloads");

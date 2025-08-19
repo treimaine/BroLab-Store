@@ -1,0 +1,45 @@
+Erreur lors de l'authentification: Error: 🔒 Clerk: The "clerkMiddleware" should be registered before using "getAuth".
+Example:
+
+import express from 'express';
+import { clerkMiddleware } from '@clerk/express';
+
+const app = express();
+app.use(clerkMiddleware());
+
+  For more info, check out the docs: https://clerk.com/docs,
+  or come say hi in our discord server: https://clerk.com/discord
+  
+    at getAuth (/home/runner/workspace/node_modules/.pnpm/@clerk+express@1.7.17_express@4.21.2_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/@clerk/express/src/getAuth.ts:20:11)
+    at isAuthenticated (/home/runner/workspace/server/auth.ts:43:50)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/layer.js:95:5)
+    at next (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/layer.js:95:5)
+    at /home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:280:10)
+    at jsonParser (/home/runner/workspace/node_modules/.pnpm/body-parser@1.20.3/node_modules/body-parser/lib/types/json.js:113:7)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:328:13)
+    at /home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:280:10)
+    at expressInit (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/middleware/init.js:40:5)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:328:13)
+    at /home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:280:10)
+    at query (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/middleware/query.js:45:5)
+    at Layer.handle [as handle_request] (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:328:13)
+    at /home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:346:12)
+    at next (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:175:3)
+    at Function.handle (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/application.js:181:10)
+    at Server.app (/home/runner/workspace/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/express.js:39:9)
+    at Server.emit (node:events:524:28)
+    at parserOnIncoming (node:_http_server:1141:12)
+    at HTTPParser.parserOnHeadersComplete (node:_http_common:118:17)

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
-import { Heart, Music } from "lucide-react";
+import { Heart, Music, Clock, Hash, User } from "lucide-react";
 import { useState } from "react";
 
 import type { BeatProduct as Beat } from "@shared/schema";
@@ -90,9 +90,9 @@ export function ResponsiveBeatCard({
 
         {/* Top badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-2">
-          {beat.genre && (
+          {beat.categories?.[0]?.name && (
             <Badge variant="secondary" className="bg-black/70 text-white border-0 text-xs">
-              {beat.genre}
+              {beat.categories[0].name}
             </Badge>
           )}
         </div>
@@ -126,9 +126,14 @@ export function ResponsiveBeatCard({
               <h3 className="font-semibold text-white text-lg leading-tight line-clamp-2">
                 {beat.title}
               </h3>
-              <div className="flex items-center gap-4 text-sm text-gray-400">
-                {/* Removed BPM display to match WooCommerce-only content */}
-              </div>
+              {beat.categories?.[0]?.name && (
+                <div className="flex items-center gap-4 text-sm text-gray-400">
+                  <div className="flex items-center gap-1">
+                    <Music className="w-4 h-4" />
+                    <span>{beat.categories[0].name}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Price and Cart */}
@@ -168,14 +173,14 @@ export function ResponsiveBeatCard({
                 <h3 className="font-semibold text-white text-white text-lg leading-tight line-clamp-2">
                   {beat.title}
                 </h3>
-                <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
-                  {beat.bpm && (
+                {beat.categories?.[0]?.name && (
+                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
                     <div className="flex items-center gap-1">
                       <Music className="w-4 h-4" />
-                      <span>{beat.bpm} BPM</span>
+                      <span>{beat.categories[0].name}</span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               <div className="text-right">

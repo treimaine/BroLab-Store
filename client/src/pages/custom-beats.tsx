@@ -4,6 +4,8 @@ import { StandardHero } from "@/components/ui/StandardHero";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Clock, Music, Star } from "lucide-react";
 import { useState } from "react";
+import { useLocation } from "wouter";
+import { nanoid } from "nanoid";
 
 interface BeatRequest {
   genre: string;
@@ -26,6 +28,7 @@ export default function CustomBeats() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedRequests, setSubmittedRequests] = useState<BeatRequest[]>([]);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const handleSubmitRequest = async (request: BeatRequest) => {
     setIsSubmitting(true);
@@ -67,10 +70,26 @@ Additional Notes: ${request.additionalNotes || "None"}`,
       });
 
       if (response.ok) {
+        const reservation = await response.json();
         setSubmittedRequests(prev => [...prev, request]);
 
+        // Create pending payment for checkout
+        const pendingPayment = {
+          service: 'custom_beat',
+          serviceName: 'Custom Beat Production',
+          serviceDetails: `${request.genre} beat - ${request.priority} priority (${request.duration}s)`,
+          reservationId: reservation.id,
+          price: reservationData.total_price / 100, // Convert cents to dollars
+          quantity: 1,
+        };
+        
+        // Add to existing services array
+        const existingServices = JSON.parse(sessionStorage.getItem('pendingServices') || '[]');
+        const updatedServices = [...existingServices, pendingPayment];
+        sessionStorage.setItem('pendingServices', JSON.stringify(updatedServices));
+
         toast({
-          title: "Custom Beat Request Submitted!",
+          title: "Custom Beat Request Reserved!",
           description: `Your custom beat request has been submitted. We'll get back to you within ${
             request.priority === "express"
               ? "24 hours"
@@ -79,6 +98,9 @@ Additional Notes: ${request.additionalNotes || "None"}`,
               : "5-7 days"
           }.`,
         });
+
+        // Redirect to checkout
+        setLocation("/checkout");
       } else {
         throw new Error("Failed to submit request");
       }

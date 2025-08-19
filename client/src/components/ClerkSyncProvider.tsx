@@ -1,6 +1,6 @@
+import React, { ReactNode, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useClerkSync } from "@/hooks/useClerkSync";
-import { ReactNode, useEffect } from "react";
 
 interface ClerkSyncProviderProps {
   children: ReactNode;

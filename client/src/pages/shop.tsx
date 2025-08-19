@@ -285,19 +285,51 @@ export default function Shop() {
                     key={product.id}
                     id={product.id}
                     title={product.name || "Untitled"}
-                    genre={product.genre || "Unknown"}
-                    bpm={product.bpm}
+                    genre={
+                      product.categories?.[0]?.name ||
+                      product.categories?.find((cat: any) => cat.name)?.name ||
+                      product.meta_data?.find((meta: any) => meta.key === "genre")?.value ||
+                      product.meta_data?.find((meta: any) => meta.key === "category")?.value ||
+                      product.meta_data?.find((meta: any) => meta.key === "style")?.value ||
+                      product.attributes?.find((attr: any) => attr.name === "Genre")?.options?.[0] ||
+                      product.attributes?.find((attr: any) => attr.name === "Style")?.options?.[0] ||
+                      ""
+                    }
+                    bpm={
+                      product.bpm ||
+                      product.meta_data?.find((meta: any) => meta.key === "bpm")?.value ||
+                      product.meta_data?.find((meta: any) => meta.key === "BPM")?.value ||
+                      product.attributes?.find((attr: any) => attr.name === "BPM")?.options?.[0] ||
+                      ""
+                    }
                     price={product.price}
                     imageUrl={product.images?.[0]?.src || ""}
                     audioUrl={product.audio_url || ""}
-                    tags={product.tags?.map((tag: any) => tag.name) || []}
+                    tags={
+                      (() => {
+                        const tags = [];
+                        if (product.tags && Array.isArray(product.tags)) {
+                          tags.push(...product.tags.map((tag: any) => tag.name));
+                        }
+                        const metaTags = product.meta_data?.find((meta: any) => meta.key === "tags")?.value;
+                        if (metaTags) {
+                          if (typeof metaTags === 'string') {
+                            tags.push(...metaTags.split(',').map((tag: string) => tag.trim()));
+                          } else if (Array.isArray(metaTags)) {
+                            tags.push(...metaTags);
+                          }
+                        }
+                        return tags.filter(Boolean);
+                      })()
+                    }
                     featured={product.featured}
                     downloads={product.downloads || 0}
                     duration={product.duration}
                     isFree={
-                      typeof product.price === "string"
-                        ? product.price === "0"
-                        : product.price === 0
+                      product.is_free ||
+                      product.tags?.some((tag: any) => tag.name?.toLowerCase() === 'free') ||
+                      (typeof product.price === "string" && (product.price === "0" || parseFloat(product.price) === 0)) ||
+                      (typeof product.price === "number" && product.price === 0)
                     }
                     onViewDetails={() => handleProductView(product.id)}
                   />

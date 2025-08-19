@@ -1,3 +1,4 @@
+import React from "react";
 import { LazyDashboard } from "@/components/LazyDashboard";
 import { RedirectToSignIn, SignedIn, SignedOut } from "@clerk/clerk-react";
 

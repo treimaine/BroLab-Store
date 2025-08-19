@@ -13,8 +13,10 @@ import { StandardHero } from "@/components/ui/StandardHero";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, Mail, MessageCircle, Phone, User, Video } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useUser } from "@clerk/clerk-react";
+import { nanoid } from "nanoid";
 
 interface ConsultationFormData {
   name: string;
@@ -35,6 +37,7 @@ interface ConsultationFormData {
 export default function ProductionConsultation() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user, isSignedIn } = useUser();
   const [formData, setFormData] = useState<ConsultationFormData>({
     name: "",
     email: "",
@@ -50,6 +53,17 @@ export default function ProductionConsultation() {
     challenges: "",
     message: "",
   });
+
+  // Auto-fill form with user data from Clerk
+  useEffect(() => {
+    if (isSignedIn && user) {
+      setFormData(prev => ({
+        ...prev,
+        name: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        email: user.primaryEmailAddress?.emailAddress || "",
+      }));
+    }
+  }, [isSignedIn, user]);
 
   const handleInputChange = (field: keyof ConsultationFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -95,11 +109,27 @@ Additional Message: ${formData.message}`,
       });
 
       if (response.ok) {
+        const reservation = await response.json();
+        
+        // Create pending payment for checkout
+        const pendingPayment = {
+          service: 'consultation',
+          serviceName: 'Production Consultation',
+          serviceDetails: `${formData.consultationType === 'video' ? 'Video' : 'Audio'} consultation - ${formData.duration} minutes`,
+          reservationId: reservation.id,
+          price: reservationData.total_price / 100, // Convert cents to dollars
+          quantity: 1,
+        };
+        
+        // Add to existing services array
+        const existingServices = JSON.parse(sessionStorage.getItem('pendingServices') || '[]');
+        const updatedServices = [...existingServices, pendingPayment];
+        sessionStorage.setItem('pendingServices', JSON.stringify(updatedServices));
         toast({
           title: "Consultation Booked!",
           description: "We'll contact you within 24 hours to confirm your consultation session.",
         });
-        setLocation("/");
+        setLocation("/checkout");
       } else {
         throw new Error("Failed to book consultation");
       }
