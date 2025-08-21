@@ -156,6 +156,8 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
                       productId={product.id.toString()}
                       productName={product.name}
                       imageUrl={product.images?.[0]?.src || product.imageUrl || product.image}
+                      price={product.price}
+                      isFree={product.is_free || product.price === 0 || product.price === "0"}
                       size="sm"
                       className="bg-black/70 hover:bg-[var(--accent-purple)]/80"
                     />

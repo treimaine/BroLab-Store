@@ -1,6 +1,5 @@
 import { CartProvider } from "@/components/cart-provider";
-import { ClerkSyncProvider } from "@/components/ClerkSyncProvider";
-import { SimpleAudioPlayer } from "@/components/SimpleAudioPlayer";
+import { EnhancedGlobalAudioPlayer } from "@/components/EnhancedGlobalAudioPlayer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
@@ -129,7 +128,7 @@ function App() {
               <MobileBottomNav />
 
               {/* Global audio player */}
-              <SimpleAudioPlayer />
+              <EnhancedGlobalAudioPlayer />
 
               {/* Newsletter modal */}
               <NewsletterModal isOpen={isOpen} onClose={closeModal} />

@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
 export interface AudioTrack {
   id: string;
@@ -9,6 +9,8 @@ export interface AudioTrack {
   artwork?: string;
   imageUrl?: string;
   duration?: number;
+  price?: number | string;
+  isFree?: boolean;
 }
 
 interface AudioState {
@@ -31,14 +33,14 @@ interface AudioActions {
   setDuration: (duration: number) => void;
   setIsLoading: (loading: boolean) => void;
   setProgress: (progress: number) => void;
-  
+
   // Playback controls
   play: () => void;
   pause: () => void;
   toggle: () => void;
   stop: () => void;
   seek: (time: number) => void;
-  
+
   // Queue management
   setQueue: (tracks: AudioTrack[]) => void;
   addToQueue: (track: AudioTrack) => void;
@@ -49,7 +51,7 @@ interface AudioActions {
   playTrackFromQueue: (index: number) => void;
   playNext: () => void;
   playPrevious: () => void;
-  
+
   // Utility
   reset: () => void;
 }
@@ -68,52 +70,52 @@ const initialState: AudioState = {
 
 export const useAudioStore = create<AudioState & AudioActions>((set, get) => ({
   ...initialState,
-  
-  setCurrentTrack: (track) => {
+
+  setCurrentTrack: track => {
     const state = get();
     // If changing to a different track, keep playing state but reset time
     if (state.currentTrack?.id !== track?.id) {
-      set({ 
-        currentTrack: track, 
+      set({
+        currentTrack: track,
         currentTime: 0,
-        duration: 0 
+        duration: 0,
         // Keep isPlaying as is - don't force it to false
       });
     } else {
       set({ currentTrack: track });
     }
   },
-  setIsPlaying: (playing) => set({ isPlaying: playing }),
-  setCurrentTime: (currentTime) => set({ currentTime }),
-  setVolume: (volume) => set({ volume }),
-  setDuration: (duration) => set({ duration }),
-  setIsLoading: (loading) => set({ isLoading: loading }),
-  setProgress: (progress) => set({ progress }),
-  
+  setIsPlaying: playing => set({ isPlaying: playing }),
+  setCurrentTime: currentTime => set({ currentTime }),
+  setVolume: volume => set({ volume }),
+  setDuration: duration => set({ duration }),
+  setIsLoading: loading => set({ isLoading: loading }),
+  setProgress: progress => set({ progress }),
+
   play: () => set({ isPlaying: true }),
   pause: () => set({ isPlaying: false }),
-  toggle: () => set((state) => ({ isPlaying: !state.isPlaying })),
+  toggle: () => set(state => ({ isPlaying: !state.isPlaying })),
   stop: () => set({ isPlaying: false, currentTime: 0 }),
-  seek: (time) => set({ currentTime: time }),
-  
-  setQueue: (tracks) => set({ queue: tracks, currentIndex: -1 }),
-  
-  addToQueue: (track) =>
-    set((state) => ({
+  seek: time => set({ currentTime: time }),
+
+  setQueue: tracks => set({ queue: tracks, currentIndex: -1 }),
+
+  addToQueue: track =>
+    set(state => ({
       queue: [...state.queue, track],
     })),
-  
-  removeFromQueue: (trackId) =>
-    set((state) => ({
-      queue: state.queue.filter((track) => track.id !== trackId),
+
+  removeFromQueue: trackId =>
+    set(state => ({
+      queue: state.queue.filter(track => track.id !== trackId),
     })),
-  
+
   clearQueue: () => set({ queue: [], currentIndex: -1 }),
-  
+
   nextTrack: () => {
     const { queue, currentIndex } = get();
     const nextIndex = currentIndex + 1;
-    
+
     if (nextIndex < queue.length) {
       set({
         currentIndex: nextIndex,
@@ -122,11 +124,11 @@ export const useAudioStore = create<AudioState & AudioActions>((set, get) => ({
       });
     }
   },
-  
+
   previousTrack: () => {
     const { queue, currentIndex } = get();
     const prevIndex = currentIndex - 1;
-    
+
     if (prevIndex >= 0) {
       set({
         currentIndex: prevIndex,
@@ -135,10 +137,10 @@ export const useAudioStore = create<AudioState & AudioActions>((set, get) => ({
       });
     }
   },
-  
-  playTrackFromQueue: (index) => {
+
+  playTrackFromQueue: index => {
     const { queue } = get();
-    
+
     if (index >= 0 && index < queue.length) {
       set({
         currentIndex: index,
@@ -147,17 +149,17 @@ export const useAudioStore = create<AudioState & AudioActions>((set, get) => ({
       });
     }
   },
-  
+
   playNext: () => get().nextTrack(),
   playPrevious: () => get().previousTrack(),
-  
+
   reset: () => set(initialState),
 }));
 
 // Hook for easier access to audio controls
 export const useAudioPlayer = () => {
   const store = useAudioStore();
-  
+
   return {
     // State
     currentTrack: store.currentTrack,
@@ -167,7 +169,7 @@ export const useAudioPlayer = () => {
     duration: store.duration,
     isLoading: store.isLoading,
     queue: store.queue,
-    
+
     // Actions
     playTrack: (track: AudioTrack) => {
       // Stop current track and play new one
@@ -175,14 +177,14 @@ export const useAudioPlayer = () => {
       store.setCurrentTime(0);
       store.setIsPlaying(true);
     },
-    
+
     play: store.play,
     pause: store.pause,
     toggle: store.toggle,
     stop: store.stop,
     seek: store.seek,
     setVolume: store.setVolume,
-    
+
     // Queue controls
     addToQueue: store.addToQueue,
     playNext: store.playNext,

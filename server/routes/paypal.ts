@@ -105,7 +105,7 @@ router.post("/create-order", async (req: any, res: Response) => {
 
     if (result.success) {
       console.log("✅ PayPal order created successfully:", result.orderId);
-      
+
       // ✅ CORRECTION: Renvoyer uniquement l'approvalLink PayPal
       // Ne pas construire d'URL "maison" avec token= ou reservationId
       res.json({
@@ -200,23 +200,23 @@ router.get("/capture/:token", async (req: Request, res: Response) => {
 
     if (result.success) {
       console.log("✅ Payment auto-captured successfully:", result.transactionId);
-      
+
       // ✅ CORRECTION: Rediriger vers la page de succès avec les bons paramètres
-      const successUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/payment/success?token=${token}&PayerID=${PayerID}`;
-      
+      const successUrl = `${process.env.CLIENT_URL || "http://localhost:5000"}/payment/success?token=${token}&PayerID=${PayerID}`;
+
       res.redirect(successUrl);
     } else {
       console.error("❌ Failed to auto-capture payment:", result.error);
-      
+
       // Rediriger vers la page d'erreur
-      const errorUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/payment/error?error=capture_failed&token=${token}`;
+      const errorUrl = `${process.env.CLIENT_URL || "http://localhost:5000"}/payment/error?error=capture_failed&token=${token}`;
       res.redirect(errorUrl);
     }
   } catch (error) {
     console.error("❌ Error in auto-capture endpoint:", error);
-    
+
     // Rediriger vers la page d'erreur
-    const errorUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/payment/error?error=server_error`;
+    const errorUrl = `${process.env.CLIENT_URL || "http://localhost:5000"}/payment/error?error=server_error`;
     res.redirect(errorUrl);
   }
 });
