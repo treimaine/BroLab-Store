@@ -1,14 +1,12 @@
-import React from "react";
 import { HoverPlayButton } from "@/components/HoverPlayButton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useRecentlyViewedBeats } from "@/hooks/useRecentlyViewedBeats";
 import { useAudioStore } from "@/store/useAudioStore";
-import { Download, Heart, Music, ShoppingCart, Clock, Hash } from "lucide-react";
-import { useState } from "react";
+import { Download, Heart, Music, ShoppingCart } from "lucide-react";
+import React, { useState } from "react";
 import { useCartContext } from "./cart-provider";
-import { Badge } from "@/components/ui/badge";
 
 interface BeatCardProps {
   id: string | number;
@@ -50,7 +48,7 @@ export function BeatCard({
 
   const isFavorite = (beatId: number | string): boolean => {
     // Ensure beatId is consistently a string for comparison if needed, or handle types appropriately
-    const idAsString = typeof beatId === 'number' ? beatId.toString() : beatId;
+    const idAsString = typeof beatId === "number" ? beatId.toString() : beatId;
     return favorites.some((fav: any) => fav.beatId === idAsString);
   };
   const { addBeat } = useRecentlyViewedBeats();
@@ -69,6 +67,8 @@ export function BeatCard({
         url: audioUrl,
         audioUrl: audioUrl,
         imageUrl: imageUrl || "",
+        price: price,
+        isFree: isFree,
       });
       setIsPlaying(true);
     }
@@ -150,8 +150,6 @@ export function BeatCard({
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
-
-
   return (
     <div
       className={`card-dark overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer ${
@@ -210,6 +208,8 @@ export function BeatCard({
               productId={id.toString()}
               productName={title}
               imageUrl={imageUrl}
+              price={price}
+              isFree={isFree}
               size="lg"
               onPlay={handlePreviewAudio}
             />
@@ -227,8 +227,6 @@ export function BeatCard({
               <span className="text-[var(--color-gold)] text-xs">{downloads} downloads</span>
             )}
           </div>
-
-
 
           {/* Tags */}
           {tags.length > 0 && (

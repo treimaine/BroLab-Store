@@ -1,13 +1,13 @@
+import { useCartContext } from "@/components/cart-provider";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { useAudioStore } from "@/store/useAudioStore";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  Maximize2,
-  Minimize2,
   Pause,
   Play,
+  ShoppingCart,
   SkipBack,
   SkipForward,
   Volume2,
@@ -31,6 +31,8 @@ export function EnhancedGlobalAudioPlayer() {
     nextTrack,
     previousTrack,
   } = useAudioStore();
+
+  const { addItem } = useCartContext();
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -64,6 +66,10 @@ export function EnhancedGlobalAudioPlayer() {
       }
     });
 
+    // Reset duration when track changes
+    setDuration(0);
+    setCurrentTime(0);
+
     audio.src = currentTrack.audioUrl;
     lastTrackRef.current = currentTrack.id;
 
@@ -74,7 +80,7 @@ export function EnhancedGlobalAudioPlayer() {
         console.error("❌ Audio play failed on track change:", error);
       });
     }
-  }, [currentTrack?.id, isPlaying]);
+  }, [currentTrack?.id, isPlaying, setDuration, setCurrentTime]);
 
   // Handle play/pause separately to avoid loops
   useEffect(() => {
@@ -119,11 +125,37 @@ export function EnhancedGlobalAudioPlayer() {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setDuration(audio.duration);
+    const updateTime = () => {
+      if (audio.currentTime !== currentTime) {
+        setCurrentTime(audio.currentTime);
+      }
+    };
+
+    const updateDuration = () => {
+      if (audio.duration && audio.duration !== duration) {
+        console.log("🎵 Duration updated:", audio.duration);
+        setDuration(audio.duration);
+      }
+    };
+
+    const handleCanPlay = () => {
+      if (audio.duration && audio.duration !== duration) {
+        console.log("🎵 Can play - Duration:", audio.duration);
+        setDuration(audio.duration);
+      }
+    };
+
+    const handleLoadedData = () => {
+      if (audio.duration && audio.duration !== duration) {
+        console.log("🎵 Loaded data - Duration:", audio.duration);
+        setDuration(audio.duration);
+      }
+    };
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
+    audio.addEventListener("canplay", handleCanPlay);
+    audio.addEventListener("loadeddata", handleLoadedData);
     audio.addEventListener("ended", () => {
       setIsPlaying(false);
       nextTrack();
@@ -132,8 +164,10 @@ export function EnhancedGlobalAudioPlayer() {
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
       audio.removeEventListener("loadedmetadata", updateDuration);
+      audio.removeEventListener("canplay", handleCanPlay);
+      audio.removeEventListener("loadeddata", handleLoadedData);
     };
-  }, [setCurrentTime, setDuration, setIsPlaying, nextTrack]);
+  }, [setCurrentTime, setDuration, setIsPlaying, nextTrack, currentTime, duration]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -142,19 +176,141 @@ export function EnhancedGlobalAudioPlayer() {
     }
   }, [volume, isMuted]);
 
-  // Waveform animation disabled to fix AudioContext issues
+  // Initialize audio context for waveform visualization
+  useEffect(() => {
+    if (!currentTrack || !audioRef.current) return;
 
-  const handleSeek = (value: number[]) => {
+    const initAudioContext = async () => {
+      try {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const analyser = context.createAnalyser();
+        const source = context.createMediaElementSource(audio);
+
+        analyser.fftSize = 256;
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        source.connect(analyser);
+        analyser.connect(context.destination);
+
+        setAudioContext(context);
+        setAnalyser(analyser);
+        setDataArray(dataArray);
+      } catch (error) {
+        console.error("❌ Failed to initialize audio context:", error);
+      }
+    };
+
+    initAudioContext();
+
+    return () => {
+      if (audioContext) {
+        audioContext.close();
+        setAudioContext(null);
+        setAnalyser(null);
+        setDataArray(null);
+      }
+    };
+  }, [currentTrack?.id]);
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement | HTMLCanvasElement>) => {
     const audio = audioRef.current;
-    if (audio && duration) {
-      const newTime = (value[0] / 100) * duration;
-      audio.currentTime = newTime;
-      setCurrentTime(newTime);
-    }
+    if (!audio || !duration) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const progress = clickX / rect.width;
+    const newTime = progress * duration;
+
+    audio.currentTime = newTime;
+    setCurrentTime(newTime);
   };
 
-  const handleVolumeChange = (value: number[]) => {
-    setVolume(value[0]);
+  // Waveform animation
+  useEffect(() => {
+    if (!analyser || !dataArray || !canvasRef.current || !isPlaying) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const animate = () => {
+      if (!analyser || !dataArray) return;
+
+      if (dataArray) {
+        (analyser as any).getByteFrequencyData(dataArray);
+      }
+
+      const width = canvas.width;
+      const height = canvas.height;
+      const barWidth = width / dataArray.length;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#a259ff"; // Purple color
+
+      for (let i = 0; i < dataArray.length; i++) {
+        const barHeight = (dataArray[i] / 255) * height;
+        const x = i * barWidth;
+        const y = (height - barHeight) / 2;
+
+        ctx.fillRect(x, y, barWidth - 1, barHeight);
+      }
+
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [analyser, dataArray, isPlaying]);
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setVolume(Number(e.target.value));
+  };
+
+  const handleAddToCart = () => {
+    if (!currentTrack) return;
+
+    addItem({
+      beatId: parseInt(currentTrack.id),
+      title: currentTrack.title,
+      genre: "Unknown",
+      imageUrl: currentTrack.imageUrl || "",
+      licenseType: "basic" as const,
+      quantity: 1,
+      isFree: currentTrack.isFree || false,
+    });
+  };
+
+  const getDisplayPrice = () => {
+    if (!currentTrack) return "";
+
+    // Utiliser les propriétés du track directement
+    const trackPrice = currentTrack.price;
+    const trackIsFree = currentTrack.isFree;
+
+    if (trackIsFree) {
+      return "FREE";
+    }
+
+    if (trackPrice && typeof trackPrice === "number") {
+      return `$${(trackPrice / 100).toFixed(2)}`;
+    }
+
+    if (trackPrice && typeof trackPrice === "string") {
+      // Si c'est déjà une chaîne formatée
+      return trackPrice.startsWith("$") ? trackPrice : `$${trackPrice}`;
+    }
+
+    // Si aucun prix n'est disponible, ne rien afficher
+    return "";
   };
 
   const handleClose = () => {
@@ -164,6 +320,7 @@ export function EnhancedGlobalAudioPlayer() {
   };
 
   const formatTime = (time: number) => {
+    if (!time || isNaN(time)) return "0:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
@@ -172,122 +329,139 @@ export function EnhancedGlobalAudioPlayer() {
   if (!currentTrack) return null;
 
   return (
-    <div
-      className={`
-        fixed bottom-0 left-0 right-0 bg-[var(--dark-gray)] border-t border-[var(--medium-gray)] z-50 
-        transition-all duration-300 safe-area-inset-bottom
-        ${isExpanded && !isMobile ? "h-32" : isMobile ? "h-16" : "h-20"}
-      `}
-    >
-      <audio ref={audioRef} crossOrigin="anonymous" />
+    <AnimatePresence>
+      <motion.div
+        initial={{ y: 100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 100, opacity: 0 }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-sm border-t border-zinc-800 z-50 pb-safe-area-inset-bottom"
+      >
+        <audio ref={audioRef} crossOrigin="anonymous" />
 
-      <div className="max-w-7xl mx-auto p-2 sm:p-4">
-        {/* Main Player Controls */}
-        <div className="flex items-center justify-between">
-          {/* Track Info */}
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-12 h-12 bg-zinc-800 rounded-lg flex-shrink-0">
-              {currentTrack.imageUrl && (
-                <img
-                  src={currentTrack.imageUrl}
-                  alt={currentTrack.title}
-                  className="w-full h-full object-cover rounded-lg"
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            {/* Playback Controls */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={previousTrack}
+                className="w-8 h-8 p-0 text-gray-400 hover:text-white"
+              >
+                <SkipBack className="w-4 h-4" />
+              </Button>
+
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="w-12 h-10 p-0 bg-[var(--accent-purple)] hover:bg-purple-600 rounded-lg"
+              >
+                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={nextTrack}
+                className="w-8 h-8 p-0 text-gray-400 hover:text-white"
+              >
+                <SkipForward className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Waveform Visualization */}
+            <div className="flex-1 flex items-center gap-3 mx-4">
+              <span className="text-xs text-gray-400 w-8 text-right">
+                {formatTime(currentTime)}
+              </span>
+
+              <div className="flex-1 relative">
+                {/* Waveform Canvas */}
+                <canvas
+                  ref={canvasRef}
+                  width={400}
+                  height={40}
+                  className="w-full h-10 cursor-pointer"
+                  onClick={handleSeek}
                 />
-              )}
+
+                {/* Progress Overlay */}
+                <motion.div
+                  className="absolute top-0 left-0 h-full bg-red-500/30 pointer-events-none"
+                  style={{
+                    width: `${duration ? (currentTime / duration) * 100 : 0}%`,
+                  }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                  transition={{ duration: 0.1, ease: "linear" }}
+                />
+
+                {/* Playback Cursor */}
+                <motion.div
+                  className="absolute top-1/2 transform -translate-y-1/2 w-1 h-8 bg-red-500 rounded-full"
+                  style={{
+                    left: `${duration ? (currentTime / duration) * 100 : 0}%`,
+                  }}
+                  initial={{ left: 0 }}
+                  animate={{ left: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+                  transition={{ duration: 0.1, ease: "linear" }}
+                />
+              </div>
+
+              <span className="text-xs text-gray-400 w-8">{formatTime(duration)}</span>
             </div>
-            <div className="min-w-0 flex-1">
-              <h4 className="text-white font-medium text-sm truncate">{currentTrack.title}</h4>
-              <p className="text-gray-400 text-xs truncate">{currentTrack.artist}</p>
-            </div>
-          </div>
 
-          {/* Playback Controls */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={previousTrack}
-              className="w-8 h-8 p-0 text-gray-400 hover:text-white"
-            >
-              <SkipBack className="w-4 h-4" />
-            </Button>
+            {/* Volume Controls */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsMuted(!isMuted)}
+                className="w-8 h-8 p-0 text-gray-400 hover:text-white"
+              >
+                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </Button>
 
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setIsPlaying(!isPlaying)}
-              className="w-10 h-10 p-0 bg-[var(--accent-purple)] hover:bg-purple-600"
-            >
-              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={nextTrack}
-              className="w-8 h-8 p-0 text-gray-400 hover:text-white"
-            >
-              <SkipForward className="w-4 h-4" />
-            </Button>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="flex-1 max-w-md mx-4">
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-              <span className="w-10 text-right">{formatTime(currentTime)}</span>
-              <Slider
-                value={[duration ? (currentTime / duration) * 100 : 0]}
-                max={100}
-                step={0.1}
-                onValueChange={handleSeek}
-                className="flex-1"
-              />
-              <span className="w-10">{formatTime(duration)}</span>
-            </div>
-          </div>
-
-          {/* Volume Controls */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsMuted(!isMuted)}
-              className="w-8 h-8 p-0 text-gray-400 hover:text-white"
-            >
-              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            </Button>
-
-            <div className="w-20">
-              <Slider
-                value={[isMuted ? 0 : volume]}
-                max={100}
-                step={1}
-                onValueChange={handleVolumeChange}
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={isMuted ? 0 : volume}
+                onChange={handleVolumeChange}
+                className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
               />
             </div>
+
+            {/* Add to Cart Button */}
+            {getDisplayPrice() && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleAddToCart}
+                  className="w-8 h-8 p-0 text-gray-400 hover:text-white relative"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--accent-purple)] rounded-full"></span>
+                </Button>
+                <span className="text-sm text-white font-medium">{getDisplayPrice()}</span>
+              </div>
+            )}
+
+            {/* Close Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClose}
+              className="w-8 h-8 p-0 text-gray-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </Button>
           </div>
-
-          {/* Expand/Collapse Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="w-8 h-8 p-0 text-gray-400 hover:text-white"
-          >
-            {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </Button>
-
-          {/* Close Button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClose}
-            className="w-8 h-8 p-0 text-gray-400 hover:text-white"
-          >
-            <X className="w-4 h-4" />
-          </Button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

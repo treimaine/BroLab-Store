@@ -13,6 +13,8 @@ interface HoverPlayButtonProps {
   productId?: string;
   productName?: string;
   imageUrl?: string;
+  price?: number | string;
+  isFree?: boolean;
 }
 
 export function HoverPlayButton({
@@ -24,6 +26,8 @@ export function HoverPlayButton({
   productId = "",
   productName = "",
   imageUrl = "",
+  price,
+  isFree = false,
 }: HoverPlayButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { currentTrack, isPlaying, setCurrentTrack, setIsPlaying } = useAudioStore();
@@ -62,6 +66,8 @@ export function HoverPlayButton({
           url: audioUrl ?? "",
           audioUrl: audioUrl ?? "",
           imageUrl: imageUrl || "/api/placeholder/64/64",
+          price: price,
+          isFree: isFree,
         });
         setIsPlaying(true);
         trackPlayPreview(productId, productName);

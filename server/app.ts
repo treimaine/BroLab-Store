@@ -3,6 +3,7 @@ import { registerAuthRoutes, setupAuth } from "./auth";
 import activityRouter from "./routes/activity";
 import avatarRouter from "./routes/avatar";
 // Clerk router removed - using native components
+import clerkRouter from "./routes/clerk";
 import downloadsRouter from "./routes/downloads";
 import emailRouter from "./routes/email";
 import monitoringRouter from "./routes/monitoring";
@@ -12,11 +13,11 @@ import paymentsRouter from "./routes/payments";
 import paypalRouter from "./routes/paypal";
 import reservationsRouter from "./routes/reservations";
 import schemaRouter from "./routes/schema";
-import stripeRouter from "./routes/stripe";
 import securityRouter from "./routes/security";
 import serviceOrdersRouter from "./routes/serviceOrders";
 import sitemapRouter from "./routes/sitemap";
 import storageRouter from "./routes/storage";
+import stripeRouter from "./routes/stripe";
 // import stripeWebhookRouter from "./routes/stripeWebhook"; // Removed - using Clerk for billing
 // import subscriptionRouter from "./routes/subscription"; // Removed - using Clerk for billing
 import syncRouter from "./routes/sync";
@@ -52,6 +53,7 @@ app.use("/api/opengraph", openGraphRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/payment/paypal", paypalRouter);
 app.use("/api/payment/stripe", stripeRouter);
+app.use("/api/clerk", clerkRouter);
 app.use("/api/payments", paymentsRouter);
 app.use("/api/reservations", reservationsRouter);
 app.use("/api/schema", schemaRouter);
