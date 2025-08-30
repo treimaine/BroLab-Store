@@ -1,39 +1,34 @@
-import React from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
-import {
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-  PieChart as PieChartIcon,
   Activity,
+  BarChart3,
   Calendar,
   Download,
-  ShoppingCart,
   Music,
+  ShoppingCart,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react";
-import { motion } from "framer-motion";
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-// Types pour les données de graphiques
+// Chart data types
 interface ChartDataPoint {
   date: string;
   orders: number;
@@ -57,12 +52,18 @@ interface TrendChartsProps {
     revenue: TrendData;
     beats: TrendData;
   };
+  favoritesMonthly?: { label: string; count: number }[];
   isLoading?: boolean;
   className?: string;
 }
 
-// Composant pour afficher une tendance
-function TrendIndicator({ trend, label, icon: Icon, color }: {
+// Trend indicator
+function TrendIndicator({
+  trend,
+  label,
+  icon: Icon,
+  color,
+}: {
   trend: TrendData;
   label: string;
   icon: any;
@@ -70,7 +71,7 @@ function TrendIndicator({ trend, label, icon: Icon, color }: {
 }) {
   const isPositive = trend.changePercent > 0;
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -84,41 +85,42 @@ function TrendIndicator({ trend, label, icon: Icon, color }: {
           </div>
           <span className="text-sm font-medium text-gray-300">{label}</span>
         </div>
-        <Badge 
+        <Badge
           variant={isPositive ? "default" : "destructive"}
           className={cn(
             "text-xs",
-            isPositive ? "bg-green-500/20 text-green-400 border-green-500/30" : "bg-red-500/20 text-red-400 border-red-500/30"
+            isPositive
+              ? "bg-green-500/20 text-green-400 border-green-500/30"
+              : "bg-red-500/20 text-red-400 border-red-500/30"
           )}
         >
           <TrendIcon className="w-3 h-3 mr-1" />
           {Math.abs(trend.changePercent).toFixed(1)}%
         </Badge>
       </div>
-      
+
       <div className="space-y-1">
-        <p className="text-2xl font-bold text-white">
-          {trend.value.toLocaleString('fr-FR')}
-        </p>
+        <p className="text-2xl font-bold text-white">{trend.value.toLocaleString("en-US")}</p>
         <p className="text-xs text-gray-400">
-          {isPositive ? '+' : ''}{trend.change.toLocaleString('fr-FR')} ce mois
+          {isPositive ? "+" : ""}
+          {trend.change.toLocaleString("en-US")} this month
         </p>
       </div>
     </motion.div>
   );
 }
 
-// Composant pour le graphique en aires
+// Revenue area chart
 function RevenueAreaChart({ data }: { data: ChartDataPoint[] }) {
   return (
     <Card className="bg-gray-900/50 border-gray-700/50">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-white">
           <BarChart3 className="h-5 w-5" />
-          <span>Évolution des revenus</span>
+          <span>Revenue growth</span>
         </CardTitle>
         <CardDescription className="text-gray-400">
-          Revenus mensuels des 6 derniers mois
+          Monthly revenue for the last 6 months
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -132,29 +134,29 @@ function RevenueAreaChart({ data }: { data: ChartDataPoint[] }) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis 
-                dataKey="date" 
+              <XAxis
+                dataKey="date"
                 stroke="#9ca3af"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
               />
-              <YAxis 
+              <YAxis
                 stroke="#9ca3af"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `${value}€`}
+                tickFormatter={value => `$${value}`}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#1f2937',
-                  border: '1px solid #374151',
-                  borderRadius: '8px',
-                  color: '#f9fafb'
+                  backgroundColor: "#1f2937",
+                  border: "1px solid #374151",
+                  borderRadius: "8px",
+                  color: "#f9fafb",
                 }}
-                formatter={(value: number) => [`${value}€`, 'Revenus']}
-                labelStyle={{ color: '#d1d5db' }}
+                formatter={(value: number) => [`$${value}`, "Revenue"]}
+                labelStyle={{ color: "#d1d5db" }}
               />
               <Area
                 type="monotone"
@@ -171,61 +173,54 @@ function RevenueAreaChart({ data }: { data: ChartDataPoint[] }) {
   );
 }
 
-// Composant pour le graphique des activités
+// Activity line chart
 function ActivityLineChart({ data }: { data: ChartDataPoint[] }) {
   return (
     <Card className="bg-gray-900/50 border-gray-700/50">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-white">
           <Activity className="h-5 w-5" />
-          <span>Activité utilisateur</span>
+          <span>User activity</span>
         </CardTitle>
-        <CardDescription className="text-gray-400">
-          Commandes et téléchargements par mois
-        </CardDescription>
+        <CardDescription className="text-gray-400">Orders and downloads per month</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis 
-                dataKey="date" 
+              <XAxis
+                dataKey="date"
                 stroke="#9ca3af"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
               />
-              <YAxis 
-                stroke="#9ca3af"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
+              <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#1f2937',
-                  border: '1px solid #374151',
-                  borderRadius: '8px',
-                  color: '#f9fafb'
+                  backgroundColor: "#1f2937",
+                  border: "1px solid #374151",
+                  borderRadius: "8px",
+                  color: "#f9fafb",
                 }}
-                labelStyle={{ color: '#d1d5db' }}
+                labelStyle={{ color: "#d1d5db" }}
               />
               <Line
                 type="monotone"
                 dataKey="orders"
                 stroke="#10b981"
                 strokeWidth={2}
-                dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                name="Commandes"
+                dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
+                name="Orders"
               />
               <Line
                 type="monotone"
                 dataKey="downloads"
                 stroke="#3b82f6"
                 strokeWidth={2}
-                dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
-                name="Téléchargements"
+                dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
+                name="Downloads"
               />
             </LineChart>
           </ResponsiveContainer>
@@ -235,52 +230,41 @@ function ActivityLineChart({ data }: { data: ChartDataPoint[] }) {
   );
 }
 
-// Composant pour le graphique en barres des beats
+// Favorites bar chart (previously beats)
 function BeatsBarChart({ data }: { data: ChartDataPoint[] }) {
   return (
     <Card className="bg-gray-900/50 border-gray-700/50">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2 text-white">
           <Music className="h-5 w-5" />
-          <span>Beats ajoutés</span>
+          <span>Favorites added</span>
         </CardTitle>
-        <CardDescription className="text-gray-400">
-          Nouveaux beats par mois
-        </CardDescription>
+        <CardDescription className="text-gray-400">Favorites added per month</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis 
-                dataKey="date" 
+              <XAxis
+                dataKey="date"
                 stroke="#9ca3af"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
               />
-              <YAxis 
-                stroke="#9ca3af"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
+              <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#1f2937',
-                  border: '1px solid #374151',
-                  borderRadius: '8px',
-                  color: '#f9fafb'
+                  backgroundColor: "#1f2937",
+                  border: "1px solid #374151",
+                  borderRadius: "8px",
+                  color: "#f9fafb",
                 }}
-                formatter={(value: number) => [value, 'Beats']}
-                labelStyle={{ color: '#d1d5db' }}
+                formatter={(value: number) => [value, "Favorites"]}
+                labelStyle={{ color: "#d1d5db" }}
               />
-              <Bar
-                dataKey="beats"
-                fill="#f59e0b"
-                radius={[4, 4, 0, 0]}
-              />
+              <Bar dataKey="beats" fill="#f59e0b" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -290,22 +274,52 @@ function BeatsBarChart({ data }: { data: ChartDataPoint[] }) {
 }
 
 // Composant principal
-export function TrendCharts({ data, trends, isLoading = false, className }: TrendChartsProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
+export function TrendCharts({
+  data,
+  trends,
+  favoritesMonthly,
+  isLoading = false,
+  className,
+}: TrendChartsProps) {
+  const [selectedPeriod, setSelectedPeriod] = useState<"7d" | "30d" | "90d" | "1y">("30d");
 
   const filteredData = useMemo(() => {
     const now = new Date();
     const daysToSubtract = {
-      '7d': 7,
-      '30d': 30,
-      '90d': 90,
-      '1y': 365
+      "7d": 7,
+      "30d": 30,
+      "90d": 90,
+      "1y": 365,
     }[selectedPeriod];
-    
+
     const cutoffDate = new Date(now.getTime() - daysToSubtract * 24 * 60 * 60 * 1000);
-    
+
     return data.filter(item => new Date(item.date) >= cutoffDate);
   }, [data, selectedPeriod]);
+
+  // Use provided monthly favorites if available; map to chart shape for the bar chart
+  const favoritesData = useMemo<ChartDataPoint[]>(() => {
+    if (favoritesMonthly && favoritesMonthly.length > 0) {
+      // When period is days-based, we still show up to the matching months window
+      const monthsWindow =
+        selectedPeriod === "7d"
+          ? 1
+          : selectedPeriod === "30d"
+            ? 1
+            : selectedPeriod === "90d"
+              ? 3
+              : 12;
+      const sliced = favoritesMonthly.slice(-monthsWindow);
+      return sliced.map(m => ({
+        date: m.label,
+        orders: 0,
+        downloads: 0,
+        revenue: 0,
+        beats: m.count,
+      }));
+    }
+    return filteredData;
+  }, [favoritesMonthly, filteredData, selectedPeriod]);
 
   if (isLoading) {
     return (
@@ -332,11 +346,11 @@ export function TrendCharts({ data, trends, isLoading = false, className }: Tren
 
   return (
     <div className={cn("space-y-6", className)}>
-      {/* Sélecteur de période */}
+      {/* Period selector */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-white">Analytics & Tendances</h2>
+        <h2 className="text-xl font-semibold text-white">Analytics & Trends</h2>
         <div className="flex space-x-2">
-          {(['7d', '30d', '90d', '1y'] as const).map((period) => (
+          {(["7d", "30d", "90d", "1y"] as const).map(period => (
             <Button
               key={period}
               variant={selectedPeriod === period ? "default" : "outline"}
@@ -349,38 +363,38 @@ export function TrendCharts({ data, trends, isLoading = false, className }: Tren
                   : "border-gray-600 text-gray-300 hover:bg-gray-800"
               )}
             >
-              {period === '7d' && '7 jours'}
-              {period === '30d' && '30 jours'}
-              {period === '90d' && '3 mois'}
-              {period === '1y' && '1 an'}
+              {period === "7d" && "7 days"}
+              {period === "30d" && "30 days"}
+              {period === "90d" && "3 months"}
+              {period === "1y" && "1 year"}
             </Button>
           ))}
         </div>
       </div>
 
-      {/* Indicateurs de tendance */}
+      {/* Trend indicators */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <TrendIndicator
           trend={trends.orders}
-          label="Commandes"
+          label="Orders"
           icon={ShoppingCart}
           color="bg-green-500/20 text-green-400"
         />
         <TrendIndicator
           trend={trends.downloads}
-          label="Téléchargements"
+          label="Downloads"
           icon={Download}
           color="bg-blue-500/20 text-blue-400"
         />
         <TrendIndicator
           trend={trends.revenue}
-          label="Revenus"
+          label="Revenue"
           icon={BarChart3}
           color="bg-purple-500/20 text-purple-400"
         />
         <TrendIndicator
           trend={trends.beats}
-          label="Beats"
+          label="Favorites"
           icon={Music}
           color="bg-yellow-500/20 text-yellow-400"
         />
@@ -391,56 +405,62 @@ export function TrendCharts({ data, trends, isLoading = false, className }: Tren
         <RevenueAreaChart data={filteredData} />
         <ActivityLineChart data={filteredData} />
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <BeatsBarChart data={filteredData} />
+          <BeatsBarChart data={favoritesData} />
         </div>
-        
-        {/* Statistiques rapides */}
+
+        {/* Quick stats */}
         <Card className="bg-gray-900/50 border-gray-700/50">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white">
               <Calendar className="h-5 w-5" />
-              <span>Résumé</span>
+              <span>Summary</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Total revenus</span>
+                <span className="text-sm text-gray-400">Total revenue</span>
                 <span className="font-semibold text-white">
-                  {filteredData.reduce((sum, item) => sum + item.revenue, 0).toLocaleString('fr-FR')}€
+                  $
+                  {filteredData
+                    .reduce((sum, item) => sum + item.revenue, 0)
+                    .toLocaleString("en-US")}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Total commandes</span>
+                <span className="text-sm text-gray-400">Total orders</span>
                 <span className="font-semibold text-white">
                   {filteredData.reduce((sum, item) => sum + item.orders, 0)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Total téléchargements</span>
+                <span className="text-sm text-gray-400">Total downloads</span>
                 <span className="font-semibold text-white">
                   {filteredData.reduce((sum, item) => sum + item.downloads, 0)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Nouveaux beats</span>
+                <span className="text-sm text-gray-400">Favorites</span>
                 <span className="font-semibold text-white">
                   {filteredData.reduce((sum, item) => sum + item.beats, 0)}
                 </span>
               </div>
             </div>
-            
+
             <div className="pt-4 border-t border-gray-700">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">Revenus moyens/commande</span>
+                <span className="text-sm text-gray-400">Avg revenue/order</span>
                 <span className="font-semibold text-green-400">
                   {(
                     filteredData.reduce((sum, item) => sum + item.revenue, 0) /
-                    Math.max(filteredData.reduce((sum, item) => sum + item.orders, 0), 1)
-                  ).toFixed(2)}€
+                    Math.max(
+                      filteredData.reduce((sum, item) => sum + item.orders, 0),
+                      1
+                    )
+                  ).toFixed(2)}
                 </span>
               </div>
             </div>

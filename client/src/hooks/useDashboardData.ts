@@ -33,49 +33,33 @@ export function useDashboardData() {
 
   // Récupérer les statistiques utilisateur avec type casting pour éviter les erreurs
   const userStats = useQuery(
-    (api as any)["users/getUserStats"]?.getUserStats,
+    (api as any)["users/getUserStats"].getUserStats,
     clerkUser ? {} : "skip"
   );
 
   // Récupérer les favoris avec type casting pour éviter les erreurs
   const favorites = useQuery(
-    (api as any)["favorites/getFavorites"]?.getFavorites,
+    (api as any)["favorites/getFavorites"].getFavorites,
     clerkUser ? {} : "skip"
   );
 
   // Récupérer les recommandations avec type casting pour éviter les erreurs
   const recommendations = useQuery(
-    (api as any)["products/forYou"]?.getForYouBeats,
+    (api as any)["products/forYou"].getForYouBeats,
     clerkUser ? { limit: 6 } : "skip"
   );
 
   // Données par défaut si les requêtes échouent
-  const defaultStats = {
-    totalFavorites: 0,
-    totalDownloads: 0,
-    totalOrders: 0,
-    totalSpent: 0,
-    recentActivity: 0,
-  };
+  // defaults removed; UI should handle undefined gracefully
 
   // État de chargement
   const isLoading = !isLoaded || (clerkUser && userStats === undefined);
 
   // Données utilisateur avec fallback
-  const user =
-    userStats?.user ||
-    (clerkUser
-      ? {
-          id: clerkUser.id,
-          email: clerkUser.emailAddresses[0]?.emailAddress,
-          username: clerkUser.username,
-          firstName: clerkUser.firstName,
-          lastName: clerkUser.lastName,
-        }
-      : null);
+  const user = userStats?.user || null;
 
   // Statistiques avec fallback
-  const stats = userStats?.stats || defaultStats;
+  const stats = userStats?.stats;
 
   // Données détaillées avec fallback
   const favoritesData = favorites || [];

@@ -1,6 +1,7 @@
 import { Request, Response, Router } from "express";
 import { isAuthenticated } from "../auth";
 import { PAYPAL_WEBHOOK_ID } from "../config/paypal";
+import { urls } from "../config/urls";
 import PayPalService, { PaymentRequest } from "../services/paypal";
 
 const router = Router();
@@ -202,21 +203,21 @@ router.get("/capture/:token", async (req: Request, res: Response) => {
       console.log("✅ Payment auto-captured successfully:", result.transactionId);
 
       // ✅ CORRECTION: Rediriger vers la page de succès avec les bons paramètres
-      const successUrl = `${process.env.CLIENT_URL || "http://localhost:5000"}/payment/success?token=${token}&PayerID=${PayerID}`;
+      const successUrl = urls.paypal.success(token, PayerID);
 
       res.redirect(successUrl);
     } else {
       console.error("❌ Failed to auto-capture payment:", result.error);
 
       // Rediriger vers la page d'erreur
-      const errorUrl = `${process.env.CLIENT_URL || "http://localhost:5000"}/payment/error?error=capture_failed&token=${token}`;
+      const errorUrl = urls.paypal.error("capture_failed", token);
       res.redirect(errorUrl);
     }
   } catch (error) {
     console.error("❌ Error in auto-capture endpoint:", error);
 
     // Rediriger vers la page d'erreur
-    const errorUrl = `${process.env.CLIENT_URL || "http://localhost:5000"}/payment/error?error=server_error`;
+    const errorUrl = urls.paypal.error("server_error");
     res.redirect(errorUrl);
   }
 });

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import Stripe from "stripe";
+import { urls } from "../config/urls";
 
 const router = Router();
 
@@ -55,8 +56,8 @@ router.post("/create-checkout-session", async (req, res) => {
           },
         ],
         mode: "payment",
-        success_url: `${process.env.CLIENT_URL || "http://localhost:5000"}/checkout-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.CLIENT_URL || "http://localhost:5000"}/cart`,
+        success_url: urls.checkoutSuccess("{CHECKOUT_SESSION_ID}" as any),
+        cancel_url: urls.cart,
         metadata: {
           userId: metadata.userId,
           userEmail: metadata.userEmail,

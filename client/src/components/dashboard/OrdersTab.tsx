@@ -1,45 +1,31 @@
+import { formatCurrencyUSD } from "@/utils/currency";
 import { Package } from "lucide-react";
 
 interface OrdersTabProps {
-  ordersData?: any;
+  ordersData?: { items?: any[]; hasMore?: boolean };
   ordersLoading?: boolean;
   ordersError?: any;
   onOrderClick?: (orderId: number) => void;
+  onLoadMore?: () => void;
 }
 
 export default function OrdersTab({
-  ordersData = { orders: [] },
+  ordersData = { items: [] },
   ordersLoading = false,
   ordersError = null,
   onOrderClick = () => {},
+  onLoadMore,
 }: OrdersTabProps) {
-  // Données par défaut si aucune commande n'est fournie
-  const defaultOrders = [
-    {
-      id: 1,
-      items: [{ name: "Tropical Vibes" }],
-      created_at: new Date().toISOString(),
-      total: 999,
-      status: "completed",
-    },
-    {
-      id: 2,
-      items: [{ name: "Midnight Groove" }],
-      created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      total: 1299,
-      status: "processing",
-    },
-  ];
+  // Utiliser les vraies données des commandes ou un tableau vide
+  const displayOrders = ordersData?.items || [];
 
-  const displayOrders = ordersData?.orders?.length > 0 ? ordersData.orders : defaultOrders;
-
-  if (ordersLoading) {
+  if (ordersLoading && displayOrders.length === 0) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div>
           <h2 className="text-white flex items-center text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
             <Package className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-[var(--accent-purple)]" />
-            Vos Commandes
+            Your Orders
           </h2>
           <div className="space-y-3 sm:space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -59,10 +45,10 @@ export default function OrdersTab({
         <div>
           <h2 className="text-white flex items-center text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
             <Package className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-[var(--accent-purple)]" />
-            Vos Commandes
+            Your Orders
           </h2>
           <p className="text-red-400 text-sm sm:text-base">
-            Échec du chargement des commandes. Veuillez réessayer.
+            Failed to load orders. Please try again.
           </p>
         </div>
       </div>
@@ -74,23 +60,29 @@ export default function OrdersTab({
       <div>
         <h2 className="text-white flex items-center text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
           <Package className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-[var(--accent-purple)]" />
-          Vos Commandes
+          Your Orders
         </h2>
-        {displayOrders.length > 0 ? (
+        {displayOrders && displayOrders.length > 0 ? (
           <div className="space-y-3 sm:space-y-4">
             {displayOrders.map((order: any) => (
               <div
                 key={order.id}
                 className="p-3 sm:p-4 bg-gray-900/20 backdrop-blur-sm border border-gray-700/30 rounded-lg hover:bg-gray-900/30 transition-colors cursor-pointer"
-                onClick={() => onOrderClick(order.id)}
+                onClick={() => {
+                  if (order.invoiceUrl) {
+                    window.open(order.invoiceUrl as string, "_blank", "noopener");
+                  } else {
+                    onOrderClick(order.id);
+                  }
+                }}
               >
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-4">
                   <div className="flex-1 min-w-0">
                     <p className="text-white font-medium text-sm sm:text-base truncate">
-                      {order.items?.[0]?.name || `Commande #${order.id}`}
+                      {order.items?.[0]?.name || order.items?.[0]?.title || `Order #${order.id}`}
                     </p>
                     <p className="text-gray-400 text-xs sm:text-sm">
-                      {new Date(order.created_at).toLocaleDateString("fr-FR", {
+                      {new Date(order.createdAt || order.created_at).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "short",
                         day: "numeric",
@@ -99,7 +91,7 @@ export default function OrdersTab({
                   </div>
                   <div className="text-left sm:text-right flex-shrink-0">
                     <p className="text-white font-bold text-sm sm:text-base">
-                      ${(order.total / 100).toFixed(2)}
+                      {Number(order.total || 0) <= 0 ? "FREE" : formatCurrencyUSD(order.total)}
                     </p>
                     <div className="flex items-center gap-2">
                       <span
@@ -115,11 +107,11 @@ export default function OrdersTab({
                       ></span>
                       <p className="text-gray-400 text-xs sm:text-sm capitalize">
                         {order.status === "completed"
-                          ? "Terminée"
+                          ? "Completed"
                           : order.status === "processing"
-                            ? "En cours"
+                            ? "Processing"
                             : order.status === "cancelled"
-                              ? "Annulée"
+                              ? "Cancelled"
                               : order.status}
                       </p>
                     </div>
@@ -127,12 +119,26 @@ export default function OrdersTab({
                 </div>
               </div>
             ))}
+
+            {ordersData?.hasMore && (
+              <div className="pt-2">
+                <button
+                  className="text-xs sm:text-sm px-3 py-2 rounded-md bg-gray-800 hover:bg-gray-700 text-white border border-gray-700"
+                  onClick={onLoadMore}
+                  disabled={ordersLoading}
+                >
+                  {ordersLoading ? "Loading..." : "Load more"}
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-8 sm:py-12">
             <Package className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-3 sm:mb-4" />
-            <p className="text-gray-400 text-sm sm:text-base mb-2">Aucune commande trouvée</p>
-            <p className="text-gray-500 text-xs sm:text-sm">Vos commandes apparaîtront ici</p>
+            <p className="text-gray-400 text-sm sm:text-base mb-2">No orders found</p>
+            <p className="text-gray-500 text-xs sm:text-sm">
+              {ordersLoading ? "Loading orders..." : "Your orders will appear here"}
+            </p>
           </div>
         )}
       </div>

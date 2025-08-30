@@ -13,14 +13,16 @@ import type {
   FilterApi,
   FunctionReference,
 } from "convex/server";
+import type * as activity_getRecent from "../activity/getRecent.js";
 import type * as audit from "../audit.js";
 import type * as auth_roles from "../auth/roles.js";
-import type * as clerk_webhooks from "../clerk/webhooks.js";
+import type * as downloads_enriched from "../downloads/enriched.js";
 import type * as downloads_record from "../downloads/record.js";
 import type * as downloads from "../downloads.js";
 import type * as favorites_add from "../favorites/add.js";
 import type * as favorites_getFavorites from "../favorites/getFavorites.js";
 import type * as favorites_remove from "../favorites/remove.js";
+import type * as http from "../http.js";
 import type * as lib_validation from "../lib/validation.js";
 import type * as messages from "../messages.js";
 import type * as migrations_cleanupSupabase from "../migrations/cleanupSupabase.js";
@@ -34,9 +36,11 @@ import type * as reservations_createReservation from "../reservations/createRese
 import type * as reservations_index from "../reservations/index.js";
 import type * as reservations_listReservations from "../reservations/listReservations.js";
 import type * as reservations_updateReservationStatus from "../reservations/updateReservationStatus.js";
+import type * as subscriptions_createOrUpdateFromClerk from "../subscriptions/createOrUpdateFromClerk.js";
 import type * as subscriptions_createSubscription from "../subscriptions/createSubscription.js";
 import type * as subscriptions_getCurrentSubscription from "../subscriptions/getCurrentSubscription.js";
 import type * as subscriptions_getSubscription from "../subscriptions/getSubscription.js";
+import type * as subscriptions_invoices from "../subscriptions/invoices.js";
 import type * as subscriptions_updateSubscription from "../subscriptions/updateSubscription.js";
 import type * as sync_woocommerce from "../sync/woocommerce.js";
 import type * as sync_wordpress from "../sync/wordpress.js";
@@ -53,14 +57,16 @@ import type * as users from "../users.js";
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  "activity/getRecent": typeof activity_getRecent;
   audit: typeof audit;
   "auth/roles": typeof auth_roles;
-  "clerk/webhooks": typeof clerk_webhooks;
+  "downloads/enriched": typeof downloads_enriched;
   "downloads/record": typeof downloads_record;
   downloads: typeof downloads;
   "favorites/add": typeof favorites_add;
   "favorites/getFavorites": typeof favorites_getFavorites;
   "favorites/remove": typeof favorites_remove;
+  http: typeof http;
   "lib/validation": typeof lib_validation;
   messages: typeof messages;
   "migrations/cleanupSupabase": typeof migrations_cleanupSupabase;
@@ -74,9 +80,11 @@ declare const fullApi: ApiFromModules<{
   "reservations/index": typeof reservations_index;
   "reservations/listReservations": typeof reservations_listReservations;
   "reservations/updateReservationStatus": typeof reservations_updateReservationStatus;
+  "subscriptions/createOrUpdateFromClerk": typeof subscriptions_createOrUpdateFromClerk;
   "subscriptions/createSubscription": typeof subscriptions_createSubscription;
   "subscriptions/getCurrentSubscription": typeof subscriptions_getCurrentSubscription;
   "subscriptions/getSubscription": typeof subscriptions_getSubscription;
+  "subscriptions/invoices": typeof subscriptions_invoices;
   "subscriptions/updateSubscription": typeof subscriptions_updateSubscription;
   "sync/woocommerce": typeof sync_woocommerce;
   "sync/wordpress": typeof sync_wordpress;

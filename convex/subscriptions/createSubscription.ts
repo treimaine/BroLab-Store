@@ -3,7 +3,7 @@ import { mutation } from "../_generated/server";
 
 export const createSubscription = mutation({
   args: {
-    userId: v.string(),
+    clerkId: v.string(),
     planId: v.string(),
     status: v.string(),
     features: v.array(v.string()),
@@ -13,15 +13,22 @@ export const createSubscription = mutation({
   },
   handler: async (ctx, args) => {
     try {
-      console.log(`🔄 Creating subscription for user: ${args.userId}, plan: ${args.planId}`);
+      console.log(`🔄 Creating subscription for clerkId: ${args.clerkId}, plan: ${args.planId}`);
 
       const now = Date.now();
+
+      // Resolve user by clerkId
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", q => q.eq("clerkId", args.clerkId))
+        .first();
+      if (!user) throw new Error("User not found for clerkId");
       const currentPeriodStart = now;
       const currentPeriodEnd = now + 30 * 24 * 60 * 60 * 1000; // +30 jours
 
       // Créer l'abonnement
       const subscriptionId = await ctx.db.insert("subscriptions", {
-        userId: args.userId as any, // Cast vers Id<"users">
+        userId: user._id,
         clerkSubscriptionId: args.clerkSubscriptionId || `sub_${Date.now()}`,
         planId: args.planId,
         status: args.status,
@@ -41,7 +48,7 @@ export const createSubscription = mutation({
 
       // Créer les quotas pour cet abonnement
       await ctx.db.insert("quotas", {
-        userId: args.userId as any,
+        userId: user._id,
         subscriptionId,
         quotaType: "downloads",
         limit: args.downloadQuota,
@@ -55,7 +62,7 @@ export const createSubscription = mutation({
 
       // Log de l'activité
       await ctx.db.insert("activityLog", {
-        userId: args.userId as any,
+        userId: user._id,
         action: "subscription_created",
         details: {
           planId: args.planId,
@@ -78,13 +85,13 @@ export const createSubscription = mutation({
 
       // Log de l'erreur
       await ctx.db.insert("auditLogs", {
-        userId: args.userId as any,
+        // userId optional if user not found earlier
         action: "subscription_creation_error",
         resource: "subscription",
         details: {
           error: errorMessage,
           planId: args.planId,
-          userId: args.userId,
+          clerkId: args.clerkId,
         },
         timestamp: Date.now(),
       });

@@ -16,9 +16,7 @@ export function useClerkSync() {
   const syncInProgress = useRef(false);
   const hasAttemptedSync = useRef(false);
 
-  // Utiliser any pour éviter l'erreur TypeScript TS2589
-  // @ts-ignore - Ignorer l'erreur de type instantiation excessive
-  const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser as any);
+  const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser);
 
   const syncUser = useCallback(async () => {
     if (!clerkLoaded || !clerkUser || !isAuthenticated) {
@@ -77,7 +75,7 @@ export function useClerkSync() {
     }
   }, [clerkLoaded, clerkUser, isAuthenticated, syncUserMutation]);
 
-  // Tentative de synchronisation unique avec délai plus long
+  // Tentative de synchronisation avec retry/backoff
   useEffect(() => {
     if (
       clerkLoaded &&
@@ -86,12 +84,19 @@ export function useClerkSync() {
       !hasAttemptedSync.current &&
       !syncInProgress.current
     ) {
-      // Délai plus long pour éviter les problèmes de suspension
-      const timer = setTimeout(() => {
-        syncUser();
-      }, 1000); // Augmenté à 1 seconde
-
-      return () => clearTimeout(timer);
+      let cancelled = false;
+      let attempt = 0;
+      const run = async () => {
+        while (!cancelled && attempt < 3 && !isSynced) {
+          await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt))); // 0.5s,1s,2s
+          await syncUser();
+          attempt += 1;
+        }
+      };
+      run();
+      return () => {
+        cancelled = true;
+      };
     }
   }, [clerkLoaded, clerkUser, isAuthenticated, syncUser]);
 

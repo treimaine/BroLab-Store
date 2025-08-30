@@ -45,10 +45,11 @@ export function EnhancedGlobalAudioPlayer() {
   const isMobile = useIsMobile();
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  // Initialize audio context for waveform visualization
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
-  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
-  const [dataArray, setDataArray] = useState<Uint8Array | null>(null);
+  // Web Audio API: initialize once and reuse for the lifetime of the audio element
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const dataArrayRef = useRef<Uint8Array | null>(null);
 
   // Update audio source when track changes
   useEffect(() => {
@@ -98,21 +99,31 @@ export function EnhancedGlobalAudioPlayer() {
       if (isPlaying) {
         console.log("▶️ Attempting to play audio...");
 
-        // Only stop other audio elements if this audio is ready to play
-        if (audio.readyState >= 2) {
-          // HAVE_CURRENT_DATA or higher
-          document.querySelectorAll("audio").forEach(otherAudio => {
-            if (otherAudio !== audio && !otherAudio.paused) {
-              console.log("🛑 Stopping other audio element");
-              otherAudio.pause();
-              otherAudio.currentTime = 0;
+        const tryPlay = async () => {
+          try {
+            const ctx = audioContextRef.current;
+            if (ctx && ctx.state === "suspended") {
+              await ctx.resume();
             }
-          });
-        }
 
-        audio.play().catch(error => {
-          console.error("❌ Audio play failed:", error);
-        });
+            // Only stop other audio elements if this audio is ready to play
+            if (audio.readyState >= 2) {
+              document.querySelectorAll("audio").forEach(otherAudio => {
+                if (otherAudio !== audio && !otherAudio.paused) {
+                  console.log("🛑 Stopping other audio element");
+                  otherAudio.pause();
+                  otherAudio.currentTime = 0;
+                }
+              });
+            }
+
+            await audio.play();
+          } catch (error) {
+            console.error("❌ Audio play failed:", error);
+          }
+        };
+
+        void tryPlay();
       } else {
         console.log("⏸️ Pausing audio...");
         audio.pause();
@@ -176,45 +187,43 @@ export function EnhancedGlobalAudioPlayer() {
     }
   }, [volume, isMuted]);
 
-  // Initialize audio context for waveform visualization
+  // Initialize Web Audio graph once and reuse; close only on unmount
   useEffect(() => {
-    if (!currentTrack || !audioRef.current) return;
+    const audio = audioRef.current;
+    if (!audio) return;
 
-    const initAudioContext = async () => {
-      try {
-        const audio = audioRef.current;
-        if (!audio) return;
-
-        const context = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const analyser = context.createAnalyser();
-        const source = context.createMediaElementSource(audio);
-
-        analyser.fftSize = 256;
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-
-        source.connect(analyser);
-        analyser.connect(context.destination);
-
-        setAudioContext(context);
-        setAnalyser(analyser);
-        setDataArray(dataArray);
-      } catch (error) {
-        console.error("❌ Failed to initialize audio context:", error);
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       }
-    };
+      if (!mediaSourceRef.current) {
+        mediaSourceRef.current = audioContextRef.current.createMediaElementSource(audio);
+      }
+      if (!analyserRef.current) {
+        const analyser = audioContextRef.current.createAnalyser();
+        analyser.fftSize = 256;
+        analyserRef.current = analyser;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArrayRef.current = new Uint8Array(bufferLength);
 
-    initAudioContext();
+        mediaSourceRef.current.connect(analyserRef.current);
+        analyserRef.current.connect(audioContextRef.current.destination);
+      }
+    } catch (error) {
+      console.error("❌ Failed to initialize audio context:", error);
+    }
 
     return () => {
-      if (audioContext) {
-        audioContext.close();
-        setAudioContext(null);
-        setAnalyser(null);
-        setDataArray(null);
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => undefined);
+        audioContextRef.current = null;
       }
+      mediaSourceRef.current = null;
+      analyserRef.current = null;
+      dataArrayRef.current = null;
     };
-  }, [currentTrack?.id]);
+  }, []);
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement | HTMLCanvasElement>) => {
     const audio = audioRef.current;
@@ -231,6 +240,8 @@ export function EnhancedGlobalAudioPlayer() {
 
   // Waveform animation
   useEffect(() => {
+    const analyser = analyserRef.current;
+    const dataArray = dataArrayRef.current;
     if (!analyser || !dataArray || !canvasRef.current || !isPlaying) return;
 
     const canvas = canvasRef.current;
@@ -240,16 +251,14 @@ export function EnhancedGlobalAudioPlayer() {
     const animate = () => {
       if (!analyser || !dataArray) return;
 
-      if (dataArray) {
-        (analyser as any).getByteFrequencyData(dataArray);
-      }
+      analyser.getByteFrequencyData(dataArray);
 
       const width = canvas.width;
       const height = canvas.height;
       const barWidth = width / dataArray.length;
 
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = "#a259ff"; // Purple color
+      ctx.fillStyle = "#a259ff";
 
       for (let i = 0; i < dataArray.length; i++) {
         const barHeight = (dataArray[i] / 255) * height;
@@ -269,7 +278,7 @@ export function EnhancedGlobalAudioPlayer() {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [analyser, dataArray, isPlaying]);
+  }, [isPlaying]);
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setVolume(Number(e.target.value));
@@ -355,7 +364,18 @@ export function EnhancedGlobalAudioPlayer() {
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => setIsPlaying(!isPlaying)}
+                onClick={async () => {
+                  try {
+                    if (!isPlaying) {
+                      const ctx = audioContextRef.current;
+                      if (ctx && ctx.state === "suspended") {
+                        await ctx.resume();
+                      }
+                    }
+                  } finally {
+                    setIsPlaying(!isPlaying);
+                  }
+                }}
                 className="w-12 h-10 p-0 bg-[var(--accent-purple)] hover:bg-purple-600 rounded-lg"
               >
                 {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}

@@ -3,6 +3,7 @@ import { ClerkPaymentForm } from "@/components/ClerkPaymentForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { StandardHero } from "@/components/ui/StandardHero";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, CheckCircle, CreditCard, ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -86,8 +87,13 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--dark-bg)] py-8">
-      <div className="container mx-auto px-6 max-w-6xl">
+    <div className="min-h-screen bg-[var(--deep-black)]">
+      <StandardHero
+        title="Checkout"
+        subtitle="Your payment information is encrypted and secure. Powered by Clerk."
+      />
+
+      <div className="container mx-auto px-6 max-w-6xl py-8">
         <div className="flex items-center gap-4 mb-8">
           <Button
             variant="ghost"
@@ -98,7 +104,6 @@ export default function Checkout() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Cart
           </Button>
-          <h1 className="text-3xl font-bold text-white">Checkout</h1>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

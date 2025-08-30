@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TC001",
+    "title": "authentication system user synchronization",
+    "description": "Verify that the authentication system correctly synchronizes user data between Clerk and the Convex database, ensuring data consistency and secure authentication."
+  },
+  {
+    "id": "TC002",
+    "title": "beats store filtering and search",
+    "description": "Test the beats marketplace filtering by genre, BPM, price, and search functionality to ensure accurate and responsive product listing updates."
+  },
+  {
+    "id": "TC003",
+    "title": "audio player waveform playback controls",
+    "description": "Validate the advanced audio player supports waveform visualization, playback controls including volume and seeking, and maintains persistent playback state across navigation."
+  },
+  {
+    "id": "TC004",
+    "title": "user dashboard analytics and downloads",
+    "description": "Check that the user dashboard correctly displays analytics, order history, downloads, and subscription status with accurate and up-to-date information."
+  },
+  {
+    "id": "TC005",
+    "title": "shopping cart and checkout flow",
+    "description": "Ensure the shopping cart management, quantity updates, and checkout process work seamlessly for both guest and authenticated users, including payment processing via Clerk Billing."
+  },
+  {
+    "id": "TC006",
+    "title": "subscription plans and billing integration",
+    "description": "Verify subscription plan selection, billing integration with Clerk, quota management, and accurate reflection of subscription status and billing history."
+  },
+  {
+    "id": "TC007",
+    "title": "service booking system functionality",
+    "description": "Test the service booking forms for mixing, mastering, recording sessions, and custom beats requests to ensure correct data capture and submission."
+  },
+  {
+    "id": "TC008",
+    "title": "favorites wishlist management",
+    "description": "Validate the favorites and wishlist management features, including adding, removing, and viewing recently played beats."
+  },
+  {
+    "id": "TC009",
+    "title": "internationalization multi language support",
+    "description": "Check that the application supports multiple languages and currency localization correctly using i18next integration."
+  },
+  {
+    "id": "TC010",
+    "title": "error handling and monitoring",
+    "description": "Verify that the error handling mechanisms capture and display errors gracefully, including Clerk error boundaries and notification systems."
+  }
+]

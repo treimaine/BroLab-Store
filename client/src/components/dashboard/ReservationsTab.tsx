@@ -2,8 +2,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { api } from "@convex/_generated/api";
+import { useQuery as useConvexQuery } from "convex/react";
 import { Calendar, CheckCircle, Clock, Clock4, CreditCard, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface Reservation {
   id: string;
@@ -34,16 +36,36 @@ export default function ReservationsTab({
   error = null,
 }: ReservationsTabProps) {
   const { toast } = useToast();
-  const [localReservations, setLocalReservations] = useState<Reservation[]>([]);
-  const [isLoadingReservations, setIsLoadingReservations] = useState(false);
+  const [limit, setLimit] = useState<number>(20);
+
+  // Convex realtime reservations
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const uqAny: any = useConvexQuery as unknown as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getUserReservationsAny: any = (api as any)["reservations/listReservations"]
+    .getUserReservations;
+  const rtReservations = uqAny(getUserReservationsAny, { limit });
+
+  const localReservations = useMemo<Reservation[]>(() => {
+    if (reservations && reservations.length > 0) return reservations;
+    const raw = (rtReservations || []) as any[];
+    return raw.map(r => ({
+      id: String(r._id || r.id),
+      service_type: r.serviceType || r.service_type,
+      preferred_date: r.preferredDate || r.preferred_date,
+      duration_minutes: r.durationMinutes ?? r.duration_minutes,
+      total_price: r.totalPrice ?? r.total_price,
+      status: r.status,
+      details: r.details || {},
+      created_at: new Date(r.createdAt || r.created_at || Date.now()).toISOString(),
+    }));
+  }, [reservations, rtReservations]);
+
+  const isLoadingReservations =
+    (reservations.length === 0 && rtReservations === undefined) || isLoading;
 
   useEffect(() => {
-    if (reservations && reservations.length > 0) {
-      setLocalReservations(reservations);
-    } else {
-      // Charger les réservations depuis l'API si aucune n'est fournie
-      fetchUserReservations();
-    }
+    // When provided via props, pagination is external; otherwise controlled by limit
   }, [reservations]);
 
   // Vérifier les paramètres URL pour les nouvelles réservations
@@ -56,7 +78,7 @@ export default function ReservationsTab({
     if ((reservationSuccess === "true" || paymentSuccess === "true") && reservationId) {
       // Rafraîchir les réservations après une nouvelle réservation ou un paiement
       setTimeout(() => {
-        fetchUserReservations();
+        setLimit(l => Math.max(l, 50));
         // Nettoyer l'URL
         window.history.replaceState({}, document.title, window.location.pathname);
 
@@ -72,25 +94,7 @@ export default function ReservationsTab({
     }
   }, [toast]);
 
-  const fetchUserReservations = async () => {
-    setIsLoadingReservations(true);
-    try {
-      const response = await fetch("/api/reservations/me");
-      if (response.ok) {
-        const data = await response.json();
-        setLocalReservations(data);
-        console.log("✅ Reservations loaded:", data);
-      } else {
-        console.error("Failed to fetch reservations:", response.status);
-        setLocalReservations([]);
-      }
-    } catch (error) {
-      console.error("Error fetching reservations:", error);
-      setLocalReservations([]);
-    } finally {
-      setIsLoadingReservations(false);
-    }
-  };
+  const loadMore = () => setLimit(prev => prev + 20);
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {

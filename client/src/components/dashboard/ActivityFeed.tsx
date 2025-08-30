@@ -76,10 +76,10 @@ function ActivityItem({ activity, index }: ActivityItemProps) {
     const now = new Date();
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
 
-    if (diffInMinutes < 1) return "À l'instant";
-    if (diffInMinutes < 60) return `Il y a ${diffInMinutes} min`;
-    if (diffInMinutes < 1440) return `Il y a ${Math.floor(diffInMinutes / 60)} h`;
-    return date.toLocaleDateString("fr-FR", {
+    if (diffInMinutes < 1) return "Just now";
+    if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} h ago`;
+    return date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       hour: "2-digit",
@@ -163,10 +163,10 @@ export function ActivityFeed({
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="flex items-center space-x-2 text-white text-sm sm:text-base">
               <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span>Activité récente</span>
+              <span>Recent activity</span>
             </CardTitle>
             <CardDescription className="text-gray-400 text-xs sm:text-sm">
-              Vos dernières actions sur la plateforme
+              Your latest actions on the platform
             </CardDescription>
           </CardHeader>
         )}
@@ -194,7 +194,7 @@ export function ActivityFeed({
           <CardTitle className="flex items-center justify-between text-white">
             <div className="flex items-center space-x-2">
               <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span className="text-sm sm:text-base">Activité récente</span>
+              <span className="text-sm sm:text-base">Recent activity</span>
             </div>
             {activities.length > maxItems && (
               <Badge variant="outline" className="border-gray-600 text-gray-400 text-xs">
@@ -203,7 +203,7 @@ export function ActivityFeed({
             )}
           </CardTitle>
           <CardDescription className="text-gray-400 text-xs sm:text-sm">
-            Vos dernières actions sur la plateforme
+            Your latest actions on the platform
           </CardDescription>
         </CardHeader>
       )}
@@ -227,8 +227,8 @@ export function ActivityFeed({
               className="text-center py-6 sm:py-8"
             >
               <Clock className="w-8 h-8 sm:w-12 sm:h-12 text-gray-600 mx-auto mb-2 sm:mb-3" />
-              <p className="text-gray-400 text-xs sm:text-sm">Aucune activité récente</p>
-              <p className="text-gray-500 text-xs mt-1">Vos actions apparaîtront ici</p>
+              <p className="text-gray-400 text-xs sm:text-sm">No recent activity</p>
+              <p className="text-gray-500 text-xs mt-1">Your actions will appear here</p>
             </motion.div>
           )}
         </AnimatePresence>

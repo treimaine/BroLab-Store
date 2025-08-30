@@ -1,8 +1,8 @@
+import { StandardHero } from "@/components/ui/StandardHero";
 import { useWordPress } from "@/hooks/use-wordpress";
-import { StandardHero } from '@/components/ui/StandardHero';
 
 export default function Privacy() {
-  const { page, isLoading, error } = useWordPress('privacy-policy');
+  const { page, isLoading, error } = useWordPress("privacy-policy");
 
   if (isLoading) {
     return (
@@ -38,9 +38,8 @@ export default function Privacy() {
         title="Privacy Policy"
         subtitle="Learn how we collect, use, and protect your personal information at BroLab Entertainment."
       />
-      
+
       <div className="max-w-4xl mx-auto px-4 py-20">
-        
         <div className="prose prose-invert prose-lg max-w-none">
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8 mb-8">
             <h2 className="text-2xl font-bold mb-6">Information We Collect</h2>
@@ -72,28 +71,35 @@ export default function Privacy() {
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8 mb-8">
             <h2 className="text-2xl font-bold mb-6">Information Sharing</h2>
             <p className="text-gray-300 leading-relaxed mb-6">
-              We do not sell, trade, or otherwise transfer your personal information to third parties except as described in this policy. We may share your information with trusted service providers who assist us in operating our website and conducting our business.
+              We do not sell, trade, or otherwise transfer your personal information to third
+              parties except as described in this policy. We may share your information with trusted
+              service providers who assist us in operating our website and conducting our business.
             </p>
           </div>
 
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8 mb-8">
             <h2 className="text-2xl font-bold mb-6">Data Security</h2>
             <p className="text-gray-300 leading-relaxed mb-6">
-              We implement appropriate security measures to protect your personal information. However, no method of transmission over the internet is 100% secure, and we cannot guarantee absolute security.
+              We implement appropriate security measures to protect your personal information.
+              However, no method of transmission over the internet is 100% secure, and we cannot
+              guarantee absolute security.
             </p>
           </div>
 
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8 mb-8">
             <h2 className="text-2xl font-bold mb-6">Cookies and Tracking</h2>
             <p className="text-gray-300 leading-relaxed mb-6">
-              We use cookies and similar technologies to enhance your browsing experience, analyze website traffic, and understand where our visitors are coming from. You can control cookie settings through your browser.
+              We use cookies and similar technologies to enhance your browsing experience, analyze
+              website traffic, and understand where our visitors are coming from. You can control
+              cookie settings through your browser.
             </p>
           </div>
 
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8">
             <h2 className="text-2xl font-bold mb-6">Contact Us</h2>
             <p className="text-gray-300 leading-relaxed">
-              If you have questions about this privacy policy, please contact us at contact@brolabentertainment.com.
+              If you have questions about this privacy policy, please contact us at
+              contact@brolabentertainment.com.
             </p>
           </div>
         </div>
@@ -102,21 +108,23 @@ export default function Privacy() {
   );
 
   return (
-    <div className="pt-16 min-h-screen bg-[var(--deep-black)] text-white">
-      <div className="max-w-4xl mx-auto px-4 py-20">
-        {page ? (
-          <>
-            <h1 className="text-4xl md:text-5xl font-bold mb-12 text-center"
-                dangerouslySetInnerHTML={{ __html: page.title.rendered }} />
-            <div 
+    <div className="min-h-screen bg-[var(--deep-black)] text-white">
+      {page ? (
+        <>
+          <StandardHero
+            title={(page.title?.rendered || "Privacy Policy").replace(/<[^>]+>/g, "")}
+            subtitle="Learn how we collect, use, and protect your personal information at BroLab Entertainment."
+          />
+          <div className="max-w-4xl mx-auto px-4 py-20">
+            <div
               className="prose prose-invert prose-lg max-w-none"
               dangerouslySetInnerHTML={{ __html: page.content.rendered }}
             />
-          </>
-        ) : (
-          fallbackContent
-        )}
-      </div>
+          </div>
+        </>
+      ) : (
+        fallbackContent
+      )}
     </div>
   );
 }
