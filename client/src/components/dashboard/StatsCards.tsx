@@ -111,28 +111,28 @@ export function StatsCards({ stats, previousStats, isLoading, className }: Stats
 
   const statsConfig = [
     {
-      title: "Favoris",
+      title: "Favorites",
       value: stats.totalFavorites,
       icon: <Heart className="w-full h-full text-white" />,
       color: "bg-red-500/20",
       trend: calculateTrend(stats.totalFavorites, previousStats?.totalFavorites),
     },
     {
-      title: "Téléchargements",
+      title: "Downloads",
       value: stats.totalDownloads,
       icon: <Download className="w-full h-full text-white" />,
       color: "bg-blue-500/20",
       trend: calculateTrend(stats.totalDownloads, previousStats?.totalDownloads),
     },
     {
-      title: "Commandes",
+      title: "Orders",
       value: stats.totalOrders,
       icon: <ShoppingCart className="w-full h-full text-white" />,
       color: "bg-green-500/20",
       trend: calculateTrend(stats.totalOrders, previousStats?.totalOrders),
     },
     {
-      title: "Total dépensé",
+      title: "Total spent",
       value: stats.totalSpent,
       icon: <DollarSign className="w-full h-full text-white" />,
       color: "bg-yellow-500/20",

@@ -5,20 +5,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile, useIsTablet } from "@/hooks/useBreakpoint";
 import { useDashboardDataOptimized } from "@/hooks/useDashboardDataOptimized";
 import { useClerk, useUser } from "@clerk/clerk-react";
+import { api } from "@convex/_generated/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { useQuery as useConvexQuery } from "convex/react";
 import { motion } from "framer-motion";
 import {
   Activity,
   BarChart3,
   Download,
   Music,
-  RefreshCw,
   Settings,
   ShoppingCart,
   Star,
   TrendingUp,
   User,
 } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 // Lazy-load heavy dashboard subcomponents
 const StatsCards = lazy(() =>
@@ -69,9 +71,9 @@ function LoadingWithRetry({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-      <p className="text-gray-400">Chargement du tableau de bord...</p>
+      <p className="text-gray-400">Loading dashboard...</p>
       <Button onClick={onRetry} variant="outline" size="sm">
-        Réessayer
+        Retry
       </Button>
     </div>
   );
@@ -161,21 +163,85 @@ export function LazyDashboard() {
   const { openUserProfile } = useClerk();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
+  // Active tab needs to be defined before realtime queries so we can conditionally enable them
+  const [activeTab, setActiveTab] = useState("overview");
   const {
     stats,
     favorites,
     orders,
     downloads,
+    reservations,
     recommendations,
     recentActivity,
     chartData,
     trends,
     isLoading,
-    error,
+    favoritesAddedPerMonth,
     refetch,
+    loadMoreOrders,
   } = useDashboardDataOptimized();
 
-  const [activeTab, setActiveTab] = useState("overview");
+  // Cache pour enrichir les téléchargements avec les titres WooCommerce si absents en base
+  const [downloadBeatMeta, setDownloadBeatMeta] = useState<Record<number, { title?: string }>>({});
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function fetchMissingTitles() {
+      const toFetch = new Set<number>();
+      (downloads || []).forEach((d: any) => {
+        const idNum = Number(d.beatId);
+        if (!d.beatTitle && Number.isFinite(idNum) && !downloadBeatMeta[idNum]) {
+          toFetch.add(idNum);
+        }
+      });
+      if (toFetch.size === 0) return;
+
+      await Promise.all(
+        Array.from(toFetch).map(async id => {
+          try {
+            const res = await fetch(`/api/woocommerce/products/${id}`, {
+              signal: controller.signal,
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const title = data?.name || data?.title || data?.beat?.name || undefined;
+            if (title) {
+              setDownloadBeatMeta(prev => ({ ...prev, [id]: { title } }));
+            }
+          } catch (_) {
+            // Ignore network errors silently; UI already has a fallback name
+          }
+        })
+      );
+    }
+
+    fetchMissingTitles();
+    return () => controller.abort();
+  }, [downloads, downloadBeatMeta]);
+
+  // Real-time sources
+  const queryClient = useQueryClient();
+  // Only fetch realtime favorites when the overview tab (which renders the recommendations block) is active
+  // Use lightweight any-casted function refs to avoid TS2589
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const uqAny: any = useConvexQuery as unknown as any;
+  // Helper indirection to avoid deep generic instantiation on Convex generated `api`
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const apiAny = (a: unknown): any => a as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getFavoritesAny: any = apiAny(api)?.["favorites/getFavorites"]?.getFavorites as any;
+  const rtFavorites = uqAny(getFavoritesAny, user && activeTab === "overview" ? {} : "skip");
+  // Fetch activity in realtime only when Overview or Activity tab is active
+  const shouldFetchActivity = activeTab === "overview" || activeTab === "activity";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getRecentActivityAny: any = apiAny(api)?.["activity/getRecent"]?.getRecent as any;
+  const rtActivity = uqAny(getRecentActivityAny, user && shouldFetchActivity ? {} : "skip");
+
+  // Prefer realtime favorites when available
+  const favoritesEffective = useMemo(() => {
+    return (rtFavorites || favorites || []) as any[];
+  }, [rtFavorites, favorites]);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [analyticsTimeRange, setAnalyticsTimeRange] = useState<"7d" | "30d" | "90d" | "1y">("30d");
@@ -188,6 +254,37 @@ export function LazyDashboard() {
     await refetch();
     setTimeout(() => setIsRefreshing(false), 1000);
   };
+
+  // Invalidate relevant queries on download-success events
+  useEffect(() => {
+    const onDownloadSuccess = () => {
+      // Dashboard aggregate
+      queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
+      // Realtime-friendly keys used across hooks
+      queryClient.invalidateQueries({ queryKey: ["convex", "downloads"] });
+      queryClient.invalidateQueries({ queryKey: ["convex", "activity"] });
+    };
+    window.addEventListener("download-success", onDownloadSuccess);
+    return () => window.removeEventListener("download-success", onDownloadSuccess);
+  }, [queryClient]);
+
+  // Invalidate after order creation/update events
+  useEffect(() => {
+    const invalidateOrders = () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
+      queryClient.invalidateQueries({ queryKey: ["convex", "orders"] });
+      queryClient.invalidateQueries({ queryKey: ["convex", "activity"] });
+    };
+    window.addEventListener("order-created", invalidateOrders);
+    window.addEventListener("order-updated", invalidateOrders);
+    // Also listen to generic webhook signal (optional server-sent event via window dispatch)
+    window.addEventListener("webhook-order-updated", invalidateOrders as any);
+    return () => {
+      window.removeEventListener("order-created", invalidateOrders);
+      window.removeEventListener("order-updated", invalidateOrders);
+      window.removeEventListener("webhook-order-updated", invalidateOrders as any);
+    };
+  }, [queryClient]);
 
   const handleRetry = async () => {
     setConvexError(null);
@@ -211,22 +308,7 @@ export function LazyDashboard() {
     );
   }
 
-  if (error) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="pt-16 sm:pt-20 min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800 flex items-center justify-center px-4"
-      >
-        <div className="text-center space-y-4">
-          <p className="text-red-400">Erreur lors du chargement du tableau de bord</p>
-          <Button onClick={handleRefresh} variant="outline">
-            Réessayer
-          </Button>
-        </div>
-      </motion.div>
-    );
-  }
+  // Error state handled via convexError below
 
   return (
     <ErrorBoundary onError={handleError}>
@@ -247,41 +329,30 @@ export function LazyDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
-                  Bonjour, {user?.firstName || "Utilisateur"} 👋
+                  Hello, {user?.firstName || "User"} 👋
                 </h1>
                 <p className="text-sm sm:text-base text-gray-300">
-                  Voici un aperçu de votre activité sur BroLab
+                  Here is an overview of your activity on BroLab
                 </p>
               </div>
               <div className="flex items-center space-x-2 sm:space-x-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  className="border-gray-600 text-gray-300 hover:bg-gray-800 text-xs sm:text-sm"
-                >
-                  <RefreshCw
-                    className={`w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 ${isRefreshing ? "animate-spin" : ""}`}
-                  />
-                  {isRefreshing ? "Actualisation..." : "Actualiser"}
-                </Button>
+                {/* Refresh button removed; realtime + auto invalidation covers updates. Use Retry in error card. */}
               </div>
             </div>
           </motion.div>
 
-          {/* Statistiques */}
+          {/* Statistics */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
             <Suspense fallback={<StatsSkeleton />}>
-              <StatsCards stats={stats} isLoading={isLoading} className="mb-6 sm:mb-8" />
+              <StatsCards stats={stats} isLoading={Boolean(isLoading)} className="mb-6 sm:mb-8" />
             </Suspense>
           </motion.div>
 
-          {/* Onglets du Dashboard */}
+          {/* Dashboard tabs */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -289,20 +360,23 @@ export function LazyDashboard() {
           >
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
               <div className="overflow-x-auto">
-                <TabsList className="flex w-full min-w-max bg-gray-900/50 border-gray-700/50 backdrop-blur-sm gap-2 sm:gap-4 px-2 sm:px-4 py-1 sm:py-2">
+                <TabsList
+                  aria-label="User dashboard tabs"
+                  className="flex w-full min-w-max bg-gray-900/50 border-gray-700/50 backdrop-blur-sm gap-2 sm:gap-4 px-2 sm:px-4 py-1 sm:py-2"
+                >
                   <TabsTrigger
                     value="overview"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
                     <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    {isMobile ? "Vue" : "Vue d'ensemble"}
+                    {isMobile ? "Overview" : "Overview"}
                   </TabsTrigger>
                   <TabsTrigger
                     value="activity"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
                     <Activity className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    Activité
+                    Activity
                   </TabsTrigger>
                   <TabsTrigger
                     value="analytics"
@@ -316,35 +390,35 @@ export function LazyDashboard() {
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
                     <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    Commandes
+                    Orders
                   </TabsTrigger>
                   <TabsTrigger
                     value="downloads"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
                     <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    Téléchargements
+                    Downloads
                   </TabsTrigger>
                   <TabsTrigger
                     value="reservations"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
                     <Star className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    Réservations
+                    Reservations
                   </TabsTrigger>
                   <TabsTrigger
                     value="profile"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
                     <User className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    Profil
+                    Profile
                   </TabsTrigger>
                   <TabsTrigger
                     value="settings"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
                     <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
-                    Paramètres
+                    Settings
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -354,8 +428,8 @@ export function LazyDashboard() {
                   <div className="lg:col-span-2">
                     <Suspense fallback={<ActivitySkeleton />}>
                       <ActivityFeed
-                        activities={recentActivity || []}
-                        isLoading={isLoading}
+                        activities={(rtActivity as any) || recentActivity || []}
+                        isLoading={Boolean(isLoading)}
                         maxItems={isMobile ? 4 : isTablet ? 6 : 8}
                       />
                     </Suspense>
@@ -364,14 +438,14 @@ export function LazyDashboard() {
                     <CardHeader className="p-4 sm:p-6">
                       <CardTitle className="flex items-center space-x-2 text-white text-sm sm:text-base">
                         <Star className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span>Recommandations</span>
+                        <span>Recommendations</span>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 sm:p-6">
                       <Suspense fallback={<RecommendationsSkeleton />}>
                         <div className="space-y-3">
-                          {favorites &&
-                            favorites.slice(0, isMobile ? 3 : 4).map((favorite, index) => (
+                          {favoritesEffective &&
+                            favoritesEffective.slice(0, isMobile ? 3 : 4).map((favorite, index) => (
                               <div
                                 key={index}
                                 className="flex items-center space-x-3 p-3 rounded-lg bg-gray-800/50"
@@ -396,15 +470,20 @@ export function LazyDashboard() {
 
               <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
                 <Suspense fallback={<ChartsSkeleton />}>
-                  <TrendCharts data={chartData || []} trends={trends || {}} isLoading={isLoading} />
+                  <TrendCharts
+                    data={chartData || []}
+                    trends={trends || {}}
+                    favoritesMonthly={favoritesAddedPerMonth}
+                    isLoading={Boolean(isLoading)}
+                  />
                 </Suspense>
               </TabsContent>
 
               <TabsContent value="activity" className="space-y-4 sm:space-y-6">
                 <Suspense fallback={<ActivitySkeleton />}>
                   <ActivityFeed
-                    activities={recentActivity || []}
-                    isLoading={isLoading}
+                    activities={(rtActivity as any) || recentActivity || []}
+                    isLoading={Boolean(isLoading)}
                     maxItems={isMobile ? 10 : isTablet ? 15 : 20}
                     showHeader={false}
                   />
@@ -412,34 +491,39 @@ export function LazyDashboard() {
               </TabsContent>
 
               <TabsContent value="orders" className="space-y-4 sm:space-y-6">
-                <OrdersTab ordersData={orders} />
+                <OrdersTab
+                  ordersData={orders}
+                  ordersLoading={Boolean(isLoading)}
+                  onLoadMore={loadMoreOrders}
+                />
               </TabsContent>
 
               <TabsContent value="downloads" className="space-y-4 sm:space-y-6">
                 <DownloadsTable
-                  downloads={
-                    downloads?.map((download: any) => ({
-                      id: download.id || download._id || `download-${download.beatId}`,
-                      beatTitle: download.beatTitle || `Beat ${download.beatId}`,
-                      artist: "Artiste inconnu",
-                      fileSize: 5.2,
-                      format: "mp3" as const,
-                      quality: "320kbps",
-                      downloadedAt: new Date().toISOString(),
-                      downloadCount: 1,
-                      maxDownloads: 3,
-                      licenseType: "Standard",
-                      downloadUrl: download.downloadUrl || "/download/beat",
-                    })) || []
-                  }
-                  isLoading={isLoading}
+                  downloads={(downloads || []).map((d: any) => ({
+                    id: d._id || d.id || `download-${d.beatId}`,
+                    beatTitle:
+                      downloadBeatMeta[Number(d.beatId)]?.title ||
+                      d.beatTitle ||
+                      `Beat ${d.beatId}`,
+                    artist: d.artist,
+                    fileSize: typeof d.fileSize === "number" ? d.fileSize : 0,
+                    format: (d.format || "mp3") as any,
+                    quality: d.quality || "320kbps",
+                    downloadedAt: new Date(d.timestamp || Date.now()).toISOString(),
+                    downloadCount: typeof d.quotaUsed === "number" ? d.quotaUsed : 0,
+                    maxDownloads: typeof d.quotaLimit === "number" ? d.quotaLimit : undefined,
+                    licenseType: d.licenseType,
+                    downloadUrl: d.downloadUrl || "",
+                  }))}
+                  isLoading={Boolean(isLoading)}
                   onRefresh={handleRefresh}
                 />
               </TabsContent>
 
               <TabsContent value="reservations" className="space-y-4 sm:space-y-6">
                 <Suspense fallback={<ActivitySkeleton />}>
-                  <ReservationsTab reservations={[]} />
+                  <ReservationsTab reservations={reservations} />
                 </Suspense>
               </TabsContent>
 
@@ -455,7 +539,7 @@ export function LazyDashboard() {
                     <CardHeader className="p-4 sm:p-6">
                       <CardTitle className="flex items-center space-x-2 text-white text-sm sm:text-base">
                         <User className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span>Profil utilisateur</span>
+                        <span>User profile</span>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4 p-4 sm:p-6">
@@ -478,11 +562,11 @@ export function LazyDashboard() {
                       <Button
                         className="w-full bg-purple-600 hover:bg-purple-700 text-xs sm:text-sm"
                         onClick={() => {
-                          // Ouvrir l'interface Clerk pour modifier le profil
+                          // Open Clerk profile interface
                           openUserProfile();
                         }}
                       >
-                        Modifier le profil
+                        Edit profile
                       </Button>
                     </CardContent>
                   </Card>
@@ -497,13 +581,13 @@ export function LazyDashboard() {
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <p className="text-red-700 text-xs sm:text-sm">Erreur Convex: {convexError}</p>
+                  <p className="text-red-700 text-xs sm:text-sm">Convex error: {convexError}</p>
                   <Button
                     onClick={handleRetry}
                     size="sm"
                     className="ml-auto bg-red-600 hover:bg-red-700 text-xs"
                   >
-                    Réessayer
+                    Retry
                   </Button>
                 </div>
               </CardContent>

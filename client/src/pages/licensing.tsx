@@ -1,8 +1,8 @@
+import { StandardHero } from "@/components/ui/StandardHero";
 import { useWordPress } from "@/hooks/use-wordpress";
-import { StandardHero } from '@/components/ui/StandardHero';
 
 export default function Licensing() {
-  const { page, isLoading, error } = useWordPress('licensing');
+  const { page, isLoading, error } = useWordPress("licensing");
 
   if (isLoading) {
     return (
@@ -38,12 +38,13 @@ export default function Licensing() {
         title="Licensing Guide"
         subtitle="Understand our beat licensing options and choose the right license for your music projects."
       />
-      
+
       <div className="max-w-4xl mx-auto px-4 py-20">
-        
         <div className="prose prose-invert prose-lg max-w-none">
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8 mb-8">
-            <h2 className="text-2xl font-bold mb-6 text-[var(--accent-purple)]">Basic MP3 License - $29.99</h2>
+            <h2 className="text-2xl font-bold mb-6 text-[var(--accent-purple)]">
+              Basic MP3 License - $29.99
+            </h2>
             <ul className="text-gray-300 space-y-3 ml-6">
               <li>• Up to 50,000 audio streams</li>
               <li>• Distribute up to 2,500 copies</li>
@@ -54,7 +55,9 @@ export default function Licensing() {
           </div>
 
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8 mb-8">
-            <h2 className="text-2xl font-bold mb-6 text-[var(--accent-purple)]">Premium WAV License - $49.99</h2>
+            <h2 className="text-2xl font-bold mb-6 text-[var(--accent-purple)]">
+              Premium WAV License - $49.99
+            </h2>
             <ul className="text-gray-300 space-y-3 ml-6">
               <li>• Up to 150,000 audio streams</li>
               <li>• Distribute up to 2,500 copies</li>
@@ -66,7 +69,9 @@ export default function Licensing() {
           </div>
 
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8 mb-8">
-            <h2 className="text-2xl font-bold mb-6 text-[var(--accent-purple)]">Unlimited License - $149.99</h2>
+            <h2 className="text-2xl font-bold mb-6 text-[var(--accent-purple)]">
+              Unlimited License - $149.99
+            </h2>
             <ul className="text-gray-300 space-y-3 ml-6">
               <li>• Unlimited audio streams</li>
               <li>• Unlimited copies distribution</li>
@@ -77,8 +82,6 @@ export default function Licensing() {
               <li>• Complete commercial freedom with stems</li>
             </ul>
           </div>
-
-
 
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8">
             <h2 className="text-2xl font-bold mb-6">Important Notes</h2>
@@ -96,21 +99,23 @@ export default function Licensing() {
   );
 
   return (
-    <div className="pt-16 min-h-screen bg-[var(--deep-black)] text-white">
-      <div className="max-w-4xl mx-auto px-4 py-20">
-        {page ? (
-          <>
-            <h1 className="text-4xl md:text-5xl font-bold mb-12 text-center"
-                dangerouslySetInnerHTML={{ __html: page.title.rendered }} />
-            <div 
+    <div className="min-h-screen bg-[var(--deep-black)] text-white">
+      {page ? (
+        <>
+          <StandardHero
+            title={(page.title?.rendered || "Licensing").replace(/<[^>]+>/g, "")}
+            subtitle="Understand our beat licensing options and choose the right license for your music projects."
+          />
+          <div className="max-w-4xl mx-auto px-4 py-20">
+            <div
               className="prose prose-invert prose-lg max-w-none"
               dangerouslySetInnerHTML={{ __html: page.content.rendered }}
             />
-          </>
-        ) : (
-          fallbackContent
-        )}
-      </div>
+          </div>
+        </>
+      ) : (
+        fallbackContent
+      )}
     </div>
   );
 }

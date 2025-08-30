@@ -31,7 +31,7 @@ export const PAYPAL_WEBHOOK_ID = process.env.PAYPAL_WEBHOOK_ID;
 // ✅ CORRECTION: URLs de redirection vers les routes de capture PayPal
 // PayPal renverra l'utilisateur vers /api/paypal/capture/:token
 export const PAYPAL_RETURN_URL = `${process.env.SERVER_URL || "http://localhost:5000"}/api/paypal/capture`;
-export const PAYPAL_CANCEL_URL = `${process.env.CLIENT_URL || "http://localhost:5000"}/payment/cancel`;
+export const PAYPAL_CANCEL_URL = `${process.env.CLIENT_URL || "https://brolabentertainment.com"}/payment/cancel`;
 
 // Configuration des devises supportées
 export const SUPPORTED_CURRENCIES = ["EUR", "USD"];

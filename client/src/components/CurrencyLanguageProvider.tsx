@@ -1,56 +1,59 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { IntlProvider } from 'react-intl';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { IntlProvider } from "react-intl";
 
 // Language configurations
 const SUPPORTED_LANGUAGES = {
-  en: { name: 'English', flag: '🇺🇸' },
-  es: { name: 'Español', flag: '🇪🇸' },
-  fr: { name: 'Français', flag: '🇫🇷' },
-  de: { name: 'Deutsch', flag: '🇩🇪' },
-  ja: { name: '日本語', flag: '🇯🇵' },
-  zh: { name: '中文', flag: '🇨🇳' }
+  en: { name: "English", flag: "🇺🇸" },
+  es: { name: "Español", flag: "🇪🇸" },
+  fr: { name: "Français", flag: "🇫🇷" },
+  de: { name: "Deutsch", flag: "🇩🇪" },
+  ja: { name: "日本語", flag: "🇯🇵" },
+  zh: { name: "中文", flag: "🇨🇳" },
 };
 
-// Currency configurations  
+// Currency configurations
 const SUPPORTED_CURRENCIES = {
-  USD: { symbol: '$', name: 'US Dollar', flag: '🇺🇸' },
-  EUR: { symbol: '€', name: 'Euro', flag: '🇪🇺' },
-  GBP: { symbol: '£', name: 'British Pound', flag: '🇬🇧' },
-  JPY: { symbol: '¥', name: 'Japanese Yen', flag: '🇯🇵' },
-  CNY: { symbol: '¥', name: 'Chinese Yuan', flag: '🇨🇳' },
-  CAD: { symbol: 'C$', name: 'Canadian Dollar', flag: '🇨🇦' },
-  AUD: { symbol: 'A$', name: 'Australian Dollar', flag: '🇦🇺' },
-  CHF: { symbol: 'Fr', name: 'Swiss Franc', flag: '🇨🇭' },
-  SEK: { symbol: 'kr', name: 'Swedish Krona', flag: '🇸🇪' },
-  NOK: { symbol: 'kr', name: 'Norwegian Krone', flag: '🇳🇴' },
-  DKK: { symbol: 'kr', name: 'Danish Krone', flag: '🇩🇰' },
-  PLN: { symbol: 'zł', name: 'Polish Złoty', flag: '🇵🇱' },
-  BRL: { symbol: 'R$', name: 'Brazilian Real', flag: '🇧🇷' },
-  MXN: { symbol: '$', name: 'Mexican Peso', flag: '🇲🇽' },
-  INR: { symbol: '₹', name: 'Indian Rupee', flag: '🇮🇳' }
+  USD: { symbol: "$", name: "US Dollar", flag: "🇺🇸" },
+  EUR: { symbol: "€", name: "Euro", flag: "🇪🇺" },
+  GBP: { symbol: "£", name: "British Pound", flag: "🇬🇧" },
+  JPY: { symbol: "¥", name: "Japanese Yen", flag: "🇯🇵" },
+  CNY: { symbol: "¥", name: "Chinese Yuan", flag: "🇨🇳" },
+  CAD: { symbol: "C$", name: "Canadian Dollar", flag: "🇨🇦" },
+  AUD: { symbol: "A$", name: "Australian Dollar", flag: "🇦🇺" },
+  CHF: { symbol: "Fr", name: "Swiss Franc", flag: "🇨🇭" },
+  SEK: { symbol: "kr", name: "Swedish Krona", flag: "🇸🇪" },
+  NOK: { symbol: "kr", name: "Norwegian Krone", flag: "🇳🇴" },
+  DKK: { symbol: "kr", name: "Danish Krone", flag: "🇩🇰" },
+  PLN: { symbol: "zł", name: "Polish Złoty", flag: "🇵🇱" },
+  BRL: { symbol: "R$", name: "Brazilian Real", flag: "🇧🇷" },
+  MXN: { symbol: "$", name: "Mexican Peso", flag: "🇲🇽" },
+  INR: { symbol: "₹", name: "Indian Rupee", flag: "🇮🇳" },
 };
 
 // Country to currency/language mapping
-const COUNTRY_MAPPING: Record<string, { currency: keyof typeof SUPPORTED_CURRENCIES; language: keyof typeof SUPPORTED_LANGUAGES }> = {
-  US: { currency: 'USD', language: 'en' },
-  CA: { currency: 'CAD', language: 'en' },
-  GB: { currency: 'GBP', language: 'en' },
-  DE: { currency: 'EUR', language: 'de' },
-  FR: { currency: 'EUR', language: 'fr' },
-  ES: { currency: 'EUR', language: 'es' },
-  IT: { currency: 'EUR', language: 'en' },
-  NL: { currency: 'EUR', language: 'en' },
-  JP: { currency: 'JPY', language: 'ja' },
-  CN: { currency: 'CNY', language: 'zh' },
-  AU: { currency: 'AUD', language: 'en' },
-  CH: { currency: 'CHF', language: 'en' },
-  SE: { currency: 'SEK', language: 'en' },
-  NO: { currency: 'NOK', language: 'en' },
-  DK: { currency: 'DKK', language: 'en' },
-  PL: { currency: 'PLN', language: 'en' },
-  BR: { currency: 'BRL', language: 'en' },
-  MX: { currency: 'MXN', language: 'es' },
-  IN: { currency: 'INR', language: 'en' }
+const COUNTRY_MAPPING: Record<
+  string,
+  { currency: keyof typeof SUPPORTED_CURRENCIES; language: keyof typeof SUPPORTED_LANGUAGES }
+> = {
+  US: { currency: "USD", language: "en" },
+  CA: { currency: "CAD", language: "en" },
+  GB: { currency: "GBP", language: "en" },
+  DE: { currency: "EUR", language: "de" },
+  FR: { currency: "EUR", language: "fr" },
+  ES: { currency: "EUR", language: "es" },
+  IT: { currency: "EUR", language: "en" },
+  NL: { currency: "EUR", language: "en" },
+  JP: { currency: "JPY", language: "ja" },
+  CN: { currency: "CNY", language: "zh" },
+  AU: { currency: "AUD", language: "en" },
+  CH: { currency: "CHF", language: "en" },
+  SE: { currency: "SEK", language: "en" },
+  NO: { currency: "NOK", language: "en" },
+  DK: { currency: "DKK", language: "en" },
+  PL: { currency: "PLN", language: "en" },
+  BR: { currency: "BRL", language: "en" },
+  MX: { currency: "MXN", language: "es" },
+  IN: { currency: "INR", language: "en" },
 };
 
 interface CurrencyLanguageContextType {
@@ -66,23 +69,23 @@ interface CurrencyLanguageContextType {
 }
 
 const CurrencyLanguageContext = createContext<CurrencyLanguageContextType>({
-  currency: 'USD',
-  language: 'en',
+  currency: "USD",
+  language: "en",
   exchangeRate: 1,
   setCurrency: () => {},
   setLanguage: () => {},
-  convertPrice: (price) => price,
-  formatPrice: (price) => `$${price.toFixed(2)}`,
+  convertPrice: price => price,
+  formatPrice: price => `$${price.toFixed(2)}`,
   isLoading: true,
-  userCountry: 'US'
+  userCountry: "US",
 });
 
 export const CurrencyLanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currency, setCurrencyState] = useState<keyof typeof SUPPORTED_CURRENCIES>('USD');
-  const [language, setLanguageState] = useState<keyof typeof SUPPORTED_LANGUAGES>('en');
+  const [currency, setCurrencyState] = useState<keyof typeof SUPPORTED_CURRENCIES>("USD");
+  const [language, setLanguageState] = useState<keyof typeof SUPPORTED_LANGUAGES>("en");
   const [exchangeRate, setExchangeRate] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
-  const [userCountry, setUserCountry] = useState('US');
+  const [userCountry, setUserCountry] = useState("US");
 
   // Auto-detect user location and set currency/language
   useEffect(() => {
@@ -91,7 +94,7 @@ export const CurrencyLanguageProvider: React.FC<{ children: React.ReactNode }> =
 
   // Fetch exchange rates when currency changes
   useEffect(() => {
-    if (currency !== 'USD') {
+    if (currency !== "USD") {
       fetchExchangeRate();
     } else {
       setExchangeRate(1);
@@ -102,17 +105,17 @@ export const CurrencyLanguageProvider: React.FC<{ children: React.ReactNode }> =
     try {
       // Try multiple geolocation services for reliability
       const services = [
-        'https://ipapi.co/json/',
-        'https://api.ipify.org?format=json', // Fallback
+        "https://ipapi.co/json/",
+        "https://api.ipify.org?format=json", // Fallback
       ];
 
       let locationData = null;
-      
+
       for (const service of services) {
         try {
           const response = await fetch(service);
           const data = await response.json();
-          
+
           if (data.country_code || data.country) {
             locationData = data;
             break;
@@ -123,20 +126,27 @@ export const CurrencyLanguageProvider: React.FC<{ children: React.ReactNode }> =
       }
 
       if (locationData) {
-        const countryCode = locationData.country_code || locationData.country || 'US';
+        const countryCode = locationData.country_code || locationData.country || "US";
         const mapping = COUNTRY_MAPPING[countryCode] || COUNTRY_MAPPING.US;
-        
+
         setUserCountry(countryCode);
         setCurrencyState(mapping.currency);
-        setLanguageState(mapping.language);
-        
+
+        // Language preference: honor stored value or default to English; do not auto-switch
+        const storedLang = localStorage.getItem("brolab_language");
+        setLanguageState(
+          storedLang && storedLang in SUPPORTED_LANGUAGES
+            ? (storedLang as keyof typeof SUPPORTED_LANGUAGES)
+            : "en"
+        );
+
         // Save preferences to localStorage
-        localStorage.setItem('brolab_currency', mapping.currency);
-        localStorage.setItem('brolab_language', mapping.language);
-        localStorage.setItem('brolab_country', countryCode);
+        localStorage.setItem("brolab_currency", mapping.currency);
+        if (!storedLang) localStorage.setItem("brolab_language", "en");
+        localStorage.setItem("brolab_country", countryCode);
       }
     } catch (error) {
-      console.warn('Geolocation detection failed, using defaults:', error);
+      console.warn("Geolocation detection failed, using defaults:", error);
     } finally {
       setIsLoading(false);
     }
@@ -146,7 +156,7 @@ export const CurrencyLanguageProvider: React.FC<{ children: React.ReactNode }> =
     try {
       const response = await fetch(`https://api.exchangerate-api.com/v4/latest/USD`);
       const data = await response.json();
-      
+
       if (data.rates && data.rates[currency]) {
         setExchangeRate(data.rates[currency]);
       } else {
@@ -154,19 +164,19 @@ export const CurrencyLanguageProvider: React.FC<{ children: React.ReactNode }> =
         setExchangeRate(1);
       }
     } catch (error) {
-      console.warn('Failed to fetch exchange rate:', error);
+      console.warn("Failed to fetch exchange rate:", error);
       setExchangeRate(1);
     }
   };
 
   const setCurrency = (newCurrency: keyof typeof SUPPORTED_CURRENCIES) => {
     setCurrencyState(newCurrency);
-    localStorage.setItem('brolab_currency', newCurrency);
+    localStorage.setItem("brolab_currency", newCurrency);
   };
 
   const setLanguage = (newLanguage: keyof typeof SUPPORTED_LANGUAGES) => {
     setLanguageState(newLanguage);
-    localStorage.setItem('brolab_language', newLanguage);
+    localStorage.setItem("brolab_language", newLanguage);
   };
 
   const convertPrice = (usdPrice: number): number => {
@@ -188,7 +198,7 @@ export const CurrencyLanguageProvider: React.FC<{ children: React.ReactNode }> =
     convertPrice,
     formatPrice,
     isLoading,
-    userCountry
+    userCountry,
   };
 
   return (
@@ -203,7 +213,7 @@ export const CurrencyLanguageProvider: React.FC<{ children: React.ReactNode }> =
 export const useCurrencyLanguage = () => {
   const context = useContext(CurrencyLanguageContext);
   if (!context) {
-    throw new Error('useCurrencyLanguage must be used within CurrencyLanguageProvider');
+    throw new Error("useCurrencyLanguage must be used within CurrencyLanguageProvider");
   }
   return context;
 };
@@ -217,7 +227,7 @@ export const CurrencyLanguageSwitcher: React.FC = () => {
       {/* Currency Selector */}
       <select
         value={currency}
-        onChange={(e) => setCurrency(e.target.value as keyof typeof SUPPORTED_CURRENCIES)}
+        onChange={e => setCurrency(e.target.value as keyof typeof SUPPORTED_CURRENCIES)}
         className="bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-sm"
       >
         {Object.entries(SUPPORTED_CURRENCIES).map(([code, config]) => (
@@ -230,7 +240,7 @@ export const CurrencyLanguageSwitcher: React.FC = () => {
       {/* Language Selector */}
       <select
         value={language}
-        onChange={(e) => setLanguage(e.target.value as keyof typeof SUPPORTED_LANGUAGES)}
+        onChange={e => setLanguage(e.target.value as keyof typeof SUPPORTED_LANGUAGES)}
         className="bg-gray-800 text-white border border-gray-600 rounded px-2 py-1 text-sm"
       >
         {Object.entries(SUPPORTED_LANGUAGES).map(([code, config]) => (
@@ -241,9 +251,7 @@ export const CurrencyLanguageSwitcher: React.FC = () => {
       </select>
 
       {/* Location Indicator */}
-      <span className="text-xs text-gray-400">
-        📍 {userCountry}
-      </span>
+      <span className="text-xs text-gray-400">📍 {userCountry}</span>
     </div>
   );
 };

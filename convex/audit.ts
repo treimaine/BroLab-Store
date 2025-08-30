@@ -1,5 +1,24 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation } from "./_generated/server";
+
+export const log = mutation({
+  args: {
+    action: v.string(),
+    resource: v.string(),
+    details: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("auditLogs", {
+      action: args.action,
+      resource: args.resource,
+      details: args.details,
+      timestamp: Date.now(),
+    });
+    return { success: true };
+  },
+});
+
+import { query } from "./_generated/server";
 
 export interface AuditLogEntry {
   userId?: string;

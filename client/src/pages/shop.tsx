@@ -4,13 +4,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { StandardHero } from "@/components/ui/StandardHero";
 import { UnifiedFilterPanel } from "@/components/UnifiedFilterPanel";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { useUnifiedFilters } from "@/hooks/useUnifiedFilters";
 import { UnifiedFilters } from "@/lib/unifiedFilters";
+import type { BeatProduct } from "@shared/schema";
 import { Filter, Grid3X3, List, RotateCcw, Search } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useLocation } from "wouter";
+
+type WooCategory = { id: number; name: string };
+type WooMeta = { key: string; value: any };
+type WooAttribute = { name: string; options?: string[] };
+type BeatProductWithWoo = BeatProduct & {
+  categories?: WooCategory[];
+  meta_data?: WooMeta[];
+  attributes?: WooAttribute[];
+};
 
 export default function Shop() {
   const [, setLocation] = useLocation();
@@ -85,7 +96,7 @@ export default function Shop() {
             <div className="text-center">
               <h2 className="text-xl font-semibold mb-4">Erreur de chargement</h2>
               <p className="text-muted-foreground mb-4">
-                Impossible de charger les produits. Veuillez réessayer.
+                Unable to load products. Please try again.
               </p>
               <Button onClick={() => window.location.reload()}>
                 <RotateCcw className="w-4 h-4 mr-2" />
@@ -99,20 +110,13 @@ export default function Shop() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--deep-black)] pt-16 sm:pt-20">
-      {/* Header */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
-              BroLab Beats Store
-            </h1>
-            <p className="text-gray-400 text-sm sm:text-base">
-              Discover professional beats for your next project
-            </p>
-          </div>
-        </div>
+    <div className="min-h-screen bg-[var(--deep-black)]">
+      <StandardHero
+        title="BroLab Beats Store"
+        subtitle="Discover professional beats for your next project"
+      />
 
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Search and Filters Bar */}
         <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mb-6">
           {/* Search */}
@@ -286,49 +290,73 @@ export default function Shop() {
                     id={product.id}
                     title={product.name || "Untitled"}
                     genre={
-                      product.categories?.[0]?.name ||
-                      product.categories?.find((cat: any) => cat.name)?.name ||
-                      product.meta_data?.find((meta: any) => meta.key === "genre")?.value ||
-                      product.meta_data?.find((meta: any) => meta.key === "category")?.value ||
-                      product.meta_data?.find((meta: any) => meta.key === "style")?.value ||
-                      product.attributes?.find((attr: any) => attr.name === "Genre")?.options?.[0] ||
-                      product.attributes?.find((attr: any) => attr.name === "Style")?.options?.[0] ||
+                      (product as BeatProductWithWoo).categories?.[0]?.name ||
+                      (product as BeatProductWithWoo).categories?.find(cat => cat.name)?.name ||
+                      String(
+                        (product as BeatProductWithWoo).meta_data?.find(
+                          meta => meta.key === "genre"
+                        )?.value ?? ""
+                      ) ||
+                      String(
+                        (product as BeatProductWithWoo).meta_data?.find(
+                          meta => meta.key === "category"
+                        )?.value ?? ""
+                      ) ||
+                      String(
+                        (product as BeatProductWithWoo).meta_data?.find(
+                          meta => meta.key === "style"
+                        )?.value ?? ""
+                      ) ||
+                      (product as BeatProductWithWoo).attributes?.find(
+                        attr => attr.name === "Genre"
+                      )?.options?.[0] ||
+                      (product as BeatProductWithWoo).attributes?.find(
+                        attr => attr.name === "Style"
+                      )?.options?.[0] ||
                       ""
                     }
-                    bpm={
-                      product.bpm ||
-                      product.meta_data?.find((meta: any) => meta.key === "bpm")?.value ||
-                      product.meta_data?.find((meta: any) => meta.key === "BPM")?.value ||
-                      product.attributes?.find((attr: any) => attr.name === "BPM")?.options?.[0] ||
-                      ""
-                    }
+                    bpm={(() => {
+                      if (typeof product.bpm === "number") return product.bpm;
+                      const md = (product as BeatProductWithWoo).meta_data || [];
+                      const bpmMeta =
+                        md.find(m => m.key === "bpm")?.value ??
+                        md.find(m => m.key === "BPM")?.value;
+                      const attrVal = (product as BeatProductWithWoo).attributes?.find(
+                        a => a.name === "BPM"
+                      )?.options?.[0];
+                      const parsed = Number(bpmMeta ?? attrVal);
+                      return Number.isFinite(parsed) ? parsed : undefined;
+                    })()}
                     price={product.price}
                     imageUrl={product.images?.[0]?.src || ""}
                     audioUrl={product.audio_url || ""}
-                    tags={
-                      (() => {
-                        const tags = [];
-                        if (product.tags && Array.isArray(product.tags)) {
-                          tags.push(...product.tags.map((tag: any) => tag.name));
+                    tags={(() => {
+                      const tags = [];
+                      if (product.tags && Array.isArray(product.tags)) {
+                        tags.push(...product.tags.map(t => (typeof t === "string" ? t : t.name)));
+                      }
+                      const metaTags = (product as BeatProductWithWoo).meta_data?.find(
+                        meta => meta.key === "tags"
+                      )?.value as string | string[] | undefined;
+                      if (metaTags) {
+                        if (typeof metaTags === "string") {
+                          tags.push(...metaTags.split(",").map((tag: string) => tag.trim()));
+                        } else if (Array.isArray(metaTags)) {
+                          tags.push(...metaTags);
                         }
-                        const metaTags = product.meta_data?.find((meta: any) => meta.key === "tags")?.value;
-                        if (metaTags) {
-                          if (typeof metaTags === 'string') {
-                            tags.push(...metaTags.split(',').map((tag: string) => tag.trim()));
-                          } else if (Array.isArray(metaTags)) {
-                            tags.push(...metaTags);
-                          }
-                        }
-                        return tags.filter(Boolean);
-                      })()
-                    }
+                      }
+                      return tags.filter(Boolean);
+                    })()}
                     featured={product.featured}
                     downloads={product.downloads || 0}
                     duration={product.duration}
                     isFree={
                       product.is_free ||
-                      product.tags?.some((tag: any) => tag.name?.toLowerCase() === 'free') ||
-                      (typeof product.price === "string" && (product.price === "0" || parseFloat(product.price) === 0)) ||
+                      product.tags?.some(
+                        tag => (typeof tag === "string" ? tag : tag.name)?.toLowerCase() === "free"
+                      ) ||
+                      (typeof product.price === "string" &&
+                        (product.price === "0" || parseFloat(product.price) === 0)) ||
                       (typeof product.price === "number" && product.price === 0)
                     }
                     onViewDetails={() => handleProductView(product.id)}

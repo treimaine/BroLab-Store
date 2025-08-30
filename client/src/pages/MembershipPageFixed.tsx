@@ -1,11 +1,10 @@
-import React, { Suspense, startTransition, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { useToast } from "@/hooks/use-toast";
 import { PricingTable, useUser } from "@clerk/clerk-react";
 import { Download, Music, Zap } from "lucide-react";
+import { startTransition, useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { ClerkPricingTableWithFallback } from "@/components/ClerkWithFallback";
 
 // Composant de chargement pour PricingTable
 const PricingTableFallback = () => (
@@ -35,17 +34,17 @@ const ClerkErrorFallback = () => (
   <div className="max-w-4xl mx-auto text-center">
     <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-8">
       <h3 className="text-2xl font-bold text-yellow-200 mb-4">
-        Système d'abonnement temporairement indisponible
+        Subscription system temporarily unavailable
       </h3>
       <p className="text-yellow-200 mb-6">
-        Nous résolvons actuellement un problème technique avec notre système d'abonnement Clerk.
-        Veuillez réessayer dans quelques minutes ou nous contacter si le problème persiste.
+        We are currently resolving a technical issue with our Clerk subscription system. Please try
+        again in a few minutes or contact us if the problem persists.
       </p>
       <button
         onClick={() => window.location.reload()}
         className="bg-[var(--accent-purple)] hover:bg-[var(--accent-purple)]/90 text-white px-6 py-3 rounded-lg font-medium transition-colors"
       >
-        Réessayer
+        Try again
       </button>
     </div>
   </div>

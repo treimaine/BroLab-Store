@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Repeat, Shuffle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { cn } from '@/lib/utils';
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
+import { Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 export interface WaveformAudioPlayerProps {
   src: string;
@@ -22,69 +22,74 @@ export function WaveformAudioPlayer({
   src,
   title,
   artist,
-  className = '',
+  className = "",
   showControls = true,
   showWaveform = true,
   previewOnly = false,
   autoPlay = false,
   onPlay,
   onPause,
-  onEnded
+  onEnded,
 }: WaveformAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const waveformContainerRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number>();
-  
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState([0.8]);
   const [isMuted, setIsMuted] = useState(false);
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
-  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
-  const [dataArray, setDataArray] = useState<Uint8Array | null>(null);
+  // Web Audio API: initialize once per <audio> element and reuse
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const dataArrayRef = useRef<Uint8Array | null>(null);
   const [staticWaveform, setStaticWaveform] = useState<number[]>([]);
 
-  // Initialize audio context and analyser
+  // Initialize audio context and analyser once
   useEffect(() => {
     if (!showWaveform || !audioRef.current) return;
 
-    const initializeAudio = async () => {
-      try {
-        const context = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const analyserNode = context.createAnalyser();
-        const source = context.createMediaElementSource(audioRef.current!);
-        
-        analyserNode.fftSize = 256;
-        const bufferLength = analyserNode.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-
-        source.connect(analyserNode);
-        analyserNode.connect(context.destination);
-
-        setAudioContext(context);
-        setAnalyser(analyserNode);
-        setDataArray(dataArray);
-      } catch (error) {
-        console.warn('Audio context initialization failed:', error);
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       }
-    };
+      if (!mediaSourceRef.current && audioRef.current) {
+        mediaSourceRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
+      }
+      if (!analyserRef.current) {
+        const analyser = audioContextRef.current.createAnalyser();
+        analyser.fftSize = 256;
+        analyserRef.current = analyser;
+        const bufferLength = analyser.frequencyBinCount;
+        dataArrayRef.current = new Uint8Array(bufferLength);
 
-    initializeAudio();
+        mediaSourceRef.current!.connect(analyserRef.current);
+        analyserRef.current.connect(audioContextRef.current.destination);
+      }
+    } catch (error) {
+      console.warn("Audio context initialization failed:", error);
+    }
 
     return () => {
-      if (audioContext) {
-        audioContext.close();
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => undefined);
+        audioContextRef.current = null;
       }
+      mediaSourceRef.current = null;
+      analyserRef.current = null;
+      dataArrayRef.current = null;
     };
   }, [showWaveform]);
 
   // Generate static waveform pattern
   useEffect(() => {
     if (!showWaveform) return;
-    
+
     // Generate a realistic static waveform pattern
     const waveformData = [];
     for (let i = 0; i < 200; i++) {
@@ -102,40 +107,40 @@ export function WaveformAudioPlayer({
     if (!showWaveform || !canvasRef.current || staticWaveform.length === 0) return;
 
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const drawWaveform = () => {
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       const barWidth = canvas.width / staticWaveform.length;
       const centerY = canvas.height / 2;
-      
+
       staticWaveform.forEach((amplitude, i) => {
         const x = i * barWidth;
         const barHeight = amplitude * canvas.height * 0.8;
-        
+
         // Calculate progress for color animation
         const progress = duration > 0 ? currentTime / duration : 0;
         const isPlayed = i / staticWaveform.length < progress;
-        
+
         // Set color based on play state
         if (isPlayed && isPlaying) {
-          ctx.fillStyle = '#06b6d4'; // Cyan for played portion
+          ctx.fillStyle = "#06b6d4"; // Cyan for played portion
         } else if (isPlayed) {
-          ctx.fillStyle = '#0891b2'; // Darker cyan for paused played portion  
+          ctx.fillStyle = "#0891b2"; // Darker cyan for paused played portion
         } else {
-          ctx.fillStyle = '#374151'; // Gray for unplayed portion
+          ctx.fillStyle = "#374151"; // Gray for unplayed portion
         }
-        
+
         // Draw vertical bar from center
         ctx.fillRect(x, centerY - barHeight / 2, Math.max(1, barWidth - 0.5), barHeight);
       });
     };
 
     drawWaveform();
-    
+
     let animationFrame: number;
     if (isPlaying) {
       const animate = () => {
@@ -182,18 +187,18 @@ export function WaveformAudioPlayer({
       onPause?.();
     };
 
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
 
     return () => {
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
     };
   }, [onPlay, onPause, onEnded]);
 
@@ -205,13 +210,14 @@ export function WaveformAudioPlayer({
         audioRef.current.pause();
       } else {
         // Resume audio context if suspended
-        if (audioContext && audioContext.state === 'suspended') {
-          await audioContext.resume();
+        const ctx = audioContextRef.current;
+        if (ctx && ctx.state === "suspended") {
+          await ctx.resume();
         }
         await audioRef.current.play();
       }
     } catch (error) {
-      console.warn('Playback error:', error);
+      console.warn("Playback error:", error);
     }
   };
 
@@ -232,7 +238,7 @@ export function WaveformAudioPlayer({
 
   const toggleMute = () => {
     if (!audioRef.current) return;
-    
+
     if (isMuted) {
       audioRef.current.volume = volume[0];
       setIsMuted(false);
@@ -245,17 +251,17 @@ export function WaveformAudioPlayer({
   const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
   // Compact table layout for smaller displays
-  if (className?.includes('h-8') || className?.includes('h-10')) {
+  if (className?.includes("h-8") || className?.includes("h-10")) {
     return (
       <div className={cn("bg-transparent", className)}>
         <audio ref={audioRef} src={src} preload="metadata" />
-        
+
         {/* Compact Table Row Layout */}
         <div className="flex items-center space-x-3">
           {/* Play Button */}
@@ -278,12 +284,12 @@ export function WaveformAudioPlayer({
           {/* Compact Waveform */}
           {showWaveform && (
             <div ref={waveformContainerRef} className="flex-1 min-w-0">
-              <canvas 
+              <canvas
                 ref={canvasRef}
                 width={400}
                 height={32}
                 className="w-full h-8 cursor-pointer"
-                onClick={(e) => {
+                onClick={e => {
                   if (!duration) return;
                   const rect = e.currentTarget.getBoundingClientRect();
                   const x = e.clientX - rect.left;
@@ -310,26 +316,28 @@ export function WaveformAudioPlayer({
   return (
     <div className={cn("bg-transparent", className)}>
       <audio ref={audioRef} src={src} preload="metadata" />
-      
+
       {/* Clean Professional Layout */}
       <div className="space-y-4">
         {/* Header with Title */}
         {(title || artist) && (
           <div className="text-center">
-            <h3 className="text-white font-medium text-lg">{title || 'Audio Preview'}</h3>
-            {artist && <p className="text-gray-400 text-sm font-light">BY {artist.toUpperCase()}</p>}
+            <h3 className="text-white font-medium text-lg">{title || "Audio Preview"}</h3>
+            {artist && (
+              <p className="text-gray-400 text-sm font-light">BY {artist.toUpperCase()}</p>
+            )}
           </div>
         )}
 
         {/* Waveform Visualization */}
         {showWaveform && (
           <div ref={waveformContainerRef} className="relative">
-            <canvas 
+            <canvas
               ref={canvasRef}
               width={800}
               height={120}
               className="w-full h-[120px] cursor-pointer"
-              onClick={(e) => {
+              onClick={e => {
                 if (!duration) return;
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
@@ -341,7 +349,7 @@ export function WaveformAudioPlayer({
                 }
               }}
             />
-            
+
             {/* Overlay for preview notice */}
             {previewOnly && !isPlaying && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm rounded">
@@ -401,12 +409,7 @@ export function WaveformAudioPlayer({
         {/* Volume Control (if enabled) */}
         {showControls && (
           <div className="flex items-center justify-center gap-3">
-            <Button
-              onClick={toggleMute}
-              variant="ghost"
-              size="sm"
-              className="p-2"
-            >
+            <Button onClick={toggleMute} variant="ghost" size="sm" className="p-2">
               {isMuted || volume[0] === 0 ? (
                 <VolumeX className="w-4 h-4 text-gray-400" />
               ) : (
@@ -426,7 +429,9 @@ export function WaveformAudioPlayer({
         {/* Preview Notice */}
         {previewOnly && (
           <div className="text-center">
-            <p className="text-xs text-gray-500 font-medium">PREVIEW • Full version available after purchase</p>
+            <p className="text-xs text-gray-500 font-medium">
+              PREVIEW • Full version available after purchase
+            </p>
           </div>
         )}
       </div>

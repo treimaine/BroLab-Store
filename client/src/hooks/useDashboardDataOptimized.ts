@@ -1,6 +1,8 @@
 import { useUser } from "@clerk/clerk-react";
+import { api } from "@convex/_generated/api";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
+import { useQuery } from "convex/react";
+import { useCallback, useMemo, useState } from "react";
 
 // Types pour les données
 export interface Activity {
@@ -53,35 +55,56 @@ export interface DashboardUser {
 export function useDashboardDataOptimized() {
   const { user: clerkUser, isLoaded } = useUser();
   const queryClient = useQueryClient();
+  const [ordersCursor, setOrdersCursor] = useState<number | undefined>(undefined);
+  const [ordersPages, setOrdersPages] = useState<any[]>([]);
 
-  // Données de développement temporaires pour faire fonctionner Analytics
-  const mockRecentOrders = useMemo(() => [
-    { _id: "1", beatId: 1, beatTitle: "Beat 1", total: 29.99, status: "completed", createdAt: Date.now() - 86400000 },
-    { _id: "2", beatId: 2, beatTitle: "Beat 2", total: 19.99, status: "pending", createdAt: Date.now() - 172800000 },
-  ], []);
+  // Use lightweight wrapper to avoid TS2589 deep instantiation
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const uq: <T>(fn: any, args: any) => T | undefined = useQuery as unknown as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getUserStatsAny: any = (api as any)["users/getUserStats"].getUserStats;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getFavoritesAny: any = (api as any)["favorites/getFavorites"].getFavorites;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getDownloadsEnrichedAny: any = (api as any)["downloads/enriched"].getUserDownloadsEnriched;
+  // Defer resolving orders function via runtime accessor to avoid deep instantiation
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const listOrdersAny: any = (api as any as Record<string, any>)["orders"]?.["listOrders"];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getReservationsAny: any = (api as any)["reservations/listReservations"]
+    ?.getUserReservations;
+  // Queries (using lightweight wrapper to avoid deep type instantiation)
+  const userStatsRes = uq<
+    | {
+        user?: unknown;
+        stats?: UserStats;
+        recentActivity?: Activity[];
+        orders?: unknown[];
+      }
+    | undefined
+  >(getUserStatsAny, clerkUser ? {} : "skip");
 
-  const mockUserFavorites = useMemo(() => [
-    { _id: "f1", beatId: 1, beat: { title: "Favorite Beat 1" }, createdAt: Date.now() - 86400000 },
-    { _id: "f2", beatId: 2, beat: { title: "Favorite Beat 2" }, createdAt: Date.now() - 172800000 },
-  ], []);
+  const favoritesRes = uq<unknown[] | undefined>(
+    // Prefer favorites with beat join when available
+    ((api as any)["favorites/getFavorites"] as any).getFavoritesWithBeats || getFavoritesAny,
+    clerkUser ? {} : "skip"
+  );
 
-  const mockUserDownloads = useMemo(() => [
-    { _id: "d1", beatId: 1, beatTitle: "Downloaded Beat 1", downloadedAt: Date.now() - 86400000 },
-  ], []);
+  const downloadsRes = uq<unknown[] | undefined>(getDownloadsEnrichedAny, clerkUser ? {} : "skip");
 
-  const mockReservations = useMemo(() => [
-    { _id: "r1", serviceType: "Mixing", status: "confirmed", createdAt: Date.now() - 86400000 },
-  ], []);
-
-  const mockAuditLogs = useMemo(() => [
-    { _id: "a1", action: "login", timestamp: Date.now() - 3600000, details: { description: "Connexion utilisateur" } },
-    { _id: "a2", action: "purchase", timestamp: Date.now() - 7200000, details: { description: "Achat d'un beat" } },
-  ], []);
+  const ordersPage = uq<any | undefined>(
+    listOrdersAny,
+    clerkUser ? { limit: 20, cursor: ordersCursor } : "skip"
+  );
+  const reservationsRes = uq<unknown[] | undefined>(
+    getReservationsAny,
+    clerkUser ? { limit: 50 } : "skip"
+  );
 
   // État de chargement optimisé
   const isLoading = useMemo(() => {
-    return !isLoaded;
-  }, [isLoaded]);
+    return !isLoaded || (clerkUser && userStatsRes === undefined);
+  }, [isLoaded, clerkUser, userStatsRes]);
 
   // Données utilisateur avec fallback Clerk
   const user: DashboardUser | null = useMemo(() => {
@@ -100,116 +123,119 @@ export function useDashboardDataOptimized() {
 
   // Statistiques calculées à partir des données de développement
   const stats: UserStats = useMemo(() => {
-    const favoritesCount = mockUserFavorites?.length || 0;
-    const ordersCount = mockRecentOrders?.length || 0;
-    const downloadsCount = mockUserDownloads?.length || 0;
-    const totalSpent = mockRecentOrders?.reduce((sum, order) => {
-      if (order.status === "completed" || order.status === "paid") {
-        return sum + (order.total || 0);
-      }
-      return sum;
-    }, 0) || 0;
-
+    const s = (userStatsRes as any)?.stats as
+      | {
+          totalFavorites?: number;
+          totalDownloads?: number;
+          totalOrders?: number;
+          totalSpent?: number;
+          recentActivity?: number;
+        }
+      | undefined;
     return {
-      totalFavorites: favoritesCount,
-      totalDownloads: downloadsCount,
-      totalOrders: ordersCount,
-      totalSpent,
-      recentActivity: Math.max(favoritesCount, ordersCount, downloadsCount),
+      totalFavorites: s?.totalFavorites ?? 0,
+      totalDownloads: s?.totalDownloads ?? 0,
+      totalOrders: s?.totalOrders ?? 0,
+      totalSpent: s?.totalSpent ?? 0,
+      recentActivity: s?.recentActivity ?? 0,
     };
-  }, [mockUserFavorites, mockRecentOrders, mockUserDownloads]);
+  }, [userStatsRes]);
 
   // Activité récente calculée à partir des données de développement
   const recentActivity: Activity[] = useMemo(() => {
-    const activities: Activity[] = [];
-
-    // Ajouter les logs d'audit récents
-    mockAuditLogs.forEach((log: any) => {
-      activities.push({
-        id: log._id,
-        type: log.action,
-        description: log.details?.description || log.action,
-        timestamp: new Date(log.timestamp).toISOString(),
-        date: new Date(log.timestamp).toLocaleDateString(),
-        severity: log.details?.severity || "info",
-      });
-    });
-
-    // Ajouter les commandes récentes
-    mockRecentOrders.forEach((order: any, index: number) => {
-      activities.push({
-        id: `order-${order._id || index}`,
-        type: "order",
-        description: `Commande ${order.status === 'completed' ? 'complétée' : 'créée'} - ${order.total}€`,
-        timestamp: new Date(order.createdAt).toISOString(),
-        date: new Date(order.createdAt).toLocaleDateString(),
-        severity: "info",
-      });
-    });
-
-    // Ajouter les réservations récentes
-    mockReservations.forEach((reservation: any, index: number) => {
-      activities.push({
-        id: `reservation-${reservation._id || index}`,
-        type: "reservation",
-        description: `Réservation ${reservation.serviceType} - ${reservation.status}`,
-        timestamp: new Date(reservation.createdAt).toISOString(),
-        date: new Date(reservation.createdAt).toLocaleDateString(),
-        severity: "info",
-      });
-    });
-
-    // Ajouter les favoris récents
-    mockUserFavorites.forEach((favorite: any, index: number) => {
-      activities.push({
-        id: `favorite-${favorite._id || index}`,
-        type: "favorite",
-        description: `Beat ajouté aux favoris: ${favorite.beat?.title || 'Beat'}`,
-        timestamp: new Date(favorite.createdAt).toISOString(), 
-        date: new Date(favorite.createdAt).toLocaleDateString(),
-        severity: "info",
-      });
-    });
-
-    return activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 10);
-  }, [mockAuditLogs, mockRecentOrders, mockReservations, mockUserFavorites]);
+    return (((userStatsRes as any)?.recentActivity as Activity[]) || []) as Activity[];
+  }, [userStatsRes]);
 
   // Favoris récents avec données de développement
   const favorites: Favorite[] = useMemo(() => {
-    return mockUserFavorites.map((favorite: any) => ({
-      id: favorite._id,
+    const raw = (favoritesRes || []) as any[];
+    return raw.map(favorite => ({
+      id: favorite._id ?? favorite.id,
       beatId: favorite.beatId,
-      beatTitle: favorite.beat?.title,
-      createdAt: favorite.createdAt,
+      beatTitle: favorite.beat?.title as string | undefined,
+      createdAt: favorite.createdAt as number | undefined,
     }));
-  }, [mockUserFavorites]);
+  }, [favoritesRes]);
+
+  // Nombre de favoris ajoutés par mois (6 derniers mois)
+  const favoritesAddedPerMonth = useMemo(() => {
+    const now = new Date();
+    const buckets: { label: string; count: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
+      const count = (favorites || []).filter(f => {
+        const ts = (f.createdAt as number) || 0;
+        const fd = new Date(ts);
+        return fd.getMonth() === d.getMonth() && fd.getFullYear() === d.getFullYear();
+      }).length;
+      buckets.push({ label, count });
+    }
+    return buckets;
+  }, [favorites]);
 
   // Téléchargements récents avec données de développement
   const downloads = useMemo(() => {
-    return mockUserDownloads.map((download: any) => ({
-      id: download._id,
-      beatId: download.beatId,
-      beatTitle: download.beatTitle,
-      downloadedAt: new Date(download.downloadedAt).toISOString(),
-      downloadUrl: download.downloadUrl,
+    const raw = (downloadsRes || []) as any[];
+    return raw.map(download => ({
+      ...download,
+      id: download._id ?? download.id,
+      downloadedAt: new Date((download.timestamp as number) || Date.now()).toISOString(),
     }));
-  }, [mockUserDownloads]);
+  }, [downloadsRes]);
 
   // Commandes récentes avec données de développement
   const orders: Order[] = useMemo(() => {
-    return mockRecentOrders.map((order: any) => ({
-      id: order._id,
-      beatId: order.beatId,
-      beatTitle: order.beatTitle,
-      amount: order.total,
-      total: order.total,
-      status: order.status,
-      createdAt: order.createdAt,
-      items: order.items,
+    const merged = [...ordersPages];
+    if (ordersPage && Array.isArray(ordersPage.items)) {
+      // Avoid duplicates when cursor doesn't move
+      const existingIds = new Set(merged.map(o => String(o.id)));
+      for (const o of ordersPage.items) {
+        if (!existingIds.has(String(o.id))) merged.push(o);
+      }
+    }
+    return merged.map(order => ({
+      id: String(order.id),
+      beatId: (order as any).beatId as number,
+      beatTitle: (order as any).beatTitle as string | undefined,
+      amount: Number(order.displayTotal ?? order.total ?? 0),
+      total: Number(order.displayTotal ?? order.total ?? 0),
+      status: String(order.status || "pending"),
+      createdAt: Number(order.createdAt || 0),
+      items: (order.items as any[]) || undefined,
     }));
-  }, [mockRecentOrders]);
+  }, [ordersPage, ordersPages]);
 
-  // Données pour les graphiques
+  const hasMoreOrders = Boolean(ordersPage?.hasMore);
+  const loadMoreOrders = useCallback(() => {
+    if (ordersPage && ordersPage.cursor) {
+      setOrdersPages(prev => {
+        const existingIds = new Set(prev.map(o => String(o.id)));
+        const incoming = (ordersPage.items || []).filter(
+          (o: any) => !existingIds.has(String(o.id))
+        );
+        return [...prev, ...incoming];
+      });
+      setOrdersCursor(ordersPage.cursor as number);
+    }
+  }, [ordersPage]);
+
+  // Réservations récentes (mapping UI-friendly)
+  const reservations = useMemo(() => {
+    const raw = (reservationsRes || []) as any[];
+    return raw.map(r => ({
+      id: String(r._id || r.id),
+      service_type: r.serviceType || r.service_type,
+      preferred_date: r.preferredDate || r.preferred_date,
+      duration_minutes: r.durationMinutes ?? r.duration_minutes,
+      total_price: r.totalPrice ?? r.total_price,
+      status: r.status,
+      details: r.details || {},
+      created_at: new Date(r.createdAt || r.created_at || Date.now()).toISOString(),
+    }));
+  }, [reservationsRes]);
+
+  // Données pour les graphiques (corrigé: revenue seulement pour paid/completed; conversion cents→euros si nécessaire)
   const chartData = useMemo(() => {
     const now = new Date();
     const months = [];
@@ -219,8 +245,7 @@ export function useDashboardDataOptimized() {
       const monthOrders = orders.filter((order: any) => {
         const orderDate = new Date(order.createdAt || 0);
         return (
-          orderDate.getMonth() === date.getMonth() &&
-          orderDate.getFullYear() === date.getFullYear()
+          orderDate.getMonth() === date.getMonth() && orderDate.getFullYear() === date.getFullYear()
         );
       });
 
@@ -232,17 +257,34 @@ export function useDashboardDataOptimized() {
         );
       });
 
+      // Favorites ajoutés sur le mois
+      const monthFavorites = (favorites || []).filter((favorite: any) => {
+        const ts = (favorite.createdAt as number) || 0;
+        const d = new Date(ts);
+        return d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear();
+      }).length;
+
+      // Revenue: seulement commandes réglées et conversion cents → euros si nécessaire
+      const paidOrders = monthOrders.filter((o: any) => {
+        const s = String(o.status || "").toLowerCase();
+        return s === "paid" || s === "completed";
+      });
+      const isCents = paidOrders.some((o: any) => (o.total ?? 0) >= 1000);
+      const monthRevenue =
+        paidOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0) / (isCents ? 100 : 1);
+
       months.push({
         date: date.toLocaleDateString("fr-FR", { month: "short", year: "numeric" }),
         orders: monthOrders.length,
         downloads: monthDownloads.length,
-        revenue: monthOrders.reduce((sum: number, order: any) => sum + (order.total || 0), 0),
-        beats: Math.floor(Math.random() * 10) + 5, // Données simulées pour les beats
+        revenue: monthRevenue,
+        // Conserver la clé "beats" pour compatibilité mais y mettre les favoris mensuels
+        beats: monthFavorites,
       });
     }
 
     return months;
-  }, [orders, downloads]);
+  }, [orders, downloads, favorites]);
 
   // Tendances calculées
   const trends = useMemo(() => {
@@ -305,11 +347,14 @@ export function useDashboardDataOptimized() {
     recentActivity,
     favorites,
     downloads,
-    orders,
+    orders: { items: orders, hasMore: hasMoreOrders },
+    loadMoreOrders,
+    reservations,
     recommendations,
     chartData,
     trends,
     isLoading,
+    favoritesAddedPerMonth,
     refetch,
   };
 }

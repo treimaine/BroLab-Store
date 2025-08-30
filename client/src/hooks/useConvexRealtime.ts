@@ -246,6 +246,8 @@ export function useConvexCreateOrder() {
     onSuccess: () => {
       // Invalider les requêtes commandes
       queryClient.invalidateQueries({ queryKey: ["convex", "orders"] });
+      // Émettre un événement pour rafraîchir le dashboard et l'activité
+      window.dispatchEvent(new CustomEvent("order-created"));
     },
   });
 }

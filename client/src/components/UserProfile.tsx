@@ -55,7 +55,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
     totalDownloads: 0,
     totalFavorites: 0,
     totalSpent: 0,
-    memberSince: user?.createdAt ? new Date(user.createdAt).toLocaleDateString("fr-FR") : "N/A",
+    memberSince: user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US") : "N/A",
     lastActivity: "—",
   };
 
@@ -90,24 +90,24 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
 
       setIsUploadingPhoto(true);
       try {
-        // Vérifier le type de fichier
+        // Validate file type
         if (!file.type.startsWith("image/")) {
-          toast.error("Veuillez sélectionner une image valide");
+          toast.error("Please select a valid image file");
           return;
         }
 
-        // Vérifier la taille (max 5MB)
+        // Validate size (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
-          toast.error("L'image doit faire moins de 5MB");
+          toast.error("Image must be smaller than 5MB");
           return;
         }
 
-        // Mettre à jour la photo de profil via Clerk
+        // Update profile photo via Clerk
         await user.setProfileImage({ file });
-        toast.success("Photo de profil mise à jour avec succès");
+        toast.success("Profile photo updated successfully");
       } catch (error) {
-        console.error("Erreur lors de l'upload de la photo:", error);
-        toast.error("Erreur lors de l'upload de la photo");
+        console.error("Error uploading photo:", error);
+        toast.error("Error uploading photo");
       } finally {
         setIsUploadingPhoto(false);
       }
@@ -126,10 +126,10 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
         username: formData.username,
       });
       setIsEditing(false);
-      toast.success("Profil mis à jour avec succès");
+      toast.success("Profile updated successfully");
     } catch (error) {
-      console.error("Erreur lors de la mise à jour du profil:", error);
-      toast.error("Erreur lors de la mise à jour du profil");
+      console.error("Error updating profile:", error);
+      toast.error("Error updating profile");
     } finally {
       setIsUpdating(false);
     }
@@ -177,7 +177,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
     return (
       <Card className={className}>
         <CardContent className="p-6 text-center">
-          <p className="text-muted-foreground">Utilisateur non connecté</p>
+          <p className="text-muted-foreground">User not signed in</p>
         </CardContent>
       </Card>
     );
@@ -209,7 +209,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
                   variant="outline"
                   className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full p-0 hover:bg-purple-600 hover:text-white transition-colors"
                   onClick={() => fileInputRef.current?.click()}
-                  title="Modifier la photo de profil"
+                  title="Edit profile photo"
                   disabled={isUploadingPhoto}
                 >
                   {isUploadingPhoto ? (
@@ -235,9 +235,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
               </div>
               <div className="space-y-1">
                 <div className="flex items-center space-x-2">
-                  <h3 className="text-xl font-semibold text-white">
-                    {user.fullName || "Utilisateur"}
-                  </h3>
+                  <h3 className="text-xl font-semibold text-white">{user.fullName || "User"}</h3>
                   <Badge className={`${role.color} text-white`}>
                     <RoleIcon className="w-3 h-3 mr-1" />
                     {role.label}
@@ -294,19 +292,19 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Informations personnelles */}
+          {/* Personal information */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                Informations personnelles
+                Personal information
               </h4>
               <div className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
-                💡 Cliquez sur l'icône appareil photo pour uploader une nouvelle photo
+                💡 Click the camera icon to upload a new photo
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">Prénom</Label>
+                <Label htmlFor="firstName">First name</Label>
                 {isEditing ? (
                   <Input
                     id="firstName"
@@ -316,12 +314,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
                   />
                 ) : (
                   <p className="text-sm py-2 px-3 bg-muted rounded-md">
-                    {user.firstName || "Non renseigné"}
+                    {user.firstName || "Not provided"}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Nom</Label>
+                <Label htmlFor="lastName">Last name</Label>
                 {isEditing ? (
                   <Input
                     id="lastName"
@@ -331,12 +329,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
                   />
                 ) : (
                   <p className="text-sm py-2 px-3 bg-muted rounded-md">
-                    {user.lastName || "Non renseigné"}
+                    {user.lastName || "Not provided"}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="username">Nom d'utilisateur</Label>
+                <Label htmlFor="username">Username</Label>
                 {isEditing ? (
                   <Input
                     id="username"
@@ -346,12 +344,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
                   />
                 ) : (
                   <p className="text-sm py-2 px-3 bg-muted rounded-md">
-                    {user.username || "Non renseigné"}
+                    {user.username || "Not provided"}
                   </p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label>Membre depuis</Label>
+                <Label>Member since</Label>
                 <p className="text-sm py-2 px-3 bg-muted rounded-md flex items-center">
                   <Calendar className="w-4 h-4 mr-2" />
                   {userStats.memberSince}
@@ -362,10 +360,10 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
 
           <Separator />
 
-          {/* Statistiques utilisateur */}
+          {/* User stats */}
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Statistiques
+              Statistics
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <motion.div
@@ -374,7 +372,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
               >
                 <ShoppingCart className="w-6 h-6 mx-auto mb-2 text-blue-500" />
                 <p className="text-2xl font-bold">{userStats.totalOrders}</p>
-                <p className="text-xs text-muted-foreground">Commandes</p>
+                <p className="text-xs text-muted-foreground">Orders</p>
               </motion.div>
               <motion.div
                 whileHover={{ scale: 1.02 }}
@@ -382,7 +380,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
               >
                 <Download className="w-6 h-6 mx-auto mb-2 text-green-500" />
                 <p className="text-2xl font-bold">{userStats.totalDownloads}</p>
-                <p className="text-xs text-muted-foreground">Téléchargements</p>
+                <p className="text-xs text-muted-foreground">Downloads</p>
               </motion.div>
               <motion.div
                 whileHover={{ scale: 1.02 }}
@@ -390,7 +388,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
               >
                 <Heart className="w-6 h-6 mx-auto mb-2 text-red-500" />
                 <p className="text-2xl font-bold">{userStats.totalFavorites}</p>
-                <p className="text-xs text-muted-foreground">Favoris</p>
+                <p className="text-xs text-muted-foreground">Favorites</p>
               </motion.div>
               <motion.div
                 whileHover={{ scale: 1.02 }}
@@ -398,20 +396,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
               >
                 <Music className="w-6 h-6 mx-auto mb-2 text-purple-500" />
                 <p className="text-2xl font-bold">{userStats.totalSpent.toFixed(0)}€</p>
-                <p className="text-xs text-muted-foreground">Dépensé</p>
+                <p className="text-xs text-muted-foreground">Spent</p>
               </motion.div>
             </div>
           </div>
 
           <Separator />
 
-          {/* Activité récente */}
+          {/* Recent activity */}
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Activité
+              Activity
             </h4>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Dernière activité</span>
+              <span className="text-muted-foreground">Last activity</span>
               <span className="text-muted-foreground">{userStats.lastActivity}</span>
             </div>
           </div>

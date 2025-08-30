@@ -1,8 +1,8 @@
+import { StandardHero } from "@/components/ui/StandardHero";
 import { useWordPress } from "@/hooks/use-wordpress";
-import { StandardHero } from '@/components/ui/StandardHero';
 
 export default function Refund() {
-  const { page, isLoading, error } = useWordPress('refund-policy');
+  const { page, isLoading, error } = useWordPress("refund-policy");
 
   if (isLoading) {
     return (
@@ -38,14 +38,15 @@ export default function Refund() {
         title="Refund Policy"
         subtitle="Learn about our refund policy for digital products and the circumstances under which refunds may be considered."
       />
-      
+
       <div className="max-w-4xl mx-auto px-4 py-20">
-        
         <div className="prose prose-invert prose-lg max-w-none">
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8 mb-8">
             <h2 className="text-2xl font-bold mb-6">Digital Product Policy</h2>
             <p className="text-gray-300 leading-relaxed mb-6">
-              Due to the digital nature of our products, all sales are final. Once a beat is purchased and downloaded, we cannot offer refunds as the product has been delivered in full.
+              Due to the digital nature of our products, all sales are final. Once a beat is
+              purchased and downloaded, we cannot offer refunds as the product has been delivered in
+              full.
             </p>
           </div>
 
@@ -64,9 +65,7 @@ export default function Refund() {
 
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8 mb-8">
             <h2 className="text-2xl font-bold mb-6">Request Process</h2>
-            <p className="text-gray-300 leading-relaxed mb-4">
-              To request a refund consideration:
-            </p>
+            <p className="text-gray-300 leading-relaxed mb-4">To request a refund consideration:</p>
             <ol className="text-gray-300 space-y-2 ml-6">
               <li>1. Contact us within 48 hours of purchase</li>
               <li>2. Provide your order number and email address</li>
@@ -81,7 +80,8 @@ export default function Refund() {
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8 mb-8">
             <h2 className="text-2xl font-bold mb-6">Chargeback Policy</h2>
             <p className="text-gray-300 leading-relaxed mb-6">
-              Initiating a chargeback without first contacting us may result in permanent suspension from our services. We encourage customers to reach out directly for any issues.
+              Initiating a chargeback without first contacting us may result in permanent suspension
+              from our services. We encourage customers to reach out directly for any issues.
             </p>
           </div>
 
@@ -102,21 +102,23 @@ export default function Refund() {
   );
 
   return (
-    <div className="pt-16 min-h-screen bg-[var(--deep-black)] text-white">
-      <div className="max-w-4xl mx-auto px-4 py-20">
-        {page ? (
-          <>
-            <h1 className="text-4xl md:text-5xl font-bold mb-12 text-center"
-                dangerouslySetInnerHTML={{ __html: page.title.rendered }} />
-            <div 
+    <div className="min-h-screen bg-[var(--deep-black)] text-white">
+      {page ? (
+        <>
+          <StandardHero
+            title={(page.title?.rendered || "Refund Policy").replace(/<[^>]+>/g, "")}
+            subtitle="Learn about our refund policy for digital products and the circumstances under which refunds may be considered."
+          />
+          <div className="max-w-4xl mx-auto px-4 py-20">
+            <div
               className="prose prose-invert prose-lg max-w-none"
               dangerouslySetInnerHTML={{ __html: page.content.rendered }}
             />
-          </>
-        ) : (
-          fallbackContent
-        )}
-      </div>
+          </div>
+        </>
+      ) : (
+        fallbackContent
+      )}
     </div>
   );
 }
