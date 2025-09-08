@@ -26,7 +26,7 @@ export function useOrders() {
   const queryClient = useQueryClient();
 
   // Lister les commandes avec Convex
-  const orders = useConvexQuery(api.orders.listOrders, {});
+  const orders = useConvexQuery(api.orders.listOrders as any, {});
 
   // Créer une commande avec Convex
   const createOrderMutation = useConvexMutation(api.orders.createOrder);

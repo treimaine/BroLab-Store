@@ -6,6 +6,7 @@
   "description": "BroLab Entertainment - Modern Beats Store with WooCommerce Integration",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx -r dotenv/config server/index.ts",
+    "dev:development": "cross-env NODE_ENV=development tsx -r dotenv/config server/index.ts",
     "client": "vite",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "cross-env NODE_ENV=production node dist/index.js",
@@ -118,7 +119,7 @@
     "shx": "^0.4.0",
     "sonner": "^2.0.7",
     "stripe": "^18.4.0",
-    "svix": "^1.21.0",
+    "svix": "^1.75.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "tw-animate-css": "^1.2.5",

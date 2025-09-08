@@ -6,7 +6,16 @@ import { cn } from "@/lib/utils";
 import { useIntersectionObserver } from "@/utils/virtualScrolling";
 import type { BeatProduct as Beat } from "@shared/schema";
 import React, { useCallback, useRef, useState } from "react";
-import { Music, Clock, Hash } from "lucide-react";
+
+// Utility function to normalize tags (handle both string and {name: string} formats)
+const normalizeTag = (tag: string | { name: string }): string => {
+  return typeof tag === "string" ? tag : tag.name;
+};
+
+// Utility function to normalize tags array
+const normalizeTags = (tags?: Array<string | { name: string }> | null): string[] => {
+  return tags ? tags.map(normalizeTag) : [];
+};
 
 interface OptimizedBeatGridProps {
   beats: Beat[];
@@ -46,13 +55,13 @@ function LazyBeatCard({
             price={beat.price}
             imageUrl={beat.image_url || beat.image || beat.images?.[0]?.src || ""}
             audioUrl={beat.audio_url || ""}
-            tags={beat.tags || []}
+            tags={normalizeTags(beat.tags)}
             featured={beat.featured || false}
             downloads={beat.downloads || 0}
             duration={beat.duration || 0}
             isFree={
               beat.is_free ||
-              beat.tags?.some((tag: string) => tag.toLowerCase() === "free") ||
+              normalizeTags(beat.tags).some(tag => tag.toLowerCase() === "free") ||
               beat.price === 0 ||
               false
             }
@@ -65,9 +74,11 @@ function LazyBeatCard({
               id: beat.id,
               title: beat.title || beat.name || "Untitled",
               name: beat.title || beat.name || "Untitled",
-              image: beat.image_url || beat.image || beat.images?.[0]?.src || "/api/placeholder/400/400",
-              image_url: beat.image_url || beat.image || beat.images?.[0]?.src || "/api/placeholder/400/400",
-                audio_url: beat.audio_url || "",
+              image:
+                beat.image_url || beat.image || beat.images?.[0]?.src || "/api/placeholder/400/400",
+              image_url:
+                beat.image_url || beat.image || beat.images?.[0]?.src || "/api/placeholder/400/400",
+              audio_url: beat.audio_url || "",
             }}
           />
         )

@@ -34,5 +34,7 @@ module.exports = {
     "^file-type$": "<rootDir>/__tests__/mocks/file-type.mock.js",
     "^@clerk/clerk-sdk-node$": "<rootDir>/__tests__/mocks/clerk-node.js",
     "^@clerk/express$": "<rootDir>/__tests__/mocks/clerk-express.js",
+    "^../lib/openGraphGenerator$": "<rootDir>/__tests__/mocks/openGraph-generator.mock.js",
+    "^../lib/schemaMarkup$": "<rootDir>/__tests__/mocks/schema-markup.mock.js",
   },
 };

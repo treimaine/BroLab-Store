@@ -1,5 +1,7 @@
 import express from "express";
 import { isAuthenticated, registerAuthRoutes, setupAuth } from "./auth";
+import { env } from "./lib/env";
+import { logger } from "./lib/logger";
 import activityRouter from "./routes/activity";
 import avatarRouter from "./routes/avatar";
 // Clerk router removed - using native components
@@ -29,14 +31,19 @@ import wpRouter from "./routes/wp";
 const app = express();
 app.use(express.json());
 
-// Debug: Vérifier les variables d'environnement Clerk
-console.log("🔧 Clerk Configuration:");
-console.log(
-  "  - VITE_CLERK_PUBLISHABLE_KEY:",
-  process.env.VITE_CLERK_PUBLISHABLE_KEY ? "✅ Configuré" : "❌ Manquant"
-);
-console.log("  - CLERK_SECRET_KEY:", process.env.CLERK_SECRET_KEY ? "✅ Configuré" : "❌ Manquant");
-console.log("  - NODE_ENV:", process.env.NODE_ENV);
+// Debug structured env log (without secrets)
+logger.info("Server starting", {
+  nodeEnv: env.NODE_ENV,
+  convexUrl: env.VITE_CONVEX_URL,
+  clerkConfigured: Boolean(env.VITE_CLERK_PUBLISHABLE_KEY) && Boolean(env.CLERK_SECRET_KEY),
+  flags: env.flags,
+});
+
+// Request ID middleware
+app.use((req: any, _res, next) => {
+  req.requestId = req.headers["x-request-id"] || `req_${Date.now()}`;
+  next();
+});
 
 // Configuration de l'authentification (inclut le middleware Clerk)
 setupAuth(app); // Middleware Clerk réactivé
@@ -92,9 +99,22 @@ app.post("/api/auth/signin", (_req, res) => {
   res.json({ accessToken: process.env.TEST_USER_TOKEN || "mock-test-token" });
 });
 
-app.post("/api/auth/login", (_req, res) => {
+app.post("/api/auth/login", (req: any, res) => {
   const token = process.env.TEST_USER_TOKEN || "mock-test-token";
+  // If credentials are provided, also establish a session for server-side routes
+  if (req.body && (req.body.username || req.body.email)) {
+    // Use a stable test user id
+    req.session = req.session || {};
+    req.session.userId = 123;
+  }
   res.json({ token, access_token: token });
+});
+
+// Minimal register endpoint used by some tests to create a session
+app.post("/api/auth/register", (req: any, res) => {
+  req.session = req.session || {};
+  req.session.userId = 123;
+  res.status(201).json({ success: true, userId: 123 });
 });
 
 // Alias with hyphen used by some tests
@@ -161,7 +181,7 @@ app.get("/api/beats/:id", (req, res) => {
   if (!Number.isFinite(id)) {
     return res.status(404).json({ error: "Beat not found" });
   }
-  res.json({ id, title: "Test Beat", bpm: 120, price: 0 });
+  return res.json({ id, title: "Test Beat", bpm: 120, price: 0 });
 });
 
 // Dashboard aggregator

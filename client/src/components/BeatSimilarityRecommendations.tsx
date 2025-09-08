@@ -37,6 +37,16 @@ export function BeatSimilarityRecommendations({
   );
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
+  // Utility function to normalize tags (handle both string and {name: string} formats)
+  const normalizeTag = (tag: string | { name: string }): string => {
+    return typeof tag === "string" ? tag : tag.name;
+  };
+
+  // Utility function to normalize tags array
+  const normalizeTags = (tags?: Array<string | { name: string }> | null): string[] => {
+    return tags ? tags.map(normalizeTag) : [];
+  };
+
   // Calculate similarity score between beats
   const calculateSimilarity = (beat1: Beat, beat2: Beat): SimilarityScore => {
     const scores = {
@@ -80,8 +90,10 @@ export function BeatSimilarityRecommendations({
 
     // Style/Tags similarity (10% weight)
     if (beat1.tags && beat2.tags) {
-      const commonTags = beat1.tags.filter(tag => beat2.tags?.includes(tag));
-      scores.style = Math.min(10, (commonTags.length / beat1.tags.length) * 10);
+      const normalizedTags1 = normalizeTags(beat1.tags);
+      const normalizedTags2 = normalizeTags(beat2.tags);
+      const commonTags = normalizedTags1.filter(tag => normalizedTags2.includes(tag));
+      scores.style = Math.min(10, (commonTags.length / normalizedTags1.length) * 10);
     }
 
     const total = Object.values(scores).reduce((sum, score) => sum + score, 0);
@@ -149,7 +161,7 @@ export function BeatSimilarityRecommendations({
   });
 
   // Get unique tags from all recommendations
-  const allTags = Array.from(new Set(recommendations.flatMap(beat => beat.tags || [])));
+  const allTags = Array.from(new Set(recommendations.flatMap(beat => normalizeTags(beat.tags))));
 
   if (isLoading) {
     return (
@@ -273,7 +285,8 @@ export function BeatSimilarityRecommendations({
             {sortedRecommendations
               .filter(
                 beat =>
-                  selectedTags.length === 0 || selectedTags.some(tag => beat.tags?.includes(tag))
+                  selectedTags.length === 0 ||
+                  selectedTags.some(tag => normalizeTags(beat.tags).includes(tag))
               )
               .slice(0, 12)
               .map(beat => {

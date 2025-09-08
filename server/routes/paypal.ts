@@ -203,7 +203,7 @@ router.get("/capture/:token", async (req: Request, res: Response) => {
       console.log("✅ Payment auto-captured successfully:", result.transactionId);
 
       // ✅ CORRECTION: Rediriger vers la page de succès avec les bons paramètres
-      const successUrl = urls.paypal.success(token, PayerID);
+      const successUrl = urls.paypal.success(token, PayerID as string);
 
       res.redirect(successUrl);
     } else {

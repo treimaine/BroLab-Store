@@ -1,4 +1,4 @@
-import type { BeatProduct } from '@shared/schema';
+import type { BeatProduct } from "@shared/schema";
 
 export interface SchemaMarkupOptions {
   includeOffers?: boolean;
@@ -19,61 +19,75 @@ export function generateBeatSchemaMarkup(
     "@context": "https://schema.org",
     "@type": "MusicRecording",
     "@id": `${baseUrl}/product/${beat.id}`,
-    "name": beat.title,
-    "description": beat.description || `${beat.title} - ${beat.genre} beat`,
-    "url": `${baseUrl}/product/${beat.id}`,
-    "image": beat.image_url || beat.image,
-    "genre": beat.genre,
-    "duration": beat.duration ? `PT${Math.floor(beat.duration / 60)}M${beat.duration % 60}S` : undefined,
-    "byArtist": {
+    name: beat.title,
+    description: beat.description || `${beat.title} - ${beat.genre} beat`,
+    url: `${baseUrl}/product/${beat.id}`,
+    image: beat.image_url || beat.image,
+    genre: beat.genre,
+    duration: beat.duration
+      ? `PT${Math.floor(beat.duration / 60)}M${beat.duration % 60}S`
+      : undefined,
+    byArtist: {
       "@type": "MusicGroup",
-      "name": beat.tags?.find(tag => tag.toLowerCase().includes('producer')) || "BroLab Entertainment"
+      name: (() => {
+        const producerTag = beat.tags?.find(tag => {
+          const tagName = typeof tag === "string" ? tag : tag.name;
+          return tagName.toLowerCase().includes("producer");
+        });
+        return producerTag
+          ? typeof producerTag === "string"
+            ? producerTag
+            : producerTag.name
+          : "BroLab Entertainment";
+      })(),
     },
-    "inAlbum": {
+    inAlbum: {
       "@type": "MusicAlbum",
-      "name": `${beat.genre} Beats Collection`,
-      "byArtist": {
+      name: `${beat.genre} Beats Collection`,
+      byArtist: {
         "@type": "MusicGroup",
-        "name": "BroLab Entertainment"
-      }
+        name: "BroLab Entertainment",
+      },
     },
-    "audio": beat.audio_url ? {
-      "@type": "AudioObject",
-      "contentUrl": beat.audio_url,
-      "encodingFormat": "audio/mpeg"
-    } : undefined,
-    "additionalProperty": [
+    audio: beat.audio_url
+      ? {
+          "@type": "AudioObject",
+          contentUrl: beat.audio_url,
+          encodingFormat: "audio/mpeg",
+        }
+      : undefined,
+    additionalProperty: [
       {
         "@type": "PropertyValue",
-        "name": "BPM",
-        "value": beat.bpm?.toString() || "120"
-      },
-      {
-        "@type": "PropertyValue", 
-        "name": "Key",
-        "value": beat.key || "C Major"
+        name: "BPM",
+        value: beat.bpm?.toString() || "120",
       },
       {
         "@type": "PropertyValue",
-        "name": "Mood",
-        "value": beat.mood || "Energetic"
-      }
-    ]
+        name: "Key",
+        value: beat.key || "C Major",
+      },
+      {
+        "@type": "PropertyValue",
+        name: "Mood",
+        value: beat.mood || "Energetic",
+      },
+    ],
   };
 
   // Ajouter les offres si demandé
   if (options.includeOffers && beat.price) {
     schema.offers = {
       "@type": "Offer",
-      "price": beat.price,
-      "priceCurrency": "USD",
-      "availability": "https://schema.org/InStock",
-      "url": `${baseUrl}/product/${beat.id}`,
-      "seller": {
+      price: beat.price,
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+      url: `${baseUrl}/product/${beat.id}`,
+      seller: {
         "@type": "Organization",
-        "name": "BroLab Entertainment",
-        "url": baseUrl
-      }
+        name: "BroLab Entertainment",
+        url: baseUrl,
+      },
     };
   }
 
@@ -81,10 +95,10 @@ export function generateBeatSchemaMarkup(
   if (options.includeAggregateRating) {
     schema.aggregateRating = {
       "@type": "AggregateRating",
-      "ratingValue": "4.5",
-      "reviewCount": beat.downloads || 0,
-      "bestRating": "5",
-      "worstRating": "1"
+      ratingValue: "4.5",
+      reviewCount: beat.downloads || 0,
+      bestRating: "5",
+      worstRating: "1",
     };
   }
 
@@ -102,31 +116,31 @@ export function generateBeatsListSchemaMarkup(
   const schema = {
     "@context": "https://schema.org",
     "@type": "MusicAlbum",
-    "name": pageTitle,
-    "description": "Professional beats collection for music producers and artists",
-    "url": `${baseUrl}/shop`,
-    "byArtist": {
+    name: pageTitle,
+    description: "Professional beats collection for music producers and artists",
+    url: `${baseUrl}/shop`,
+    byArtist: {
       "@type": "MusicGroup",
-      "name": "BroLab Entertainment"
+      name: "BroLab Entertainment",
     },
-    "tracks": beats.map(beat => ({
+    tracks: beats.map(beat => ({
       "@type": "MusicRecording",
-      "name": beat.title,
-      "url": `${baseUrl}/product/${beat.id}`,
-      "genre": beat.genre,
-      "byArtist": {
+      name: beat.title,
+      url: `${baseUrl}/product/${beat.id}`,
+      genre: beat.genre,
+      byArtist: {
         "@type": "MusicGroup",
-        "name": "BroLab Entertainment"
-      }
+        name: "BroLab Entertainment",
+      },
     })),
-    "offers": {
+    offers: {
       "@type": "AggregateOffer",
-      "priceCurrency": "USD",
-      "lowPrice": Math.min(...beats.map(b => b.price || 0)),
-      "highPrice": Math.max(...beats.map(b => b.price || 0)),
-      "offerCount": beats.length,
-      "availability": "https://schema.org/InStock"
-    }
+      priceCurrency: "USD",
+      lowPrice: Math.min(...beats.map(b => b.price || 0)),
+      highPrice: Math.max(...beats.map(b => b.price || 0)),
+      offerCount: beats.length,
+      availability: "https://schema.org/InStock",
+    },
   };
 
   return JSON.stringify(schema, null, 2);
@@ -139,23 +153,21 @@ export function generateOrganizationSchemaMarkup(baseUrl: string): string {
   const schema = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "BroLab Entertainment",
-    "url": baseUrl,
-    "logo": `${baseUrl}/logo.png`,
-    "description": "Professional beats marketplace for music producers and artists",
-    "sameAs": [
-      "https://brolabentertainment.com"
-    ],
-    "contactPoint": {
+    name: "BroLab Entertainment",
+    url: baseUrl,
+    logo: `${baseUrl}/logo.png`,
+    description: "Professional beats marketplace for music producers and artists",
+    sameAs: ["https://brolabentertainment.com"],
+    contactPoint: {
       "@type": "ContactPoint",
-      "contactType": "customer service",
-      "email": "contact@brolabentertainment.com"
+      contactType: "customer service",
+      email: "contact@brolabentertainment.com",
     },
-    "address": {
+    address: {
       "@type": "PostalAddress",
-      "addressCountry": "US"
-    }
+      addressCountry: "US",
+    },
   };
 
   return JSON.stringify(schema, null, 2);
-} 
+}

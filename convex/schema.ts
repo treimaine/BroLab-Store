@@ -66,34 +66,100 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_session", ["sessionId"]),
 
-  // Orders (remplace Supabase orders)
+  // Orders (remplace Supabase orders) - étendu pour Stripe/convex-only
   orders: defineTable({
     userId: v.optional(v.id("users")),
-    sessionId: v.optional(v.string()),
-    woocommerceId: v.optional(v.number()), // ID de la commande WooCommerce
     email: v.string(),
+    status: v.string(), // 'draft'|'pending'|'paid'|'payment_failed'|'refunded'|'cancelled'
+    currency: v.optional(v.string()),
+    subtotal: v.optional(v.number()),
+    tax: v.optional(v.number()),
     total: v.number(),
-    status: v.string(), // 'pending', 'processing', 'paid', 'completed', 'failed', 'refunded', 'cancelled'
-    items: v.array(v.any()), // JSONB equivalent
-    paymentId: v.optional(v.string()), // ID du paiement Clerk
-    paymentStatus: v.optional(v.string()), // Statut du paiement
-    invoiceUrl: v.optional(v.string()), // URL de la facture générée
-    currency: v.optional(v.string()), // Devise (EUR, USD, etc.)
-    taxAmount: v.optional(v.number()), // Montant des taxes
-    discountAmount: v.optional(v.number()), // Montant de la remise
-    shippingAddress: v.optional(v.any()), // Adresse de livraison
-    billingAddress: v.optional(v.any()), // Adresse de facturation
-    notes: v.optional(v.string()), // Notes de la commande
+    itemsCount: v.optional(v.number()),
+    items: v.array(v.any()),
+    // Removed temporary migration fields (taxAmount, discountAmount)
+    paymentProvider: v.optional(v.string()), // 'stripe'|null
+    paymentStatus: v.optional(v.string()), // 'pending'|'succeeded'|'failed'|'refunded'
+    checkoutSessionId: v.optional(v.string()),
+    paymentIntentId: v.optional(v.string()),
+    paymentId: v.optional(v.string()), // Generic payment ID
+    woocommerceId: v.optional(v.number()), // WooCommerce order ID for legacy support
+    invoiceId: v.optional(v.id("invoicesOrders")),
+    invoiceUrl: v.optional(v.string()),
+    invoiceNumber: v.optional(v.string()),
+    idempotencyKey: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+    sessionId: v.optional(v.string()),
+    notes: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_session", ["sessionId"])
     .index("by_status", ["status"])
-    .index("by_woocommerce_id", ["woocommerceId"])
-    .index("by_payment_id", ["paymentId"])
     .index("by_email", ["email"])
-    .index("by_created_at", ["createdAt"]),
+    .index("by_created_at", ["createdAt"])
+    .index("by_checkout_session", ["checkoutSessionId"])
+    .index("by_payment_intent", ["paymentIntentId"])
+    .index("by_idempotency", ["idempotencyKey"])
+    .index("by_woocommerce_id", ["woocommerceId"]),
+
+  // Order items (détaillé)
+  orderItems: defineTable({
+    orderId: v.id("orders"),
+    productId: v.number(),
+    type: v.string(), // 'beat'|'subscription'|'service'
+    title: v.string(),
+    sku: v.optional(v.string()),
+    qty: v.number(),
+    unitPrice: v.number(),
+    totalPrice: v.number(),
+    metadata: v.optional(v.any()),
+  }).index("by_order", ["orderId"]),
+
+  // Payments (Stripe)
+  payments: defineTable({
+    orderId: v.id("orders"),
+    provider: v.string(), // 'stripe'
+    status: v.string(), // 'succeeded'|'failed'|'refunded'
+    amount: v.number(),
+    currency: v.string(),
+    stripeEventId: v.optional(v.string()),
+    stripePaymentIntentId: v.optional(v.string()),
+    stripeChargeId: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_order", ["orderId"])
+    .index("by_event", ["stripeEventId"])
+    .index("by_pi", ["stripePaymentIntentId"]),
+
+  // Invoices (par commande)
+  invoicesOrders: defineTable({
+    orderId: v.id("orders"),
+    number: v.string(),
+    pdfKey: v.string(), // storage id as string
+    pdfUrl: v.optional(v.string()),
+    amount: v.number(),
+    currency: v.string(),
+    issuedAt: v.number(),
+    taxAmount: v.optional(v.number()),
+    billingInfo: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_order", ["orderId"])
+    .index("by_number", ["number"]),
+
+  // Counters (atomiques par nom)
+  counters: defineTable({
+    name: v.string(),
+    value: v.number(),
+  }).index("by_name", ["name"]),
+
+  // Webhook processed events (idempotence)
+  processedEvents: defineTable({
+    provider: v.string(), // 'stripe'
+    eventId: v.string(),
+    processedAt: v.number(),
+  }).index("by_provider_event", ["provider", "eventId"]),
 
   // Downloads (remplace Supabase downloads)
   downloads: defineTable({
