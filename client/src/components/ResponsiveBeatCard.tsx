@@ -5,10 +5,20 @@ import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
-import { Heart, Music, Clock, Hash, User } from "lucide-react";
+import { Heart, Music } from "lucide-react";
 import { useState } from "react";
 
 import type { BeatProduct as Beat } from "@shared/schema";
+
+// Utility function to normalize tags (handle both string and {name: string} formats)
+const normalizeTag = (tag: string | { name: string }): string => {
+  return typeof tag === "string" ? tag : tag.name;
+};
+
+// Utility function to normalize tags array
+const normalizeTags = (tags?: Array<string | { name: string }> | null): string[] => {
+  return tags ? tags.map(normalizeTag) : [];
+};
 
 interface ResponsiveBeatCardProps {
   beat: Beat;
@@ -142,7 +152,7 @@ export function ResponsiveBeatCard({
                 {(() => {
                   const isFree =
                     beat.is_free ||
-                    beat.tags?.some((tag: string) => tag.toLowerCase() === "free") ||
+                    normalizeTags(beat.tags).some(tag => tag.toLowerCase() === "free") ||
                     beat.price === 0 ||
                     false;
                   return isFree ? (
@@ -154,12 +164,12 @@ export function ResponsiveBeatCard({
               </div>
               <AddToCartButton
                 product={{
-                    beatId: beat.id,
-                    title: beat.title || beat.name || "Untitled",
-                    genre: beat.genre || "Unknown",
-                    imageUrl: beat.image || beat.image_url || "",
-                    price: beat.price || 0,
-                  }}
+                  beatId: beat.id,
+                  title: beat.title || beat.name || "Untitled",
+                  genre: beat.genre || "Unknown",
+                  imageUrl: beat.image || beat.image_url || "",
+                  price: beat.price || 0,
+                }}
                 size="sm"
                 className="px-3 ml-[6px] mr-[6px] pl-[12px] pr-[12px] pt-[0px] pb-[0px]"
               />
@@ -188,7 +198,7 @@ export function ResponsiveBeatCard({
                   {(() => {
                     const isFree =
                       beat.is_free ||
-                      beat.tags?.some((tag: string) => tag.toLowerCase() === "free") ||
+                      normalizeTags(beat.tags).some(tag => tag.toLowerCase() === "free") ||
                       beat.price === 0 ||
                       false;
                     return isFree ? (

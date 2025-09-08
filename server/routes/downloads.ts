@@ -1,7 +1,6 @@
 import { ConvexHttpClient } from "convex/browser";
 import express from "express";
 import { Parser } from "json2csv";
-import { api } from "../../convex/_generated/api";
 import { insertDownloadSchema } from "../../shared/schema";
 import { getCurrentUser, isAuthenticated } from "../auth";
 import { createValidationMiddleware } from "../lib/validation";
@@ -42,9 +41,8 @@ router.post(
         productName,
       });
 
-      // Log download with Convex (use any to avoid deep type instantiation in TS in tests)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const download = await convex.mutation((api as any).downloads.record.recordDownload as any, {
+      // Log download with Convex (use string literal to avoid deep type instantiation)
+      const download = await (convex as any).mutation("downloads:recordDownload", {
         beatId: Number(productId),
         licenseType: String(license),
         downloadUrl: undefined,
@@ -87,7 +85,7 @@ router.get("/", isAuthenticated, async (req, res) => {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const downloads = await convex.query((api as any).downloads.record.getUserDownloads as any, {});
+    const downloads = await (convex as any).query("downloads:getUserDownloads", {});
 
     res.json({
       downloads: downloads.map((download: any) => ({
@@ -119,7 +117,7 @@ router.get("/export", isAuthenticated, async (req, res) => {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const downloads = await convex.query((api as any).downloads.record.getUserDownloads as any, {});
+    const downloads = await (convex as any).query("downloads:getUserDownloads", {});
 
     // Prepare CSV data
     const csvData = downloads.map((download: any) => ({
@@ -163,10 +161,10 @@ router.get("/quota", isAuthenticated, async (req, res) => {
     }
 
     // Get download quota from Convex
-    const quotaData = await convex.query(api.downloads.record.getUserDownloadQuota, {});
+    const quotaData = await (convex as any).query("downloads:getUserDownloadQuota", {});
 
     // For now, return a basic quota response since checkDownloadQuota returns unlimited
-    const downloads = await convex.query(api.downloads.record.getUserDownloads, {});
+    const downloads = await (convex as any).query("downloads:getUserDownloads", {});
 
     const downloadsUsed = downloads.length;
     const quota = 10; // Basic quota

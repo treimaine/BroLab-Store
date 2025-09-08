@@ -12,11 +12,10 @@ import {
 import { StandardHero } from "@/components/ui/StandardHero";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, Mail, MapPin, Mic, Phone, User } from "lucide-react";
-import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
 import { useUser } from "@clerk/clerk-react";
-import { nanoid } from "nanoid";
+import { Calendar, Clock, Mail, MapPin, Mic, Phone, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
 interface BookingFormData {
   name: string;
@@ -55,8 +54,8 @@ export default function RecordingSessions() {
     if (isSignedIn && user) {
       setFormData(prev => ({
         ...prev,
-        name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-        email: user.primaryEmailAddress?.emailAddress || '',
+        name: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        email: user.primaryEmailAddress?.emailAddress || "",
       }));
     }
   }, [isSignedIn, user]);
@@ -86,10 +85,10 @@ export default function RecordingSessions() {
           formData.budget === "300-500"
             ? 40000 // $400 in cents
             : formData.budget === "500-1000"
-            ? 75000 // $750 in cents
-            : formData.budget === "1000-2000"
-            ? 150000 // $1500 in cents
-            : 250000, // $2500+ in cents
+              ? 75000 // $750 in cents
+              : formData.budget === "1000-2000"
+                ? 150000 // $1500 in cents
+                : 250000, // $2500+ in cents
         notes: `Session Type: ${formData.sessionType}, Location: ${formData.location}, Budget: ${formData.budget}`,
       };
 
@@ -101,27 +100,27 @@ export default function RecordingSessions() {
 
       if (response.ok) {
         const reservation = await response.json();
-        
+
         // Create pending payment for checkout
         const pendingPayment = {
-          service: 'recording',
-          serviceName: 'Recording Session',
-          serviceDetails: `${formData.sessionType} - ${formData.duration} hour${parseInt(formData.duration) > 1 ? 's' : ''} (${formData.location})`,
+          service: "recording",
+          serviceName: "Recording Session",
+          serviceDetails: `${formData.sessionType} - ${formData.duration} hour${parseInt(formData.duration) > 1 ? "s" : ""} (${formData.location})`,
           reservationId: reservation.id,
           price: reservationData.total_price / 100, // Convert cents to dollars
           quantity: 1,
         };
-        
+
         // Add to existing services array
-        const existingServices = JSON.parse(sessionStorage.getItem('pendingServices') || '[]');
+        const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
         const updatedServices = [...existingServices, pendingPayment];
-        sessionStorage.setItem('pendingServices', JSON.stringify(updatedServices));
-        
+        sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
+
         toast({
           title: "Recording Session Reserved!",
           description: "Complete your payment to confirm the booking.",
         });
-        
+
         // Redirect to checkout
         setLocation("/checkout");
       } else {
@@ -148,7 +147,6 @@ export default function RecordingSessions() {
       <StandardHero
         title="Recording Sessions"
         subtitle="Professional studio recordings with state-of-the-art equipment"
-        description="Book your recording session with our experienced sound engineers and capture your music in pristine quality."
       />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -177,7 +175,9 @@ export default function RecordingSessions() {
 
                 <div className="p-4 bg-green-600/10 border border-green-600/20 rounded-lg">
                   <h3 className="font-semibold text-green-400 mb-2">Full Production</h3>
-                  <p className="text-gray-300 text-sm mb-2">Complete recording, mixing, and mastering</p>
+                  <p className="text-gray-300 text-sm mb-2">
+                    Complete recording, mixing, and mastering
+                  </p>
                   <p className="text-white font-bold">$500/session</p>
                 </div>
 
@@ -333,7 +333,7 @@ export default function RecordingSessions() {
                         value={formData.preferredDate}
                         onChange={e => handleInputChange("preferredDate", e.target.value)}
                         className="bg-gray-700 border-gray-600 text-white pl-10"
-                        min={new Date().toISOString().split('T')[0]}
+                        min={new Date().toISOString().split("T")[0]}
                       />
                     </div>
                   </div>

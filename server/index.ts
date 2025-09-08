@@ -2,7 +2,9 @@ import { config } from "dotenv";
 import express, { NextFunction, type Request, Response } from "express";
 import { app } from "./app";
 import { choosePort } from "./lib/cliPort";
+import { env } from "./lib/env";
 import { parsePortFlags } from "./lib/findFreePort";
+import { logger } from "./lib/logger";
 // RLS Security removed - using Convex for security
 import { log, serveStatic, setupVite } from "./vite";
 
@@ -90,7 +92,7 @@ if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
     });
 
     const { port: flagPort, auto, maxTries } = parsePortFlags();
-    const envPort = process.env.PORT ? Number(process.env.PORT) : undefined;
+    const envPort = env.PORT ? Number(env.PORT) : undefined;
     const basePort = flagPort || envPort || 5000;
     const port = await choosePort({
       base: basePort,
@@ -108,13 +110,7 @@ if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
     }
 
     const serverInstance = server.listen(port, () => {
-      if (port === basePort) {
-        console.log(`API running at http://localhost:${port}`);
-      } else {
-        console.log(
-          `Port ${basePort} in use, fallback to ${port} — API running at http://localhost:${port}`
-        );
-      }
+      logger.info("API running", { port, basePort, url: `http://localhost:${port}` });
     });
     serverInstance.on("error", (err: any) => {
       if (err.code === "EADDRINUSE") {

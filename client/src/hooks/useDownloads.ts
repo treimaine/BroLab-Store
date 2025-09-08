@@ -1,9 +1,13 @@
+// @ts-nocheck
 import {
   useConvexAuth,
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
 } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+// Casting Convex generated API to any to avoid deep instantiation issues in React hooks
+// See known issue note in project rules for similar workaround
+import { api as generatedApi } from "../../../convex/_generated/api";
+const api: any = generatedApi as any;
 
 export interface DownloadData {
   productId: number;
@@ -16,10 +20,11 @@ export function useDownloads() {
   const { isAuthenticated } = useConvexAuth();
 
   // Lister les téléchargements avec Convex
-  const downloads = useConvexQuery(api.downloads.getUserDownloads, {});
+  // Avoid TS2589 by relaxing types for generated query and args
+  const downloads = useConvexQuery(api.downloads.getUserDownloads as any, {} as any) as any;
 
   // Logger un téléchargement avec Convex
-  const logDownloadMutation = useConvexMutation(api.downloads.logDownload);
+  const logDownloadMutation = useConvexMutation(api.downloads.logDownload as any) as any;
 
   const logDownload = async (downloadData: DownloadData) => {
     if (!isAuthenticated) {

@@ -18,6 +18,7 @@ export default function Checkout() {
   const [paymentStatus, setPaymentStatus] = useState<
     "idle" | "processing" | "succeeded" | "failed"
   >("idle");
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   // Check for pending services from sessionStorage
   useEffect(() => {
@@ -34,6 +35,9 @@ export default function Checkout() {
       sessionStorage.setItem("pendingServices", JSON.stringify([singleService]));
       sessionStorage.removeItem("pendingPayment");
     }
+
+    // Mark data as loaded
+    setIsDataLoaded(true);
   }, []);
 
   // Calculate total (cumulative: services + cart items)
@@ -80,9 +84,15 @@ export default function Checkout() {
     });
   };
 
-  // Redirect if both cart and pending services are empty
-  if (cart.items.length === 0 && pendingServices.length === 0) {
-    setLocation("/cart");
+  // Redirect if both cart and pending services are empty (only after data is loaded)
+  useEffect(() => {
+    if (isDataLoaded && cart.items.length === 0 && pendingServices.length === 0) {
+      setLocation("/cart");
+    }
+  }, [isDataLoaded, cart.items.length, pendingServices.length, setLocation]);
+
+  // Show loading state while data is loading or while redirecting
+  if (!isDataLoaded || (isDataLoaded && cart.items.length === 0 && pendingServices.length === 0)) {
     return null;
   }
 

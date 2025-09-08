@@ -7,8 +7,8 @@ export const clerkConfig = {
     variables: {
       colorPrimary: "#8B5CF6",
       colorBackground: "#1a1a1a",
-      colorText: "#ffffff"
-    }
+      colorText: "#ffffff",
+    },
   },
   // Désactiver certaines fonctionnalités qui causent des erreurs réseau
   telemetry: false,
@@ -20,7 +20,8 @@ export const clerkConfig = {
 // Vérifier si Clerk peut s'initialiser correctement
 export const isClerkAvailable = (): boolean => {
   try {
-    return !!window.Clerk || !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+    // Check if Clerk is available on window object or if we have a publishable key
+    return !!(window as any).Clerk || !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   } catch {
     return false;
   }

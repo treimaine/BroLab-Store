@@ -55,6 +55,7 @@ export const syncWooCommerceOrders = mutation({
             userId: undefined, // Sera mis à jour si l'utilisateur est connecté
             email: order.customerEmail,
             total: parseFloat(order.total) * 100, // Convertir en centimes
+            currency: "EUR", // Default currency for WooCommerce orders
             status: order.status,
             items: order.items,
             createdAt: Date.now(),

@@ -71,19 +71,17 @@ export const createOrder = mutation({
       const orderId = await ctx.db.insert("orders", {
         userId: user._id,
         sessionId: args.sessionId,
-        woocommerceId: undefined,
         items: validatedOrder.items,
         total: validatedOrder.total,
         email: validatedOrder.email,
         status: validatedOrder.status,
-        currency: validatedOrder.currency,
-        paymentId: args.paymentId,
-        paymentStatus: args.paymentId ? "pending" : undefined,
-        taxAmount: 0, // TODO: Calculate tax
-        discountAmount: 0,
+        currency: validatedOrder.currency || "USD",
+        subtotal: undefined,
+        tax: 0,
+        itemsCount: (validatedOrder.items || []).length,
         createdAt: now,
         updatedAt: now,
-      });
+      } as any);
 
       // Log de l'activité
       await ctx.db.insert("activityLog", {
@@ -143,6 +141,306 @@ export const createOrder = mutation({
 
       throw new Error(`Failed to create order: ${errorMessage}`);
     }
+  },
+});
+
+// Idempotent order creation (server-calculated totals)
+export const createOrderIdempotent = mutation({
+  args: {
+    items: v.array(
+      v.object({
+        productId: v.number(),
+        title: v.string(),
+        type: v.string(), // 'beat'|'subscription'|'service'
+        qty: v.number(),
+        unitPrice: v.number(), // cents
+        metadata: v.optional(v.any()),
+      })
+    ),
+    currency: v.string(),
+    email: v.string(),
+    metadata: v.optional(v.any()),
+    idempotencyKey: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const clerkId = identity.subject;
+
+    // Return existing order if idempotencyKey exists
+    if (args.idempotencyKey) {
+      const existing = await ctx.db
+        .query("orders")
+        .withIndex("by_idempotency", q => q.eq("idempotencyKey", args.idempotencyKey!))
+        .first();
+      if (existing) return { orderId: existing._id, order: existing, idempotent: true } as const;
+    }
+
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
+      .first();
+    if (!user) {
+      const userId = await ctx.db.insert("users", {
+        clerkId,
+        email: identity.email || args.email,
+        username: identity.name || `user_${clerkId.slice(-8)}`,
+        firstName: identity.givenName || "",
+        lastName: identity.familyName || "",
+        imageUrl: identity.pictureUrl || "",
+        role: "user",
+        isActive: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      user = await ctx.db.get(userId);
+    }
+    if (!user) throw new Error("User creation failed");
+
+    // Compute totals (cents)
+    const itemsCount = args.items.reduce((n, it) => n + Math.max(1, Number(it.qty || 1)), 0);
+    const subtotal = args.items.reduce(
+      (sum, it) => sum + Math.max(0, Math.round(it.unitPrice)) * Math.max(1, Math.round(it.qty)),
+      0
+    );
+    const tax = 0; // v1: no tax
+    const total = subtotal + tax;
+
+    const now = Date.now();
+    const orderId = await ctx.db.insert("orders", {
+      userId: user._id,
+      email: args.email,
+      status: "draft",
+      currency: args.currency,
+      subtotal,
+      tax,
+      total,
+      itemsCount,
+      items: args.items.map(it => ({
+        productId: it.productId,
+        title: it.title,
+        type: it.type,
+        qty: it.qty,
+        unitPrice: it.unitPrice,
+        totalPrice: it.unitPrice * it.qty,
+        metadata: it.metadata || {},
+      })),
+      paymentProvider: undefined,
+      checkoutSessionId: undefined,
+      paymentIntentId: undefined,
+      invoiceId: undefined,
+      invoiceUrl: undefined,
+      invoiceNumber: undefined,
+      idempotencyKey: args.idempotencyKey,
+      metadata: args.metadata || {},
+      sessionId: undefined,
+      notes: undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Persist detailed items in orderItems table
+    for (const it of args.items) {
+      await ctx.db.insert("orderItems", {
+        orderId,
+        productId: it.productId,
+        type: it.type,
+        title: it.title,
+        sku: undefined,
+        qty: it.qty,
+        unitPrice: it.unitPrice,
+        totalPrice: it.unitPrice * it.qty,
+        metadata: it.metadata || {},
+      });
+    }
+
+    return { orderId, order: await ctx.db.get(orderId), idempotent: false } as const;
+  },
+});
+
+// Save Stripe Checkout session/PI identifiers on order
+export const saveStripeCheckoutSession = mutation({
+  args: {
+    orderId: v.id("orders"),
+    checkoutSessionId: v.string(),
+    paymentIntentId: v.optional(v.string()),
+  },
+  handler: async (ctx, { orderId, checkoutSessionId, paymentIntentId }) => {
+    const now = Date.now();
+    await ctx.db.patch(orderId, {
+      paymentProvider: "stripe",
+      checkoutSessionId,
+      paymentIntentId,
+      status: "pending",
+      updatedAt: now,
+    });
+    return await ctx.db.get(orderId);
+  },
+});
+
+// Get order with its items, payments and invoice
+export const getOrderWithRelations = query({
+  args: { orderId: v.id("orders") },
+  handler: async (ctx, { orderId }) => {
+    const order = await ctx.db.get(orderId);
+    if (!order) throw new Error("Order not found");
+    const items = await ctx.db
+      .query("orderItems")
+      .withIndex("by_order", q => q.eq("orderId", orderId))
+      .collect();
+    const payments = await ctx.db
+      .query("payments")
+      .withIndex("by_order", q => q.eq("orderId", orderId))
+      .order("desc")
+      .collect();
+    const invoice = order.invoiceId ? await ctx.db.get(order.invoiceId as any) : null;
+    return { order, items, payments, invoice } as const;
+  },
+});
+
+// Admin listing with filters
+export const listOrdersAdmin = query({
+  args: {
+    status: v.optional(v.string()),
+    from: v.optional(v.number()),
+    to: v.optional(v.number()),
+    email: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Authorization should be enforced by the caller (Express) using Clerk roles
+    let qBase = ctx.db.query("orders");
+    if (args.status) qBase = qBase.filter(qq => qq.eq(qq.field("status"), args.status!));
+    let results = await qBase.order("desc").take(Math.max(1, Math.min(args.limit || 50, 200)));
+    if (args.email) results = results.filter(o => (o.email as string) === args.email);
+    if (args.from) results = results.filter(o => (o.createdAt as number) >= args.from!);
+    if (args.to) results = results.filter(o => (o.createdAt as number) <= args.to!);
+    return results as any;
+  },
+});
+
+// Atomic counter: returns next value
+export const incrementCounter = mutation({
+  args: { name: v.string() },
+  handler: async (ctx, { name }) => {
+    const existing = await ctx.db
+      .query("counters")
+      .withIndex("by_name", q => q.eq("name", name))
+      .first();
+    if (!existing) {
+      const id = await ctx.db.insert("counters", { name, value: 1 });
+      const doc = await ctx.db.get(id);
+      return (doc?.value as number) || 1;
+    }
+    await ctx.db.patch(existing._id, { value: (existing.value as number) + 1 });
+    const updated = await ctx.db.get(existing._id);
+    return (updated?.value as number) || (existing.value as number) + 1;
+  },
+});
+
+// Record payment row for an order
+export const recordPayment = mutation({
+  args: {
+    orderId: v.id("orders"),
+    provider: v.string(),
+    status: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    stripeEventId: v.optional(v.string()),
+    stripePaymentIntentId: v.optional(v.string()),
+    stripeChargeId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    await ctx.db.insert("payments", { ...args, createdAt: now });
+    // Update order status if succeeded/failed
+    const order = await ctx.db.get(args.orderId);
+    if (order) {
+      const statusMap: Record<string, string> = {
+        succeeded: "paid",
+        failed: "payment_failed",
+        refunded: "refunded",
+      };
+      const newStatus = statusMap[args.status] || order.status;
+      await ctx.db.patch(order._id, { status: newStatus, updatedAt: now });
+    }
+    return { success: true } as const;
+  },
+});
+
+// Mark a Stripe event as processed (idempotency)
+export const markProcessedEvent = mutation({
+  args: { provider: v.string(), eventId: v.string() },
+  handler: async (ctx, { provider, eventId }) => {
+    const existing = await ctx.db
+      .query("processedEvents")
+      .withIndex("by_provider_event", q => q.eq("provider", provider).eq("eventId", eventId))
+      .first();
+    if (existing) return { alreadyProcessed: true } as const;
+    await ctx.db.insert("processedEvents", { provider, eventId, processedAt: Date.now() });
+    return { alreadyProcessed: false } as const;
+  },
+});
+
+// Set invoice for order using Convex storage key
+export const setInvoiceForOrder = mutation({
+  args: {
+    orderId: v.id("orders"),
+    storageId: v.string(), // key from upload URL
+    amount: v.number(),
+    currency: v.string(),
+    taxAmount: v.optional(v.number()),
+    billingInfo: v.optional(v.any()),
+  },
+  handler: async (ctx, { orderId, storageId, amount, currency, taxAmount, billingInfo }) => {
+    const order = await ctx.db.get(orderId);
+    if (!order) throw new Error("Order not found");
+
+    // Build next invoice number BRL-YYYY-####
+    const year = new Date().getFullYear();
+    // Call sibling mutation through Convex's internal action is not available here; inline increment
+    const existing = await ctx.db
+      .query("counters")
+      .withIndex("by_name", q => q.eq("name", "invoice_seq"))
+      .first();
+    let seq = 1;
+    if (!existing) {
+      const id = await ctx.db.insert("counters", { name: "invoice_seq", value: 1 });
+      const doc = await ctx.db.get(id);
+      seq = (doc?.value as number) || 1;
+    } else {
+      await ctx.db.patch(existing._id, { value: (existing.value as number) + 1 });
+      const updated = await ctx.db.get(existing._id);
+      seq = (updated?.value as number) || (existing.value as number) + 1;
+    }
+    const padded = String(seq).padStart(4, "0");
+    const number = `BRL-${year}-${padded}`;
+
+    const issuedAt = Date.now();
+    const pdfUrl = await ctx.storage.getUrl(storageId as any);
+
+    const invoiceId = await ctx.db.insert("invoicesOrders", {
+      orderId,
+      number,
+      pdfKey: storageId,
+      pdfUrl: pdfUrl || undefined,
+      amount,
+      currency,
+      issuedAt,
+      taxAmount,
+      billingInfo,
+      createdAt: issuedAt,
+    });
+
+    await ctx.db.patch(orderId, {
+      invoiceId,
+      invoiceUrl: pdfUrl || undefined,
+      invoiceNumber: number,
+      updatedAt: issuedAt,
+    });
+
+    return { invoiceId, number, url: pdfUrl } as const;
   },
 });
 
@@ -207,14 +505,13 @@ export const listOrders = query({
         const normalizedStatusRaw = allowedStatuses.has(String(o.status))
           ? String(o.status)
           : "pending";
-        const normalizedStatus = normalizedStatusRaw === "paid" ? "completed" : normalizedStatusRaw;
+        const normalizedStatus = normalizedStatusRaw;
         return {
           id: o._id,
           items: o.items,
           total: Number(o.total || 0),
           currency: o.currency || "USD",
           status: normalizedStatus,
-          paymentStatus: o.paymentStatus,
           createdAt: Number(o.createdAt || Date.now()),
           invoiceUrl: o.invoiceUrl,
           email: o.email,
@@ -235,7 +532,7 @@ export const listOrders = query({
       }
 
       const priceMap = new Map<number, number>();
-      for (const pid of uniqueProductIds) {
+      for (const pid of Array.from(uniqueProductIds)) {
         const beat = await ctx.db
           .query("beats")
           .withIndex("by_wordpress_id", q => q.eq("wordpressId", pid))
@@ -471,6 +768,7 @@ export const markOrderFromWebhook = mutation({
       if (args.sessionId) {
         order = await ctx.db
           .query("orders")
+          .withIndex("by_created_at")
           .filter(q => q.eq(q.field("sessionId"), args.sessionId))
           .order("desc")
           .first();
@@ -479,7 +777,18 @@ export const markOrderFromWebhook = mutation({
       if (!order && args.paymentId) {
         order = await ctx.db
           .query("orders")
-          .filter(q => q.eq(q.field("paymentId"), args.paymentId))
+          .withIndex("by_payment_intent")
+          .filter(q => q.eq(q.field("paymentIntentId"), args.paymentId))
+          .order("desc")
+          .first();
+      }
+
+      // Try by checkoutSessionId
+      if (!order && args.sessionId) {
+        order = await ctx.db
+          .query("orders")
+          .withIndex("by_checkout_session")
+          .filter(q => q.eq(q.field("checkoutSessionId"), args.sessionId))
           .order("desc")
           .first();
       }
@@ -502,11 +811,8 @@ export const markOrderFromWebhook = mutation({
       }
 
       const newStatus = args.status || "completed";
-      const newPaymentStatus = args.paymentStatus || "succeeded";
-
       await ctx.db.patch(order._id, {
         status: newStatus,
-        paymentStatus: newPaymentStatus,
         updatedAt: now,
         notes: args.notes ?? order.notes,
       });
@@ -518,7 +824,7 @@ export const markOrderFromWebhook = mutation({
           details: {
             orderId: order._id,
             status: newStatus,
-            paymentStatus: newPaymentStatus,
+            paymentIntentId: order.paymentIntentId,
           },
           timestamp: now,
         });

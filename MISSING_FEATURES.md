@@ -1,32 +1,31 @@
 # Missing Features / Improvements - BroLab Entertainment
 
-_Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE_
+_Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE (refreshed)_
 
-## 🏆 MISSION ACCOMPLIE - 100% TEST COVERAGE ACHIEVED ✅
+## 🧪 ÉTAT DES TESTS - SYNCHRONISÉ AVEC LE CODE
 
-### ✅ STATUT FINAL - APPLICATION PRÊTE POUR EXPORT WINDOWS
+### ✅ STATUT ACTUEL
 
-⚠️ **Couverture de Tests**: 12/12 fichiers tests confirmés - AUDIT COMPLET REQUIS
+⚠️ **Fichiers de tests détectés**: 22 fichiers dans `__tests__/` et `server/__tests__/` (comptage réel)
 
-- **Suites de Tests**: État mixte détecté (audit détaillé requis)
-- **TypeScript**: 0 erreur de compilation
-- **Architecture**: Stable et production-ready
-- **Export Windows**: Configuration complète préparée
+- **Suites de Tests**: Présentes et actives (API, SEO, auth, Convex) – couverture non mesurée
+- **TypeScript**: 0 erreur de compilation signalée dans l'état actuel du repo
+- **Architecture**: Stable (Express + React + Convex + Clerk)
+- **Export Windows**: Configuration présente (voir WINDOWS_EXPORT_README.md)
 
 ## 🟢 ÉTAT ACTUEL - Post P0-SAFE-UPDATE-DB-STORAGE-VALIDATION Phases ✅
 
 ### ✅ NOUVELLES FONCTIONNALITÉS IMPLÉMENTÉES (Janvier 23, 2025)
 
-#### Système de Tests Complet ✅ 100% COUVERTURE ATTEINTE
+#### Système de Tests Présent ✅ (Non exhaustif)
 
-⚠️ **Test Suite Complète** - 12 fichiers tests confirmés (audit count needed)
+⚠️ **Tests détectés** – 22 fichiers (API, SEO, auth, Convex). La couverture exacte n'est pas publiée.
 
-- **Authentication Tests** - Session-based auth avec userId tracking stable
-- **Downloads API Tests** - Response structure alignée et validation CSV
-- **Mail Service Tests** - Mock nodemailer simplifié et tests adaptés
-- **Database Tests** - Storage interfaces harmonisées (db vs storage calls)
-- **Validation Tests** - 32+ tests de sécurité et validation de fichiers
-- **Integration Tests** - API endpoints complets avec authentification
+- **Authentication Tests** – Auth Clerk + endpoints protégés
+- **Downloads API Tests** – Structure de réponse + export CSV
+- **Mail/Services** – Tests adaptés (mocks)
+- **Validation** – Tests de sécurité/validation présents
+- **Intégration** – Endpoints API avec authentification
 
 #### Système de Gestion de Fichiers Complet ✅ TERMINÉ
 
@@ -37,33 +36,32 @@ _Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE_
 - **Tests Automatisés** - 32+ tests validation, sécurité, schemas
 - **Monitoring Système** - Health checks DB/Storage/WooCommerce, métriques performance
 
-#### Système de Réservation Complet ✅ TERMINÉ
+#### Système de Réservation – WIP
 
-- **Stockage Base de Données** - Table reservations créée avec schéma complet
-- **Suivi de Statut** - États et workflow implémentés (pending, confirmed, in_progress, completed, cancelled)
-- **Validation Serveur** - Validation complète avec Zod schemas
-- **Routes API** - CRUD complet pour réservations
-- **Tests Automatisés** - Tests d'intégration pour toutes les routes
+- **Création** – Endpoint POST opérationnel mais temporaire (sans auth/validation, stockage en mémoire)
+- **Lecture/Statut** – Endpoints existent mais dépendent de `storage`/`db.ts` partiellement implémentés
+- **Validation** – Middleware présent, certaines routes l'utilisent, d'autres non
+- **Emails/ICS** – Génération ICS et notifications prévues; intégration partielle
+- ✅ À consolider: persistance via Convex pour toutes les opérations + auth stricte
 
-#### Sécurité Renforcée ✅ PRODUCTION READY
+#### Sécurité Renforcée ✅ (avec réserves)
 
 - **Protection XSS & Input Sanitization** - Sécurisation entrées utilisateur
 - **File Security Validation** - Blocage exécutables, validation paths, MIME types
 - **Admin Access Control** - Contrôle accès administrateur strict
-- **System Event Logging** - Logs événements système dans Supabase
+- **System Event Logging** - Logs via monitoring interne; intégration Supabase non généralisée
 - **Error Handling & Recovery** - Gestion erreurs complète avec retry
 
 ## 🟢 ÉTAT ACTUEL - Post Phases de Sécurité et Optimisation ✅
 
-### ✅ STATUT CRITIQUE RÉSOLU (Score de Sécurité: 100/100)
+### ✅ ÉTAT CRITIQUE STABILISÉ
 
-- **100% Couverture de Tests** - 75/75 tests (objectif atteint)
-- **0 Erreurs TypeScript** - Compilation parfaite
-- **Suite de Tests Opérationnelle** - Assurance qualité restaurée
-- **Système d'Authentification Complet** - Session-based auth avec userId tracking
-- **Tous les Endpoints API Fonctionnels** - Downloads, mail service, validation, réservations
-- **Sécurité RLS Supabase** - Politiques de sécurité row-level complètes
-- **Export Windows Ready** - Configuration complète pour développement local
+- **Tests** – 22 fichiers confirmés, exécution via Jest (couverture non mesurée)
+- **TypeScript** – OK
+- **Authentification** – Clerk (middleware serveur + provider frontend) avec fallback session pour tests
+- **Endpoints API** – Actifs (downloads, SEO, paiements, monitoring). Réservations/commandes: partiel
+- **Supabase RLS** – Scripts présents (legacy); base de données applicative via Convex
+- **Export Windows** – Guide/config présents
 
 ### ✅ Statut Actuel de l'Application - VÉRIFIÉ PAR AUDIT DE CODE
 
@@ -72,12 +70,12 @@ _Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE_
 - **134 Fichiers Total**: 25 pages, 79 composants, 15 hooks, 11 routes, 9 bibliothèques
 - **Configuration Build**: Vite + TypeScript + Tailwind (tout configuré)
 - **Intégrité Package**: Complete avec 29 variables d'environnement
-- **Schéma Base de Données**: Supabase avec 8 tables et définitions schéma appropriées
+- **Schéma Base de Données**: Supabase (legacy scripts) + Convex (actuel)
 
 #### Fonctionnalités Implémentées avec Succès (✅ Vérifiées par Code)
 
 - **Intégration WooCommerce**: ✅ Connexion API live détectée dans les routes serveur
-- **Traitement des Paiements**: ✅ Configuration Stripe trouvée, système d'abonnement implémenté
+- **Traitement des Paiements**: ✅ Stripe Checkout/Intents + PayPal présents (abonnements via Clerk: à confirmer)
 - **Système Panier d'Achat**: ✅ Fournisseur panier, hooks, et flux checkout présents
 - **Système de Prévisualisation Audio**: ✅ Composants waveform détectés dans le codebase
 - **Support Multi-Langue**: ✅ Code i18n/traduction trouvé
@@ -105,21 +103,19 @@ _Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE_
   - ✅ Exports LazyComponents corrigés (exports par défaut)
   - ✅ Interface BeatCardProps parfaitement alignée
 
-### 2. Implémentation Système d'Authentification ✅ COMPLET
+### 2. Implémentation Système d'Authentification ✅ (Clerk)
 
-- [x] **Backend d'authentification complet** - (P0, CRITIQUE) - ✅ IMPLÉMENTÉ
-      _Système d'authentification utilisateur complet opérationnel_
-  - ✅ Middleware auth avec gestion de session
-  - ✅ Gestion de session sécurisée avec cookies appropriés
-  - ✅ Hachage de mot de passe avec bcrypt
-  - ✅ Implémentation route protégée complète
+- [x] **Clerk + Convex** - (P0, CRITIQUE) - ✅ IMPLÉMENTÉ
+      _Authentification via Clerk côté serveur (middleware) et frontend (provider)_
+  - ✅ Middleware Clerk (`@clerk/express`) + `getAuth`
+  - ✅ Fallback session pour tests automatiques (tokens de test)
+  - ❌ Pas de bcrypt ni de mots de passe locaux (non applicable avec Clerk)
+  - ✅ Routes protégées actives
 
-### 3. Sécurité Base de Données et RLS ✅ COMPLET
+### 3. Sécurité Base de Données et RLS – PARTIEL
 
-- [x] **Politiques RLS Supabase** - (P0, CRITIQUE) - ✅ IMPLÉMENTÉ
-      _Sécurité row-level complète avec 8 tables protégées_
-  - ✅ Politiques pour users, cart_items, orders, downloads, subscriptions, reservations
-  - ✅ Infrastructure admin avec endpoints de gestion
+- [ ] **Politiques RLS Supabase** - (P0) - TODO / Legacy
+      _Scripts SQL présents, mais la persistance principale utilise Convex_
   - ✅ Rate limiting (100 req/15min par IP) opérationnel
 
 ### 4. Tests et Validation API ✅ VALIDÉ
@@ -218,24 +214,13 @@ _Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE_
   - ✅ Filtres et recherche
   - ✅ Monitoring système
 
-### FINALISATION PAIEMENT ✅ TERMINÉ
+### PAIEMENT – ✅ OPÉRATIONNEL (avec réserves)
 
-- ✅ **Validation Serveur Robuste**
-  - ✅ Vérification montants avec Stripe
-  - ✅ Protection contre fraude intégrée
-  - ✅ Validation transactions multi-devises
-- ✅ **Système de Facturation Complet**
-  - ✅ Génération PDF factures automatique
-  - ✅ Templates factures personnalisés
-  - ✅ Archivage Supabase Storage
-- ✅ **Suivi Commandes Avancé**
-  - ✅ Persistance statuts dans Supabase
-  - ✅ Webhooks Stripe intégrés
-  - ✅ Interface admin monitoring
-- ✅ **Gestion Remboursements**
-  - ✅ API remboursements Stripe
-  - ✅ Workflow approbation admin
-  - ✅ Notifications automatiques
+- ✅ Stripe (Checkout Session) via `/api/clerk/create-checkout-session`
+- ✅ Stripe PaymentIntents (HTTP direct) via `/api/payment/stripe`
+- ✅ PayPal (création/capture + webhook) – implémenté; vérification signature TODO en prod
+- ✅ Génération PDF factures (utilitaires); intégration commande à compléter
+- ❌ Remboursements/portail facturation: non implémentés
 
 ### INTÉGRATION PROCESSUS ✅ TERMINÉ
 
@@ -270,17 +255,14 @@ _Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE_
 
 ### P0 - CRITIQUE (Bloqueurs Production)
 
-#### 1. Système de Commandes ✅ TERMINÉ
+#### 1. Système de Commandes – WIP
 
-- ✅ **Système de commandes complet** - (P0, ÉLEVÉ) - COMPLÉTÉ
-  _Système complet de gestion des commandes et factures_
-  - ✅ Backend complet : Routes API, validation, persistance, factures, webhooks
-  - ✅ Frontend complet : Pages, hooks, composants UI avec React Query
-  - ✅ Base de données : Tables Supabase avec RLS et historique des statuts
-  - ✅ Tests complets : Tests unitaires, d'intégration et frontend
-  - ✅ Sécurité : Authentification, autorisation, contrôle d'accès
-  - ✅ Factures : Génération PDF automatique avec téléchargement sécurisé
-  - ✅ Paiements : Intégration Stripe complète avec webhooks
+- ⚠️ **Partiellement implémenté** - (P0, ÉLEVÉ)
+  _Création d'ordre via Convex OK; lecture/factures partielle_
+  - ✅ Backend: route POST active (création)
+  - ❌ Lecture détaillée / invoice: dépend de helpers `db.ts` non finalisés
+  - ✅ Génération PDF/invoices: utilitaires présents; intégration à compléter
+  - ✅ Paiements: Stripe Checkout opérationnel (webhooks présents, logique à compléter)
 
 #### 2. Gestion et Contenus Producteurs
 
@@ -304,16 +286,14 @@ _Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE_
 
 #### 3. Expérience Utilisateur Critique
 
-- [x] **Wishlist et favoris** - (P1, ÉLEVÉ, 4-6h) - ✅ IMPLÉMENTÉ
-      _Fonctionnalité très attendue par utilisateurs_
+- [ ] **Wishlist et favoris** - (P1, ÉLEVÉ) - WIP
+      _UI complète; API partiellement implémentée_
 
-  - ✅ Hook `useWishlist` complet avec gestion d'état Supabase
-  - ✅ Page `wishlist.tsx` avec interface utilisateur complète
-  - ✅ Intégration dans `BeatCard` et `Product` avec boutons toggle
-  - ✅ Persistance base de données avec table `wishlist`
-  - ✅ Fonctionnalités: ajout, suppression, vidage, gestion erreurs
-  - ✅ Route `/wishlist` intégrée dans App.tsx
-  - ✅ Gestion authentification et notifications toast
+  - ✅ Hook `useWishlist` + page `wishlist.tsx`
+  - ⚠️ API `/api/wishlist`: stubs (retours vides/OK, pas de persistance)
+  - ✅ Endpoints alternatifs en mémoire: `/api/user/wishlist` (tests/demo)
+  - ❌ Persistance Convex/Supabase manquante
+  - ✅ Auth/notifications côté UI
 
 - [x] **Beats vus récemment** - (P1, MOYEN, 2-3h) - ✅ IMPLÉMENTÉ
       _Améliore engagement utilisateur_
@@ -457,15 +437,15 @@ _Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE_
 
 ## 📊 Résumé Statut d'Implémentation
 
-### ✅ COMPLÉTÉ (100% Fonctionnel)
+### ✅ COMPLÉTÉ (fonctionnel selon périmètre actuel)
 
 - **E-commerce Core**: Product catalog, cart, checkout, payments
 - **Gestion Utilisateurs**: Authentification, dashboard, suivi téléchargements
 - **Système Audio**: Lecteur waveform, prévisualisation beats, contrôles audio
-- **Traitement Paiements**: Stripe, PayPal, Apple/Google Pay, support crypto
+- **Traitement Paiements**: Stripe Checkout + PaymentIntents, PayPal (sans Apple/Google Pay/crypto)
 - **Fonctionnalités Avancées**: Multi-devise, multi-langue, design responsive
 - **Performance**: Optimisation mémoire, lazy loading, monitoring
-- **Sécurité**: Authentification, validation input, routes protégées, RLS Supabase
+- **Sécurité**: Authentification (Clerk), validation input, routes protégées, rate limiting
 - **Système Email**: Service centralisé, templates professionnels, vérification utilisateur, réinitialisation mot de passe
 - **Système de Réservation**: Tables, routes API, validation, notifications, calendrier
 - **Beats Vus Récemment**: Système complet avec localStorage, hook, composant et intégration
@@ -477,7 +457,7 @@ _Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE_
 - **Santé API**: 11+ endpoints fonctionnels
 - **Performance**: 30MB mémoire, chargement optimisé
 - **Sécurité**: Système d'authentification complet + RLS
-  ⚠️ **Tests**: 12 fichiers tests confirmés (api-payment.test.ts, api-auth.test.ts, etc.)
+  ⚠️ **Tests**: 22 fichiers tests confirmés (api-payment.test.ts, api-auth.test.ts, etc.)
 
 **Complétion Globale**: 95% avec fonctionnalités core complètes, système email intégré, système de réservation complet, logique business critique/sécurité nécessaire
 
