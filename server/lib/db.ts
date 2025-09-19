@@ -242,7 +242,7 @@ export async function getReservationById(id: string): Promise<Reservation | null
   return null;
 }
 
-export async function getUserReservations(userId: number): Promise<Reservation[]> {
+export async function getUserReservations(userId: string | number): Promise<Reservation[]> {
   // TODO: Implement with Convex
   console.log("Getting user reservations:", userId);
   return [];
@@ -267,7 +267,7 @@ export async function getReservationsByDateRange(
 }
 
 // Update user avatar
-export async function updateUserAvatar(userId: number, avatarUrl: string): Promise<void> {
+export async function updateUserAvatar(userId: string | number, avatarUrl: string): Promise<void> {
   // TODO: Implement with Convex
   console.log("Updating user avatar:", userId, avatarUrl);
 }

@@ -59,8 +59,11 @@ export const updateQuota = mutation({
         await ctx.db.insert("auditLogs", {
           userId: quota.userId,
           action: "quota_update_error",
-          resource: "quota",
+          resource: "quotas",
           details: {
+            operation: "update",
+            resource: "quotas",
+            resourceId: args.quotaId,
             error: errorMessage,
             quotaId: args.quotaId,
             changes: args,
@@ -111,9 +114,7 @@ export const consumeQuota = mutation({
         amount: args.amount,
         description: args.description || `Consumed ${args.amount} ${quota.quotaType}`,
         metadata: {
-          consumedAt: Date.now(),
-          previousUsage: quota.used,
-          newUsage: newUsed,
+          resourceType: quota.quotaType as "download" | "upload" | "api_call" | "storage",
         },
         createdAt: Date.now(),
       });
@@ -150,12 +151,15 @@ export const consumeQuota = mutation({
         await ctx.db.insert("auditLogs", {
           userId: quota.userId,
           action: "quota_consumption_error",
-          resource: "quota",
+          resource: "quotas",
           details: {
+            operation: "update",
+            resource: "quotas",
+            resourceId: args.quotaId,
             error: errorMessage,
             quotaId: args.quotaId,
             amount: args.amount,
-            resourceId: args.resourceId,
+            consumedResourceId: args.resourceId,
           },
           timestamp: Date.now(),
         });

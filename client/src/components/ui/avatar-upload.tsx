@@ -1,0 +1,155 @@
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { Camera } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
+const DEFAULT_AVATAR = "/assets/default-avatar.svg";
+
+interface AvatarUploadProps {
+  src?: string | null;
+  alt?: string;
+  size?: "sm" | "md" | "lg";
+  className?: string;
+  onUpload?: (url: string) => void;
+}
+
+const sizeClasses = {
+  sm: "w-8 h-8",
+  md: "w-12 h-12",
+  lg: "w-16 h-16",
+} as const;
+
+export function AvatarUpload({
+  src,
+  alt = "User avatar",
+  size = "md",
+  className,
+  onUpload,
+}: AvatarUploadProps) {
+  const [imgSrc, setImgSrc] = useState(src || DEFAULT_AVATAR);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  // Mettre à jour imgSrc quand src change
+  useEffect(() => {
+    setImgSrc(src || DEFAULT_AVATAR);
+  }, [src]);
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validation du fichier
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Erreur de validation",
+        description: "Veuillez sélectionner un fichier image valide.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      // 5MB
+      toast({
+        title: "Erreur de validation",
+        description: "Le fichier est trop volumineux. Taille maximale : 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const response = await fetch("/api/avatar/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const { url } = await response.json();
+      setImgSrc(url);
+      onUpload?.(url);
+
+      toast({
+        title: "Avatar mis à jour",
+        description: "Votre photo de profil a été mise à jour avec succès.",
+      });
+    } catch (error) {
+      console.error("Avatar upload error:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour l'avatar. Veuillez réessayer.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset l'input pour permettre la sélection du même fichier
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
+  return (
+    <div className="relative group">
+      <img
+        src={imgSrc}
+        alt={alt}
+        className={cn(
+          sizeClasses[size],
+          "rounded-full object-cover border-2 border-[var(--accent-purple)]",
+          className
+        )}
+        onError={() => {
+          if (imgSrc !== DEFAULT_AVATAR) {
+            setImgSrc(DEFAULT_AVATAR);
+            toast({
+              title: "Erreur",
+              description: "Impossible de charger l'avatar",
+              variant: "destructive",
+            });
+          }
+        }}
+      />
+
+      <button
+        type="button"
+        onClick={triggerFileInput}
+        disabled={isUploading}
+        className={cn(
+          "absolute inset-0 flex items-center justify-center rounded-full",
+          "bg-black bg-opacity-50 transition-opacity duration-200",
+          "opacity-0 group-hover:opacity-100",
+          "focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)] focus:ring-offset-2",
+          isUploading && "opacity-100"
+        )}
+      >
+        {isUploading ? (
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+        ) : (
+          <Camera className="w-4 h-4 text-white" />
+        )}
+      </button>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+    </div>
+  );
+}

@@ -6,10 +6,12 @@ import { Navbar } from "@/components/layout/navbar";
 import { LoadingFallback } from "@/components/LoadingFallback";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { NewsletterModal, useNewsletterModal } from "@/components/NewsletterModal";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { GlobalLoadingIndicator, LoadingStateProvider } from "./components/LoadingStateProvider";
 // AuthLoading removed to fix infinite loading issues
 import { lazy, Suspense } from "react";
 import { HelmetProvider } from "react-helmet-async";
@@ -18,6 +20,7 @@ import { queryClient } from "./lib/queryClient";
 
 // Pages
 import Cart from "@/pages/cart";
+import Checkout from "@/pages/checkout";
 import Home from "@/pages/home";
 import OrderConfirmation from "@/pages/order-confirmation";
 import Product from "@/pages/product";
@@ -72,7 +75,7 @@ function Router() {
       <Route path="/wishlist" component={WishlistPage} />
 
       <Route path="/mixing-mastering" component={MixingMastering} />
-      <Route path="/checkout" component={lazy(() => import("./pages/checkout"))} />
+      <Route path="/checkout" component={Checkout} />
       <Route path="/checkout-success" component={lazy(() => import("./pages/checkout-success"))} />
       <Route path="/payment/success" component={lazy(() => import("./pages/payment-success"))} />
       <Route path="/payment/cancel" component={lazy(() => import("./pages/payment-cancel"))} />
@@ -100,43 +103,53 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <HelmetProvider>
         <TooltipProvider>
-          <CartProvider>
-            <ScrollToTop />
-            <div className="min-h-screen bg-[var(--deep-black)] text-white">
-              <a
-                href="#main-content"
-                className="skip-to-content sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[var(--color-accent)] text-white px-4 py-2 rounded-lg z-50"
-                aria-label="Skip to main content"
-              >
-                Skip to content
-              </a>
+          <LoadingStateProvider>
+            <CartProvider>
+              <ScrollToTop />
+              <div className="min-h-screen bg-[var(--deep-black)] text-white">
+                <a
+                  href="#main-content"
+                  className="skip-to-content sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[var(--color-accent)] text-white px-4 py-2 rounded-lg z-50"
+                  aria-label="Skip to main content"
+                >
+                  Skip to content
+                </a>
 
-              {/* Navbar always visible */}
-              <Navbar />
+                {/* Global loading indicator */}
+                <GlobalLoadingIndicator />
 
-              <main id="main-content" role="main">
-                <ErrorBoundary>
-                  <Suspense fallback={<LoadingFallback message="Loading page..." />}>
-                    <Router />
-                  </Suspense>
-                </ErrorBoundary>
-              </main>
+                {/* Offline indicator */}
+                <div className="fixed bottom-4 right-4 z-40">
+                  <OfflineIndicator showDetails />
+                </div>
 
-              <Footer />
+                {/* Navbar always visible */}
+                <Navbar />
 
-              {/* Mobile bottom navigation */}
-              <MobileBottomNav />
+                <main id="main-content" role="main">
+                  <ErrorBoundary>
+                    <Suspense fallback={<LoadingFallback message="Loading page..." />}>
+                      <Router />
+                    </Suspense>
+                  </ErrorBoundary>
+                </main>
 
-              {/* Global audio player */}
-              <EnhancedGlobalAudioPlayer />
+                <Footer />
 
-              {/* Newsletter modal */}
-              <NewsletterModal isOpen={isOpen} onClose={closeModal} />
+                {/* Mobile bottom navigation */}
+                <MobileBottomNav />
 
-              {/* Toaster for notifications */}
-              <Toaster />
-            </div>
-          </CartProvider>
+                {/* Global audio player */}
+                <EnhancedGlobalAudioPlayer />
+
+                {/* Newsletter modal */}
+                <NewsletterModal isOpen={isOpen} onClose={closeModal} />
+
+                {/* Toaster for notifications */}
+                <Toaster />
+              </div>
+            </CartProvider>
+          </LoadingStateProvider>
         </TooltipProvider>
       </HelmetProvider>
     </QueryClientProvider>

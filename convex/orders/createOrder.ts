@@ -6,7 +6,8 @@ export const createOrder = mutation({
     items: v.array(
       v.object({
         productId: v.number(),
-        name: v.string(),
+        title: v.string(),
+        name: v.optional(v.string()), // Keep for backward compatibility
         price: v.number(),
         license: v.string(),
         quantity: v.number(),
@@ -70,7 +71,22 @@ export const createOrder = mutation({
       total: args.total,
       currency: args.currency || "EUR",
       status: args.status,
-      items: args.items,
+      items: args.items.map(item => ({
+        productId: item.productId,
+        title: item.title || item.name || `Product ${item.productId}`,
+        price: item.price,
+        quantity: item.quantity,
+        license: item.license,
+        type: "beat", // Default type
+        sku: `beat-${item.productId}`,
+        metadata: {
+          beatGenre: undefined,
+          beatBpm: undefined,
+          beatKey: undefined,
+          downloadFormat: "mp3",
+          licenseTerms: item.license,
+        },
+      })),
       paymentId: args.paymentId,
       paymentStatus: args.paymentStatus,
       createdAt: Date.now(),

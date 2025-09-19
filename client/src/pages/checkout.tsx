@@ -19,9 +19,20 @@ export default function Checkout() {
     "idle" | "processing" | "succeeded" | "failed"
   >("idle");
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isCartReady, setIsCartReady] = useState(false);
+
+  // Wait for cart to be ready
+  useEffect(() => {
+    // Cart is ready when it has been initialized (even if empty)
+    if (cart !== undefined) {
+      setIsCartReady(true);
+    }
+  }, [cart]);
 
   // Check for pending services from sessionStorage
   useEffect(() => {
+    if (!isCartReady) return;
+
     const storedPayment = sessionStorage.getItem("pendingPayment");
     const storedServices = sessionStorage.getItem("pendingServices");
 
@@ -38,7 +49,7 @@ export default function Checkout() {
 
     // Mark data as loaded
     setIsDataLoaded(true);
-  }, []);
+  }, [isCartReady]);
 
   // Calculate total (cumulative: services + cart items)
   const total = useMemo(() => {
@@ -86,15 +97,47 @@ export default function Checkout() {
 
   // Redirect if both cart and pending services are empty (only after data is loaded)
   useEffect(() => {
-    if (isDataLoaded && cart.items.length === 0 && pendingServices.length === 0) {
+    if (isDataLoaded && cart?.items?.length === 0 && pendingServices.length === 0) {
       setLocation("/cart");
     }
-  }, [isDataLoaded, cart.items.length, pendingServices.length, setLocation]);
+  }, [isDataLoaded, cart?.items?.length, pendingServices.length, setLocation]);
 
-  // Show loading state while data is loading or while redirecting
-  if (!isDataLoaded || (isDataLoaded && cart.items.length === 0 && pendingServices.length === 0)) {
-    return null;
+  // Debug logging
+  console.log("🔍 Checkout Debug:", {
+    isCartReady,
+    isDataLoaded,
+    cartItemsCount: cart?.items?.length || 0,
+    pendingServices: pendingServices.length,
+    cartItems: cart?.items || [],
+  });
+
+  // Show loading state while cart or data is loading
+  if (!isCartReady || !isDataLoaded) {
+    console.log("⏳ Checkout: Cart or data not ready yet", { isCartReady, isDataLoaded });
+    return (
+      <div className="min-h-screen bg-[var(--deep-black)] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--accent-purple)] mx-auto mb-4"></div>
+          <p className="text-white text-lg">Loading checkout...</p>
+        </div>
+      </div>
+    );
   }
+
+  // Redirect if both cart and pending services are empty (only after data is loaded)
+  if (isDataLoaded && cart?.items?.length === 0 && pendingServices.length === 0) {
+    console.log("🔄 Checkout: Redirecting to cart - no items");
+    return (
+      <div className="min-h-screen bg-[var(--deep-black)] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--accent-purple)] mx-auto mb-4"></div>
+          <p className="text-white text-lg">Redirecting to cart...</p>
+        </div>
+      </div>
+    );
+  }
+
+  console.log("✅ Checkout: Rendering checkout page");
 
   return (
     <div className="min-h-screen bg-[var(--deep-black)]">

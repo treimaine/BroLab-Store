@@ -16,8 +16,59 @@ export default defineSchema({
     role: v.optional(v.string()), // 'user', 'admin', 'artist'
     isActive: v.optional(v.boolean()), // Compte actif/suspendu
     lastLoginAt: v.optional(v.number()), // Dernière connexion
-    preferences: v.optional(v.any()), // Préférences utilisateur
-    metadata: v.optional(v.any()), // Métadonnées additionnelles
+    preferences: v.optional(
+      v.object({
+        language: v.string(),
+        theme: v.union(v.literal("light"), v.literal("dark"), v.literal("auto")),
+        notifications: v.object({
+          email: v.boolean(),
+          push: v.boolean(),
+          sms: v.boolean(),
+          marketing: v.boolean(),
+          updates: v.boolean(),
+        }),
+        privacy: v.object({
+          profileVisibility: v.union(
+            v.literal("public"),
+            v.literal("private"),
+            v.literal("friends")
+          ),
+          showActivity: v.boolean(),
+          allowAnalytics: v.boolean(),
+        }),
+        audio: v.object({
+          defaultVolume: v.number(),
+          autoplay: v.boolean(),
+          quality: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+          downloadFormat: v.union(v.literal("mp3"), v.literal("wav"), v.literal("flac")),
+        }),
+      })
+    ), // Préférences utilisateur
+    metadata: v.optional(
+      v.object({
+        signupSource: v.optional(v.string()),
+        referralCode: v.optional(v.string()),
+        lastActiveAt: v.optional(v.number()),
+        deviceInfo: v.optional(
+          v.object({
+            type: v.union(v.literal("desktop"), v.literal("mobile"), v.literal("tablet")),
+            os: v.string(),
+            browser: v.string(),
+            version: v.string(),
+            screenResolution: v.optional(v.string()),
+          })
+        ),
+        locationInfo: v.optional(
+          v.object({
+            country: v.optional(v.string()),
+            region: v.optional(v.string()),
+            city: v.optional(v.string()),
+            timezone: v.optional(v.string()),
+            ip: v.optional(v.string()),
+          })
+        ),
+      })
+    ), // Métadonnées additionnelles
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -51,7 +102,9 @@ export default defineSchema({
     .index("by_wordpress_id", ["wordpressId"])
     .index("by_genre", ["genre"])
     .index("by_featured", ["featured"])
-    .index("by_active", ["isActive"]),
+    .index("by_active", ["isActive"])
+    .index("by_price", ["price"]) // For dashboard enrichment
+    .index("by_title", ["title"]),
 
   // Cart Items (remplace Supabase cart_items)
   cartItems: defineTable({
@@ -76,7 +129,26 @@ export default defineSchema({
     tax: v.optional(v.number()),
     total: v.number(),
     itemsCount: v.optional(v.number()),
-    items: v.array(v.any()),
+    items: v.array(
+      v.object({
+        productId: v.optional(v.number()),
+        title: v.string(),
+        price: v.optional(v.number()),
+        quantity: v.optional(v.number()),
+        license: v.optional(v.string()),
+        type: v.optional(v.string()),
+        sku: v.optional(v.string()),
+        metadata: v.optional(
+          v.object({
+            beatGenre: v.optional(v.string()),
+            beatBpm: v.optional(v.number()),
+            beatKey: v.optional(v.string()),
+            downloadFormat: v.optional(v.string()),
+            licenseTerms: v.optional(v.string()),
+          })
+        ),
+      })
+    ),
     // Removed temporary migration fields (taxAmount, discountAmount)
     paymentProvider: v.optional(v.string()), // 'stripe'|null
     paymentStatus: v.optional(v.string()), // 'pending'|'succeeded'|'failed'|'refunded'
@@ -88,7 +160,16 @@ export default defineSchema({
     invoiceUrl: v.optional(v.string()),
     invoiceNumber: v.optional(v.string()),
     idempotencyKey: v.optional(v.string()),
-    metadata: v.optional(v.any()),
+    metadata: v.optional(
+      v.object({
+        source: v.union(v.literal("web"), v.literal("mobile"), v.literal("api")),
+        campaign: v.optional(v.string()),
+        referrer: v.optional(v.string()),
+        discountCode: v.optional(v.string()),
+        giftMessage: v.optional(v.string()),
+        deliveryInstructions: v.optional(v.string()),
+      })
+    ),
     sessionId: v.optional(v.string()),
     notes: v.optional(v.string()),
     createdAt: v.number(),
@@ -113,7 +194,15 @@ export default defineSchema({
     qty: v.number(),
     unitPrice: v.number(),
     totalPrice: v.number(),
-    metadata: v.optional(v.any()),
+    metadata: v.optional(
+      v.object({
+        beatGenre: v.optional(v.string()),
+        beatBpm: v.optional(v.number()),
+        beatKey: v.optional(v.string()),
+        downloadFormat: v.optional(v.string()),
+        licenseTerms: v.optional(v.string()),
+      })
+    ),
   }).index("by_order", ["orderId"]),
 
   // Payments (Stripe)
@@ -142,7 +231,23 @@ export default defineSchema({
     currency: v.string(),
     issuedAt: v.number(),
     taxAmount: v.optional(v.number()),
-    billingInfo: v.optional(v.any()),
+    billingInfo: v.optional(
+      v.object({
+        name: v.string(),
+        email: v.string(),
+        address: v.object({
+          line1: v.string(),
+          line2: v.optional(v.string()),
+          city: v.string(),
+          state: v.optional(v.string()),
+          postalCode: v.string(),
+          country: v.string(),
+        }),
+        taxId: v.optional(v.string()),
+        companyName: v.optional(v.string()),
+        phone: v.optional(v.string()),
+      })
+    ),
     createdAt: v.number(),
   })
     .index("by_order", ["orderId"])
@@ -178,14 +283,34 @@ export default defineSchema({
     .index("by_beat", ["beatId"])
     .index("by_license", ["licenseType"])
     .index("by_timestamp", ["timestamp"])
-    .index("by_user_beat", ["userId", "beatId"]),
+    .index("by_user_beat", ["userId", "beatId"])
+    .index("by_user_timestamp", ["userId", "timestamp"]), // For dashboard queries
 
   // Reservations (remplace Supabase reservations)
   reservations: defineTable({
     userId: v.optional(v.id("users")),
     serviceType: v.string(), // 'mixing', 'mastering', 'recording', 'custom_beat', 'consultation'
     status: v.string(), // 'pending', 'confirmed', 'in_progress', 'completed', 'cancelled'
-    details: v.any(), // JSONB equivalent
+    details: v.object({
+      name: v.string(),
+      email: v.string(),
+      phone: v.string(),
+      requirements: v.optional(v.string()),
+      referenceLinks: v.optional(v.array(v.string())),
+      projectDescription: v.optional(v.string()),
+      deadline: v.optional(v.string()),
+      budget: v.optional(
+        v.object({
+          min: v.number(),
+          max: v.number(),
+          currency: v.string(),
+        })
+      ),
+      additionalServices: v.optional(v.array(v.string())),
+      communicationPreference: v.optional(
+        v.union(v.literal("email"), v.literal("phone"), v.literal("video"))
+      ),
+    }), // JSONB equivalent
     preferredDate: v.string(), // ISO date string
     durationMinutes: v.number(),
     totalPrice: v.number(),
@@ -219,7 +344,13 @@ export default defineSchema({
     features: v.array(v.string()), // Fonctionnalités incluses
     downloadQuota: v.number(), // Quota téléchargements
     downloadUsed: v.number(), // Téléchargements utilisés
-    metadata: v.optional(v.any()), // Métadonnées additionnelles
+    metadata: v.optional(
+      v.object({
+        billingCycle: v.optional(v.string()),
+        promoCode: v.optional(v.string()),
+        referralSource: v.optional(v.string()),
+      })
+    ), // Métadonnées additionnelles
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -273,7 +404,26 @@ export default defineSchema({
     resourceType: v.string(), // 'download', 'upload', 'api_call'
     amount: v.number(), // Quantité consommée
     description: v.optional(v.string()),
-    metadata: v.optional(v.any()), // Données additionnelles
+    metadata: v.optional(
+      v.object({
+        resourceType: v.union(
+          v.literal("download"),
+          v.literal("upload"),
+          v.literal("api_call"),
+          v.literal("storage")
+        ),
+        resourceSize: v.optional(v.number()),
+        resourceFormat: v.optional(v.string()),
+        clientInfo: v.optional(
+          v.object({
+            type: v.union(v.literal("desktop"), v.literal("mobile"), v.literal("tablet")),
+            os: v.string(),
+            browser: v.string(),
+            version: v.string(),
+          })
+        ),
+      })
+    ), // Données additionnelles
     createdAt: v.number(),
   })
     .index("by_quota", ["quotaId"])
@@ -285,11 +435,13 @@ export default defineSchema({
   activityLog: defineTable({
     userId: v.id("users"),
     action: v.string(),
-    details: v.optional(v.any()),
+    details: v.optional(v.any()), // Made flexible to support various activity event structures
     timestamp: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_timestamp", ["timestamp"]),
+    .index("by_timestamp", ["timestamp"])
+    .index("by_user_timestamp", ["userId", "timestamp"]) // For dashboard queries
+    .index("by_action", ["action"]),
 
   // Audit Logs (remplace Supabase audit_logs)
   auditLogs: defineTable({
@@ -297,7 +449,7 @@ export default defineSchema({
     clerkId: v.optional(v.string()),
     action: v.string(),
     resource: v.string(),
-    details: v.optional(v.any()),
+    details: v.optional(v.any()), // Made flexible to support various audit event structures
     ipAddress: v.optional(v.string()),
     userAgent: v.optional(v.string()),
     timestamp: v.number(),
@@ -315,7 +467,34 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_beat", ["beatId"])
-    .index("by_user_beat", ["userId", "beatId"]),
+    .index("by_user_beat", ["userId", "beatId"])
+    .index("by_user_created", ["userId", "createdAt"]) // For dashboard queries
+    .index("by_created_at", ["createdAt"]),
+
+  // Rate Limits - New table for rate limiting system
+  rateLimits: defineTable({
+    key: v.string(), // Rate limit key (e.g., "user_123:file_upload")
+    requests: v.number(), // Current request count
+    windowStart: v.number(), // Window start timestamp
+    windowMs: v.number(), // Window duration in milliseconds
+    maxRequests: v.number(), // Maximum requests allowed
+    blocked: v.number(), // Number of blocked requests
+    lastRequest: v.number(), // Last request timestamp
+    metadata: v.optional(
+      v.object({
+        userId: v.optional(v.string()),
+        action: v.optional(v.string()),
+        ip: v.optional(v.string()),
+        userAgent: v.optional(v.string()),
+      })
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_key", ["key"])
+    .index("by_window_start", ["windowStart"])
+    .index("by_user_action", ["metadata.userId", "metadata.action"])
+    .index("by_last_request", ["lastRequest"]),
 
   // Messages (existant)
   messages: defineTable({

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { useUserProfile } from "../../client/src/hooks/useUserProfile";
 
@@ -22,9 +22,7 @@ describe("useUserProfile", () => {
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   });
 
-  const wrapper = ({ children }: any) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
+  const wrapper = ({ children }: any) => children;
 
   it("returns user profile", async () => {
     const { result } = renderHook(() => useUserProfile(), { wrapper });

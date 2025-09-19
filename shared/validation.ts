@@ -5,37 +5,51 @@ import { z } from "zod";
 // ================================
 
 // User registration validation (client-side with confirmPassword)
-export const registerSchema = z.object({
-  username: z.string()
-    .min(3, "Username must be at least 3 characters")
-    .max(30, "Username must be less than 30 characters")
-    .regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens"),
-  email: z.string()
-    .email("Please enter a valid email address")
-    .max(255, "Email is too long"),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters")
-    .max(128, "Password is too long")
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain at least one lowercase letter, one uppercase letter, and one number"),
-  confirmPassword: z.string()
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+export const registerSchema = z
+  .object({
+    username: z
+      .string()
+      .min(3, "Username must be at least 3 characters")
+      .max(30, "Username must be less than 30 characters")
+      .regex(
+        /^[a-zA-Z0-9_-]+$/,
+        "Username can only contain letters, numbers, underscores, and hyphens"
+      ),
+    email: z.string().email("Please enter a valid email address").max(255, "Email is too long"),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .max(128, "Password is too long")
+      .regex(
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+        "Password must contain at least one lowercase letter, one uppercase letter, and one number"
+      ),
+    confirmPassword: z.string(),
+  })
+  .refine(data => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 // Server-side registration validation (without confirmPassword)
 export const serverRegisterSchema = z.object({
-  username: z.string()
+  username: z
+    .string()
     .min(3, "Username must be at least 3 characters")
     .max(30, "Username must be less than 30 characters")
-    .regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens"),
-  email: z.string()
-    .email("Please enter a valid email address")
-    .max(255, "Email is too long"),
-  password: z.string()
+    .regex(
+      /^[a-zA-Z0-9_-]+$/,
+      "Username can only contain letters, numbers, underscores, and hyphens"
+    ),
+  email: z.string().email("Please enter a valid email address").max(255, "Email is too long"),
+  password: z
+    .string()
     .min(8, "Password must be at least 8 characters")
     .max(128, "Password is too long")
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain at least one lowercase letter, one uppercase letter, and one number"),
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      "Password must contain at least one lowercase letter, one uppercase letter, and one number"
+    ),
 });
 
 // User login validation
@@ -47,39 +61,40 @@ export const loginSchema = z.object({
 // Subscription creation validation
 export const createSubscriptionSchema = z.object({
   priceId: z.enum(["basic", "pro", "unlimited"], {
-    errorMap: () => ({ message: "Invalid subscription plan" })
+    errorMap: () => ({ message: "Invalid subscription plan" }),
   }),
   billingInterval: z.enum(["monthly", "annual"], {
-    errorMap: () => ({ message: "Invalid billing interval" })
+    errorMap: () => ({ message: "Invalid billing interval" }),
   }),
 });
 
 // Payment intent validation
 export const paymentIntentSchema = z.object({
-  amount: z.number()
-    .min(100, "Amount must be at least $1.00")
-    .max(999999, "Amount is too high"),
+  amount: z.number().min(100, "Amount must be at least $1.00").max(999999, "Amount is too high"),
   currency: z.enum(["usd", "eur"], {
-    errorMap: () => ({ message: "Invalid currency" })
+    errorMap: () => ({ message: "Invalid currency" }),
   }),
   metadata: z.record(z.string()).optional(),
 });
 
 // User profile update validation
 export const updateProfileSchema = z.object({
-  username: z.string()
+  username: z
+    .string()
     .min(3, "Username must be at least 3 characters")
     .max(30, "Username must be less than 30 characters")
-    .regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, underscores, and hyphens")
+    .regex(
+      /^[a-zA-Z0-9_-]+$/,
+      "Username can only contain letters, numbers, underscores, and hyphens"
+    )
     .optional(),
-  email: z.string()
+  email: z
+    .string()
     .email("Please enter a valid email address")
     .max(255, "Email is too long")
     .optional(),
   avatar: z.string().url("Invalid avatar URL").optional(),
 });
-
-
 
 // ================================
 // SERVER-SIDE VALIDATION SCHEMAS
@@ -98,7 +113,7 @@ export const stripeWebhookSchema = z.object({
   id: z.string(),
   type: z.string(),
   data: z.object({
-    object: z.any(),
+    object: z.record(z.unknown()),
   }),
   created: z.number(),
 });
@@ -116,7 +131,7 @@ export const auditLogSchema = z.object({
   userId: z.number(),
   action: z.string(),
   resource: z.string(),
-  details: z.record(z.any()).optional(),
+  details: z.record(z.unknown()).optional(),
   ipAddress: z.string().optional(),
   userAgent: z.string().optional(),
   timestamp: z.date(),
@@ -132,26 +147,26 @@ export const validateEmail = (email: string): boolean => {
 
 export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
-  
+
   if (password.length < 8) {
     errors.push("Password must be at least 8 characters");
   }
-  
+
   if (!/(?=.*[a-z])/.test(password)) {
     errors.push("Password must contain at least one lowercase letter");
   }
-  
+
   if (!/(?=.*[A-Z])/.test(password)) {
     errors.push("Password must contain at least one uppercase letter");
   }
-  
+
   if (!/(?=.*\d)/.test(password)) {
     errors.push("Password must contain at least one number");
   }
-  
+
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
@@ -176,4 +191,4 @@ export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ServerCreateSubscriptionInput = z.infer<typeof serverCreateSubscriptionSchema>;
 export type StripeWebhookInput = z.infer<typeof stripeWebhookSchema>;
 export type RateLimitInput = z.infer<typeof rateLimitSchema>;
-export type AuditLogInput = z.infer<typeof auditLogSchema>; 
+export type AuditLogInput = z.infer<typeof auditLogSchema>;

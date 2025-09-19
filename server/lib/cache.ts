@@ -3,29 +3,56 @@
  * In production, consider using Redis for distributed caching
  */
 
-interface CacheItem<T> {
+interface CacheItem<T = unknown> {
   data: T;
   timestamp: number;
   ttl: number; // Time to live in milliseconds
+  accessCount: number;
+  lastAccessed: number;
+  size: number;
+  tags?: string[];
+}
+
+interface CacheStats {
+  totalEntries: number;
+  totalSize: number;
+  hitRate: number;
+  missRate: number;
+  evictionCount: number;
+  lastEvictionAt?: number;
+  memoryUsage: number;
 }
 
 class Cache {
-  private store: Map<string, CacheItem<any>> = new Map();
+  private store: Map<string, CacheItem> = new Map();
   private maxSize: number = 1000; // Maximum number of items in cache
+  private maxMemorySize: number = 100 * 1024 * 1024; // 100MB
+  private hitCount: number = 0;
+  private missCount: number = 0;
+  private evictionCount: number = 0;
+  private lastEvictionAt?: number;
 
   /**
    * Set a value in cache
    */
-  set<T>(key: string, data: T, ttl: number = 5 * 60 * 1000): void { // Default 5 minutes
+  set<T>(key: string, data: T, ttl: number = 5 * 60 * 1000, tags?: string[]): void {
+    // Default 5 minutes
     // Clean expired items if cache is full
     if (this.store.size >= this.maxSize) {
       this.cleanup();
     }
 
+    const size = this.calculateSize(data);
+    const now = Date.now();
+
     this.store.set(key, {
       data,
-      timestamp: Date.now(),
-      ttl
+      timestamp: now,
+      ttl,
+      accessCount: 0,
+      lastAccessed: now,
+      size,
+      tags,
     });
   }
 
@@ -34,18 +61,25 @@ class Cache {
    */
   get<T>(key: string): T | null {
     const item = this.store.get(key);
-    
+
     if (!item) {
+      this.missCount++;
       return null;
     }
 
     // Check if item is expired
     if (Date.now() - item.timestamp > item.ttl) {
       this.store.delete(key);
+      this.missCount++;
       return null;
     }
 
-    return item.data;
+    // Update access tracking
+    item.accessCount++;
+    item.lastAccessed = Date.now();
+    this.hitCount++;
+
+    return item.data as T;
   }
 
   /**
@@ -82,27 +116,126 @@ class Cache {
    */
   private cleanup(): void {
     const now = Date.now();
+    let evicted = 0;
+
     this.store.forEach((item, key) => {
       if (now - item.timestamp > item.ttl) {
         this.store.delete(key);
+        evicted++;
       }
     });
+
+    if (evicted > 0) {
+      this.evictionCount += evicted;
+      this.lastEvictionAt = now;
+    }
+  }
+
+  /**
+   * Calculate approximate size of data in bytes
+   */
+  private calculateSize(data: unknown): number {
+    try {
+      return JSON.stringify(data).length * 2; // Rough estimate (UTF-16)
+    } catch {
+      return 1024; // Default size if can't serialize
+    }
   }
 
   /**
    * Get cache statistics
    */
-  stats(): {
-    size: number;
-    maxSize: number;
-    hitRate: number;
-  } {
+  stats(): CacheStats {
     this.cleanup();
+
+    const totalRequests = this.hitCount + this.missCount;
+    const hitRate = totalRequests > 0 ? this.hitCount / totalRequests : 0;
+    const missRate = totalRequests > 0 ? this.missCount / totalRequests : 0;
+
+    let totalSize = 0;
+    this.store.forEach(item => {
+      totalSize += item.size;
+    });
+
     return {
-      size: this.store.size,
-      maxSize: this.maxSize,
-      hitRate: 0 // TODO: Implement hit rate tracking
+      totalEntries: this.store.size,
+      totalSize,
+      hitRate,
+      missRate,
+      evictionCount: this.evictionCount,
+      lastEvictionAt: this.lastEvictionAt,
+      memoryUsage: totalSize / this.maxMemorySize,
     };
+  }
+
+  /**
+   * Invalidate cache entries by pattern
+   */
+  invalidate(pattern: string): number {
+    const regex = new RegExp(pattern.replace(/\*/g, ".*"));
+    let deleted = 0;
+
+    this.store.forEach((_, key) => {
+      if (regex.test(key)) {
+        this.store.delete(key);
+        deleted++;
+      }
+    });
+
+    return deleted;
+  }
+
+  /**
+   * Invalidate cache entries by tags
+   */
+  invalidateByTags(tags: string[]): number {
+    let deleted = 0;
+
+    this.store.forEach((item, key) => {
+      if (item.tags && item.tags.some(tag => tags.includes(tag))) {
+        this.store.delete(key);
+        deleted++;
+      }
+    });
+
+    return deleted;
+  }
+
+  /**
+   * Check if key exists without affecting access stats
+   */
+  exists(key: string): boolean {
+    const item = this.store.get(key);
+    if (!item) return false;
+
+    // Check if expired
+    if (Date.now() - item.timestamp > item.ttl) {
+      this.store.delete(key);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Update TTL for existing key
+   */
+  touch(key: string, ttl?: number): boolean {
+    const item = this.store.get(key);
+    if (!item) return false;
+
+    // Check if expired
+    if (Date.now() - item.timestamp > item.ttl) {
+      this.store.delete(key);
+      return false;
+    }
+
+    if (ttl !== undefined) {
+      item.ttl = ttl;
+    }
+    item.lastAccessed = Date.now();
+
+    return true;
   }
 }
 
@@ -110,12 +243,14 @@ class Cache {
 export const cache = new Cache();
 
 // Cache middleware for Express
+import { NextFunction, Request, Response } from "express";
+
 export function cacheMiddleware(ttl: number = 5 * 60 * 1000) {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const key = `cache:${req.method}:${req.originalUrl}`;
-    
+
     // Skip cache for non-GET requests
-    if (req.method !== 'GET') {
+    if (req.method !== "GET") {
       return next();
     }
 
@@ -126,9 +261,9 @@ export function cacheMiddleware(ttl: number = 5 * 60 * 1000) {
 
     // Store original send method
     const originalSend = res.json;
-    
+
     // Override send method to cache response
-    res.json = function(data: any) {
+    res.json = function (data: unknown) {
       cache.set(key, data, ttl);
       return originalSend.call(this, data);
     };
@@ -139,20 +274,20 @@ export function cacheMiddleware(ttl: number = 5 * 60 * 1000) {
 
 // Cache keys for common data
 export const CACHE_KEYS = {
-  PRODUCTS: 'products:all',
-  CATEGORIES: 'categories:all',
-  SUBSCRIPTION_PLANS: 'subscription:plans',
+  PRODUCTS: "products:all",
+  CATEGORIES: "categories:all",
+  SUBSCRIPTION_PLANS: "subscription:plans",
   USER_PROFILE: (userId: number) => `user:profile:${userId}`,
   USER_SUBSCRIPTION: (userId: number) => `user:subscription:${userId}`,
   BEAT_DETAILS: (beatId: number) => `beat:details:${beatId}`,
   WISHLIST: (userId: number) => `wishlist:${userId}`,
-  DOWNLOADS: (userId: number) => `downloads:${userId}`
+  DOWNLOADS: (userId: number) => `downloads:${userId}`,
 };
 
 // Cache durations
 export const CACHE_TTL = {
-  SHORT: 1 * 60 * 1000,      // 1 minute
-  MEDIUM: 5 * 60 * 1000,     // 5 minutes
-  LONG: 15 * 60 * 1000,      // 15 minutes
-  VERY_LONG: 60 * 60 * 1000  // 1 hour
-}; 
+  SHORT: 1 * 60 * 1000, // 1 minute
+  MEDIUM: 5 * 60 * 1000, // 5 minutes
+  LONG: 15 * 60 * 1000, // 15 minutes
+  VERY_LONG: 60 * 60 * 1000, // 1 hour
+};

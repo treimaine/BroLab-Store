@@ -39,8 +39,8 @@ export const createSubscription = mutation({
         downloadQuota: args.downloadQuota,
         downloadUsed: args.downloadUsed,
         metadata: {
-          createdVia: "manual",
-          source: "clerk_billing",
+          billingCycle: "monthly",
+          referralSource: "manual",
         },
         createdAt: now,
         updatedAt: now,
@@ -87,7 +87,7 @@ export const createSubscription = mutation({
       await ctx.db.insert("auditLogs", {
         // userId optional if user not found earlier
         action: "subscription_creation_error",
-        resource: "subscription",
+        resource: "subscriptions",
         details: {
           error: errorMessage,
           planId: args.planId,

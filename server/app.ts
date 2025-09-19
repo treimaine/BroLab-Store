@@ -13,7 +13,6 @@ import openGraphRouter from "./routes/openGraph";
 import ordersRouter from "./routes/orders";
 import paymentsRouter from "./routes/payments";
 import paypalRouter from "./routes/paypal";
-import reservationsRouter from "./routes/reservations";
 import schemaRouter from "./routes/schema";
 import securityRouter from "./routes/security";
 import serviceOrdersRouter from "./routes/serviceOrders";
@@ -62,7 +61,7 @@ app.use("/api/payment/paypal", paypalRouter);
 app.use("/api/payment/stripe", stripeRouter);
 app.use("/api/clerk", clerkRouter);
 app.use("/api/payments", paymentsRouter);
-app.use("/api/reservations", reservationsRouter);
+// Reservations routes handled by routes/index.ts to avoid conflicts
 app.use("/api/schema", schemaRouter);
 app.use("/api/security", securityRouter);
 app.use("/api/service-orders", serviceOrdersRouter);

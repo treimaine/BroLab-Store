@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-// import { supabaseAdmin } from '../lib/supabaseAdmin'; // Removed - using Convex for data
+import { rateLimiter } from "../../shared/utils/rate-limiter";
 
 interface RateLimitConfig {
   windowMs: number; // Time window in milliseconds
@@ -7,15 +7,15 @@ interface RateLimitConfig {
   keyGenerator?: (req: Request) => string; // Custom key generator
   skipSuccessfulRequests?: boolean;
   skipFailedRequests?: boolean;
+  message?: string; // Custom error message
 }
 
-interface RateLimitRecord {
-  user_id: number;
-  action: string;
-  request_count: number;
-  window_start: string;
-  created_at: string;
-  updated_at: string;
+interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  resetTime: number;
+  totalRequests: number;
+  retryAfter?: number;
 }
 
 export class RateLimiter {
@@ -35,57 +35,54 @@ export class RateLimiter {
 
   async middleware(req: Request, res: Response, next: NextFunction) {
     try {
-      if (!req.isAuthenticated()) {
+      // Allow unauthenticated requests to pass through for some actions
+      if (!req.isAuthenticated() && !this.shouldCheckUnauthenticated(req)) {
         return next();
       }
 
-      const userId = req.user!.id;
+      const userId = req.isAuthenticated() ? req.user!.id.toString() : null;
+      const ip = this.getClientIP(req);
+
       const key = this.config.keyGenerator
         ? this.config.keyGenerator(req)
-        : `${userId}:${this.action}`;
-      const now = new Date();
-      const windowStart = new Date(now.getTime() - this.config.windowMs);
+        : userId
+          ? `${userId}:${this.action}`
+          : `${ip}:${this.action}`;
 
-      // TODO: Implement with Convex
-      // // Get or create rate limit record
-      // const { data: existing, error: fetchError } = await supabaseAdmin
-      //   .from('rate_limits')
-      //   .select('*')
-      //   .eq('user_id', userId)
-      //   .eq('action', this.action)
-      //   .gte('window_start', windowStart.toISOString())
-      //   .single();
+      // Check rate limit using the shared rate limiter
+      const result: RateLimitResult = await rateLimiter.checkLimit(key, {
+        windowMs: this.config.windowMs,
+        maxRequests: this.config.maxRequests,
+        skipSuccessfulRequests: this.config.skipSuccessfulRequests,
+        skipFailedRequests: this.config.skipFailedRequests,
+        message: this.config.message,
+      });
 
-      // if (fetchError && fetchError.code !== 'PGRST116') {
-      //   console.error('Rate limiter error:', fetchError);
-      //   return next();
-      // }
+      if (!result.allowed) {
+        // Set rate limit headers
+        res.set({
+          "X-RateLimit-Limit": this.config.maxRequests.toString(),
+          "X-RateLimit-Remaining": result.remaining.toString(),
+          "X-RateLimit-Reset": new Date(result.resetTime).toISOString(),
+          "Retry-After": result.retryAfter?.toString() || "60",
+        });
 
-      // let currentCount = 0;
-      // let recordId: string | null = null;
+        return res.status(429).json({
+          error: "Rate limit exceeded",
+          message: this.config.message || `Too many ${this.action} requests. Try again later.`,
+          retryAfter: result.retryAfter,
+          resetTime: new Date(result.resetTime).toISOString(),
+        });
+      }
 
-      // if (existing) {
-      //   currentCount = existing.request_count;
-      //   recordId = existing.id;
+      // Set rate limit headers for successful requests
+      res.set({
+        "X-RateLimit-Limit": this.config.maxRequests.toString(),
+        "X-RateLimit-Remaining": result.remaining.toString(),
+        "X-RateLimit-Reset": new Date(result.resetTime).toISOString(),
+      });
 
-      //   // Check if limit exceeded
-      //   if (currentCount >= this.config.maxRequests) {
-      //     const resetTime = new Date(existing.window_start);
-      //     resetTime.setTime(resetTime.getTime() + this.config.windowMs);
-
-      //     return res.status(429).json({
-      //       error: 'Rate limit exceeded',
-      //       message: `Too many ${this.action} requests. Try again after ${resetTime.toISOString()}`,
-      //       retryAfter: Math.ceil((resetTime.getTime() - now.getTime()) / 1000)
-      //     });
-      //   }
-      // }
-
-      // Placeholder implementation
-      let currentCount = 0;
-      let recordId: string | null = null;
-
-      // Store original end function to track success/failure
+      // Store original end function to track success/failure for conditional counting
       const originalEnd = res.end;
       let requestCompleted = false;
       const self = this;
@@ -99,11 +96,9 @@ export class RateLimiter {
             (res.statusCode >= 400 && self.config.skipFailedRequests)
           );
 
-          if (shouldCount) {
-            // Update rate limit counter asynchronously
-            self
-              .updateCounter(userId, recordId, currentCount + 1, windowStart)
-              .catch(console.error);
+          // If we should skip this request, we need to decrement the counter
+          if (!shouldCount) {
+            self.decrementCounter(key).catch(console.error);
           }
         }
 
@@ -113,40 +108,36 @@ export class RateLimiter {
       next();
     } catch (error) {
       console.error("Rate limiter middleware error:", error);
+
+      // Fail open - allow request to proceed if rate limiter fails
       next();
     }
   }
 
-  private async updateCounter(
-    userId: number,
-    recordId: string | null,
-    newCount: number,
-    windowStart: Date
-  ) {
+  private shouldCheckUnauthenticated(req: Request): boolean {
+    // Check unauthenticated requests for certain actions like API calls
+    const checkUnauthenticatedActions = ["api_request", "file_download"];
+    return checkUnauthenticatedActions.includes(this.action);
+  }
+
+  private getClientIP(req: Request): string {
+    return (
+      req.ip ||
+      req.connection.remoteAddress ||
+      req.socket.remoteAddress ||
+      (req.connection as any)?.socket?.remoteAddress ||
+      "unknown"
+    );
+  }
+
+  private async decrementCounter(key: string): Promise<void> {
     try {
-      // TODO: Implement with Convex
-      // if (recordId) {
-      //   // Update existing record
-      //   await supabaseAdmin
-      //     .from('rate_limits')
-      //     .update({
-      //       request_count: newCount,
-      //       updated_at: new Date().toISOString()
-      //     })
-      //     .eq('id', recordId);
-      // } else {
-      //   // Create new record
-      //   await supabaseAdmin
-      //     .from('rate_limits')
-      //     .insert({
-      //       user_id: userId,
-      //       action: this.action,
-      //       request_count: 1,
-      //       window_start: windowStart.toISOString()
-      //     });
-      // }
+      // This would ideally decrement the counter, but for simplicity
+      // we'll just log it. In a production system, you might want to
+      // implement a more sophisticated approach
+      console.log(`Would decrement counter for key: ${key}`);
     } catch (error) {
-      console.error("Failed to update rate limit counter:", error);
+      console.error("Failed to decrement rate limit counter:", error);
     }
   }
 
@@ -155,27 +146,52 @@ export class RateLimiter {
     const limiter = new RateLimiter(action, config);
     return limiter.middleware.bind(limiter);
   }
+
+  // Method to get rate limit stats
+  async getStats(key: string) {
+    try {
+      return await rateLimiter.getStats(key);
+    } catch (error) {
+      console.error("Failed to get rate limit stats:", error);
+      return null;
+    }
+  }
+
+  // Method to reset rate limit
+  async resetLimit(key: string): Promise<boolean> {
+    try {
+      await rateLimiter.resetLimit(key);
+      return true;
+    } catch (error) {
+      console.error("Failed to reset rate limit:", error);
+      return false;
+    }
+  }
 }
 
 // Predefined rate limiters
 export const uploadRateLimit = RateLimiter.create("file_upload", {
   windowMs: 60 * 60 * 1000, // 1 hour
   maxRequests: 20, // 20 uploads per hour
+  message: "Too many file uploads. Please wait before uploading more files.",
 });
 
 export const downloadRateLimit = RateLimiter.create("file_download", {
   windowMs: 60 * 60 * 1000, // 1 hour
   maxRequests: 100, // 100 downloads per hour
+  message: "Download limit exceeded. Please wait before downloading more files.",
 });
 
 export const apiRateLimit = RateLimiter.create("api_request", {
   windowMs: 15 * 60 * 1000, // 15 minutes
   maxRequests: 500, // 500 API calls per 15 minutes
+  message: "API rate limit exceeded. Please slow down your requests.",
 });
 
 export const emailRateLimit = RateLimiter.create("email_send", {
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
   maxRequests: 10, // 10 emails per day
+  message: "Email sending limit exceeded. Please wait before sending more emails.",
 });
 
 export default RateLimiter;

@@ -9,7 +9,7 @@ const STORAGE_BUCKETS = {
 
 // Upload file to Supabase Storage (TODO: Implement with Convex)
 export async function uploadUserFile(
-  userId: number,
+  userId: string | number,
   file: Buffer,
   bucket: keyof typeof STORAGE_BUCKETS | string,
   path: string,

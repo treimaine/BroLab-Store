@@ -4,28 +4,58 @@ import {
   type InsertBeat,
   type InsertCartItem,
   type InsertOrder,
+  type InsertReservation,
   type InsertUser,
   type Order,
   type OrderStatusEnum,
-  type User,
   type Reservation,
-  type InsertReservation,
-  type ReservationStatusEnum
+  type ReservationStatusEnum,
+  type User,
 } from "@shared/schema";
-import { getOrderInvoiceData, getUserByEmail, getUserById, listUserOrders, upsertUser, createReservation, getReservationById, getUserReservations, updateReservationStatus, getReservationsByDateRange } from './lib/db';
+import * as crypto from "crypto";
+import {
+  createReservation,
+  getOrderInvoiceData,
+  getReservationById,
+  getReservationsByDateRange,
+  getUserByEmail,
+  getUserById,
+  getUserReservations,
+  listUserOrders,
+  updateReservationStatus,
+  upsertUser,
+} from "./lib/db";
 
 // === Helpers for snake_case <-> camelCase mapping ===
-function toDbBeat(beat: any) {
+function toDbBeat(beat: {
+  id?: number;
+  title: string;
+  genre?: string;
+  bpm?: number;
+  price: number;
+  audioUrl?: string;
+  imageUrl?: string;
+  [key: string]: unknown;
+}) {
   return {
     ...beat,
     wordpress_id: beat.wordpress_id ?? beat.wordpressId ?? 0,
-    image_url: beat.image_url ?? beat.imageUrl ?? '',
-    audio_url: beat.audio_url ?? beat.audioUrl ?? '',
+    image_url: beat.image_url ?? beat.imageUrl ?? "",
+    audio_url: beat.audio_url ?? beat.audioUrl ?? "",
     is_active: beat.is_active ?? beat.isActive ?? true,
     created_at: beat.created_at ?? beat.createdAt ?? new Date().toISOString(),
   };
 }
-function fromDbBeat(row: any) {
+function fromDbBeat(row: {
+  id: number;
+  title: string;
+  genre?: string;
+  bpm?: number;
+  price: number;
+  audio_url?: string;
+  image_url?: string;
+  [key: string]: unknown;
+}) {
   return {
     ...row,
     wordpressId: row.wordpress_id,
@@ -35,21 +65,42 @@ function fromDbBeat(row: any) {
     createdAt: row.created_at,
   };
 }
-function toDbUser(user: any) {
+function toDbUser(user: {
+  id?: number;
+  email: string;
+  name?: string;
+  stripeCustomerId?: string;
+  [key: string]: unknown;
+}) {
   const { stripeCustomerId, ...rest } = user;
   return {
     ...rest,
     stripe_customer_id: user.stripeCustomerId ?? user.stripe_customer_id ?? null,
   };
 }
-function fromDbUser(row: any) {
+function fromDbUser(row: {
+  id: number;
+  email: string;
+  name?: string;
+  stripe_customer_id?: string;
+  [key: string]: unknown;
+}) {
   return {
     ...row,
     stripeCustomerId: row.stripe_customer_id,
   };
 }
 // For Order: ensure items is always an array
-function fromDbOrder(row: any) {
+function fromDbOrder(row: {
+  id: number;
+  user_id?: number;
+  session_id?: string;
+  items: string | unknown[];
+  total: number;
+  status: string;
+  created_at: string;
+  [key: string]: unknown;
+}) {
   return {
     ...row,
     items: Array.isArray(row.items) ? row.items : [],
@@ -60,7 +111,7 @@ export interface IStorage {
   // Reservation management
   createReservation(reservation: InsertReservation): Promise<Reservation>;
   getReservation(id: string): Promise<Reservation | undefined>;
-  getUserReservations(userId: number): Promise<Reservation[]>;
+  getUserReservations(userId: string | number): Promise<Reservation[]>;
   updateReservationStatus(id: string, status: ReservationStatusEnum): Promise<Reservation>;
   getReservationsByDateRange(startDate: string, endDate: string): Promise<Reservation[]>;
 
@@ -85,7 +136,7 @@ export interface IStorage {
 
   // Cart management
   getCartItems(sessionId: string): Promise<CartItem[]>;
-  saveCartItems(sessionId: string, items: any): Promise<void>;
+  saveCartItems(sessionId: string, items: unknown[]): Promise<void>;
   addCartItem(item: InsertCartItem): Promise<CartItem>;
   updateCartItem(id: number, item: Partial<CartItem>): Promise<CartItem | undefined>;
   removeCartItem(id: number): Promise<boolean>;
@@ -125,7 +176,13 @@ export class MemStorage implements IStorage {
   private cartItems: Map<number, CartItem>;
   private orders: Map<number, Order>;
   private newsletterSubscriptions: Set<string>;
-  private contactMessages: any[];
+  private contactMessages: Array<{
+    id: number;
+    name: string;
+    email: string;
+    message: string;
+    createdAt: string;
+  }>;
   private currentUserId: number;
   private currentBeatId: number;
   private currentCartId: number;
@@ -155,7 +212,8 @@ export class MemStorage implements IStorage {
       {
         wordpressId: 1,
         title: "Dark Trap Vibes",
-        description: "This dark trap beat combines heavy 808s with atmospheric pads and crisp hi-hats.",
+        description:
+          "This dark trap beat combines heavy 808s with atmospheric pads and crisp hi-hats.",
         genre: "Trap",
         bpm: 140,
         key: "A minor",
@@ -216,24 +274,20 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    return Array.from(this.users.values()).find(user => user.username === username);
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.email === email,
-    );
+    return Array.from(this.users.values()).find(user => user.email === email);
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const user: User = { 
-      ...insertUser, 
-      id, 
+    const user: User = {
+      ...insertUser,
+      id,
       stripeCustomerId: null,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
     this.users.set(id, user);
     return user;
@@ -256,14 +310,15 @@ export class MemStorage implements IStorage {
 
     if (filters) {
       if (filters.genre) {
-        beats = beats.filter(beat => 
+        beats = beats.filter(beat =>
           beat.genre.toLowerCase().includes(filters.genre!.toLowerCase())
         );
       }
       if (filters.search) {
-        beats = beats.filter(beat =>
-          beat.title.toLowerCase().includes(filters.search!.toLowerCase()) ||
-          beat.description?.toLowerCase().includes(filters.search!.toLowerCase())
+        beats = beats.filter(
+          beat =>
+            beat.title.toLowerCase().includes(filters.search!.toLowerCase()) ||
+            beat.description?.toLowerCase().includes(filters.search!.toLowerCase())
         );
       }
       if (filters.minPrice) {
@@ -276,14 +331,14 @@ export class MemStorage implements IStorage {
 
     const offset = filters?.offset || 0;
     const limit = filters?.limit || 50;
-    
+
     return beats.slice(offset, offset + limit);
   }
 
   async createBeat(insertBeat: InsertBeat): Promise<Beat> {
     const id = this.currentBeatId++;
-    const beat: Beat = { 
-      ...insertBeat, 
+    const beat: Beat = {
+      ...insertBeat,
       id,
       key: insertBeat.key || null,
       description: insertBeat.description || null,
@@ -291,7 +346,7 @@ export class MemStorage implements IStorage {
       audio_url: insertBeat.audio_url || null,
       image_url: insertBeat.image_url || null,
       is_active: insertBeat.is_active ?? true,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
     this.beats.set(id, beat);
     return beat;
@@ -309,12 +364,10 @@ export class MemStorage implements IStorage {
 
   // Cart management
   async getCartItems(sessionId: string): Promise<CartItem[]> {
-    return Array.from(this.cartItems.values()).filter(
-      item => item.session_id === sessionId
-    );
+    return Array.from(this.cartItems.values()).filter(item => item.session_id === sessionId);
   }
 
-  async saveCartItems(sessionId: string, items: any): Promise<void> {
+  async saveCartItems(sessionId: string, items: unknown[]): Promise<void> {
     // Clear existing cart items for this session
     for (const [id, item] of Array.from(this.cartItems.entries())) {
       if (item.session_id === sessionId) {
@@ -325,13 +378,14 @@ export class MemStorage implements IStorage {
     // Add new items
     if (Array.isArray(items)) {
       for (const item of items) {
+        const cartItem = item as any; // Type assertion for unknown items
         await this.addCartItem({
-          beat_id: item.beatId,
-          license_type: item.licenseType,
-          price: item.price,
-          quantity: item.quantity,
+          beat_id: cartItem.beatId,
+          license_type: cartItem.licenseType,
+          price: cartItem.price,
+          quantity: cartItem.quantity,
           session_id: sessionId,
-          user_id: item.userId || null,
+          user_id: cartItem.userId || null,
         });
       }
     }
@@ -339,13 +393,13 @@ export class MemStorage implements IStorage {
 
   async addCartItem(insertItem: InsertCartItem): Promise<CartItem> {
     const id = this.currentCartId++;
-    const item: CartItem = { 
-      ...insertItem, 
+    const item: CartItem = {
+      ...insertItem,
       id,
       quantity: insertItem.quantity || 1,
       session_id: insertItem.session_id || null,
       user_id: insertItem.user_id || null,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
     this.cartItems.set(id, item);
     return item;
@@ -371,15 +425,25 @@ export class MemStorage implements IStorage {
   }
 
   async getOrdersByUser(userId: number): Promise<Order[]> {
-    return Array.from(this.orders.values()).filter(
-      order => order.user_id === userId
-    );
+    return Array.from(this.orders.values()).filter(order => order.user_id === userId);
   }
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     const id = this.currentOrderId++;
-    const order: Order = { 
-      ...insertOrder, 
+    // Convert order items to CartItem format for compatibility
+    const cartItems: CartItem[] = (insertOrder.items ?? []).map((item, index) => ({
+      id: index + 1,
+      beat_id: item.productId || 0,
+      license_type: (item.license as any) || "basic",
+      price: item.price || 0,
+      quantity: item.quantity || 1,
+      session_id: insertOrder.session_id || null,
+      user_id: insertOrder.user_id || null,
+      created_at: new Date().toISOString(),
+    }));
+
+    const order: Order = {
+      ...insertOrder,
       id,
       session_id: insertOrder.session_id || null,
       user_id: insertOrder.user_id || null,
@@ -388,7 +452,7 @@ export class MemStorage implements IStorage {
       email: insertOrder.email,
       status: insertOrder.status,
       total: insertOrder.total,
-      items: insertOrder.items ?? [],
+      items: cartItems,
     };
     this.orders.set(id, order);
     return order;
@@ -419,7 +483,7 @@ export class MemStorage implements IStorage {
     const userDownloads = this.downloads.get(download.userId) || [];
     const newDownload = {
       id: Date.now(),
-      ...download
+      ...download,
     };
     userDownloads.push(newDownload);
     this.downloads.set(download.userId, userDownloads);
@@ -439,8 +503,11 @@ export class MemStorage implements IStorage {
     message: string;
   }): Promise<void> {
     this.contactMessages.push({
-      ...message,
-      timestamp: new Date(),
+      id: Date.now(), // Generate a simple ID
+      name: `${message.firstName} ${message.lastName}`,
+      email: message.email,
+      message: message.message,
+      createdAt: new Date().toISOString(),
     });
   }
 
@@ -450,7 +517,7 @@ export class MemStorage implements IStorage {
     const newReservation: Reservation = {
       ...reservation,
       id,
-      status: 'pending',
+      status: "pending",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -462,9 +529,10 @@ export class MemStorage implements IStorage {
     return this.reservations.get(id);
   }
 
-  async getUserReservations(userId: number): Promise<Reservation[]> {
+  async getUserReservations(userId: string | number): Promise<Reservation[]> {
+    const numericUserId = typeof userId === "string" ? parseInt(userId) : userId;
     return Array.from(this.reservations.values())
-      .filter(reservation => reservation.user_id === userId)
+      .filter(reservation => reservation.user_id === numericUserId)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
@@ -505,7 +573,7 @@ export class DatabaseStorage implements IStorage {
     return reservation || undefined;
   }
 
-  async getUserReservations(userId: number): Promise<Reservation[]> {
+  async getUserReservations(userId: string | number): Promise<Reservation[]> {
     return await getUserReservations(userId);
   }
 
@@ -516,7 +584,6 @@ export class DatabaseStorage implements IStorage {
   async getReservationsByDateRange(startDate: string, endDate: string): Promise<Reservation[]> {
     return await getReservationsByDateRange(startDate, endDate);
   }
-
 
   private orders: Map<number, Order> = new Map();
   // User methods
@@ -538,10 +605,12 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const dbUser = toDbUser(insertUser);
-    // Remove camelCase property
-    delete dbUser.stripeCustomerId;
-    const user = await upsertUser(dbUser);
-    return fromDbUser(user);
+    // Remove camelCase property if it exists
+    if ("stripeCustomerId" in dbUser) {
+      delete (dbUser as any).stripeCustomerId;
+    }
+    const user = await upsertUser(dbUser as any);
+    return fromDbUser(user as any) as User;
   }
 
   // Beat methods - Not implemented (WooCommerce handles beats)
@@ -565,7 +634,7 @@ export class DatabaseStorage implements IStorage {
 
   async createBeat(insertBeat: InsertBeat): Promise<Beat> {
     // Beats are managed via WooCommerce API, not database
-    throw new Error('Beat creation handled via WooCommerce API');
+    throw new Error("Beat creation handled via WooCommerce API");
   }
 
   async updateBeat(id: number, updates: Partial<Beat>): Promise<Beat | undefined> {
@@ -573,19 +642,19 @@ export class DatabaseStorage implements IStorage {
     return undefined;
   }
 
-  // Cart methods - Not implemented (client-side cart management)  
+  // Cart methods - Not implemented (client-side cart management)
   async getCartItems(sessionId: string): Promise<CartItem[]> {
     // Cart is managed client-side with localStorage
     return [];
   }
 
-  async saveCartItems(sessionId: string, items: any): Promise<void> {
+  async saveCartItems(sessionId: string, items: unknown[]): Promise<void> {
     // Cart is managed client-side with localStorage
   }
 
   async addCartItem(insertItem: InsertCartItem): Promise<CartItem> {
     // Cart is managed client-side with localStorage
-    throw new Error('Cart management handled client-side');
+    throw new Error("Cart management handled client-side");
   }
 
   async updateCartItem(id: number, updates: Partial<CartItem>): Promise<CartItem | undefined> {
@@ -601,18 +670,18 @@ export class DatabaseStorage implements IStorage {
   // Order methods - Not fully implemented
   async getOrdersByUser(userId: number): Promise<Order[]> {
     const orders = await listUserOrders(userId);
-    return orders.map(fromDbOrder);
+    return orders.map(order => fromDbOrder(order as any)) as Order[];
   }
 
   async getOrder(id: number): Promise<Order | undefined> {
     const { order } = await getOrderInvoiceData(id);
-    return fromDbOrder(order);
+    return fromDbOrder(order as any) as Order;
   }
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     // Orders are not directly implemented in current helpers
     // This would require a new helper in lib/db.ts
-    throw new Error('Order creation not implemented - requires new helper');
+    throw new Error("Order creation not implemented - requires new helper");
   }
 
   async updateOrderStatus(id: number, status: string): Promise<Order | undefined> {
@@ -639,7 +708,7 @@ export class DatabaseStorage implements IStorage {
     console.log(`Logging download:`, download);
     return {
       id: Date.now(), // Temporary ID
-      ...download
+      ...download,
     };
   }
 
@@ -663,4 +732,9 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// Export both storage implementations
+export const memStorage = new MemStorage();
+export const databaseStorage = new DatabaseStorage();
+
+// Use MemStorage for tests, DatabaseStorage for production
+export const storage = process.env.NODE_ENV === "test" ? memStorage : databaseStorage;

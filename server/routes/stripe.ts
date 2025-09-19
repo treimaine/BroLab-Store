@@ -120,7 +120,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY environment variable is required");
 }
 const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-07-30.basil",
+  // Using default API version for compatibility
 });
 
 // Stripe instance is created above
@@ -222,16 +222,32 @@ router.post("/webhook", async (req, res) => {
       event = req.body as Stripe.Event;
     } else {
       if (!sig || !endpointSecret) return res.status(400).send("Missing signature");
+
+      // Use enhanced webhook validator for additional security
+      const { webhookValidator } = await import("../lib/webhookValidator");
+      const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body));
+
+      const validationResult = await webhookValidator.validateWebhook(
+        "stripe",
+        rawBody,
+        sig,
+        req.headers as Record<string, string>
+      );
+
+      if (!validationResult.valid) {
+        console.error("Webhook validation failed:", validationResult.errors);
+        return res.status(400).json({
+          error: "Webhook validation failed",
+          details: validationResult.errors,
+        });
+      }
+
       try {
-        // In production this requires raw body middleware; fallback to parsed body in dev
-        const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body));
-        event = stripeClient.webhooks.constructEvent(raw, sig, endpointSecret);
+        // Fallback to Stripe's built-in validation for compatibility
+        event = stripeClient.webhooks.constructEvent(rawBody, sig, endpointSecret);
       } catch (err: any) {
-        console.warn(
-          "⚠️ Stripe constructEvent failed, using parsed body fallback in dev:",
-          err?.message
-        );
-        event = req.body as Stripe.Event;
+        console.warn("⚠️ Stripe constructEvent failed, using validated payload:", err?.message);
+        event = validationResult.payload as Stripe.Event;
       }
     }
 

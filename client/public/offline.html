@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline - BroLab Entertainment</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+        color: #ffffff;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .offline-container {
+        text-align: center;
+        max-width: 500px;
+        padding: 40px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .offline-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 30px;
+        background: #ff6b35;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 40px;
+      }
+
+      h1 {
+        font-size: 2.5rem;
+        margin-bottom: 20px;
+        background: linear-gradient(45deg, #ff6b35, #f7931e);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      p {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 30px;
+        color: #cccccc;
+      }
+
+      .retry-button {
+        background: linear-gradient(45deg, #ff6b35, #f7931e);
+        color: white;
+        border: none;
+        padding: 15px 30px;
+        border-radius: 50px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .retry-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(255, 107, 53, 0.3);
+      }
+
+      .offline-features {
+        margin-top: 40px;
+        text-align: left;
+      }
+
+      .offline-features h3 {
+        color: #ff6b35;
+        margin-bottom: 15px;
+        font-size: 1.2rem;
+      }
+
+      .offline-features ul {
+        list-style: none;
+        padding: 0;
+      }
+
+      .offline-features li {
+        padding: 8px 0;
+        color: #cccccc;
+        position: relative;
+        padding-left: 25px;
+      }
+
+      .offline-features li:before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        color: #ff6b35;
+        font-weight: bold;
+      }
+
+      .connection-status {
+        margin-top: 30px;
+        padding: 15px;
+        background: rgba(255, 107, 53, 0.1);
+        border-radius: 10px;
+        border-left: 4px solid #ff6b35;
+      }
+
+      .status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 10px;
+        background: #ff4444;
+        animation: pulse 2s infinite;
+      }
+
+      .status-indicator.online {
+        background: #44ff44;
+        animation: none;
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 600px) {
+        .offline-container {
+          padding: 30px 20px;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+
+        .offline-icon {
+          width: 60px;
+          height: 60px;
+          font-size: 30px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="offline-container">
+      <div class="offline-icon">📡</div>
+
+      <h1>You're Offline</h1>
+
+      <p>
+        It looks like you've lost your internet connection. Don't worry - some features are still
+        available while you're offline!
+      </p>
+
+      <button class="retry-button" onclick="window.location.reload()">Try Again</button>
+
+      <div class="offline-features">
+        <h3>Available Offline:</h3>
+        <ul>
+          <li>Browse previously loaded beats</li>
+          <li>View your favorites (cached)</li>
+          <li>Access your download history</li>
+          <li>Continue audio playback</li>
+          <li>Queue actions for when you're back online</li>
+        </ul>
+      </div>
+
+      <div class="connection-status">
+        <span class="status-indicator" id="statusIndicator"></span>
+        <span id="statusText">Checking connection...</span>
+      </div>
+    </div>
+
+    <script>
+      // Monitor connection status
+      function updateConnectionStatus() {
+        const indicator = document.getElementById("statusIndicator");
+        const text = document.getElementById("statusText");
+
+        if (navigator.onLine) {
+          indicator.classList.add("online");
+          text.textContent = "Connection restored! Refreshing...";
+
+          // Auto-refresh when connection is restored
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        } else {
+          indicator.classList.remove("online");
+          text.textContent = "No internet connection detected";
+        }
+      }
+
+      // Initial check
+      updateConnectionStatus();
+
+      // Listen for connection changes
+      window.addEventListener("online", updateConnectionStatus);
+      window.addEventListener("offline", updateConnectionStatus);
+
+      // Periodic connection check
+      setInterval(() => {
+        // Try to fetch a small resource to verify connection
+        fetch("/favicon.ico", {
+          method: "HEAD",
+          cache: "no-cache",
+        })
+          .then(() => {
+            if (!navigator.onLine) {
+              // Connection restored but navigator.onLine hasn't updated yet
+              window.location.reload();
+            }
+          })
+          .catch(() => {
+            // Still offline
+          });
+      }, 5000);
+
+      // Service Worker registration check
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+          console.log("Service Worker is ready");
+
+          // Listen for updates
+          registration.addEventListener("updatefound", () => {
+            console.log("Service Worker update found");
+          });
+        });
+      }
+
+      // Handle back button
+      window.addEventListener("popstate", event => {
+        // Try to go back to the app
+        if (navigator.onLine) {
+          window.location.href = "/";
+        }
+      });
+    </script>
+  </body>
+</html>

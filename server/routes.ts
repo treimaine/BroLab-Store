@@ -13,7 +13,12 @@ declare global {
   namespace Express {
     interface Request {
       isAuthenticated(): boolean;
-      user?: any;
+      user?: {
+        id: string;
+        email: string;
+        name?: string;
+        [key: string]: unknown;
+      };
     }
   }
 }
@@ -170,25 +175,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!r.ok) return res.status(r.status).send(await r.text());
       const products = await r.json();
       // Map to a simpler beat list when limit param requested (array) or object with beats
-      const mapped = (products || []).map((p: any) => ({
-        id: p.id,
-        title: p.name,
-        description: p.short_description || p.description || null,
-        genre: (p.categories?.[0]?.name as string) || "",
-        bpm: Number(p.meta_data?.find((m: any) => m.key === "bpm")?.value || 0) || undefined,
-        price: Number(p.price || p.prices?.price || 0),
-        image: p.images?.[0]?.src,
-      }));
+      const mapped = (products || []).map(
+        (p: {
+          id: number;
+          name: string;
+          short_description?: string;
+          description?: string;
+          categories?: Array<{ name: string }>;
+          meta_data?: Array<{ key: string; value: unknown }>;
+          price?: string;
+          prices?: { price: string };
+          images?: Array<{ src: string }>;
+          [key: string]: unknown;
+        }) => ({
+          id: p.id,
+          title: p.name,
+          description: p.short_description || p.description || null,
+          genre: (p.categories?.[0]?.name as string) || "",
+          bpm: Number(p.meta_data?.find(m => m.key === "bpm")?.value || 0) || undefined,
+          price: Number(p.price || p.prices?.price || 0),
+          image: p.images?.[0]?.src,
+        })
+      );
       if (limit) {
         return res.json(mapped.slice(0, limit));
       }
       // Optional genre filter
       const filtered = genre
-        ? mapped.filter((b: any) => (b.genre || "").toLowerCase().includes(genre.toLowerCase()))
+        ? mapped.filter((b: { genre?: string }) =>
+            (b.genre || "").toLowerCase().includes(genre.toLowerCase())
+          )
         : mapped;
       return res.json({ beats: filtered });
-    } catch (e: any) {
-      console.error("/api/beats adapter error:", e);
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      console.error("/api/beats adapter error:", errorMessage);
       return res.status(500).json({ error: "Failed to fetch beats" });
     }
   });
@@ -198,26 +219,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.status(404).json({ error: "Beat creation not supported" });
   });
 
-  // Reservations endpoint for mixing & mastering
-  app.post("/api/reservations", async (req, res) => {
-    try {
-      const reservation = req.body;
-
-      // In a real app, you'd save this to a database
-      console.log("Reservation received:", reservation);
-
-      // You could also send an email notification here
-
-      res.json({
-        success: true,
-        message: "Reservation submitted successfully",
-        reservationId: "res_" + Date.now(),
-      });
-    } catch (error: unknown) {
-      console.error("Reservation error:", error);
-      res.status(500).json({ error: "Failed to submit reservation" });
-    }
-  });
+  // Reservations endpoint now handled by dedicated router in server/routes/reservations.ts
+  // This ensures proper authentication and validation
 
   // Simple dashboard aggregator for tests
   app.get("/api/v1/dashboard", async (req, res) => {
@@ -248,8 +251,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: "active",
         },
       });
-    } catch (e: any) {
-      console.error("/api/v1/dashboard error:", e);
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      console.error("/api/v1/dashboard error:", errorMessage);
       res.status(500).json({ error: "Failed to load dashboard" });
     }
   });
@@ -292,9 +296,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         downloadUrl: `/api/placeholder/audio.mp3`,
         licenseAgreement: `/api/license-agreement/${licenseType}`,
       });
-    } catch (error: any) {
-      console.error("Download error:", error);
-      res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Download error:", errorMessage);
+      res.status(500).json({ error: errorMessage });
     }
   });
 
@@ -370,9 +375,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         agreement,
         terms: `This ${licenseType} license grants you the rights specified in the BroLab Entertainment licensing terms.`,
       });
-    } catch (error: any) {
-      console.error("License agreement error:", error);
-      res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("License agreement error:", errorMessage);
+      res.status(500).json({ error: errorMessage });
     }
   });
 

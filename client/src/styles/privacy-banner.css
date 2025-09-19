@@ -1,0 +1,254 @@
+/* Privacy Consent Banner Styles */
+
+.privacy-consent-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.banner-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 2rem;
+}
+
+.banner-text {
+  flex: 1;
+}
+
+.banner-text h3 {
+  margin: 0 0 0.5rem 0;
+  color: #1f2937;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.banner-text p {
+  margin: 0 0 1rem 0;
+  color: #4b5563;
+  line-height: 1.5;
+  font-size: 0.875rem;
+}
+
+.details-link {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 0;
+  margin-left: 0.25rem;
+}
+
+.details-link:hover {
+  color: #2563eb;
+}
+
+.privacy-details {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.privacy-details h4 {
+  margin: 0 0 0.5rem 0;
+  color: #1f2937;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.privacy-details ul {
+  margin: 0 0 1rem 0;
+  padding-left: 1.25rem;
+  color: #4b5563;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.privacy-details li {
+  margin-bottom: 0.25rem;
+}
+
+.privacy-details ul:last-of-type {
+  margin-bottom: 0.5rem;
+}
+
+.banner-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.decline-button,
+.accept-button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 80px;
+}
+
+.decline-button {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.decline-button:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.accept-button {
+  background: #3b82f6;
+  color: white;
+}
+
+.accept-button:hover {
+  background: #2563eb;
+}
+
+.decline-button:focus,
+.accept-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .banner-content {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .banner-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .decline-button,
+  .accept-button {
+    flex: 1;
+    max-width: 120px;
+  }
+
+  .privacy-details {
+    padding: 0.75rem;
+  }
+
+  .privacy-details h4 {
+    font-size: 0.8125rem;
+  }
+
+  .privacy-details ul {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .banner-content {
+    padding: 0.75rem;
+  }
+
+  .banner-text h3 {
+    font-size: 1rem;
+  }
+
+  .banner-text p {
+    font-size: 0.8125rem;
+  }
+
+  .banner-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .decline-button,
+  .accept-button {
+    width: 100%;
+    max-width: none;
+  }
+
+  .privacy-details {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+  }
+
+  .privacy-details h4 {
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .privacy-details ul {
+    font-size: 0.6875rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .privacy-details li {
+    margin-bottom: 0.125rem;
+  }
+}
+
+/* Animation */
+.privacy-consent-banner {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .privacy-consent-banner {
+    border-top: 2px solid #000;
+  }
+
+  .decline-button {
+    border: 2px solid #000;
+  }
+
+  .accept-button {
+    background: #000;
+  }
+
+  .privacy-details {
+    border: 2px solid #000;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .privacy-consent-banner {
+    animation: none;
+  }
+
+  .decline-button,
+  .accept-button {
+    transition: none;
+  }
+}

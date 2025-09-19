@@ -16,6 +16,7 @@ export function useClerkSync() {
   const syncInProgress = useRef(false);
   const hasAttemptedSync = useRef(false);
 
+  // @ts-ignore - Avoiding deep type instantiation issue
   const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser);
 
   const syncUser = useCallback(async () => {
@@ -98,7 +99,7 @@ export function useClerkSync() {
         cancelled = true;
       };
     }
-  }, [clerkLoaded, clerkUser, isAuthenticated, syncUser]);
+  }, [clerkLoaded, clerkUser, isAuthenticated, syncUser, isSynced]);
 
   // Reset sync status when user changes
   useEffect(() => {

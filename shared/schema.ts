@@ -266,7 +266,26 @@ export const insertOrderSchema = z.object({
   total: z.number(),
   status: z.enum(OrderStatus),
   stripe_payment_intent_id: z.string().optional().nullable(),
-  items: z.any(),
+  items: z.array(
+    z.object({
+      productId: z.number().optional(),
+      title: z.string(),
+      price: z.number().optional(),
+      quantity: z.number().optional(),
+      license: z.string().optional(),
+      type: z.string().optional(),
+      sku: z.string().optional(),
+      metadata: z
+        .object({
+          beatGenre: z.string().optional(),
+          beatBpm: z.number().optional(),
+          beatKey: z.string().optional(),
+          downloadFormat: z.string().optional(),
+          licenseTerms: z.string().optional(),
+        })
+        .optional(),
+    })
+  ),
 });
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 
@@ -352,14 +371,49 @@ export type ActivityLog = {
   id: number;
   user_id?: number | null;
   action: string; // Real column name in Supabase
-  details?: any;
+  details?: {
+    action: string;
+    resource: string;
+    resourceId?: string;
+    changes?: Record<string, { from: unknown; to: unknown }>;
+    metadata: {
+      ipAddress?: string;
+      userAgent?: string;
+      duration?: number;
+      success: boolean;
+      errorMessage?: string;
+      additionalContext?: Record<string, unknown>;
+    };
+  };
   timestamp: string;
 };
 
 export const insertActivityLogSchema = z.object({
   user_id: z.number().optional().nullable(),
   action: z.string(),
-  details: z.any().optional(),
+  details: z
+    .object({
+      action: z.string(),
+      resource: z.string(),
+      resourceId: z.string().optional(),
+      changes: z
+        .record(
+          z.object({
+            from: z.unknown(),
+            to: z.unknown(),
+          })
+        )
+        .optional(),
+      metadata: z.object({
+        ipAddress: z.string().optional(),
+        userAgent: z.string().optional(),
+        duration: z.number().optional(),
+        success: z.boolean(),
+        errorMessage: z.string().optional(),
+        additionalContext: z.record(z.unknown()).optional(),
+      }),
+    })
+    .optional(),
   timestamp: z.string().optional(),
 });
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;

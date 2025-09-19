@@ -38,7 +38,7 @@ export const emailTemplates = {
   }),
 
   resetPassword: (resetLink: string, username: string) => ({
-    subject: "Réinitialisation de votre mot de passe - BroLab Entertainment", 
+    subject: "Réinitialisation de votre mot de passe - BroLab Entertainment",
     html: `
       <!DOCTYPE html>
       <html>
@@ -73,7 +73,13 @@ export const emailTemplates = {
     `,
   }),
 
-  orderConfirmation: (orderDetails: any) => ({
+  orderConfirmation: (orderDetails: {
+    orderNumber: string;
+    customerName: string;
+    items: Array<{ name: string; quantity: number; price: number }>;
+    total: number;
+    downloadLink?: string;
+  }) => ({
     subject: `Commande confirmée #${orderDetails.orderNumber} - BroLab Entertainment`,
     html: `
       <!DOCTYPE html>
@@ -113,7 +119,13 @@ export const emailTemplates = {
     `,
   }),
 
-  subscriptionConfirmation: (subscriptionDetails: any) => ({
+  subscriptionConfirmation: (subscriptionDetails: {
+    planName: string;
+    customerName: string;
+    billingCycle: string;
+    nextBillingDate: string;
+    features: string[];
+  }) => ({
     subject: `Abonnement activé - ${subscriptionDetails.planName} - BroLab Entertainment`,
     html: `
       <!DOCTYPE html>
@@ -131,8 +143,8 @@ export const emailTemplates = {
             </p>
             <div style="background: #f8f9fa; padding: 20px; border-radius: 6px; margin: 20px 0;">
               <p style="margin: 0;"><strong>Plan :</strong> ${subscriptionDetails.planName}</p>
-              <p style="margin: 10px 0 0 0;"><strong>Prix :</strong> ${subscriptionDetails.price}/mois</p>
-              <p style="margin: 10px 0 0 0;"><strong>Prochaine facture :</strong> ${subscriptionDetails.nextBilling}</p>
+              <p style="margin: 10px 0 0 0;"><strong>Cycle :</strong> ${subscriptionDetails.billingCycle}</p>
+              <p style="margin: 10px 0 0 0;"><strong>Prochaine facture :</strong> ${subscriptionDetails.nextBillingDate}</p>
             </div>
             <p style="color: #666; line-height: 1.6;">
               Profitez de tous les avantages de votre abonnement dès maintenant !

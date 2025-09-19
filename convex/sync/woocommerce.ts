@@ -44,7 +44,22 @@ export const syncWooCommerceOrders = mutation({
           await ctx.db.patch(existingOrder._id, {
             status: order.status,
             total: parseFloat(order.total) * 100, // Convertir en centimes
-            items: order.items,
+            items: order.items.map(item => ({
+              productId: item.productId,
+              title: item.name,
+              price: (parseFloat(item.total) * 100) / item.quantity,
+              quantity: item.quantity,
+              license: item.license || "basic",
+              type: "beat",
+              sku: `woo-${item.productId}`,
+              metadata: {
+                beatGenre: undefined,
+                beatBpm: undefined,
+                beatKey: undefined,
+                downloadFormat: "mp3",
+                licenseTerms: item.license || "basic",
+              },
+            })),
             updatedAt: Date.now(),
           });
           results.push({ id: order.id, action: "updated", success: true });
@@ -57,7 +72,22 @@ export const syncWooCommerceOrders = mutation({
             total: parseFloat(order.total) * 100, // Convertir en centimes
             currency: "EUR", // Default currency for WooCommerce orders
             status: order.status,
-            items: order.items,
+            items: order.items.map(item => ({
+              productId: item.productId,
+              title: item.name,
+              price: (parseFloat(item.total) * 100) / item.quantity,
+              quantity: item.quantity,
+              license: item.license || "basic",
+              type: "beat",
+              sku: `woo-${item.productId}`,
+              metadata: {
+                beatGenre: undefined,
+                beatBpm: undefined,
+                beatKey: undefined,
+                downloadFormat: "mp3",
+                licenseTerms: item.license || "basic",
+              },
+            })),
             createdAt: Date.now(),
             updatedAt: Date.now(),
           });

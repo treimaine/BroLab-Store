@@ -25,7 +25,7 @@ export interface WebhookEvent {
     id: string;
     status: string;
     custom_id?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   create_time: string;
 }
@@ -51,30 +51,35 @@ export class PayPalService {
       // Création de la commande PayPal avec le SDK officiel
       const ordersController = new OrdersController(paypalClient);
 
-      const requestBody: any = {
+      const requestBody: {
+        intent: "CAPTURE";
+        purchaseUnits: Array<{
+          amount: { currency_code: string; value: string };
+          custom_id?: string;
+        }>;
+        application_context: {
+          return_url: string;
+          cancel_url: string;
+          brand_name: string;
+          user_action: string;
+        };
+      } = {
         intent: "CAPTURE",
         purchaseUnits: [
           {
-            referenceId: reservationId, // ✅ CORRECTION: referenceId pour la réservation
-            customId: reservationId, // ✅ CORRECTION: customId pour identifier la réservation
-            description: description,
             amount: {
-              currencyCode: currency,
+              currency_code: currency,
               value: amount.toString(),
             },
-            payee: {
-              emailAddress: customerEmail,
-            },
+            custom_id: reservationId,
           },
         ],
-        applicationContext: {
+        application_context: {
           // ✅ CORRECTION: URLs de retour correctes
-          returnUrl: `${PAYPAL_RETURN_URL}/${reservationId}`, // PayPal ajoutera le token
-          cancelUrl: PAYPAL_CANCEL_URL,
-          brandName: "BroLab Entertainment",
-          landingPage: "BILLING",
-          userAction: "PAY_NOW",
-          shippingPreference: "NO_SHIPPING",
+          return_url: `${PAYPAL_RETURN_URL}/${reservationId}`, // PayPal ajoutera le token
+          cancel_url: PAYPAL_CANCEL_URL,
+          brand_name: "BroLab Entertainment",
+          user_action: "PAY_NOW",
         },
       };
 
@@ -83,13 +88,15 @@ export class PayPalService {
 
       // Appel à l'API PayPal via le contrôleur avec la bonne structure
       const order = await ordersController.createOrder({
-        body: requestBody,
+        body: requestBody as any, // Type assertion for PayPal SDK compatibility
         prefer: "return=representation",
       });
 
       if (order.result && order.result.id) {
         const orderId = order.result.id;
-        const approvalUrl = order.result.links?.find((link: any) => link.rel === "approve")?.href;
+        const approvalUrl = order.result.links?.find(
+          (link: { rel: string; href: string }) => link.rel === "approve"
+        )?.href;
 
         if (!approvalUrl) {
           throw new Error("PayPal approval URL not found");

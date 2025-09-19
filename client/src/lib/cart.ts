@@ -1,18 +1,18 @@
 // Cart utilities and types
-import { LicensePricing } from '@/../../shared/schema';
+import { LicensePricing } from "@/../../shared/schema";
 export interface CartItem {
   beatId: number;
   title: string;
   genre: string;
   imageUrl?: string;
-  licenseType: 'basic' | 'premium' | 'unlimited';
+  licenseType: "basic" | "premium" | "unlimited";
   quantity: number;
   price?: number;
   isFree?: boolean; // Nouveau champ pour détecter les produits gratuits
 }
 
 export interface License {
-  type: 'basic' | 'premium' | 'unlimited';
+  type: "basic" | "premium" | "unlimited";
   name: string;
   price: number;
   features: string[];
@@ -25,10 +25,15 @@ export interface License {
 
 export const LICENSES: License[] = [
   {
-    type: 'basic',
-    name: 'Basic License (MP3)',
+    type: "basic",
+    name: "Basic License (MP3)",
     price: LicensePricing.basic,
-    features: ['MP3 included', 'Up to 50,000 audio streams', 'Distribute up to 2,500 copies', 'Producer credit required'],
+    features: [
+      "MP3 included",
+      "Up to 50,000 audio streams",
+      "Distribute up to 2,500 copies",
+      "Producer credit required",
+    ],
     downloads: 2500,
     streams: 50000,
     sales: 2500,
@@ -36,10 +41,15 @@ export const LICENSES: License[] = [
     exclusive: false,
   },
   {
-    type: 'premium',
-    name: 'Premium License (WAV)',
+    type: "premium",
+    name: "Premium License (WAV)",
     price: LicensePricing.premium,
-    features: ['MP3 + WAV included', 'Up to 150,000 audio streams', 'Distribute up to 2,500 copies', 'Radio play permitted'],
+    features: [
+      "MP3 + WAV included",
+      "Up to 150,000 audio streams",
+      "Distribute up to 2,500 copies",
+      "Radio play permitted",
+    ],
     downloads: 2500,
     streams: 150000,
     sales: 2500,
@@ -47,17 +57,21 @@ export const LICENSES: License[] = [
     exclusive: false,
   },
   {
-    type: 'unlimited',
-    name: 'Unlimited License',
+    type: "unlimited",
+    name: "Unlimited License",
     price: LicensePricing.unlimited,
-    features: ['MP3 + WAV + stems included', 'Unlimited audio streams', 'Unlimited copies distribution', 'Paid performances allowed'],
+    features: [
+      "MP3 + WAV + stems included",
+      "Unlimited audio streams",
+      "Unlimited copies distribution",
+      "Paid performances allowed",
+    ],
     downloads: 999999,
-    streams: 'Unlimited',
-    sales: 'Unlimited',
+    streams: "Unlimited",
+    sales: "Unlimited",
     stems: true,
     exclusive: false,
   },
-
 ];
 
 // Ligne 53 - S'assurer que le prix est un nombre
@@ -73,7 +87,7 @@ export const formatPrice = (price: number): string => {
 export const calculateCartTotal = (items: CartItem[]): number => {
   return items.reduce((total, item) => {
     const price = item.price || getLicensePrice(item.licenseType);
-    return total + (price * item.quantity);
+    return total + price * item.quantity;
   }, 0);
 };
 
@@ -87,7 +101,7 @@ export interface Cart {
 
 // Cart manager for localStorage persistence
 class CartManager {
-  private static STORAGE_KEY = 'brolab_cart';
+  private static STORAGE_KEY = "brolab_cart";
 
   getCart(): Cart {
     try {
@@ -109,25 +123,29 @@ class CartManager {
     localStorage.setItem(CartManager.STORAGE_KEY, JSON.stringify(items));
   }
 
-  addItem(newItem: Omit<CartItem, 'price'>) {
+  addItem(newItem: Omit<CartItem, "price">) {
     const cart = this.getCart();
     const price = getLicensePrice(newItem.licenseType);
-    
+
     // Empêcher l'ajout de produits gratuits au panier
     if (newItem.isFree || price === 0) {
-      console.warn('🚨 Tentative d\'ajout d\'un produit gratuit au panier:', newItem.title);
-      throw new Error('Les produits gratuits ne peuvent pas être ajoutés au panier. Utilisez le bouton "Download" directement.');
+      console.warn("🚨 Tentative d'ajout d'un produit gratuit au panier:", newItem.title);
+      throw new Error(
+        'Les produits gratuits ne peuvent pas être ajoutés au panier. Utilisez le bouton "Download" directement.'
+      );
     }
-    
+
     // CRITICAL: Validate pricing before adding to cart
     if (price < 29.99) {
-      console.error('🚨 INVALID PRICING DETECTED:', price, 'for license:', newItem.licenseType);
-      console.error('Expected: Basic=$29.99, Premium=$49.99, Unlimited=$149.99');
-      throw new Error(`Invalid pricing: ${newItem.licenseType} license should be at least $29.99, got $${price}`);
+      console.error("🚨 INVALID PRICING DETECTED:", price, "for license:", newItem.licenseType);
+      console.error("Expected: Basic=$29.99, Premium=$49.99, Unlimited=$149.99");
+      throw new Error(
+        `Invalid pricing: ${newItem.licenseType} license should be at least $29.99, got $${price}`
+      );
     }
-    
-    console.log('✅ Adding item with correct price:', price, 'for license:', newItem.licenseType);
-    
+
+    console.log("✅ Adding item with correct price:", price, "for license:", newItem.licenseType);
+
     // Check if item already exists
     const existingIndex = cart.items.findIndex(
       item => item.beatId === newItem.beatId && item.licenseType === newItem.licenseType
@@ -179,7 +197,7 @@ class CartManager {
     );
 
     if (itemIndex >= 0) {
-      cart.items[itemIndex].licenseType = newLicense as CartItem['licenseType'];
+      cart.items[itemIndex].licenseType = newLicense as CartItem["licenseType"];
       cart.items[itemIndex].price = getLicensePrice(newLicense);
       this.saveCart(cart.items);
     }
@@ -194,7 +212,7 @@ class CartManager {
     const cart = this.getCart();
     const updatedItems = cart.items.map(item => ({
       ...item,
-      price: getLicensePrice(item.licenseType) // Update to new pricing
+      price: getLicensePrice(item.licenseType), // Update to new pricing
     }));
     this.saveCart(updatedItems);
   }

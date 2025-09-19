@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
-import { validateClerkId, ValidationError } from "../lib/validation";
+import { ValidationError, validateClerkId } from "../lib/validation";
 
 // Types de rôles disponibles
 export type UserRole = "admin" | "moderator" | "premium" | "user" | "guest";
@@ -43,16 +43,8 @@ export const ROLE_PERMISSIONS = {
     "reservation.read",
     "reservation.write",
   ],
-  user: [
-    "user.read",
-    "order.read",
-    "product.read",
-    "download.read",
-    "reservation.read",
-  ],
-  guest: [
-    "product.read",
-  ],
+  user: ["user.read", "order.read", "product.read", "download.read", "reservation.read"],
+  guest: ["product.read"],
 } as const;
 
 /**
@@ -92,7 +84,9 @@ export const hasPermission = query({
       const permissions = ROLE_PERMISSIONS[userRole] || [];
       const hasAccess = permissions.includes(args.permission as any);
 
-      console.log(`${hasAccess ? '✅' : '❌'} Permission ${args.permission} for role ${userRole}: ${hasAccess}`);
+      console.log(
+        `${hasAccess ? "✅" : "❌"} Permission ${args.permission} for role ${userRole}: ${hasAccess}`
+      );
       return hasAccess;
     } catch (error) {
       console.error(`❌ Error checking permission:`, error);
@@ -136,7 +130,9 @@ export const getUserPermissions = query({
       const userRole = (user.role || "user") as UserRole;
       const permissions = ROLE_PERMISSIONS[userRole] || [];
 
-      console.log(`✅ User ${args.clerkId} has ${permissions.length} permissions for role ${userRole}`);
+      console.log(
+        `✅ User ${args.clerkId} has ${permissions.length} permissions for role ${userRole}`
+      );
       return permissions;
     } catch (error) {
       console.error(`❌ Error getting user permissions:`, error);
@@ -173,7 +169,9 @@ export const updateUserRole = mutation({
         throw new ValidationError(`Invalid role: ${args.newRole}`);
       }
 
-      console.log(`🔄 Admin ${adminClerkId} updating role for ${args.targetClerkId} to ${args.newRole}`);
+      console.log(
+        `🔄 Admin ${adminClerkId} updating role for ${args.targetClerkId} to ${args.newRole}`
+      );
 
       // Vérifier que l'utilisateur actuel est admin
       const adminUser = await ctx.db
@@ -223,13 +221,24 @@ export const updateUserRole = mutation({
         userId: adminUser._id,
         clerkId: adminClerkId,
         action: "user_role_updated",
-        resource: "user",
+        resource: "users",
         details: {
+          operation: "update",
+          resource: "users",
+          resourceId: targetUser._id,
           targetUserId: targetUser._id,
           targetClerkId: args.targetClerkId,
           previousRole,
           newRole: args.newRole,
           reason: args.reason,
+          changes: [
+            {
+              field: "role",
+              oldValue: previousRole,
+              newValue: args.newRole,
+              changeType: "update" as const,
+            },
+          ],
         },
         timestamp: now,
       });
@@ -241,26 +250,28 @@ export const updateUserRole = mutation({
       };
     } catch (error) {
       console.error(`❌ Error updating user role:`, error);
-      
+
       // Log de l'erreur
       const identity = await ctx.auth.getUserIdentity();
       const errorMessage = error instanceof Error ? error.message : String(error);
       await ctx.db.insert("auditLogs", {
         clerkId: identity?.subject,
         action: "update_user_role_error",
-        resource: "user",
+        resource: "users",
         details: {
+          operation: "update",
+          resource: "users",
           error: errorMessage,
           targetClerkId: args.targetClerkId,
           newRole: args.newRole,
         },
         timestamp: Date.now(),
       });
-      
+
       if (error instanceof ValidationError) {
         throw new Error(`Validation error: ${error.message}`);
       }
-      
+
       throw new Error(`Failed to update user role: ${errorMessage}`);
     }
   },
@@ -292,7 +303,7 @@ export const getUsersByRole = query({
         .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
         .first();
 
-      if (!currentUser || !['admin', 'moderator'].includes(currentUser.role || '')) {
+      if (!currentUser || !["admin", "moderator"].includes(currentUser.role || "")) {
         console.log(`🚫 Access denied: ${clerkId} lacks permissions`);
         throw new Error("Access denied: Admin or moderator role required");
       }
@@ -328,7 +339,7 @@ export async function requirePermission(
     }
 
     const userClerkId = clerkId || identity.subject;
-    
+
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", userClerkId))
@@ -340,7 +351,7 @@ export async function requirePermission(
 
     const userRole = (user.role || "user") as UserRole;
     const permissions = ROLE_PERMISSIONS[userRole] || [];
-    
+
     return permissions.includes(permission as any);
   } catch (error) {
     console.error(`❌ Error checking permission:`, error);

@@ -29,6 +29,29 @@ export interface AuditLogEntry {
   userAgent?: string;
 }
 
+// Enhanced audit details interface to support both structured and flexible properties
+export interface AuditDetails {
+  // Core structured properties (optional for backward compatibility)
+  operation?: string;
+  resource?: string;
+  resourceId?: string;
+  changes?: Array<{
+    field: string;
+    oldValue?: string;
+    newValue?: string;
+    changeType: "create" | "update" | "delete";
+  }>;
+  context?: {
+    requestId?: string;
+    sessionId?: string;
+    apiVersion?: string;
+    clientVersion?: string;
+    correlationId?: string;
+  };
+  // Allow any additional custom properties for specific audit events
+  [key: string]: any;
+}
+
 // Log a security-relevant action
 export const logAuditEvent = mutation({
   args: {

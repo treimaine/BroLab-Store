@@ -1,7 +1,14 @@
+import { memStorage } from "../../server/storage";
 import { ReservationStatus, ServiceType } from "../../shared/schema";
-import { storage } from "../storage";
 
 describe("Reservation System", () => {
+  // Use memStorage directly for tests and clear it between tests
+  const storage = memStorage;
+
+  beforeEach(() => {
+    // Clear all reservations before each test
+    (storage as any).reservations.clear();
+  });
   const mockReservation = {
     user_id: 1,
     service_type: "mixing" as (typeof ServiceType)[number],

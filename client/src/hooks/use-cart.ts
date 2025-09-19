@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { cartManager, Cart, CartItem } from '@/lib/cart';
-import { LicenseTypeEnum } from '@shared/schema';
+import { Cart, CartItem, cartManager } from "@/lib/cart";
+import { useEffect, useState } from "react";
 
 export function useCart() {
   const [cart, setCart] = useState<Cart>(cartManager.getCart());
@@ -9,7 +8,7 @@ export function useCart() {
     setCart(cartManager.getCart());
   };
 
-  const addItem = (item: Omit<CartItem, 'price'>) => {
+  const addItem = (item: Omit<CartItem, "price">) => {
     cartManager.addItem(item);
     updateCart();
   };
@@ -39,20 +38,18 @@ export function useCart() {
     updateCart();
   };
 
-
-
   const getItemCount = () => cartManager.getItemCount();
 
   useEffect(() => {
     // Listen for storage changes from other tabs
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'brolab_cart') {
+      if (e.key === "brolab_cart") {
         updateCart();
       }
     };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
   return {
