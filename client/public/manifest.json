@@ -1,0 +1,108 @@
+{
+  "name": "BroLab Entertainment - Beat Store",
+  "short_name": "BroLab Beats",
+  "description": "Professional beat store with offline support for music producers",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a1a",
+  "theme_color": "#ff6b35",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["music", "entertainment", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Desktop view of the beat store"
+    },
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile view of the beat store"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Browse Beats",
+      "short_name": "Browse",
+      "description": "Browse available beats",
+      "url": "/beats",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "My Favorites",
+      "short_name": "Favorites",
+      "description": "View your favorite beats",
+      "url": "/favorites",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Downloads",
+      "short_name": "Downloads",
+      "description": "Access your downloads",
+      "url": "/downloads",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+brolab",
+      "url": "/handle?url=%s"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/handle-audio",
+      "accept": {
+        "audio/*": [".mp3", ".wav", ".flac"]
+      }
+    }
+  ]
+}

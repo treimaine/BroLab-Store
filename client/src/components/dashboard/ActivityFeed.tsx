@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Activity } from "@/hooks/useDashboardDataOptimized";
 import { cn } from "@/lib/utils";
+import type { Activity } from "@shared/types/dashboard";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
@@ -39,7 +39,7 @@ function ActivityItem({ activity, index }: ActivityItemProps) {
     }
   };
 
-  const getActivityColor = (type: string, severity: string) => {
+  const getActivityColor = (type: string, severity?: string) => {
     if (severity === "error") return "bg-red-500/20 text-red-400";
     if (severity === "warning") return "bg-yellow-500/20 text-yellow-400";
     if (severity === "success") return "bg-green-500/20 text-green-400";
@@ -58,7 +58,7 @@ function ActivityItem({ activity, index }: ActivityItemProps) {
     }
   };
 
-  const getSeverityIcon = (severity: string) => {
+  const getSeverityIcon = (severity?: string) => {
     switch (severity) {
       case "error":
         return <AlertCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />;
@@ -111,7 +111,7 @@ function ActivityItem({ activity, index }: ActivityItemProps) {
               {activity.beatTitle || activity.description}
             </p>
             <div className="flex items-center space-x-1 sm:space-x-2">
-              {activity.severity !== "info" && (
+              {activity.severity && activity.severity !== "info" && (
                 <div
                   className={cn(
                     "flex items-center space-x-1",

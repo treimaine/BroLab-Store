@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Clock, Music, Star } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { nanoid } from "nanoid";
 
 interface BeatRequest {
   genre: string;
@@ -22,6 +21,7 @@ interface BeatRequest {
   revisions: number;
   priority: "standard" | "priority" | "express";
   additionalNotes?: string;
+  uploadedFiles?: File[];
 }
 
 export default function CustomBeats() {
@@ -52,7 +52,8 @@ Reference Track: ${request.referenceTrack || "None"}
 Priority: ${request.priority}
 Deadline: ${request.deadline}
 Revisions: ${request.revisions}
-Additional Notes: ${request.additionalNotes || "None"}`,
+Additional Notes: ${request.additionalNotes || "None"}
+Uploaded Files: ${request.uploadedFiles?.length ? `${request.uploadedFiles.length} file(s) uploaded` : "None"}`,
         },
         preferred_date: new Date().toISOString(), // Will be set by user
         duration_minutes: 480, // 8 hours for custom beat production
@@ -75,18 +76,18 @@ Additional Notes: ${request.additionalNotes || "None"}`,
 
         // Create pending payment for checkout
         const pendingPayment = {
-          service: 'custom_beat',
-          serviceName: 'Custom Beat Production',
+          service: "custom_beat",
+          serviceName: "Custom Beat Production",
           serviceDetails: `${request.genre} beat - ${request.priority} priority (${request.duration}s)`,
           reservationId: reservation.id,
           price: reservationData.total_price / 100, // Convert cents to dollars
           quantity: 1,
         };
-        
+
         // Add to existing services array
-        const existingServices = JSON.parse(sessionStorage.getItem('pendingServices') || '[]');
+        const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
         const updatedServices = [...existingServices, pendingPayment];
-        sessionStorage.setItem('pendingServices', JSON.stringify(updatedServices));
+        sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
 
         toast({
           title: "Custom Beat Request Reserved!",
@@ -94,8 +95,8 @@ Additional Notes: ${request.additionalNotes || "None"}`,
             request.priority === "express"
               ? "24 hours"
               : request.priority === "priority"
-              ? "2-3 days"
-              : "5-7 days"
+                ? "2-3 days"
+                : "5-7 days"
           }.`,
         });
 
@@ -219,15 +220,15 @@ Additional Notes: ${request.additionalNotes || "None"}`,
                           (request.priority === "express"
                             ? 100
                             : request.priority === "priority"
-                            ? 50
-                            : 0)}
+                              ? 50
+                              : 0)}
                       </div>
                       <div className="text-xs text-[var(--accent-purple)] mt-1">
                         {request.priority === "express"
                           ? "Express (1-2 days)"
                           : request.priority === "priority"
-                          ? "Priority (3-5 days)"
-                          : "Standard (5-7 days)"}
+                            ? "Priority (3-5 days)"
+                            : "Standard (5-7 days)"}
                       </div>
                     </div>
                   ))}

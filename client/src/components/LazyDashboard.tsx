@@ -1,6 +1,21 @@
+/**
+ * Legacy Dashboard Component (Modernized)
+ *
+ * This component has been modernized to remove unnecessary lazy loading
+ * and use the new dashboard architecture while maintaining backward compatibility.
+ *
+ * Requirements addressed:
+ * - 2.1: Eliminate unnecessary lazy loading components
+ * - 2.2: Clear hierarchy with proper separation of concerns
+ * - 2.4: Consistent patterns across all components
+ * - 3.1: Consistent skeleton components
+ * - 3.2: Clear loading indicators
+ * - 9.3: Actionable error messages with retry mechanisms
+ * - 9.4: Escalation paths or support contact
+ */
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile, useIsTablet } from "@/hooks/useBreakpoint";
 import { useDashboardDataOptimized } from "@/hooks/useDashboardDataOptimized";
@@ -20,23 +35,23 @@ import {
   TrendingUp,
   User,
 } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-// Lazy-load heavy dashboard subcomponents
-const StatsCards = lazy(() =>
-  import("@/components/dashboard/StatsCards").then(m => ({ default: m.StatsCards }))
-);
-const ActivityFeed = lazy(() =>
-  import("@/components/dashboard/ActivityFeed").then(m => ({ default: m.ActivityFeed }))
-);
-const TrendCharts = lazy(() =>
-  import("@/components/dashboard/TrendCharts").then(m => ({ default: m.TrendCharts }))
-);
-const OrdersTab = lazy(() => import("@/components/dashboard/OrdersTab"));
-const ReservationsTab = lazy(() => import("@/components/dashboard/ReservationsTab"));
-const DownloadsTable = lazy(() => import("@/components/DownloadsTable"));
-const UserProfile = lazy(() => import("@/components/UserProfile"));
-// SubscriptionManager supprimé - gestion via interface Clerk native
+// Import components directly (no lazy loading for better performance and simpler architecture)
+import DownloadsTable from "@/components/DownloadsTable";
+import UserProfile from "@/components/UserProfile";
+import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { DashboardErrorBoundary } from "@/components/dashboard/DashboardErrorBoundary";
+import {
+  ActivityFeedSkeleton,
+  LoadingWithRetry,
+  RecommendationsSkeleton,
+  StatsCardsSkeleton,
+} from "@/components/dashboard/DashboardSkeletons";
+import OrdersTab from "@/components/dashboard/OrdersTab";
+import ReservationsTab from "@/components/dashboard/ReservationsTab";
+import { StatsCards } from "@/components/dashboard/StatsCards";
+import { TrendCharts } from "@/components/dashboard/TrendCharts";
 
 // Types locaux simplifiés (éviter les conflits avec les hooks)
 type DashboardFavorite = {
@@ -66,96 +81,9 @@ type DashboardDownload = {
   downloadUrl?: string;
 };
 
-// Composants de chargement
-function LoadingWithRetry({ onRetry }: { onRetry: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-      <p className="text-gray-400">Loading dashboard...</p>
-      <Button onClick={onRetry} variant="outline" size="sm">
-        Retry
-      </Button>
-    </div>
-  );
-}
+// Use modernized components (removed duplicate definitions)
 
-function ErrorBoundary({
-  children,
-  onError,
-}: {
-  children: React.ReactNode;
-  onError: (error: Error) => void;
-}) {
-  return <div>{children}</div>;
-}
-
-// Squelettes de chargement
-function StatsSkeleton() {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="bg-gray-900/50 rounded-lg p-4 sm:p-6 h-24 sm:h-32">
-          <Skeleton className="h-4 w-20 mb-2" />
-          <Skeleton className="h-6 sm:h-8 w-16 mb-1" />
-          <Skeleton className="h-3 w-24" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ActivitySkeleton() {
-  return (
-    <Card className="bg-gray-900/50 border-gray-700/50">
-      <CardHeader className="p-4 sm:p-6">
-        <Skeleton className="h-6 w-32" />
-      </CardHeader>
-      <CardContent className="space-y-4 p-4 sm:p-6">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="flex items-center space-x-3">
-            <Skeleton className="h-8 w-8 sm:h-10 sm:w-10 rounded-full" />
-            <div className="space-y-2 flex-1">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-function RecommendationsSkeleton() {
-  return (
-    <div className="space-y-3">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="flex items-center space-x-3 p-3 rounded-lg bg-gray-800/50">
-          <Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-3 w-1/2" />
-          </div>
-          <Skeleton className="h-6 w-12" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ChartsSkeleton() {
-  return (
-    <Card className="bg-gray-900/50 border-gray-700/50">
-      <CardHeader className="p-4 sm:p-6">
-        <Skeleton className="h-6 w-40" />
-      </CardHeader>
-      <CardContent className="p-4 sm:p-6">
-        <div className="h-48 sm:h-64 w-full">
-          <div className="h-full w-full bg-gray-800/50 rounded animate-pulse" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+// Skeleton components are now imported from DashboardSkeletons
 
 // Composant principal du Dashboard
 export function LazyDashboard() {
@@ -311,7 +239,7 @@ export function LazyDashboard() {
   // Error state handled via convexError below
 
   return (
-    <ErrorBoundary onError={handleError}>
+    <DashboardErrorBoundary onError={handleError}>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -347,9 +275,11 @@ export function LazyDashboard() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <Suspense fallback={<StatsSkeleton />}>
+            {isLoading ? (
+              <StatsCardsSkeleton />
+            ) : (
               <StatsCards stats={stats} isLoading={Boolean(isLoading)} className="mb-6 sm:mb-8" />
-            </Suspense>
+            )}
           </motion.div>
 
           {/* Dashboard tabs */}
@@ -426,13 +356,15 @@ export function LazyDashboard() {
               <TabsContent value="overview" className="space-y-4 sm:space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                   <div className="lg:col-span-2">
-                    <Suspense fallback={<ActivitySkeleton />}>
+                    {isLoading ? (
+                      <ActivityFeedSkeleton />
+                    ) : (
                       <ActivityFeed
                         activities={(rtActivity as any) || recentActivity || []}
                         isLoading={Boolean(isLoading)}
                         maxItems={isMobile ? 4 : isTablet ? 6 : 8}
                       />
-                    </Suspense>
+                    )}
                   </div>
                   <Card className="bg-gray-900/50 border-gray-700/50 backdrop-blur-sm">
                     <CardHeader className="p-4 sm:p-6">
@@ -442,13 +374,15 @@ export function LazyDashboard() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 sm:p-6">
-                      <Suspense fallback={<RecommendationsSkeleton />}>
+                      {isLoading ? (
+                        <RecommendationsSkeleton />
+                      ) : (
                         <div className="space-y-3">
                           {favoritesEffective &&
                             favoritesEffective.slice(0, isMobile ? 3 : 4).map((favorite, index) => (
                               <div
                                 key={index}
-                                className="flex items-center space-x-3 p-3 rounded-lg bg-gray-800/50"
+                                className="flex items-center space-x-3 p-3 rounded-lg bg-gray-800/50 hover:bg-gray-800/70 transition-colors"
                               >
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
                                   <Music className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
@@ -462,32 +396,38 @@ export function LazyDashboard() {
                               </div>
                             ))}
                         </div>
-                      </Suspense>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
               </TabsContent>
 
               <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
-                <Suspense fallback={<ChartsSkeleton />}>
+                {isLoading ? (
+                  <div className="bg-gray-900/50 border-gray-700/50 rounded-lg p-6">
+                    <div className="h-64 bg-gray-800/50 rounded animate-pulse" />
+                  </div>
+                ) : (
                   <TrendCharts
                     data={chartData || []}
                     trends={trends || {}}
                     favoritesMonthly={favoritesAddedPerMonth}
                     isLoading={Boolean(isLoading)}
                   />
-                </Suspense>
+                )}
               </TabsContent>
 
               <TabsContent value="activity" className="space-y-4 sm:space-y-6">
-                <Suspense fallback={<ActivitySkeleton />}>
+                {isLoading ? (
+                  <ActivityFeedSkeleton />
+                ) : (
                   <ActivityFeed
                     activities={(rtActivity as any) || recentActivity || []}
                     isLoading={Boolean(isLoading)}
                     maxItems={isMobile ? 10 : isTablet ? 15 : 20}
                     showHeader={false}
                   />
-                </Suspense>
+                )}
               </TabsContent>
 
               <TabsContent value="orders" className="space-y-4 sm:space-y-6">
@@ -508,7 +448,7 @@ export function LazyDashboard() {
                       `Beat ${d.beatId}`,
                     artist: d.artist,
                     fileSize: typeof d.fileSize === "number" ? d.fileSize : 0,
-                    format: (d.format || "mp3") as any,
+                    format: (d.format || "mp3") as unknown,
                     quality: d.quality || "320kbps",
                     downloadedAt: new Date(d.timestamp || Date.now()).toISOString(),
                     downloadCount: typeof d.quotaUsed === "number" ? d.quotaUsed : 0,
@@ -522,15 +462,11 @@ export function LazyDashboard() {
               </TabsContent>
 
               <TabsContent value="reservations" className="space-y-4 sm:space-y-6">
-                <Suspense fallback={<ActivitySkeleton />}>
-                  <ReservationsTab reservations={reservations} />
-                </Suspense>
+                <ReservationsTab reservations={reservations} />
               </TabsContent>
 
               <TabsContent value="profile" className="space-y-4 sm:space-y-6">
-                <Suspense fallback={<ActivitySkeleton />}>
-                  <UserProfile className="max-w-4xl mx-auto" />
-                </Suspense>
+                <UserProfile className="max-w-4xl mx-auto" />
               </TabsContent>
 
               <TabsContent value="settings" className="space-y-4 sm:space-y-6">
@@ -580,7 +516,7 @@ export function LazyDashboard() {
             <Card className="border-red-200 bg-red-50">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <div className="w-2 h-2 bg-red-500 rounded-full" />
                   <p className="text-red-700 text-xs sm:text-sm">Convex error: {convexError}</p>
                   <Button
                     onClick={handleRetry}
@@ -595,7 +531,7 @@ export function LazyDashboard() {
           )}
         </div>
       </motion.div>
-    </ErrorBoundary>
+    </DashboardErrorBoundary>
   );
 }
 

@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { cn } from "@/lib/utils";
 import { useAudioStore } from "@/store/useAudioStore";
-import { useQuery } from "@tanstack/react-query";
+import { useUser } from "@clerk/clerk-react";
 import { Headphones, Home, Music, ShoppingCart, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -45,11 +45,8 @@ export function MobileBottomNav() {
   const { currentTrack } = useAudioStore();
   const isMobile = useIsMobile();
 
-  // Check if user is authenticated
-  const { data: user } = useQuery({
-    queryKey: ["/api/auth/user"],
-    retry: false,
-  });
+  // Check if user is authenticated using Clerk
+  const { user, isSignedIn } = useUser();
 
   const cartItemCount = getItemCount();
 
@@ -111,7 +108,7 @@ export function MobileBottomNav() {
             location === item.href || (item.href !== "/" && location.startsWith(item.href));
 
           // Hide auth-required items if not logged in
-          if (item.requiresAuth && !user) {
+          if (item.requiresAuth && !isSignedIn) {
             return null;
           }
 

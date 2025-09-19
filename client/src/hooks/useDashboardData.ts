@@ -1,5 +1,4 @@
 import { useUser } from "@clerk/clerk-react";
-import { api } from "@convex/_generated/api";
 import { useQuery } from "convex/react";
 
 // Types pour les données
@@ -32,20 +31,14 @@ export function useDashboardData() {
   const { user: clerkUser, isLoaded } = useUser();
 
   // Récupérer les statistiques utilisateur avec type casting pour éviter les erreurs
-  const userStats = useQuery(
-    (api as any)["users/getUserStats"].getUserStats,
-    clerkUser ? {} : "skip"
-  );
+  const userStats = useQuery("users/getUserStats:getUserStats" as any, clerkUser ? {} : "skip");
 
   // Récupérer les favoris avec type casting pour éviter les erreurs
-  const favorites = useQuery(
-    (api as any)["favorites/getFavorites"].getFavorites,
-    clerkUser ? {} : "skip"
-  );
+  const favorites = useQuery("favorites/getFavorites:getFavorites" as any, clerkUser ? {} : "skip");
 
   // Récupérer les recommandations avec type casting pour éviter les erreurs
   const recommendations = useQuery(
-    (api as any)["products/forYou"].getForYouBeats,
+    "products/forYou:getForYouBeats" as any,
     clerkUser ? { limit: 6 } : "skip"
   );
 
@@ -76,15 +69,19 @@ export function useDashboardData() {
 
     // Statistiques
     stats: {
-      totalFavorites: stats.totalFavorites,
-      totalDownloads: stats.totalDownloads,
-      totalOrders: stats.totalOrders,
-      totalSpent: stats.totalSpent,
-      recentActivity: stats.recentActivity,
+      totalFavorites: stats?.totalFavorites || 0,
+      totalDownloads: stats?.totalDownloads || 0,
+      totalOrders: stats?.totalOrders || 0,
+      totalSpent: stats?.totalSpent || 0,
+      recentActivity: stats?.recentActivity || 0,
     },
 
     // Données détaillées
-    favorites: favoritesData as Favorite[],
+    favorites: (favoritesData || []).map((fav: any) => ({
+      id: fav._id || fav.id,
+      beatId: fav.beatId,
+      beatTitle: fav.beatTitle,
+    })) as Favorite[],
     downloads: downloadsData as any[],
     orders: ordersData as Order[],
     recentActivity: activityData as Activity[],
@@ -104,7 +101,7 @@ export function useRecommendations() {
   const { user: clerkUser } = useUser();
 
   const recommendations = useQuery(
-    (api as any)["products/forYou"]?.getForYouBeats,
+    "products/forYou:getForYouBeats" as any,
     clerkUser ? { limit: 6 } : "skip"
   );
 
@@ -119,10 +116,7 @@ export function useRecommendations() {
 export function useUserActivity() {
   const { user: clerkUser } = useUser();
 
-  const userStats = useQuery(
-    (api as any)["users/getUserStats"]?.getUserStats,
-    clerkUser ? {} : "skip"
-  );
+  const userStats = useQuery("users/getUserStats:getUserStats" as any, clerkUser ? {} : "skip");
 
   return {
     activity: userStats?.recentActivity || [],

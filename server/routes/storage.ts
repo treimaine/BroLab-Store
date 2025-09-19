@@ -64,7 +64,7 @@ router.post(
 
       // Validate and save file record to database
       const fileRecord: InsertFile = {
-        user_id: userId,
+        user_id: parseInt(userId),
         filename: fileName,
         original_name: req.file.originalname,
         storage_path: path,
@@ -73,7 +73,7 @@ router.post(
         role: role as "upload" | "deliverable" | "invoice",
         reservation_id: reservation_id || null,
         order_id: order_id ? parseInt(order_id) : null,
-        owner_id: userId,
+        owner_id: parseInt(userId),
       };
 
       const validatedRecord = fileRecord;

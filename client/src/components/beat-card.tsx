@@ -44,13 +44,9 @@ export function BeatCard({
   categories, // Destructure categories prop
 }: BeatCardProps) {
   const { addItem } = useCartContext();
-  const { favorites, addToFavorites, removeFromFavorites } = useFavorites();
+  const { favorites, addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
 
-  const isFavorite = (beatId: number | string): boolean => {
-    // Ensure beatId is consistently a string for comparison if needed, or handle types appropriately
-    const idAsString = typeof beatId === "number" ? beatId.toString() : beatId;
-    return favorites.some((fav: any) => fav.beatId === idAsString);
-  };
+  const beatIdAsNumber = typeof id === "string" ? parseInt(id) : id;
   const { addBeat } = useRecentlyViewedBeats();
   const { toast } = useToast();
   const { setCurrentTrack, setIsPlaying, currentTrack, isPlaying } = useAudioStore();
@@ -79,10 +75,9 @@ export function BeatCard({
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const beatId = typeof id === "string" ? parseInt(id) : id;
 
     addItem({
-      beatId,
+      beatId: beatIdAsNumber,
       title,
       genre,
       imageUrl,
@@ -100,7 +95,7 @@ export function BeatCard({
   const handleViewDetails = () => {
     // Ajouter le beat à l'historique des beats vus récemment
     addBeat({
-      id: typeof id === "string" ? parseInt(id) : id,
+      id: beatIdAsNumber,
       title,
       genre,
       bpm,
@@ -124,15 +119,14 @@ export function BeatCard({
   const handleWishlistToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const beatId = typeof id === "string" ? parseInt(id) : id;
-      if (isFavorite(beatId)) {
-        await removeFromFavorites(beatId);
+      if (isFavorite(beatIdAsNumber)) {
+        await removeFromFavorites(beatIdAsNumber);
         toast({
           title: "Removed from Wishlist",
           description: "This beat has been removed from your wishlist.",
         });
       } else {
-        await addToFavorites(beatId);
+        await addToFavorites(beatIdAsNumber);
         toast({
           title: "Added to Wishlist",
           description: "This beat has been added to your wishlist.",
@@ -168,18 +162,14 @@ export function BeatCard({
         <button
           onClick={handleWishlistToggle}
           className={`absolute top-2 right-2 sm:top-3 sm:right-3 p-1.5 sm:p-2 rounded-full transition-all duration-200 z-30 ${
-            isFavorite(typeof id === "string" ? parseInt(id) : id)
+            isFavorite(beatIdAsNumber)
               ? "bg-red-500 text-white hover:bg-red-600"
               : "bg-black/70 text-white hover:bg-red-500 hover:text-white"
           }`}
-          title={
-            isFavorite(typeof id === "string" ? parseInt(id) : id)
-              ? "Remove from wishlist"
-              : "Add to wishlist"
-          }
+          title={isFavorite(beatIdAsNumber) ? "Remove from wishlist" : "Add to wishlist"}
         >
           <Heart
-            className={`w-3 h-3 sm:w-4 sm:h-4 ${isFavorite(typeof id === "string" ? parseInt(id) : id) ? "fill-current" : ""}`}
+            className={`w-3 h-3 sm:w-4 sm:h-4 ${isFavorite(beatIdAsNumber) ? "fill-current" : ""}`}
           />
         </button>
         {imageUrl && imageUrl !== "" && imageUrl !== "/api/placeholder/200/200" ? (

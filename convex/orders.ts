@@ -1,6 +1,7 @@
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { validateAndSanitizeOrder, ValidationError } from "./lib/validation";
+import { ValidationError, validateAndSanitizeOrder } from "./lib/validation";
 
 export const createOrder = mutation({
   args: {
@@ -101,8 +102,11 @@ export const createOrder = mutation({
         userId: user._id,
         clerkId: clerkId,
         action: "order_created",
-        resource: "order",
+        resource: "orders",
         details: {
+          operation: "create",
+          resource: "orders",
+          resourceId: orderId,
           orderId: orderId,
           total: validatedOrder.total,
           email: validatedOrder.email,
@@ -126,8 +130,10 @@ export const createOrder = mutation({
       await ctx.db.insert("auditLogs", {
         clerkId: identity?.subject,
         action: "order_creation_error",
-        resource: "order",
+        resource: "orders",
         details: {
+          operation: "create",
+          resource: "orders",
           error: errorMessage,
           email: args.email,
           total: args.total,
@@ -707,12 +713,23 @@ export const updateOrderStatus = mutation({
         userId: user._id,
         clerkId: clerkId,
         action: "order_status_updated",
-        resource: "order",
+        resource: "orders",
         details: {
+          operation: "update",
+          resource: "orders",
+          resourceId: args.orderId,
           orderId: args.orderId,
           previousStatus,
           newStatus: args.status,
           paymentStatus: args.paymentStatus,
+          changes: [
+            {
+              field: "status",
+              oldValue: previousStatus,
+              newValue: args.status,
+              changeType: "update" as const,
+            },
+          ],
         },
         timestamp: now,
       });
@@ -734,8 +751,11 @@ export const updateOrderStatus = mutation({
       await ctx.db.insert("auditLogs", {
         clerkId: identity?.subject,
         action: "update_order_status_error",
-        resource: "order",
+        resource: "orders",
         details: {
+          operation: "update",
+          resource: "orders",
+          resourceId: args.orderId,
           error: errorMessage,
           orderId: args.orderId,
           status: args.status,
@@ -763,7 +783,7 @@ export const markOrderFromWebhook = mutation({
       const now = Date.now();
 
       // Try to find the order by provided identifiers
-      let order = null as any;
+      let order: any = null;
 
       if (args.sessionId) {
         order = await ctx.db
@@ -856,5 +876,34 @@ export const saveInvoiceUrl = mutation({
     });
 
     return await ctx.db.get(orderId);
+  },
+});
+// Restore order data
+export const restore = mutation({
+  args: {
+    orderId: v.string(),
+    state: v.any(),
+  },
+  handler: async (ctx, { orderId, state }) => {
+    try {
+      console.log("Order data restore:", {
+        orderId,
+        stateSize: JSON.stringify(state).length,
+        timestamp: Date.now(),
+      });
+
+      // Restore order data
+      await ctx.db.patch(orderId as Id<"orders">, {
+        ...state,
+        _restoredAt: Date.now(),
+        _restoredFrom: "order_restore",
+      });
+
+      console.log("Order data restored successfully:", { orderId });
+      return { success: true, orderId, timestamp: Date.now() };
+    } catch (error) {
+      console.error("Error restoring order data:", error);
+      throw error;
+    }
   },
 });

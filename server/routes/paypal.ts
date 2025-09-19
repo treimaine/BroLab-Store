@@ -1,5 +1,5 @@
 import { Request, Response, Router } from "express";
-import { isAuthenticated } from "../auth";
+import { isAuthenticated as requireAuth } from "../auth";
 import { PAYPAL_WEBHOOK_ID } from "../config/paypal";
 import { urls } from "../config/urls";
 import PayPalService, { PaymentRequest } from "../services/paypal";
@@ -37,7 +37,7 @@ router.get("/test", async (req: Request, res: Response) => {
  * GET /api/paypal/test-auth
  * Route de test pour vérifier l'authentification
  */
-router.get("/test-auth", isAuthenticated, async (req: any, res: Response) => {
+router.get("/test-auth", requireAuth, async (req: any, res: Response) => {
   try {
     console.log("🔐 Testing PayPal authentication");
     console.log("👤 User data:", {
@@ -72,8 +72,7 @@ router.get("/test-auth", isAuthenticated, async (req: any, res: Response) => {
  * Crée une commande PayPal pour le paiement d'une réservation
  * ✅ CORRECTION: Renvoie uniquement l'approvalLink PayPal
  */
-router.post("/create-order", async (req: any, res: Response) => {
-  // TEMPORAIRE: Authentification désactivée
+router.post("/create-order", requireAuth, async (req: any, res: Response) => {
   try {
     const { serviceType, amount, currency, description, reservationId, customerEmail } = req.body;
 
@@ -87,8 +86,8 @@ router.post("/create-order", async (req: any, res: Response) => {
     }
 
     // ✅ AUTHENTIFICATION VÉRIFIÉE - Utilisateur connecté
-    console.log("⚠️ TEMPORAIRE: Authentification désactivée pour test PayPal");
-    console.log("🚀 Creating PayPal order (auth bypassed)");
+    console.log("🚀 Creating PayPal order for authenticated user:", req.user);
+    console.log("👤 User ID:", req.user!.id);
 
     // Création de la commande PayPal avec l'utilisateur authentifié
     const paymentRequest: PaymentRequest = {
@@ -97,7 +96,7 @@ router.post("/create-order", async (req: any, res: Response) => {
       currency: currency.toUpperCase(),
       description,
       reservationId,
-      userId: "temp_user_for_testing", // TEMPORAIRE: ID utilisateur temporaire
+      userId: req.user!.id, // Utiliser l'ID utilisateur authentifié
       customerEmail,
     };
 

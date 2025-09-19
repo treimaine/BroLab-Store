@@ -101,8 +101,8 @@ export const mockBeatsList: MockBeatList[] = [
 
 // Stub pour la fonction wcApiRequest
 export const stubWcApiRequest = async (endpoint: string): Promise<any> => {
-  // Simuler un délai réseau
-  await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
+  // Remove network delay simulation in tests to avoid async cleanup issues
+  // await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
 
   if (endpoint.includes("/products/")) {
     const productId = parseInt(endpoint.split("/").pop() || "0");

@@ -17,9 +17,10 @@ import { api } from "@/lib/convex";
 import { apiRequest } from "@/lib/queryClient";
 import { useUser } from "@clerk/clerk-react";
 import { useQuery } from "convex/react";
-import { CheckCircle, Clock, Mail, Phone, Upload, User } from "lucide-react";
+import { CheckCircle, Clock, Mail, Phone, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import FileUpload from "../../../components/kokonutui/file-upload";
 
 const services = [
   {
@@ -141,27 +142,31 @@ export default function MixingMastering() {
 
       if (reservationResponse.ok) {
         const reservationData = await reservationResponse.json();
-        
+
         // Create payment intent for the service
-        const paymentResponse = await apiRequest("POST", "/api/payment/stripe/create-payment-intent", {
-          amount: selectedServiceData?.price || 0,
-          currency: "usd",
-          metadata: {
-            reservationId: reservationData.id,
-            service: selectedService,
-            customerName: formData.name,
-            customerEmail: formData.email,
-          },
-        });
+        const paymentResponse = await apiRequest(
+          "POST",
+          "/api/payment/stripe/create-payment-intent",
+          {
+            amount: selectedServiceData?.price || 0,
+            currency: "usd",
+            metadata: {
+              reservationId: reservationData.id,
+              service: selectedService,
+              customerName: formData.name,
+              customerEmail: formData.email,
+            },
+          }
+        );
 
         if (paymentResponse.ok) {
           const paymentData = await paymentResponse.json();
-          
+
           // Store payment info in multi-services format
           const pendingPayment = {
             clientSecret: paymentData.clientSecret,
             service: selectedService,
-            serviceName: selectedServiceData?.name || 'Mixing & Mastering',
+            serviceName: selectedServiceData?.name || "Mixing & Mastering",
             serviceDetails: formData.projectDetails,
             price: selectedServiceData?.price || 0,
             quantity: 1,
@@ -169,15 +174,15 @@ export default function MixingMastering() {
           };
 
           // Add to existing services array
-          const existingServices = JSON.parse(sessionStorage.getItem('pendingServices') || '[]');
+          const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
           const updatedServices = [...existingServices, pendingPayment];
-          sessionStorage.setItem('pendingServices', JSON.stringify(updatedServices));
-          
+          sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
+
           toast({
             title: "Service Added!",
             description: "Your mixing & mastering service has been added to checkout.",
           });
-          
+
           setLocation("/checkout");
         } else {
           throw new Error("Failed to create payment intent");
@@ -440,28 +445,23 @@ export default function MixingMastering() {
               {/* File Upload Section */}
               <div className="space-y-3">
                 <Label className="text-white">Upload Project Files (Optional)</Label>
-                <div className="border-2 border-dashed border-[var(--medium-gray)] rounded-lg p-6 text-center hover:border-[var(--accent-purple)] transition-colors">
-                  <input
-                    id="file-upload"
-                    type="file"
-                    multiple
-                    accept="audio/*,.zip,.rar,.7z"
-                    onChange={e => {
-                      if (e.target.files) {
-                        setUploadedFiles(Array.from(e.target.files));
-                      }
+                <div className="flex justify-center">
+                  <FileUpload
+                    onUploadSuccess={(file: File) => {
+                      setUploadedFiles(prev => [...prev, file]);
                     }}
-                    className="hidden"
+                    onUploadError={(error: any) => {
+                      toast({
+                        title: "Erreur d'upload",
+                        description: error.message,
+                        variant: "destructive",
+                      });
+                    }}
+                    acceptedFileTypes={["audio/*", ".zip", ".rar", ".7z"]}
+                    maxFileSize={100 * 1024 * 1024} // 100MB
+                    uploadDelay={0} // Pas de simulation d'upload
+                    className="w-full"
                   />
-                  <label htmlFor="file-upload" className="cursor-pointer">
-                    <Upload className="w-8 h-8 text-[var(--accent-purple)] mx-auto mb-2" />
-                    <p className="text-gray-300 font-medium">
-                      Click to upload audio files or project archives
-                    </p>
-                    <p className="text-gray-500 text-sm mt-1">
-                      Supports: MP3, WAV, FLAC, ZIP, RAR (Max 100MB per file)
-                    </p>
-                  </label>
                 </div>
 
                 {/* Display uploaded files */}

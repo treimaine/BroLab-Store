@@ -30,8 +30,13 @@ export const upsert = mutation({
       await ctx.db.insert("auditLogs", {
         clerkId: clerkUserId,
         action: "subscription_upsert_user_missing",
-        resource: "subscription",
-        details: { clerkSubscriptionId },
+        resource: "subscriptions",
+        details: {
+          operation: "upsert",
+          resource: "subscriptions",
+          clerkSubscriptionId,
+          error: "User not found for Clerk ID",
+        },
         timestamp: now,
       });
       throw new Error("User not found for Clerk ID");

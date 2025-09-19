@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { getUserStats, getUserStatsByClerkId } from "./users/getUserStats";
 
@@ -121,3 +122,32 @@ export const updateUserAvatar = mutation({
 
 // Re-export getUserStats functions
 export { getUserStats, getUserStatsByClerkId };
+// Restore user data
+export const restore = mutation({
+  args: {
+    userId: v.string(),
+    state: v.any(),
+  },
+  handler: async (ctx, { userId, state }) => {
+    try {
+      console.log("User data restore:", {
+        userId,
+        stateSize: JSON.stringify(state).length,
+        timestamp: Date.now(),
+      });
+
+      // Restore user data
+      await ctx.db.patch(userId as Id<"users">, {
+        ...state,
+        _restoredAt: Date.now(),
+        _restoredFrom: "user_restore",
+      });
+
+      console.log("User data restored successfully:", { userId });
+      return { success: true, userId, timestamp: Date.now() };
+    } catch (error) {
+      console.error("Error restoring user data:", error);
+      throw error;
+    }
+  },
+});

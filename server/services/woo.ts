@@ -1,7 +1,16 @@
 // WooCommerce Service Functions
 // WooCommerce API Service
 
-export async function fetchWooProducts(filters: any = {}) {
+export async function fetchWooProducts(
+  filters: {
+    per_page?: number;
+    page?: number;
+    search?: string;
+    category?: string;
+    status?: string;
+    [key: string]: unknown;
+  } = {}
+) {
   try {
     // Utiliser directement les valeurs du fichier .env
     const apiUrl =

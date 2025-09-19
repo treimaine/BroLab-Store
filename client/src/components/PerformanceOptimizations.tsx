@@ -1,13 +1,13 @@
-import React, { Suspense, memo, useMemo, useCallback, lazy } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Zap, Clock, Database, Wifi, Image, FileText } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Database, Image, Wifi, Zap } from "lucide-react";
+import React, { Suspense, lazy, memo, useCallback, useMemo } from "react";
 
 // Lazy load heavy components
-const LazyWaveformPlayer = lazy(() => import('./WaveformPlayer'));
-const LazyAdvancedFilters = lazy(() => import('./AdvancedBeatFilters'));
-const LazyPaymentDashboard = lazy(() => import('../pages/payment-dashboard'));
+const LazyWaveformPlayer = lazy(() => import("./WaveformPlayer"));
+const LazyAdvancedFilters = lazy(() => import("./AdvancedBeatFilters"));
+const LazyPaymentDashboard = lazy(() => import("../pages/payment-dashboard"));
 
 // Performance monitoring hook
 export const usePerformanceMonitoring = () => {
@@ -16,46 +16,48 @@ export const usePerformanceMonitoring = () => {
     firstContentfulPaint: 0,
     largestContentfulPaint: 0,
     cumulativeLayoutShift: 0,
-    firstInputDelay: 0
+    firstInputDelay: 0,
   });
 
   React.useEffect(() => {
     // Collect Core Web Vitals
-    const observer = new PerformanceObserver((list) => {
-      list.getEntries().forEach((entry) => {
+    const observer = new PerformanceObserver(list => {
+      list.getEntries().forEach(entry => {
         switch (entry.entryType) {
-          case 'navigation':
+          case "navigation":
             const navEntry = entry as PerformanceNavigationTiming;
             setPerformanceMetrics(prev => ({
               ...prev,
-              pageLoadTime: navEntry.loadEventEnd - navEntry.loadEventStart
+              pageLoadTime: navEntry.loadEventEnd - navEntry.loadEventStart,
             }));
             break;
-          case 'paint':
-            if (entry.name === 'first-contentful-paint') {
+          case "paint":
+            if (entry.name === "first-contentful-paint") {
               setPerformanceMetrics(prev => ({
                 ...prev,
-                firstContentfulPaint: entry.startTime
+                firstContentfulPaint: entry.startTime,
               }));
             }
             break;
-          case 'largest-contentful-paint':
+          case "largest-contentful-paint":
             setPerformanceMetrics(prev => ({
               ...prev,
-              largestContentfulPaint: entry.startTime
+              largestContentfulPaint: entry.startTime,
             }));
             break;
-          case 'layout-shift':
+          case "layout-shift":
             setPerformanceMetrics(prev => ({
               ...prev,
-              cumulativeLayoutShift: prev.cumulativeLayoutShift + (entry as any).value
+              cumulativeLayoutShift: prev.cumulativeLayoutShift + (entry as any).value,
             }));
             break;
         }
       });
     });
 
-    observer.observe({ entryTypes: ['navigation', 'paint', 'largest-contentful-paint', 'layout-shift'] });
+    observer.observe({
+      entryTypes: ["navigation", "paint", "largest-contentful-paint", "layout-shift"],
+    });
 
     return () => observer.disconnect();
   }, []);
@@ -90,24 +92,24 @@ export const OptimizedImage: React.FC<{
           <Image className="w-8 h-8 text-gray-500" />
         </div>
       )}
-      
+
       <img
         src={src}
         alt={alt}
         width={width}
         height={height}
-        loading={priority ? 'eager' : 'lazy'}
+        loading={priority ? "eager" : "lazy"}
         onLoad={handleLoad}
         onError={handleError}
         className={`transition-opacity duration-300 ${
-          isLoaded ? 'opacity-100' : 'opacity-0'
+          isLoaded ? "opacity-100" : "opacity-0"
         } ${className}`}
-        style={{ 
-          width: width ? `${width}px` : 'auto',
-          height: height ? `${height}px` : 'auto'
+        style={{
+          width: width ? `${width}px` : "auto",
+          height: height ? `${height}px` : "auto",
         }}
       />
-      
+
       {error && (
         <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
           <span className="text-gray-400 text-sm">Failed to load</span>
@@ -117,7 +119,7 @@ export const OptimizedImage: React.FC<{
   );
 });
 
-OptimizedImage.displayName = 'OptimizedImage';
+OptimizedImage.displayName = "OptimizedImage";
 
 // Virtual scrolling for large lists
 export const VirtualizedBeatList: React.FC<{
@@ -141,21 +143,17 @@ export const VirtualizedBeatList: React.FC<{
   }, []);
 
   return (
-    <div
-      className="overflow-auto"
-      style={{ height: containerHeight }}
-      onScroll={handleScroll}
-    >
-      <div style={{ height: beats.length * itemHeight, position: 'relative' }}>
+    <div className="overflow-auto" style={{ height: containerHeight }} onScroll={handleScroll}>
+      <div style={{ height: beats.length * itemHeight, position: "relative" }}>
         {visibleItems.map((item, index) => (
           <div
             key={startIndex + index}
             style={{
-              position: 'absolute',
+              position: "absolute",
               top: (startIndex + index) * itemHeight,
               left: 0,
               right: 0,
-              height: itemHeight
+              height: itemHeight,
             }}
           >
             {renderItem(item, startIndex + index)}
@@ -166,42 +164,10 @@ export const VirtualizedBeatList: React.FC<{
   );
 });
 
-VirtualizedBeatList.displayName = 'VirtualizedBeatList';
+VirtualizedBeatList.displayName = "VirtualizedBeatList";
 
-// Cache management
-class CacheManager {
-  private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
-
-  set(key: string, data: any, ttl: number = 5 * 60 * 1000) { // 5 minutes default
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now(),
-      ttl
-    });
-  }
-
-  get(key: string): any | null {
-    const item = this.cache.get(key);
-    if (!item) return null;
-
-    if (Date.now() - item.timestamp > item.ttl) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    return item.data;
-  }
-
-  clear() {
-    this.cache.clear();
-  }
-
-  size() {
-    return this.cache.size;
-  }
-}
-
-export const cacheManager = new CacheManager();
+// Import the comprehensive cache manager
+import { cacheManager } from "../../../shared/utils/cache-manager";
 
 // Performance Dashboard Component
 export const PerformanceDashboard: React.FC = () => {
@@ -209,21 +175,27 @@ export const PerformanceDashboard: React.FC = () => {
   const [cacheStats, setCacheStats] = React.useState({ size: 0, hitRate: 0 });
 
   React.useEffect(() => {
-    const updateCacheStats = () => {
-      setCacheStats({
-        size: cacheManager.size(),
-        hitRate: Math.random() * 100 // Placeholder for actual hit rate calculation
-      });
+    const updateCacheStats = async () => {
+      try {
+        const stats = await cacheManager.getStats();
+        setCacheStats({
+          size: stats.totalEntries,
+          hitRate: stats.hitRate,
+        });
+      } catch (error) {
+        console.error("Failed to get cache stats:", error);
+      }
     };
 
+    updateCacheStats();
     const interval = setInterval(updateCacheStats, 5000);
     return () => clearInterval(interval);
   }, []);
 
   const getPerformanceScore = (value: number, thresholds: [number, number]) => {
-    if (value <= thresholds[0]) return 'good';
-    if (value <= thresholds[1]) return 'needs-improvement';
-    return 'poor';
+    if (value <= thresholds[0]) return "good";
+    if (value <= thresholds[1]) return "needs-improvement";
+    return "poor";
   };
 
   const formatTime = (ms: number) => `${ms.toFixed(1)}ms`;
@@ -242,13 +214,16 @@ export const PerformanceDashboard: React.FC = () => {
           <div className="flex justify-between items-center">
             <span className="text-gray-300">First Contentful Paint</span>
             <div className="flex items-center space-x-2">
-              <Badge className={
-                getPerformanceScore(metrics.firstContentfulPaint, [1800, 3000]) === 'good' 
-                  ? 'bg-green-500' 
-                  : getPerformanceScore(metrics.firstContentfulPaint, [1800, 3000]) === 'needs-improvement'
-                  ? 'bg-yellow-500'
-                  : 'bg-red-500'
-              }>
+              <Badge
+                className={
+                  getPerformanceScore(metrics.firstContentfulPaint, [1800, 3000]) === "good"
+                    ? "bg-green-500"
+                    : getPerformanceScore(metrics.firstContentfulPaint, [1800, 3000]) ===
+                        "needs-improvement"
+                      ? "bg-yellow-500"
+                      : "bg-red-500"
+                }
+              >
                 {getPerformanceScore(metrics.firstContentfulPaint, [1800, 3000])}
               </Badge>
               <span className="text-white">{formatTime(metrics.firstContentfulPaint)}</span>
@@ -258,13 +233,16 @@ export const PerformanceDashboard: React.FC = () => {
           <div className="flex justify-between items-center">
             <span className="text-gray-300">Largest Contentful Paint</span>
             <div className="flex items-center space-x-2">
-              <Badge className={
-                getPerformanceScore(metrics.largestContentfulPaint, [2500, 4000]) === 'good' 
-                  ? 'bg-green-500' 
-                  : getPerformanceScore(metrics.largestContentfulPaint, [2500, 4000]) === 'needs-improvement'
-                  ? 'bg-yellow-500'
-                  : 'bg-red-500'
-              }>
+              <Badge
+                className={
+                  getPerformanceScore(metrics.largestContentfulPaint, [2500, 4000]) === "good"
+                    ? "bg-green-500"
+                    : getPerformanceScore(metrics.largestContentfulPaint, [2500, 4000]) ===
+                        "needs-improvement"
+                      ? "bg-yellow-500"
+                      : "bg-red-500"
+                }
+              >
                 {getPerformanceScore(metrics.largestContentfulPaint, [2500, 4000])}
               </Badge>
               <span className="text-white">{formatTime(metrics.largestContentfulPaint)}</span>
@@ -274,13 +252,16 @@ export const PerformanceDashboard: React.FC = () => {
           <div className="flex justify-between items-center">
             <span className="text-gray-300">Cumulative Layout Shift</span>
             <div className="flex items-center space-x-2">
-              <Badge className={
-                getPerformanceScore(metrics.cumulativeLayoutShift, [0.1, 0.25]) === 'good' 
-                  ? 'bg-green-500' 
-                  : getPerformanceScore(metrics.cumulativeLayoutShift, [0.1, 0.25]) === 'needs-improvement'
-                  ? 'bg-yellow-500'
-                  : 'bg-red-500'
-              }>
+              <Badge
+                className={
+                  getPerformanceScore(metrics.cumulativeLayoutShift, [0.1, 0.25]) === "good"
+                    ? "bg-green-500"
+                    : getPerformanceScore(metrics.cumulativeLayoutShift, [0.1, 0.25]) ===
+                        "needs-improvement"
+                      ? "bg-yellow-500"
+                      : "bg-red-500"
+                }
+              >
                 {getPerformanceScore(metrics.cumulativeLayoutShift, [0.1, 0.25])}
               </Badge>
               <span className="text-white">{metrics.cumulativeLayoutShift.toFixed(3)}</span>
@@ -307,9 +288,13 @@ export const PerformanceDashboard: React.FC = () => {
             <span className="text-white">{cacheStats.hitRate.toFixed(1)}%</span>
           </div>
           <Button
-            onClick={() => {
-              cacheManager.clear();
-              setCacheStats(prev => ({ ...prev, size: 0 }));
+            onClick={async () => {
+              try {
+                await cacheManager.clear();
+                setCacheStats({ size: 0, hitRate: 0 });
+              } catch (error) {
+                console.error("Failed to clear cache:", error);
+              }
             }}
             size="sm"
             variant="outline"
@@ -352,7 +337,7 @@ export const LoadingSkeleton: React.FC<{
   lines?: number;
   height?: string;
   className?: string;
-}> = memo(({ lines = 3, height = 'h-4', className = '' }) => {
+}> = memo(({ lines = 3, height = "h-4", className = "" }) => {
   return (
     <div className={`animate-pulse space-y-2 ${className}`}>
       {Array.from({ length: lines }).map((_, index) => (
@@ -362,7 +347,7 @@ export const LoadingSkeleton: React.FC<{
   );
 });
 
-LoadingSkeleton.displayName = 'LoadingSkeleton';
+LoadingSkeleton.displayName = "LoadingSkeleton";
 
 // Performance-optimized Suspense wrapper
 export const OptimizedSuspense: React.FC<{
@@ -376,9 +361,5 @@ export const OptimizedSuspense: React.FC<{
     </div>
   );
 
-  return (
-    <Suspense fallback={fallback || defaultFallback}>
-      {children}
-    </Suspense>
-  );
+  return <Suspense fallback={fallback || defaultFallback}>{children}</Suspense>;
 };

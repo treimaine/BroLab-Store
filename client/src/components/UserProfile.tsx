@@ -1,4 +1,4 @@
-import { Avatar } from "@/components/ui/avatar";
+import { AvatarUpload } from "@/components/ui/avatar-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -9,7 +9,6 @@ import { useClerk, useUser } from "@clerk/clerk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Calendar,
-  Camera,
   Download,
   Edit3,
   Heart,
@@ -198,38 +197,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="relative">
-                <Avatar
+                <AvatarUpload
                   src={user.imageUrl}
                   alt={user.fullName || "User"}
                   size="lg"
                   className="w-16 h-16"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full p-0 hover:bg-purple-600 hover:text-white transition-colors"
-                  onClick={() => fileInputRef.current?.click()}
-                  title="Edit profile photo"
-                  disabled={isUploadingPhoto}
-                >
-                  {isUploadingPhoto ? (
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                  ) : (
-                    <Camera className="w-3 h-3" />
-                  )}
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      handlePhotoUpload(file);
-                      // Reset l'input pour permettre la sélection du même fichier
-                      e.target.value = "";
-                    }
+                  onUpload={url => {
+                    // Mettre à jour l'avatar dans Clerk
+                    user.setProfileImage({ file: url });
                   }}
                 />
               </div>

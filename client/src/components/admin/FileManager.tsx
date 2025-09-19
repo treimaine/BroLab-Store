@@ -1,15 +1,32 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
-import { Upload, Download, Trash2, File, FileText, FileMusic, Calendar, User, Hash } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Calendar,
+  Download,
+  File,
+  FileMusic,
+  FileText,
+  Hash,
+  Trash2,
+  Upload,
+  User,
+} from "lucide-react";
+import { useState } from "react";
+import FileUpload from "../../../../components/kokonutui/file-upload";
 
 interface FileRecord {
   id: string;
@@ -19,7 +36,7 @@ interface FileRecord {
   storage_path: string;
   mime_type?: string;
   size_bytes?: number;
-  role: 'upload' | 'deliverable' | 'invoice';
+  role: "upload" | "deliverable" | "invoice";
   created_at: string;
 }
 
@@ -27,54 +44,54 @@ interface FileUploadProps {
   onUploadSuccess: () => void;
 }
 
-function FileUpload({ onUploadSuccess }: FileUploadProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [role, setRole] = useState<'upload' | 'deliverable' | 'invoice'>('upload');
-  const [reservationId, setReservationId] = useState('');
-  const [orderId, setOrderId] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+function FileUploadComponent({ onUploadSuccess }: FileUploadProps) {
+  const [role, setRole] = useState<"upload" | "deliverable" | "invoice">("upload");
+  const [reservationId, setReservationId] = useState("");
+  const [orderId, setOrderId] = useState("");
   const { toast } = useToast();
 
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-
-    setIsUploading(true);
+  const handleUploadSuccess = async (file: File) => {
     try {
       const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('role', role);
-      if (reservationId) formData.append('reservation_id', reservationId);
-      if (orderId) formData.append('order_id', orderId);
+      formData.append("file", file);
+      formData.append("role", role);
+      if (reservationId) formData.append("reservation_id", reservationId);
+      if (orderId) formData.append("order_id", orderId);
 
-      const response = await fetch('/api/storage/upload', {
-        method: 'POST',
+      const response = await fetch("/api/storage/upload", {
+        method: "POST",
         body: formData,
-        credentials: 'include'
+        credentials: "include",
       });
 
       if (!response.ok) {
-        throw new Error('Upload failed');
+        throw new Error("Upload failed");
       }
 
       const result = await response.json();
       toast({
-        title: 'Upload réussi',
-        description: `Fichier "${selectedFile.name}" uploadé avec succès`
+        title: "Upload réussi",
+        description: `Fichier "${file.name}" uploadé avec succès`,
       });
 
-      setSelectedFile(null);
-      setReservationId('');
-      setOrderId('');
+      setReservationId("");
+      setOrderId("");
       onUploadSuccess();
     } catch (error: any) {
       toast({
-        title: 'Erreur d\'upload',
+        title: "Erreur d'upload",
         description: error.message,
-        variant: 'destructive'
+        variant: "destructive",
       });
-    } finally {
-      setIsUploading(false);
     }
+  };
+
+  const handleUploadError = (error: any) => {
+    toast({
+      title: "Erreur de validation",
+      description: error.message,
+      variant: "destructive",
+    });
   };
 
   return (
@@ -86,16 +103,6 @@ function FileUpload({ onUploadSuccess }: FileUploadProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <Label htmlFor="file">Fichier</Label>
-          <Input
-            id="file"
-            type="file"
-            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-            accept=".pdf,.doc,.docx,.mp3,.wav,.zip,.jpg,.png"
-          />
-        </div>
-
         <div>
           <Label htmlFor="role">Type de fichier</Label>
           <Select value={role} onValueChange={(value: any) => setRole(value)}>
@@ -116,7 +123,7 @@ function FileUpload({ onUploadSuccess }: FileUploadProps) {
             <Input
               id="reservationId"
               value={reservationId}
-              onChange={(e) => setReservationId(e.target.value)}
+              onChange={e => setReservationId(e.target.value)}
               placeholder="uuid-reservation"
             />
           </div>
@@ -125,105 +132,119 @@ function FileUpload({ onUploadSuccess }: FileUploadProps) {
             <Input
               id="orderId"
               value={orderId}
-              onChange={(e) => setOrderId(e.target.value)}
+              onChange={e => setOrderId(e.target.value)}
               placeholder="123"
               type="number"
             />
           </div>
         </div>
 
-        <Button 
-          onClick={handleUpload}
-          disabled={!selectedFile || isUploading}
-          className="w-full"
-        >
-          {isUploading ? 'Upload en cours...' : 'Uploader le fichier'}
-        </Button>
+        <div className="flex justify-center">
+          <div className="w-full max-w-md">
+            <FileUpload
+              onUploadSuccess={handleUploadSuccess}
+              onUploadError={handleUploadError}
+              acceptedFileTypes={[".pdf", ".doc", ".docx", ".mp3", ".wav", ".zip", ".jpg", ".png"]}
+              maxFileSize={100 * 1024 * 1024} // 100MB
+              uploadDelay={0} // Pas de simulation d'upload
+              className="w-full"
+            />
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
 function FileList() {
-  const [selectedRole, setSelectedRole] = useState<string>('all');
+  const [selectedRole, setSelectedRole] = useState<string>("all");
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: files = [], isLoading, refetch } = useQuery({
-    queryKey: ['/api/storage/files', selectedRole],
+  const {
+    data: files = [],
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["/api/storage/files", selectedRole],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (selectedRole !== 'all') params.append('role', selectedRole);
-      
-      const response = await apiRequest('GET', `/api/storage/files?${params}`);
+      if (selectedRole !== "all") params.append("role", selectedRole);
+
+      const response = await apiRequest("GET", `/api/storage/files?${params}`);
       const data = await response.json();
       return data.files || [];
-    }
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (fileId: string) => {
-      const response = await apiRequest('DELETE', `/api/storage/files/${fileId}`);
+      const response = await apiRequest("DELETE", `/api/storage/files/${fileId}`);
       return response.json();
     },
     onSuccess: () => {
       toast({
-        title: 'Fichier supprimé',
-        description: 'Le fichier a été supprimé avec succès'
+        title: "Fichier supprimé",
+        description: "Le fichier a été supprimé avec succès",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/storage/files'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/storage/files"] });
     },
     onError: (error: any) => {
       toast({
-        title: 'Erreur de suppression',
+        title: "Erreur de suppression",
         description: error.message,
-        variant: 'destructive'
+        variant: "destructive",
       });
-    }
+    },
   });
 
   const downloadFile = async (fileId: string, fileName: string) => {
     try {
-      const response = await apiRequest('GET', `/api/storage/signed-url/${fileId}`);
+      const response = await apiRequest("GET", `/api/storage/signed-url/${fileId}`);
       const data = await response.json();
-      
+
       // Open download URL in new tab
-      window.open(data.url, '_blank');
-      
+      window.open(data.url, "_blank");
+
       toast({
-        title: 'Téléchargement initié',
-        description: `Téléchargement de "${fileName}" en cours`
+        title: "Téléchargement initié",
+        description: `Téléchargement de "${fileName}" en cours`,
       });
     } catch (error: any) {
       toast({
-        title: 'Erreur de téléchargement',
+        title: "Erreur de téléchargement",
         description: error.message,
-        variant: 'destructive'
+        variant: "destructive",
       });
     }
   };
 
   const getFileIcon = (mimeType?: string) => {
     if (!mimeType) return <File className="w-4 h-4" />;
-    if (mimeType.startsWith('audio/')) return <FileMusic className="w-4 h-4" />;
-    if (mimeType.includes('pdf') || mimeType.includes('document')) return <FileText className="w-4 h-4" />;
+    if (mimeType.startsWith("audio/")) return <FileMusic className="w-4 h-4" />;
+    if (mimeType.includes("pdf") || mimeType.includes("document"))
+      return <FileText className="w-4 h-4" />;
     return <File className="w-4 h-4" />;
   };
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case 'upload': return 'bg-blue-500';
-      case 'deliverable': return 'bg-green-500';
-      case 'invoice': return 'bg-purple-500';
-      default: return 'bg-gray-500';
+      case "upload":
+        return "bg-blue-500";
+      case "deliverable":
+        return "bg-green-500";
+      case "invoice":
+        return "bg-purple-500";
+      default:
+        return "bg-gray-500";
     }
   };
 
   const formatFileSize = (bytes?: number) => {
-    if (!bytes) return 'N/A';
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    if (!bytes) return "N/A";
+    const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + " " + sizes[i];
   };
 
   return (
@@ -255,12 +276,15 @@ function FileList() {
         ) : (
           <div className="space-y-3">
             {files.map((file: FileRecord) => (
-              <div key={file.id} className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              <div
+                key={file.id}
+                className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {getFileIcon(file.mime_type)}
                     <div>
-                      <div className="font-medium">{file.storage_path.split('/').pop()}</div>
+                      <div className="font-medium">{file.storage_path.split("/").pop()}</div>
                       <div className="text-sm text-gray-500 flex items-center gap-4">
                         <span className="flex items-center gap-1">
                           <User className="w-3 h-3" />
@@ -268,7 +292,7 @@ function FileList() {
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {new Date(file.created_at).toLocaleDateString('fr-FR')}
+                          {new Date(file.created_at).toLocaleDateString("fr-FR")}
                         </span>
                         <span>{formatFileSize(file.size_bytes)}</span>
                         {file.reservation_id && (
@@ -286,7 +310,7 @@ function FileList() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     <Badge className={`text-white ${getRoleBadgeColor(file.role)}`}>
                       {file.role}
@@ -294,7 +318,9 @@ function FileList() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => downloadFile(file.id, file.storage_path.split('/').pop() || 'file')}
+                      onClick={() =>
+                        downloadFile(file.id, file.storage_path.split("/").pop() || "file")
+                      }
                     >
                       <Download className="w-4 h-4" />
                     </Button>
@@ -318,12 +344,12 @@ function FileList() {
 }
 
 export default function FileManager() {
-  const [activeTab, setActiveTab] = useState('list');
+  const [activeTab, setActiveTab] = useState("list");
   const queryClient = useQueryClient();
 
   const handleUploadSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/storage/files'] });
-    setActiveTab('list');
+    queryClient.invalidateQueries({ queryKey: ["/api/storage/files"] });
+    setActiveTab("list");
   };
 
   return (
@@ -338,13 +364,13 @@ export default function FileManager() {
           <TabsTrigger value="list">Liste des fichiers</TabsTrigger>
           <TabsTrigger value="upload">Upload de fichiers</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="list" className="mt-6">
           <FileList />
         </TabsContent>
-        
+
         <TabsContent value="upload" className="mt-6">
-          <FileUpload onUploadSuccess={handleUploadSuccess} />
+          <FileUploadComponent onUploadSuccess={handleUploadSuccess} />
         </TabsContent>
       </Tabs>
     </div>

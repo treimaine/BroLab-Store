@@ -1,10 +1,8 @@
 import { ClerkProvider, useAuth } from "@clerk/clerk-react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
-import React, { Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
-import { ClerkErrorBoundary } from "./components/ClerkErrorBoundary";
 import { initializePerformanceMonitoring } from "./lib/performanceMonitoring";
 import { optimizeImageLoading } from "./utils/clsOptimization";
 import { optimizeScrolling, preloadCriticalResources } from "./utils/performance";
@@ -16,6 +14,33 @@ optimizeScrolling();
 initPerformanceMonitoring();
 initializePerformanceMonitoring(); // PHASE 4 advanced monitoring
 optimizeImageLoading();
+
+// Register service worker for offline functionality
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then(registration => {
+        console.log("✅ Service Worker registered successfully:", registration.scope);
+
+        // Listen for updates
+        registration.addEventListener("updatefound", () => {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener("statechange", () => {
+              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                // New service worker is available
+                console.log("🔄 New service worker available, will activate on next page load");
+              }
+            });
+          }
+        });
+      })
+      .catch(error => {
+        console.error("❌ Service Worker registration failed:", error);
+      });
+  });
+}
 
 // Simple Convex initialization
 import { ConvexReactClient } from "convex/react";
@@ -43,10 +68,7 @@ const LoadingSpinner = () => (
 );
 
 createRoot(document.getElementById("root")!).render(
-  <ClerkProvider 
-    publishableKey={clerkPublishableKey}
-    telemetry={false}
-  >
+  <ClerkProvider publishableKey={clerkPublishableKey} telemetry={false}>
     <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
       <App />
     </ConvexProviderWithClerk>

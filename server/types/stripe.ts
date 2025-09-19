@@ -8,6 +8,17 @@ export interface StripeCheckoutSessionParams {
 }
 
 // Types pour les données de commande Convex
+export interface ConvexOrderItem {
+  productId?: number;
+  title: string;
+  price?: number;
+  quantity?: number;
+  license?: string;
+  type?: string;
+  sku?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface ConvexOrderData {
   order: {
     _id: Id<"orders">;
@@ -16,15 +27,13 @@ export interface ConvexOrderData {
     status: string;
     total: number;
     currency?: string;
-    items: Array<{
-      productId?: number;
-      title: string;
-      price?: number;
-      quantity?: number;
-      license?: string;
-      [key: string]: any;
-    }>;
-    [key: string]: any;
+    items: ConvexOrderItem[];
+    createdAt?: string;
+    updatedAt?: string;
+    metadata?: Record<string, unknown>;
+    invoiceNumber?: string;
+    sessionId?: string;
+    paymentIntentId?: string;
   };
   items?: Array<{
     productId: number;
@@ -32,7 +41,9 @@ export interface ConvexOrderData {
     qty: number;
     unitPrice: number;
     totalPrice: number;
-    [key: string]: any;
+    license?: string;
+    type?: string;
+    metadata?: Record<string, unknown>;
   }>;
   payments?: Array<{
     _id: Id<"payments">;
@@ -41,7 +52,8 @@ export interface ConvexOrderData {
     status: string;
     amount: number;
     currency: string;
-    [key: string]: any;
+    paymentIntentId?: string;
+    metadata?: Record<string, unknown>;
   }>;
   invoice?: {
     _id: Id<"invoicesOrders">;
@@ -49,7 +61,8 @@ export interface ConvexOrderData {
     number: string;
     amount: number;
     currency: string;
-    [key: string]: any;
+    pdfUrl?: string;
+    metadata?: Record<string, unknown>;
   } | null;
 }
 
@@ -58,9 +71,15 @@ export interface StripeWebhookEvent {
   id: string;
   type: string;
   data: {
-    object: any;
+    object: Record<string, unknown>;
   };
   created: number;
+  livemode: boolean;
+  pending_webhooks: number;
+  request?: {
+    id: string;
+    idempotency_key?: string;
+  };
 }
 
 // Types pour les sessions de paiement
@@ -73,37 +92,45 @@ export interface PaymentSessionData {
 }
 
 // Gardes de type pour valider les données Convex
-export function isValidConvexOrderData(data: any): data is ConvexOrderData {
+export function isValidConvexOrderData(data: unknown): data is ConvexOrderData {
+  if (!data || typeof data !== "object") return false;
+
+  const obj = data as Record<string, unknown>;
+
+  const order = obj.order as Record<string, unknown>;
+  if (!order || typeof order !== "object") return false;
+
   return (
-    data &&
-    typeof data === "object" &&
-    data.order &&
-    typeof data.order === "object" &&
-    typeof data.order._id === "string" &&
-    typeof data.order.email === "string" &&
-    typeof data.order.status === "string" &&
-    typeof data.order.total === "number" &&
-    Array.isArray(data.order.items)
+    typeof order._id === "string" &&
+    typeof order.email === "string" &&
+    typeof order.status === "string" &&
+    typeof order.total === "number" &&
+    Array.isArray(order.items)
   );
 }
 
-export function isValidStripeWebhookEvent(data: any): data is StripeWebhookEvent {
-  return (
-    data &&
-    typeof data === "object" &&
-    typeof data.id === "string" &&
-    typeof data.type === "string" &&
-    data.data &&
-    typeof data.data === "object" &&
-    typeof data.created === "number"
+export function isValidStripeWebhookEvent(data: unknown): data is StripeWebhookEvent {
+  if (!data || typeof data !== "object") return false;
+
+  const obj = data as Record<string, unknown>;
+
+  return Boolean(
+    typeof obj.id === "string" &&
+      typeof obj.type === "string" &&
+      obj.data &&
+      typeof obj.data === "object" &&
+      obj.data !== null &&
+      typeof obj.created === "number"
   );
 }
 
 // Types pour les réponses API
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success?: boolean;
   error?: string;
   data?: T;
+  timestamp?: number;
+  requestId?: string;
 }
 
 export interface StripeCheckoutResponse {

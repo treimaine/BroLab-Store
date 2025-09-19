@@ -7,25 +7,8 @@ import { useQuery as useConvexQuery } from "convex/react";
 import { Calendar, CheckCircle, Clock, Clock4, CreditCard, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-interface Reservation {
-  id: string;
-  service_type: string;
-  preferred_date: string;
-  duration_minutes: number;
-  total_price: number;
-  status: string;
-  details: {
-    name: string;
-    email: string;
-    requirements: string;
-    trackCount?: string;
-    genre?: string;
-  };
-  created_at: string;
-}
-
 interface ReservationsTabProps {
-  reservations?: Reservation[];
+  reservations?: any[];
   isLoading?: boolean;
   error?: string | null;
 }
@@ -46,18 +29,19 @@ export default function ReservationsTab({
     .getUserReservations;
   const rtReservations = uqAny(getUserReservationsAny, { limit });
 
-  const localReservations = useMemo<Reservation[]>(() => {
+  const localReservations = useMemo(() => {
     if (reservations && reservations.length > 0) return reservations;
     const raw = (rtReservations || []) as any[];
-    return raw.map(r => ({
+    return raw.map((r: any) => ({
       id: String(r._id || r.id),
-      service_type: r.serviceType || r.service_type,
-      preferred_date: r.preferredDate || r.preferred_date,
-      duration_minutes: r.durationMinutes ?? r.duration_minutes,
-      total_price: r.totalPrice ?? r.total_price,
+      serviceType: r.serviceType || r.service_type,
+      preferredDate: r.preferredDate || r.preferred_date,
+      duration: r.duration || r.durationMinutes || r.duration_minutes,
+      totalPrice: r.totalPrice || r.total_price,
       status: r.status,
       details: r.details || {},
-      created_at: new Date(r.createdAt || r.created_at || Date.now()).toISOString(),
+      createdAt: new Date(r.createdAt || r.created_at || Date.now()).toISOString(),
+      updatedAt: new Date(r.updatedAt || r.updated_at || Date.now()).toISOString(),
     }));
   }, [reservations, rtReservations]);
 
@@ -157,7 +141,7 @@ export default function ReservationsTab({
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="animate-pulse">
-              <div className="h-32 bg-gray-800 rounded-lg"></div>
+              <div className="h-32 bg-gray-800 rounded-lg" />
             </div>
           ))}
         </div>
@@ -213,24 +197,25 @@ export default function ReservationsTab({
                     {getStatusIcon(reservation.status)}
                     <div>
                       <CardTitle className="text-lg text-white">
-                        {reservation.service_type === "mixing" && "Mixing Professionnel"}
-                        {reservation.service_type === "mastering" && "Mastering Audio"}
-                        {reservation.service_type === "mixing-mastering" && "Mixing + Mastering"}
-                        {!["mixing", "mastering", "mixing-mastering"].includes(
-                          reservation.service_type
-                        ) && reservation.service_type}
+                        {reservation.serviceType === "mixing" && "Mixing Professionnel"}
+                        {reservation.serviceType === "mastering" && "Mastering Audio"}
+                        {reservation.serviceType === "custom_beat" && "Beat Personnalisé"}
+                        {!["mixing", "mastering", "custom_beat"].includes(
+                          reservation.serviceType
+                        ) && reservation.serviceType}
                       </CardTitle>
                       <p className="text-sm text-gray-400">
-                        {reservation.details.trackCount &&
-                          `${reservation.details.trackCount} pistes`}
-                        {reservation.details.genre && ` • ${reservation.details.genre}`}
+                        {(reservation.details as any)?.trackCount &&
+                          `${(reservation.details as any).trackCount} pistes`}
+                        {(reservation.details as any)?.genre &&
+                          ` • ${(reservation.details as unknown).genre}`}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
                     {getStatusBadge(reservation.status)}
                     <p className="text-2xl font-bold text-[var(--accent-purple)] mt-2">
-                      {formatPrice(reservation.total_price)}
+                      {formatPrice(reservation.totalPrice)}
                     </p>
                   </div>
                 </div>
@@ -240,11 +225,11 @@ export default function ReservationsTab({
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-gray-300">
                       <Calendar className="w-4 h-4" />
-                      <span>Date: {formatDate(reservation.preferred_date)}</span>
+                      <span>Date: {formatDate(reservation.preferredDate)}</span>
                     </div>
                     <div className="flex items-center gap-2 text-gray-300">
                       <Clock className="w-4 h-4" />
-                      <span>Durée: {reservation.duration_minutes} minutes</span>
+                      <span>Durée: {reservation.duration} minutes</span>
                     </div>
                     <div className="flex items-center gap-2 text-gray-300">
                       <CreditCard className="w-4 h-4" />

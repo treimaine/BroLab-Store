@@ -73,5 +73,6 @@
   "typescript.format.insertSpaceAfterOpeningAndBeforeClosingTemplateStringBraces": false,
   "typescript.format.insertSpaceAfterOpeningAndBeforeClosingJsxExpressionBraces": false,
   "typescript.format.placeOpenBraceOnNewLineForFunctions": false,
-  "typescript.format.placeOpenBraceOnNewLineForControlBlocks": false
+  "typescript.format.placeOpenBraceOnNewLineForControlBlocks": false,
+  "kiroAgent.configureMCP": "Enabled"
 }

@@ -4,7 +4,7 @@ import { query } from "../_generated/server";
 // Get comprehensive user statistics
 export const getUserStats = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async ctx => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error("Not authenticated");
@@ -50,19 +50,19 @@ export const getUserStats = query({
         .query("favorites")
         .withIndex("by_user", q => q.eq("userId", user._id))
         .collect(),
-      
+
       // Get downloads count and data
       ctx.db
         .query("downloads")
         .withIndex("by_user", q => q.eq("userId", user._id))
         .collect(),
-      
+
       // Get orders count and data
       ctx.db
         .query("orders")
         .withIndex("by_user", q => q.eq("userId", user._id))
         .collect(),
-      
+
       // Get recent activity
       ctx.db
         .query("activityLog")
@@ -110,7 +110,7 @@ export const getUserStats = query({
     const ordersData = orders.map(order => ({
       id: order._id,
       beatId: order.items?.[0]?.productId || 0,
-      beatTitle: order.items?.[0]?.name || `Order ${order._id.slice(-8)}`,
+      beatTitle: order.items?.[0]?.title || `Order ${order._id.slice(-8)}`,
       amount: order.total,
       total: order.total,
       status: order.status,
@@ -165,13 +165,13 @@ export const getUserStatsByClerkId = query({
         .withIndex("by_user", q => q.eq("userId", user._id))
         .collect()
         .then(results => results.length),
-      
+
       ctx.db
         .query("downloads")
         .withIndex("by_user", q => q.eq("userId", user._id))
         .collect()
         .then(results => results.length),
-      
+
       ctx.db
         .query("orders")
         .withIndex("by_user", q => q.eq("userId", user._id))

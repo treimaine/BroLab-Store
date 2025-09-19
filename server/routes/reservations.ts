@@ -9,48 +9,50 @@ import { generateICS } from "../utils/calendar";
 
 const router = Router();
 
-// Create a new reservation - TEMPORAIREMENT SANS AUTHENTIFICATION ET SANS VALIDATION
-router.post("/", async (req, res) => {
+// Create a new reservation - AVEC AUTHENTIFICATION ET VALIDATION
+router.post("/", requireAuth, async (req, res) => {
   try {
-    // TEMPORAIRE: Générer un ID unique pour la réservation sans authentification
-    const tempUserId = Math.floor(Math.random() * 1000000) + 1000000; // ID numérique temporaire
-    const tempReservationId = `res_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log("🚀 Creating reservation with authentication");
+    console.log("👤 Authenticated user:", req.user);
+    console.log("📝 Request body:", req.body);
 
-    console.log("🔧 Creating reservation without authentication and validation (temporary)");
-    console.log("🔧 Request body:", req.body);
-    console.log("🔧 Generated temp user ID:", tempUserId);
-    console.log("🔧 Generated temp reservation ID:", tempReservationId);
+    // Créer la réservation avec l'utilisateur authentifié
+    const reservation = await storage.createReservation({
+      ...req.body,
+      user_id: req.user!.id,
+    });
 
-    // TEMPORAIRE: Créer une réservation en mémoire au lieu d'utiliser la base de données
-    const tempReservation = {
-      id: tempReservationId,
-      service_type: req.body.service_type || "mixing",
-      details: {
-        name: req.body.details?.name || "Test User",
-        email: req.body.details?.email || "test@example.com",
-        phone: req.body.details?.phone || "+33123456789",
-        requirements: req.body.details?.requirements || "Test requirements",
-        reference_links: req.body.details?.reference_links || [],
-        trackCount: req.body.details?.trackCount || "1",
-        genre: req.body.details?.genre || "Hip-Hop",
-        specialRequests: req.body.details?.specialRequests || "",
-      },
-      preferred_date: req.body.preferred_date || new Date().toISOString(),
-      duration_minutes: req.body.duration_minutes || 120,
-      total_price: req.body.total_price || 7000,
-      user_id: tempUserId,
-      status: "pending",
-      notes: req.body.notes || "Test reservation",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    console.log("✅ Reservation created successfully:", reservation);
 
-    console.log("✅ Temporary reservation created successfully:", tempReservation);
+    // Envoyer l'email de confirmation
+    const emailContent = `
+      <h2>Confirmation de votre réservation</h2>
+      <p>Bonjour ${req.user!.username},</p>
+      <p>Nous avons bien reçu votre réservation pour une session ${reservation.service_type}.</p>
+      <div style="background: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        <p><strong>Date :</strong> ${new Date(reservation.preferred_date).toLocaleDateString("fr-FR")}</p>
+        <p><strong>Heure :</strong> ${new Date(reservation.preferred_date).toLocaleTimeString("fr-FR")}</p>
+        <p><strong>Durée :</strong> ${reservation.duration_minutes} minutes</p>
+        <p><strong>Prix :</strong> ${(reservation.total_price / 100).toFixed(2)}€</p>
+        <p><strong>Numéro de réservation :</strong> ${reservation.id}</p>
+      </div>
+      <p>Nous vous contacterons prochainement pour confirmer votre créneau.</p>
+      <p>Merci de votre confiance !<br>L'équipe BroLab</p>
+    `;
 
-    // TEMPORAIRE: Pas d'email pour l'instant
-    console.log("🔧 Skipping email confirmation (temporary mode)");
+    try {
+      await sendMail({
+        to: req.user!.email,
+        subject: "Confirmation de votre réservation BroLab",
+        html: emailContent,
+      });
+      console.log("📧 Confirmation email sent successfully");
+    } catch (emailError) {
+      console.error("⚠️ Failed to send confirmation email:", emailError);
+      // Ne pas faire échouer la réservation si l'email échoue
+    }
 
-    res.status(201).json(tempReservation);
+    res.status(201).json(reservation);
   } catch (error: any) {
     console.error("❌ Error creating reservation:", error);
     res.status(500).json({ error: error.message || "Failed to create reservation" });
@@ -75,7 +77,7 @@ router.get("/:id", requireAuth, async (req, res) => {
     if (!reservation) {
       return res.status(404).json({ error: "Reservation not found" });
     }
-    if (reservation.user_id !== req.user!.id && req.user!.role !== "service_role") {
+    if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
       return res.status(403).json({ error: "Unauthorized" });
     }
     res.json(reservation);
@@ -96,7 +98,7 @@ router.patch(
       if (!reservation) {
         return res.status(404).json({ error: "Reservation not found" });
       }
-      if (reservation.user_id !== req.user!.id && req.user!.role !== "service_role") {
+      if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
         return res.status(403).json({ error: "Unauthorized" });
       }
 
@@ -136,7 +138,7 @@ router.get("/:id/calendar", requireAuth, async (req, res) => {
     if (!reservation) {
       return res.status(404).json({ error: "Reservation not found" });
     }
-    if (reservation.user_id !== req.user!.id && req.user!.role !== "service_role") {
+    if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
       return res.status(403).json({ error: "Unauthorized" });
     }
 

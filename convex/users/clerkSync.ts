@@ -55,11 +55,11 @@ export const syncClerkUser = mutation({
         });
 
         console.log(`✅ Updated user: ${args.clerkId}`);
-        return { 
+        return {
           success: true,
-          action: "updated", 
+          action: "updated",
           userId: existingUser._id,
-          user: await ctx.db.get(existingUser._id)
+          user: await ctx.db.get(existingUser._id),
         };
       } else {
         // Créer un nouvel utilisateur
@@ -78,30 +78,32 @@ export const syncClerkUser = mutation({
         });
 
         console.log(`✅ Created new user: ${args.clerkId}`);
-        return { 
+        return {
           success: true,
-          action: "created", 
+          action: "created",
           userId,
-          user: await ctx.db.get(userId)
+          user: await ctx.db.get(userId),
         };
       }
     } catch (error) {
       console.error(`❌ Error syncing user:`, error);
-      
+
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       // Log de l'erreur
       await ctx.db.insert("auditLogs", {
         clerkId: args.clerkId,
         action: "sync_user_error",
-        resource: "user",
+        resource: "users",
         details: {
+          operation: "sync",
+          resource: "users",
           error: errorMessage,
           clerkId: args.clerkId,
         },
         timestamp: Date.now(),
       });
-      
+
       throw new Error(`Failed to sync user: ${errorMessage}`);
     }
   },
@@ -152,18 +154,17 @@ export const deleteClerkUser = mutation({
         updatedAt: Date.now(),
         metadata: {
           ...user.metadata,
-          deletedAt: Date.now(),
-          deletionReason: "clerk_user_deleted"
-        }
+          lastActiveAt: Date.now(),
+        },
       });
 
       // Log de l'activité de suppression
       await ctx.db.insert("activityLog", {
         userId: user._id,
         action: "user_deactivated",
-        details: { 
+        details: {
           source: "clerk_deletion",
-          reason: "User deleted from Clerk"
+          reason: "User deleted from Clerk",
         },
         timestamp: Date.now(),
       });
@@ -173,37 +174,50 @@ export const deleteClerkUser = mutation({
         userId: user._id,
         clerkId: clerkId,
         action: "user_deactivated",
-        resource: "user",
-        details: { 
+        resource: "users",
+        details: {
+          operation: "update",
+          resource: "users",
+          resourceId: user._id,
           reason: "clerk_user_deleted",
-          preservedData: true
+          preservedData: true,
+          changes: [
+            {
+              field: "isActive",
+              oldValue: "true",
+              newValue: "false",
+              changeType: "update" as const,
+            },
+          ],
         },
         timestamp: Date.now(),
       });
 
       console.log(`✅ Deactivated user: ${clerkId}`);
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: "User deactivated (data preserved)",
-        action: "deactivated"
+        action: "deactivated",
       };
     } catch (error) {
       console.error(`❌ Error deleting user:`, error);
-      
+
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       // Log de l'erreur
       await ctx.db.insert("auditLogs", {
         clerkId: clerkId,
         action: "user_deletion_error",
-        resource: "user",
+        resource: "users",
         details: {
+          operation: "delete",
+          resource: "users",
           clerkId: clerkId,
           error: errorMessage,
         },
         timestamp: Date.now(),
       });
-      
+
       throw new Error(`Failed to delete user: ${errorMessage}`);
     }
   },
