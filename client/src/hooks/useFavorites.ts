@@ -1,22 +1,40 @@
-import { api } from "@convex/_generated/api";
-import { useMutation as useConvexMutation, useQuery as useConvexQuery } from "convex/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/clerk-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation as useConvexMutation, useQuery } from "convex/react";
+import { api } from "../lib/convex-api";
+
+// Type definitions for favorites
+interface Favorite {
+  _id: string;
+  beatId: number;
+  userId: string;
+}
+
+interface FavoriteWithBeat extends Favorite {
+  beat?: {
+    id: number;
+    title: string;
+    artist: string;
+    // Add other beat properties as needed
+  };
+}
 
 export const useFavorites = () => {
   const queryClient = useQueryClient();
-  const { user: clerkUser } = useUser();
+  const { user: clerkUser, isLoaded } = useUser();
 
-  const favorites = useConvexQuery(
+  // Use Convex queries with proper error handling
+  const favorites = useQuery(
     api.favorites.getFavorites.getFavorites,
-    clerkUser?.id ? {} : "skip"
-  );
+    clerkUser && isLoaded ? {} : "skip"
+  ) as Favorite[] | undefined;
 
-  const favoritesWithBeats = useConvexQuery(
+  const favoritesWithBeats = useQuery(
     api.favorites.getFavorites.getFavoritesWithBeats,
-    clerkUser?.id ? {} : "skip"
-  );
+    clerkUser && isLoaded ? {} : "skip"
+  ) as FavoriteWithBeat[] | undefined;
 
+  // Convex mutations
   const addToFavoritesMutation = useConvexMutation(api.favorites.add.addToFavorites);
   const removeFromFavoritesMutation = useConvexMutation(api.favorites.remove.removeFromFavorites);
 
@@ -42,14 +60,15 @@ export const useFavorites = () => {
     },
   });
 
-  const isFavorite = (beatId: number) => {
-    return (favorites || []).some(fav => fav.beatId === beatId);
+  const isFavorite = (beatId: number): boolean => {
+    return (favorites || []).some((fav: Favorite) => fav.beatId === beatId);
   };
 
   return {
     favorites: favorites || [],
     favoritesWithBeats: favoritesWithBeats || [],
-    isLoading: favorites === undefined || favoritesWithBeats === undefined,
+    isLoading:
+      !isLoaded || (clerkUser && (favorites === undefined || favoritesWithBeats === undefined)),
     addToFavorites: addToFavorites.mutate,
     removeFromFavorites: removeFromFavorites.mutate,
     isAdding: addToFavorites.isPending,

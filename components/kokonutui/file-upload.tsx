@@ -11,8 +11,8 @@
  */
 
 import { cn } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
 import { UploadCloud } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 
 type FileStatus = "idle" | "dragging" | "uploading" | "error";

@@ -79,9 +79,9 @@ export default function Home() {
     <>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className={`card-dark p-6 animate-pulse ${className}`}>
-          <div className="w-full h-48 bg-[var(--medium-gray)] rounded-lg mb-4"></div>
-          <div className="h-4 bg-[var(--medium-gray)] rounded mb-2"></div>
-          <div className="h-3 bg-[var(--medium-gray)] rounded w-2/3"></div>
+          <div className="w-full h-48 bg-[var(--medium-gray)] rounded-lg mb-4" />
+          <div className="h-4 bg-[var(--medium-gray)] rounded mb-2" />
+          <div className="h-3 bg-[var(--medium-gray)] rounded w-2/3" />
         </div>
       ))}
     </>
@@ -94,10 +94,10 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="relative pt-16 pb-20 overflow-hidden">
-        <div className="absolute inset-0 gradient-bg opacity-90"></div>
+        <div className="absolute inset-0 gradient-bg opacity-90" />
         <div className="absolute inset-0">
-          <div className="w-96 h-96 bg-[var(--accent-purple)] rounded-full blur-3xl opacity-20 absolute -top-20 -right-20 animate-pulse"></div>
-          <div className="w-80 h-80 bg-[var(--accent-cyan)] rounded-full blur-3xl opacity-15 absolute top-40 -left-20 animate-pulse delay-1000"></div>
+          <div className="w-96 h-96 bg-[var(--accent-purple)] rounded-full blur-3xl opacity-20 absolute -top-20 -right-20 animate-pulse" />
+          <div className="w-80 h-80 bg-[var(--accent-cyan)] rounded-full blur-3xl opacity-15 absolute top-40 -left-20 animate-pulse delay-1000" />
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
@@ -270,43 +270,43 @@ export default function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {localIsLoading
               ? Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="card-dark p-4 animate-pulse">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-16 h-16 bg-gray-700/50 rounded-lg"></div>
-                      <div className="flex-1">
-                        <div className="h-4 bg-gray-700/50 rounded mb-2"></div>
-                        <div className="h-3 bg-gray-700/50 rounded w-2/3"></div>
-                      </div>
+                <div key={i} className="card-dark p-4 animate-pulse">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-16 h-16 bg-gray-700/50 rounded-lg" />
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-700/50 rounded mb-2" />
+                      <div className="h-3 bg-gray-700/50 rounded w-2/3" />
                     </div>
                   </div>
+                </div>
                 ))
               : trendingDisplayBeats.map((beat: any, index: number) => (
-                  <Card
-                    key={beat.id}
-                    className="bg-[var(--dark-gray)] border-[var(--medium-gray)] hover:border-[var(--accent-purple)] transition-all duration-300 group"
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-4">
-                        <div className="relative">
-                          <img
-                            src={beat.images?.[0]?.src || "/api/placeholder/64/64"}
-                            alt={beat.name}
-                            className="w-16 h-16 rounded-lg object-cover"
-                          />
-                          {hasRealAudio(beat) && (
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                              <HoverPlayButton
-                                audioUrl={
+                <Card
+                  key={beat.id}
+                  className="bg-[var(--dark-gray)] border-[var(--medium-gray)] hover:border-[var(--accent-purple)] transition-all duration-300 group"
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="relative">
+                        <img
+                          src={beat.images?.[0]?.src || "/api/placeholder/64/64"}
+                          alt={beat.name}
+                          className="w-16 h-16 rounded-lg object-cover"
+                        />
+                        {hasRealAudio(beat) && (
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <HoverPlayButton
+                            audioUrl={
                                   beat.audio_url ||
                                   beat.meta_data?.find((meta: any) => meta.key === "audio_url")
                                     ?.value ||
                                   "/api/placeholder/audio.mp3"
                                 }
-                                productId={beat.id.toString()}
-                                productName={beat.name}
-                                imageUrl={beat.images?.[0]?.src || beat.image_url || beat.image}
-                                price={beat.price}
-                                isFree={
+                            productId={beat.id.toString()}
+                            productName={beat.name}
+                            imageUrl={beat.images?.[0]?.src || beat.image_url || beat.image}
+                            price={beat.price}
+                            isFree={
                                   beat.is_free ||
                                   beat.tags?.some(
                                     (tag: any) => tag.name.toLowerCase() === "free"
@@ -316,16 +316,16 @@ export default function Home() {
                                   parseFloat(beat.price) === 0 ||
                                   false
                                 }
-                                size="sm"
-                                className="bg-black bg-opacity-60 hover:bg-[var(--accent-purple)]"
-                              />
-                            </div>
-                          )}
+                            size="sm"
+                            className="bg-black bg-opacity-60 hover:bg-[var(--accent-purple)]"
+                          />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-bold text-white truncate">{beat.name}</h4>
-                          <p className="text-sm text-gray-400">
-                            {beat.categories?.[0]?.name ||
+                          )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-white truncate">{beat.name}</h4>
+                        <p className="text-sm text-gray-400">
+                          {beat.categories?.[0]?.name ||
                               beat.categories?.find((cat: any) => cat.name)?.name ||
                               beat.meta_data?.find((meta: any) => meta.key === "genre")?.value ||
                               beat.meta_data?.find((meta: any) => meta.key === "category")?.value ||
@@ -335,10 +335,10 @@ export default function Home() {
                               beat.attributes?.find((attr: any) => attr.name === "Style")
                                 ?.options?.[0] ||
                               ""}
-                          </p>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="text-[var(--accent-purple)] font-bold">
-                              {(() => {
+                        </p>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-[var(--accent-purple)] font-bold">
+                            {(() => {
                                 const isFree =
                                   beat.is_free ||
                                   beat.tags?.some(
@@ -354,16 +354,16 @@ export default function Home() {
                                   `$${beat.price || "29.99"}`
                                 );
                               })()}
-                            </span>
-                            <div className="flex items-center text-xs text-gray-400">
-                              <Eye className="w-3 h-3 mr-1" />
-                              {Math.floor(Math.random() * 1000) + 100}
-                            </div>
+                          </span>
+                          <div className="flex items-center text-xs text-gray-400">
+                            <Eye className="w-3 h-3 mr-1" />
+                            {Math.floor(Math.random() * 1000) + 100}
                           </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </CardContent>
+                </Card>
                 ))}
           </div>
         </div>

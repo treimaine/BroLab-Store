@@ -1,17 +1,28 @@
 /**
- * Legacy Dashboard Component (Modernized)
+ * BroLab Dashboard Component - Music Marketplace Focused
  *
- * This component has been modernized to remove unnecessary lazy loading
- * and use the new dashboard architecture while maintaining backward compatibility.
+ * This component provides a comprehensive dashboard experience specifically
+ * designed for BroLab Entertainment's music marketplace, featuring:
  *
- * Requirements addressed:
- * - 2.1: Eliminate unnecessary lazy loading components
- * - 2.2: Clear hierarchy with proper separation of concerns
- * - 2.4: Consistent patterns across all components
- * - 3.1: Consistent skeleton components
- * - 3.2: Clear loading indicators
- * - 9.3: Actionable error messages with retry mechanisms
- * - 9.4: Escalation paths or support contact
+ * BroLab-Specific Features:
+ * - Beat-focused statistics and analytics
+ * - Music marketplace activity tracking
+ * - Beat licensing workflow management
+ * - Genre-based recommendations
+ * - Studio session booking integration
+ * - Download quota management
+ *
+ * Architecture improvements:
+ * - Clean separation between UI and business logic
+ * - BroLab-specific data transformation and metadata enrichment
+ * - Music marketplace-focused error handling
+ * - Type-safe data flow with beat-specific validation
+ * - Component structure optimized for music producers and artists
+ *
+ * Business Value Documentation:
+ * @see docs/dashboard-component-business-value.md for detailed business value analysis
+ * Each component serves specific BroLab business objectives including revenue tracking,
+ * user engagement, studio services promotion, and data-driven insights.
  */
 
 import { Button } from "@/components/ui/button";
@@ -20,13 +31,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile, useIsTablet } from "@/hooks/useBreakpoint";
 import { useDashboardDataOptimized } from "@/hooks/useDashboardDataOptimized";
 import { useClerk, useUser } from "@clerk/clerk-react";
-import { api } from "@convex/_generated/api";
-import { useQueryClient } from "@tanstack/react-query";
-import { useQuery as useConvexQuery } from "convex/react";
 import { motion } from "framer-motion";
 import {
-  Activity,
+  Activity as ActivityIcon,
   BarChart3,
+  Calendar,
+  DollarSign,
   Download,
   Music,
   Settings,
@@ -35,12 +45,21 @@ import {
   TrendingUp,
   User,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
+import { useDashboardDataTransform } from "../hooks/useDashboardDataTransform";
+import {
+  formatErrorForDisplay,
+  handleDashboardError,
+  type DashboardError,
+} from "../utils/dashboardErrorHandling";
 
-// Import components directly (no lazy loading for better performance and simpler architecture)
+// Import BroLab-specific components for music marketplace functionality
 import DownloadsTable from "@/components/DownloadsTable";
 import UserProfile from "@/components/UserProfile";
-import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { BroLabActivityFeed } from "@/components/dashboard/BroLabActivityFeed";
+import BroLabRecommendations from "@/components/dashboard/BroLabRecommendations";
+import { BroLabStatsCards } from "@/components/dashboard/BroLabStatsCards";
+import { BroLabTrendCharts } from "@/components/dashboard/BroLabTrendCharts";
 import { DashboardErrorBoundary } from "@/components/dashboard/DashboardErrorBoundary";
 import {
   ActivityFeedSkeleton,
@@ -50,179 +69,57 @@ import {
 } from "@/components/dashboard/DashboardSkeletons";
 import OrdersTab from "@/components/dashboard/OrdersTab";
 import ReservationsTab from "@/components/dashboard/ReservationsTab";
-import { StatsCards } from "@/components/dashboard/StatsCards";
-import { TrendCharts } from "@/components/dashboard/TrendCharts";
 
-// Types locaux simplifiés (éviter les conflits avec les hooks)
-type DashboardFavorite = {
-  id?: string;
-  beatId: string | number;
-  beatTitle?: string;
-  createdAt?: number | string;
-};
-
-type DashboardOrder = {
-  id?: string | number;
-  beatId?: string | number;
-  beatTitle?: string;
-  total?: number;
-  status?: string;
-  createdAt?: number | string;
-  invoice_number?: string | number;
-  email?: string;
-  items?: any[];
-};
-
-type DashboardDownload = {
-  id?: string;
-  beatId: string | number;
-  beatTitle?: string;
-  downloadedAt?: string;
-  downloadUrl?: string;
-};
-
-// Use modernized components (removed duplicate definitions)
-
-// Skeleton components are now imported from DashboardSkeletons
-
-// Composant principal du Dashboard
-export function LazyDashboard() {
+// Main Dashboard Component - focused on UI presentation with clean separation of concerns
+export const LazyDashboard = memo(() => {
   const { user } = useUser();
   const { openUserProfile } = useClerk();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
-  // Active tab needs to be defined before realtime queries so we can conditionally enable them
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Get raw dashboard data
+  const { stats, chartData, trends, favoritesAddedPerMonth, loadMoreOrders } =
+    useDashboardDataOptimized();
+
+  // Enhanced music marketplace metrics calculated from actual data
+  const enhancedStats = useMemo(() => {
+    return {
+      ...stats,
+      // Calculate real metrics from actual data
+      averageBeatPrice: stats.totalOrders > 0 ? stats.totalSpent / stats.totalOrders : 0,
+    };
+  }, [stats]);
+
+  // Get transformed data with proper type safety
   const {
-    stats,
-    favorites,
-    orders,
-    downloads,
-    reservations,
-    recommendations,
-    recentActivity,
-    chartData,
-    trends,
-    isLoading,
-    favoritesAddedPerMonth,
-    refetch,
-    loadMoreOrders,
-  } = useDashboardDataOptimized();
+    transformedOrders,
+    transformedReservations,
+    transformedActivities,
+    transformedFavorites,
+    transformedDownloadsForTable,
+    isTransforming,
+    isEnrichingMetadata,
+    transformError,
+    refreshTransformedData,
+    clearTransformError,
+  } = useDashboardDataTransform();
 
-  // Cache pour enrichir les téléchargements avec les titres WooCommerce si absents en base
-  const [downloadBeatMeta, setDownloadBeatMeta] = useState<Record<number, { title?: string }>>({});
+  // Error handling with user-friendly messages
+  const [displayError, setDisplayError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    async function fetchMissingTitles() {
-      const toFetch = new Set<number>();
-      (downloads || []).forEach((d: any) => {
-        const idNum = Number(d.beatId);
-        if (!d.beatTitle && Number.isFinite(idNum) && !downloadBeatMeta[idNum]) {
-          toFetch.add(idNum);
-        }
-      });
-      if (toFetch.size === 0) return;
+  const handleError = useCallback((error: Error) => {
+    handleDashboardError(error, "LazyDashboard", (err: DashboardError) => {
+      const formatted = formatErrorForDisplay(err);
+      setDisplayError(formatted.message);
+    });
+  }, []);
 
-      await Promise.all(
-        Array.from(toFetch).map(async id => {
-          try {
-            const res = await fetch(`/api/woocommerce/products/${id}`, {
-              signal: controller.signal,
-            });
-            if (!res.ok) return;
-            const data = await res.json();
-            const title = data?.name || data?.title || data?.beat?.name || undefined;
-            if (title) {
-              setDownloadBeatMeta(prev => ({ ...prev, [id]: { title } }));
-            }
-          } catch (_) {
-            // Ignore network errors silently; UI already has a fallback name
-          }
-        })
-      );
-    }
-
-    fetchMissingTitles();
-    return () => controller.abort();
-  }, [downloads, downloadBeatMeta]);
-
-  // Real-time sources
-  const queryClient = useQueryClient();
-  // Only fetch realtime favorites when the overview tab (which renders the recommendations block) is active
-  // Use lightweight any-casted function refs to avoid TS2589
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const uqAny: any = useConvexQuery as unknown as any;
-  // Helper indirection to avoid deep generic instantiation on Convex generated `api`
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const apiAny = (a: unknown): any => a as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const getFavoritesAny: any = apiAny(api)?.["favorites/getFavorites"]?.getFavorites as any;
-  const rtFavorites = uqAny(getFavoritesAny, user && activeTab === "overview" ? {} : "skip");
-  // Fetch activity in realtime only when Overview or Activity tab is active
-  const shouldFetchActivity = activeTab === "overview" || activeTab === "activity";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const getRecentActivityAny: any = apiAny(api)?.["activity/getRecent"]?.getRecent as any;
-  const rtActivity = uqAny(getRecentActivityAny, user && shouldFetchActivity ? {} : "skip");
-
-  // Prefer realtime favorites when available
-  const favoritesEffective = useMemo(() => {
-    return (rtFavorites || favorites || []) as any[];
-  }, [rtFavorites, favorites]);
-
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [analyticsTimeRange, setAnalyticsTimeRange] = useState<"7d" | "30d" | "90d" | "1y">("30d");
-  const [convexError, setConvexError] = useState<string | null>(null);
-
-  const unreadCount = 3;
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await refetch();
-    setTimeout(() => setIsRefreshing(false), 1000);
-  };
-
-  // Invalidate relevant queries on download-success events
-  useEffect(() => {
-    const onDownloadSuccess = () => {
-      // Dashboard aggregate
-      queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-      // Realtime-friendly keys used across hooks
-      queryClient.invalidateQueries({ queryKey: ["convex", "downloads"] });
-      queryClient.invalidateQueries({ queryKey: ["convex", "activity"] });
-    };
-    window.addEventListener("download-success", onDownloadSuccess);
-    return () => window.removeEventListener("download-success", onDownloadSuccess);
-  }, [queryClient]);
-
-  // Invalidate after order creation/update events
-  useEffect(() => {
-    const invalidateOrders = () => {
-      queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
-      queryClient.invalidateQueries({ queryKey: ["convex", "orders"] });
-      queryClient.invalidateQueries({ queryKey: ["convex", "activity"] });
-    };
-    window.addEventListener("order-created", invalidateOrders);
-    window.addEventListener("order-updated", invalidateOrders);
-    // Also listen to generic webhook signal (optional server-sent event via window dispatch)
-    window.addEventListener("webhook-order-updated", invalidateOrders as any);
-    return () => {
-      window.removeEventListener("order-created", invalidateOrders);
-      window.removeEventListener("order-updated", invalidateOrders);
-      window.removeEventListener("webhook-order-updated", invalidateOrders as any);
-    };
-  }, [queryClient]);
-
-  const handleRetry = async () => {
-    setConvexError(null);
-    await handleRefresh();
-  };
-
-  const handleError = (error: Error) => {
-    console.error("Dashboard error:", error);
-    setConvexError(error.message);
-  };
+  const handleRetry = useCallback(async () => {
+    setDisplayError(null);
+    clearTransformError();
+    await refreshTransformedData();
+  }, [clearTransformError, refreshTransformedData]);
 
   if (!user) {
     return (
@@ -231,12 +128,10 @@ export function LazyDashboard() {
         animate={{ opacity: 1 }}
         className="pt-16 sm:pt-20 min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800 flex items-center justify-center px-4"
       >
-        <LoadingWithRetry onRetry={handleRefresh} />
+        <LoadingWithRetry onRetry={handleRetry} />
       </motion.div>
     );
   }
-
-  // Error state handled via convexError below
 
   return (
     <DashboardErrorBoundary onError={handleError}>
@@ -247,7 +142,7 @@ export function LazyDashboard() {
         className="pt-16 sm:pt-20 min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800"
       >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
-          {/* En-tête du Dashboard */}
+          {/* Dashboard Header */}
           <motion.div
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -257,28 +152,32 @@ export function LazyDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
-                  Hello, {user?.firstName || "User"} 👋
+                  Welcome back, {user?.firstName || "Producer"} 🎵
                 </h1>
                 <p className="text-sm sm:text-base text-gray-300">
-                  Here is an overview of your activity on BroLab
+                  Your beat collection and music marketplace activity
                 </p>
               </div>
               <div className="flex items-center space-x-2 sm:space-x-4">
-                {/* Refresh button removed; realtime + auto invalidation covers updates. Use Retry in error card. */}
+                {/* Actions can be added here if needed */}
               </div>
             </div>
           </motion.div>
 
-          {/* Statistics */}
+          {/* BroLab-specific Statistics for Music Marketplace */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            {isLoading ? (
+            {isTransforming ? (
               <StatsCardsSkeleton />
             ) : (
-              <StatsCards stats={stats} isLoading={Boolean(isLoading)} className="mb-6 sm:mb-8" />
+              <BroLabStatsCards
+                stats={enhancedStats}
+                isLoading={isTransforming}
+                className="mb-6 sm:mb-8"
+              />
             )}
           </motion.div>
 
@@ -299,42 +198,49 @@ export function LazyDashboard() {
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
                     <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    {isMobile ? "Overview" : "Overview"}
+                    {isMobile ? "Overview" : "Beat Overview"}
                   </TabsTrigger>
                   <TabsTrigger
                     value="activity"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
-                    <Activity className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    Activity
+                    <ActivityIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    Beat Activity
                   </TabsTrigger>
                   <TabsTrigger
                     value="analytics"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
                     <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    Analytics
+                    Music Analytics
                   </TabsTrigger>
                   <TabsTrigger
                     value="orders"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
                     <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    Orders
+                    Beat Orders
                   </TabsTrigger>
                   <TabsTrigger
                     value="downloads"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
                     <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    Downloads
+                    Beat Downloads
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="recommendations"
+                    className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
+                  >
+                    <Star className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    Beat Picks
                   </TabsTrigger>
                   <TabsTrigger
                     value="reservations"
                     className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm"
                   >
-                    <Star className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                    Reservations
+                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                    Studio Sessions
                   </TabsTrigger>
                   <TabsTrigger
                     value="profile"
@@ -356,74 +262,135 @@ export function LazyDashboard() {
               <TabsContent value="overview" className="space-y-4 sm:space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                   <div className="lg:col-span-2">
-                    {isLoading ? (
+                    {isTransforming ? (
                       <ActivityFeedSkeleton />
                     ) : (
-                      <ActivityFeed
-                        activities={(rtActivity as any) || recentActivity || []}
-                        isLoading={Boolean(isLoading)}
+                      <BroLabActivityFeed
+                        activities={transformedActivities}
+                        isLoading={isTransforming}
                         maxItems={isMobile ? 4 : isTablet ? 6 : 8}
                       />
                     )}
                   </div>
-                  <Card className="bg-gray-900/50 border-gray-700/50 backdrop-blur-sm">
-                    <CardHeader className="p-4 sm:p-6">
-                      <CardTitle className="flex items-center space-x-2 text-white text-sm sm:text-base">
-                        <Star className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span>Recommendations</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 sm:p-6">
-                      {isLoading ? (
-                        <RecommendationsSkeleton />
-                      ) : (
-                        <div className="space-y-3">
-                          {favoritesEffective &&
-                            favoritesEffective.slice(0, isMobile ? 3 : 4).map((favorite, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center space-x-3 p-3 rounded-lg bg-gray-800/50 hover:bg-gray-800/70 transition-colors"
-                              >
-                                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
-                                  <Music className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs sm:text-sm font-medium text-white truncate">
-                                    {favorite.beatTitle || `Beat ${favorite.beatId}`}
-                                  </p>
-                                  <p className="text-xs text-gray-400">Hip Hop</p>
-                                </div>
-                              </div>
-                            ))}
+                  <div className="space-y-4">
+                    {/* Enhanced Music Marketplace Metrics */}
+                    <Card className="bg-gray-900/50 border-gray-700/50 backdrop-blur-sm">
+                      <CardHeader className="p-4 sm:p-6">
+                        <CardTitle className="flex items-center space-x-2 text-white text-sm sm:text-base">
+                          <Music className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <span>Music Analytics</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="space-y-4">
+                          <div className="bg-gray-800/50 rounded-lg p-3">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <DollarSign className="w-3 h-3 text-green-400" />
+                              <span className="text-xs text-gray-400">Avg Beat Price</span>
+                            </div>
+                            <p className="text-sm font-semibold text-white">
+                              ${enhancedStats.averageBeatPrice?.toFixed(2) || "0.00"}
+                            </p>
+                          </div>
+                          <div className="bg-gray-800/50 rounded-lg p-3">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <ShoppingCart className="w-3 h-3 text-purple-400" />
+                              <span className="text-xs text-gray-400">Total Orders</span>
+                            </div>
+                            <p className="text-sm font-semibold text-white">
+                              {stats.totalOrders || 0}
+                            </p>
+                          </div>
+                          <div className="bg-gray-800/50 rounded-lg p-3">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <Download className="w-3 h-3 text-blue-400" />
+                              <span className="text-xs text-gray-400">Downloads</span>
+                            </div>
+                            <p className="text-sm font-semibold text-white">
+                              {stats.totalDownloads || 0}
+                            </p>
+                          </div>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+
+                    {/* Beat Collection Preview */}
+                    <Card className="bg-gray-900/50 border-gray-700/50 backdrop-blur-sm">
+                      <CardHeader className="p-4 sm:p-6">
+                        <CardTitle className="flex items-center space-x-2 text-white text-sm sm:text-base">
+                          <Star className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <span>Recent Favorites</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 sm:p-6">
+                        {isTransforming ? (
+                          <RecommendationsSkeleton />
+                        ) : (
+                          <div className="space-y-3">
+                            {transformedFavorites &&
+                              transformedFavorites.slice(0, isMobile ? 2 : 3).map(favorite => (
+                                <div
+                                  key={favorite.id}
+                                  className="flex items-center space-x-3 p-3 rounded-lg bg-gray-800/50 hover:bg-gray-800/70 transition-colors cursor-pointer"
+                                  onClick={() =>
+                                    (window.location.href = `/beat/${favorite.beatId}`)
+                                  }
+                                >
+                                  <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
+                                    <Music className="w-4 h-4 text-white" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-white truncate">
+                                      {favorite.beatTitle || `Beat ${favorite.beatId}`}
+                                    </p>
+                                    <p className="text-xs text-gray-400">
+                                      {favorite.beatGenre || "Hip Hop"}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            {(!transformedFavorites || transformedFavorites.length === 0) && (
+                              <div className="text-center py-4">
+                                <Music className="w-6 h-6 text-gray-600 mx-auto mb-2" />
+                                <p className="text-gray-400 text-xs">No favorites yet</p>
+                                <button
+                                  onClick={() => (window.location.href = "/shop")}
+                                  className="mt-2 px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 transition-colors"
+                                >
+                                  Explore Beats
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
               </TabsContent>
 
               <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
-                {isLoading ? (
+                {isTransforming ? (
                   <div className="bg-gray-900/50 border-gray-700/50 rounded-lg p-6">
                     <div className="h-64 bg-gray-800/50 rounded animate-pulse" />
                   </div>
                 ) : (
-                  <TrendCharts
+                  <BroLabTrendCharts
                     data={chartData || []}
                     trends={trends || {}}
                     favoritesMonthly={favoritesAddedPerMonth}
-                    isLoading={Boolean(isLoading)}
+                    isLoading={isTransforming}
                   />
                 )}
               </TabsContent>
 
               <TabsContent value="activity" className="space-y-4 sm:space-y-6">
-                {isLoading ? (
+                {isTransforming ? (
                   <ActivityFeedSkeleton />
                 ) : (
-                  <ActivityFeed
-                    activities={(rtActivity as any) || recentActivity || []}
-                    isLoading={Boolean(isLoading)}
+                  <BroLabActivityFeed
+                    activities={transformedActivities}
+                    isLoading={isTransforming}
                     maxItems={isMobile ? 10 : isTablet ? 15 : 20}
                     showHeader={false}
                   />
@@ -432,37 +399,32 @@ export function LazyDashboard() {
 
               <TabsContent value="orders" className="space-y-4 sm:space-y-6">
                 <OrdersTab
-                  ordersData={orders}
-                  ordersLoading={Boolean(isLoading)}
+                  ordersData={{
+                    items: transformedOrders,
+                    hasMore: false, // Will be handled by the transform hook
+                  }}
+                  ordersLoading={isTransforming}
                   onLoadMore={loadMoreOrders}
                 />
               </TabsContent>
 
               <TabsContent value="downloads" className="space-y-4 sm:space-y-6">
                 <DownloadsTable
-                  downloads={(downloads || []).map((d: any) => ({
-                    id: d._id || d.id || `download-${d.beatId}`,
-                    beatTitle:
-                      downloadBeatMeta[Number(d.beatId)]?.title ||
-                      d.beatTitle ||
-                      `Beat ${d.beatId}`,
-                    artist: d.artist,
-                    fileSize: typeof d.fileSize === "number" ? d.fileSize : 0,
-                    format: (d.format || "mp3") as unknown,
-                    quality: d.quality || "320kbps",
-                    downloadedAt: new Date(d.timestamp || Date.now()).toISOString(),
-                    downloadCount: typeof d.quotaUsed === "number" ? d.quotaUsed : 0,
-                    maxDownloads: typeof d.quotaLimit === "number" ? d.quotaLimit : undefined,
-                    licenseType: d.licenseType,
-                    downloadUrl: d.downloadUrl || "",
-                  }))}
-                  isLoading={Boolean(isLoading)}
-                  onRefresh={handleRefresh}
+                  downloads={transformedDownloadsForTable}
+                  isLoading={isTransforming || isEnrichingMetadata}
+                  onRefresh={handleRetry}
+                />
+              </TabsContent>
+
+              <TabsContent value="recommendations" className="space-y-4 sm:space-y-6">
+                <BroLabRecommendations
+                  isLoading={isTransforming}
+                  onRefreshRecommendations={refreshTransformedData}
                 />
               </TabsContent>
 
               <TabsContent value="reservations" className="space-y-4 sm:space-y-6">
-                <ReservationsTab reservations={reservations} />
+                <ReservationsTab reservations={transformedReservations} />
               </TabsContent>
 
               <TabsContent value="profile" className="space-y-4 sm:space-y-6">
@@ -482,7 +444,7 @@ export function LazyDashboard() {
                       <div className="space-y-3">
                         <div>
                           <label className="text-xs sm:text-sm font-medium text-white">
-                            Nom complet
+                            Full Name
                           </label>
                           <p className="text-muted-foreground text-xs sm:text-sm">
                             {user?.firstName} {user?.lastName}
@@ -511,13 +473,15 @@ export function LazyDashboard() {
             </Tabs>
           </motion.div>
 
-          {/* Gestion des erreurs Convex */}
-          {convexError && (
+          {/* Error Handling */}
+          {(displayError || transformError) && (
             <Card className="border-red-200 bg-red-50">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-red-500 rounded-full" />
-                  <p className="text-red-700 text-xs sm:text-sm">Convex error: {convexError}</p>
+                  <p className="text-red-700 text-xs sm:text-sm">
+                    {displayError || transformError}
+                  </p>
                   <Button
                     onClick={handleRetry}
                     size="sm"
@@ -533,6 +497,8 @@ export function LazyDashboard() {
       </motion.div>
     </DashboardErrorBoundary>
   );
-}
+});
+
+LazyDashboard.displayName = "LazyDashboard";
 
 export default LazyDashboard;

@@ -5,11 +5,12 @@ import { isAuthenticated } from "../auth";
 const router = Router();
 
 // GET /api/activity - Get user's recent activity
-router.get("/", isAuthenticated, async (req, res) => {
+router.get("/", isAuthenticated, async (req, res): Promise<void> => {
   try {
     const userId = req.session.userId;
     if (!userId) {
-      return res.status(401).json({ error: "Not authenticated" });
+      res.status(401).json({ error: "Not authenticated" });
+      return;
     }
 
     // TODO: Implement with Convex

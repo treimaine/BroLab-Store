@@ -13,6 +13,7 @@ import {
   type User,
 } from "@shared/schema";
 import * as crypto from "crypto";
+import { ErrorMessages } from "../shared/constants/ErrorMessages";
 import {
   createReservation,
   getOrderInvoiceData,
@@ -539,7 +540,7 @@ export class MemStorage implements IStorage {
   async updateReservationStatus(id: string, status: ReservationStatusEnum): Promise<Reservation> {
     const reservation = this.reservations.get(id);
     if (!reservation) {
-      throw new Error(`Reservation not found: ${id}`);
+      throw new Error(ErrorMessages.RESERVATION.NOT_FOUND);
     }
     const updatedReservation = {
       ...reservation,
@@ -634,7 +635,7 @@ export class DatabaseStorage implements IStorage {
 
   async createBeat(insertBeat: InsertBeat): Promise<Beat> {
     // Beats are managed via WooCommerce API, not database
-    throw new Error("Beat creation handled via WooCommerce API");
+    throw new Error(ErrorMessages.GENERIC.FEATURE_UNAVAILABLE);
   }
 
   async updateBeat(id: number, updates: Partial<Beat>): Promise<Beat | undefined> {
@@ -654,7 +655,7 @@ export class DatabaseStorage implements IStorage {
 
   async addCartItem(insertItem: InsertCartItem): Promise<CartItem> {
     // Cart is managed client-side with localStorage
-    throw new Error("Cart management handled client-side");
+    throw new Error(ErrorMessages.GENERIC.FEATURE_UNAVAILABLE);
   }
 
   async updateCartItem(id: number, updates: Partial<CartItem>): Promise<CartItem | undefined> {
@@ -681,7 +682,7 @@ export class DatabaseStorage implements IStorage {
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     // Orders are not directly implemented in current helpers
     // This would require a new helper in lib/db.ts
-    throw new Error("Order creation not implemented - requires new helper");
+    throw new Error(ErrorMessages.GENERIC.FEATURE_UNAVAILABLE);
   }
 
   async updateOrderStatus(id: number, status: string): Promise<Order | undefined> {

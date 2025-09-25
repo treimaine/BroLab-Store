@@ -58,7 +58,7 @@ const BASE_URL = process.env.FRONTEND_URL || "https://brolabentertainment.com";
  * GET /api/schema/beat/:id
  * Génère le Schema markup JSON-LD pour un beat spécifique
  */
-router.get("/beat/:id", async (req, res) => {
+router.get("/beat/:id", async (req, res): Promise<void> => {
   try {
     const beatId = req.params.id;
 
@@ -68,13 +68,15 @@ router.get("/beat/:id", async (req, res) => {
       product = await wcApiRequest(`/products/${beatId}`);
     } catch (error: any) {
       if (error.message?.includes("404")) {
-        return res.status(404).json({ error: "Beat not found" });
+        res.status(404).json({ error: "Beat not found" });
+      return;
       }
       throw error;
     }
 
     if (!product) {
-      return res.status(404).json({ error: "Beat not found" });
+      res.status(404).json({ error: "Beat not found" });
+      return;
     }
 
     // Transformer les données WooCommerce en format BeatProduct
@@ -115,13 +117,14 @@ router.get("/beat/:id", async (req, res) => {
  * GET /api/schema/beats-list
  * Génère le Schema markup JSON-LD pour la liste des beats
  */
-router.get("/beats-list", async (req, res) => {
+router.get("/beats-list", async (req, res): Promise<void> => {
   try {
     // Récupérer la liste des beats depuis WooCommerce
     const products = await wcApiRequest("/products");
 
     if (!products || products.length === 0) {
-      return res.status(404).json({ error: "No beats found" });
+      res.status(404).json({ error: "No beats found" });
+      return;
     }
 
     // Transformer les données WooCommerce
@@ -159,7 +162,7 @@ router.get("/beats-list", async (req, res) => {
  * GET /api/schema/organization
  * Génère le Schema markup JSON-LD pour l'organisation BroLab
  */
-router.get("/organization", async (req, res) => {
+router.get("/organization", async (req, res): Promise<void> => {
   try {
     const schemaMarkup = generateOrganizationSchemaMarkup(BASE_URL);
 

@@ -115,7 +115,7 @@ export const DashboardLayout = memo<DashboardLayoutProps>(
   ({ children, activeTab, onTabChange, className }) => {
     const isMobile = useIsMobile();
     const isTablet = useIsTablet();
-    const config = useDashboardConfig();
+    const { config } = useDashboardConfig();
 
     // Memoize tab triggers to prevent unnecessary re-renders
     const tabTriggers = useMemo(() => {
@@ -186,14 +186,14 @@ DashboardLayout.displayName = "DashboardLayout";
 // Dashboard header component with proper separation
 interface DashboardHeaderProps {
   user: {
-    firstName?: string;
-    lastName?: string;
+    firstName?: string | null;
+    lastName?: string | null;
   } | null;
   className?: string;
 }
 
 export const DashboardHeader = memo<DashboardHeaderProps>(({ user, className }) => {
-  const config = useDashboardConfig();
+  const { config } = useDashboardConfig();
 
   const displayName = useMemo(() => {
     if (!user) return "User";

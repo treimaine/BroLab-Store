@@ -1,4 +1,5 @@
 import { ConvexHttpClient } from "convex/browser";
+import { WooCommerceOrder } from "../types/woocommerce";
 import { getWooCommerceOrders } from "./woo";
 import { getWordPressProducts } from "./wp";
 
@@ -106,40 +107,24 @@ export async function syncWooCommerceToConvex(): Promise<SyncResult> {
     }
 
     // Transformer les données pour Convex
-    const ordersForConvex = wooCommerceOrders.map(
-      (order: {
-        id: number;
-        status: string;
-        date_created: string;
-        billing?: { email?: string };
-        customer_email?: string;
-        line_items?: Array<{
-          product_id: number;
-          name: string;
-          quantity: number;
-          total: string;
-          meta_data?: Array<{ key: string; value: unknown }>;
-        }>;
-        [key: string]: unknown;
-      }) => ({
-        id: order.id,
-        status: order.status,
-        total: order.total,
-        currency: order.currency,
-        customerId: order.customer_id,
-        customerEmail: order.billing?.email || order.customer_email || "",
-        items:
-          order.line_items?.map(item => ({
-            productId: item.product_id,
-            name: item.name,
-            quantity: item.quantity,
-            total: item.total,
-            license: item.meta_data?.find(meta => meta.key === "license")?.value,
-          })) || [],
-        createdAt: order.date_created,
-        updatedAt: order.date_modified,
-      })
-    );
+    const ordersForConvex = wooCommerceOrders.map((order: WooCommerceOrder) => ({
+      id: order.id,
+      status: order.status,
+      total: order.total,
+      currency: order.currency,
+      customerId: order.customer_id,
+      customerEmail: order.billing?.email || "",
+      items:
+        order.line_items?.map(item => ({
+          productId: item.product_id,
+          name: item.name,
+          quantity: item.quantity,
+          total: item.total,
+          license: item.meta_data?.find(meta => meta.key === "license")?.value,
+        })) || [],
+      createdAt: order.date_created,
+      updatedAt: order.date_modified,
+    }));
 
     // Synchroniser avec Convex
     const result = await convex.mutation("sync:woocommerce:syncWooCommerceOrders" as any, {

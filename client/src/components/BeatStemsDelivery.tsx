@@ -74,7 +74,8 @@ export function BeatStemsDelivery({
               licenseType === 'unlimited' ? 'bg-[var(--accent-purple)]' :
               licenseType === 'premium' ? 'bg-[var(--accent-cyan)]' :
               'bg-gray-600'
-            } text-white`}>
+            } text-white`}
+            >
               {licenseType.charAt(0).toUpperCase() + licenseType.slice(1)} License
             </Badge>
           </div>

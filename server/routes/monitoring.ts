@@ -1,122 +1,130 @@
-import { Router } from 'express';
-import monitoring from '../lib/monitoring';
-import { apiRateLimit } from '../middleware/rateLimiter';
+import { Router } from "express";
+import { ErrorMessages } from "../../shared/constants/ErrorMessages";
+import monitoring from "../lib/monitoring";
+import { apiRateLimit } from "../middleware/rateLimiter";
 
 const router = Router();
 
 // Health check endpoint
-router.get('/health', apiRateLimit, async (req, res) => {
+router.get("/health", apiRateLimit, async (req, res): Promise<void> => {
   try {
     const healthChecks = await monitoring.performHealthCheck();
-    const allHealthy = healthChecks.every(check => check.status === 'healthy');
-    
+    const allHealthy = healthChecks.every(check => check.status === "healthy");
+
     res.status(allHealthy ? 200 : 503).json({
-      status: allHealthy ? 'healthy' : 'degraded',
+      status: allHealthy ? "healthy" : "degraded",
       checks: healthChecks,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({
-      status: 'error',
-      message: 'Health check failed',
-      error: error.message,
-      timestamp: new Date().toISOString()
+      status: "error",
+      message: "Health check failed",
+      error: errorMessage,
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
 // System metrics endpoint (admin only)
-router.get('/metrics', apiRateLimit, async (req, res) => {
+router.get("/metrics", apiRateLimit, async (req, res): Promise<void> => {
   try {
     if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: 'Authentication required' });
+      res.status(401).json({ error: ErrorMessages.AUTH.UNAUTHORIZED });
+      return;
     }
 
     // Simple admin check - in production, use proper role-based access
     const user = req.user!;
-    const isAdmin = user.email === 'admin@brolabentertainment.com' || user.username === 'admin';
-    
+    const isAdmin = user.email === "admin@brolabentertainment.com" || user.username === "admin";
+
     if (!isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
+      res.status(403).json({ error: ErrorMessages.AUTH.FORBIDDEN });
+      return;
     }
 
     const { metrics, healthChecks } = await monitoring.collectPerformanceMetrics();
-    
+
     res.json({
       system: metrics,
       services: healthChecks,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({
-      error: 'Failed to collect metrics',
-      message: error.message,
-      timestamp: new Date().toISOString()
+      error: "Failed to collect metrics",
+      message: errorMessage,
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
 // Quick status endpoint (lightweight)
-router.get('/status', async (req, res) => {
+router.get("/status", async (req, res): Promise<void> => {
   try {
     const metrics = monitoring.getSystemMetrics();
-    
+
     res.json({
-      status: 'online',
+      status: "online",
       uptime: metrics.uptime,
       memory: {
         used: Math.round(metrics.memoryUsage.heapUsed / 1024 / 1024),
-        total: Math.round(metrics.memoryUsage.rss / 1024 / 1024)
+        total: Math.round(metrics.memoryUsage.rss / 1024 / 1024),
       },
       requestsPerMinute: metrics.requestsPerMinute,
       errorRate: Math.round(metrics.errorRate * 100) / 100,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({
-      status: 'error',
-      message: error.message,
-      timestamp: new Date().toISOString()
+      status: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
 // Manual health check trigger (admin only)
-router.post('/health/check', apiRateLimit, async (req, res) => {
+router.post("/health/check", apiRateLimit, async (req, res): Promise<void> => {
   try {
     if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: 'Authentication required' });
+      res.status(401).json({ error: ErrorMessages.AUTH.UNAUTHORIZED });
+      return;
     }
 
     const user = req.user!;
-    const isAdmin = user.email === 'admin@brolabentertainment.com' || user.username === 'admin';
-    
+    const isAdmin = user.email === "admin@brolabentertainment.com" || user.username === "admin";
+
     if (!isAdmin) {
-      return res.status(403).json({ error: 'Admin access required' });
+      res.status(403).json({ error: ErrorMessages.AUTH.FORBIDDEN });
+      return;
     }
 
     const healthChecks = await monitoring.performHealthCheck();
-    
+
     await monitoring.logSystemEvent({
-      type: 'info',
-      service: 'monitoring',
-      message: 'Manual health check triggered',
+      type: "info",
+      service: "monitoring",
+      message: "Manual health check triggered",
       details: {
         triggeredBy: user.username,
-        results: healthChecks
-      }
+        results: healthChecks,
+      },
     });
 
     res.json({
-      message: 'Health check completed',
+      message: "Health check completed",
       results: healthChecks,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({
-      error: 'Health check failed',
-      message: error.message,
-      timestamp: new Date().toISOString()
+      error: "Health check failed",
+      message: errorMessage,
+      timestamp: new Date().toISOString(),
     });
   }
 });

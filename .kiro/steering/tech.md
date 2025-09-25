@@ -1,92 +1,131 @@
-# Technology Stack
+---
+inclusion: always
+---
 
-## Build System & Tools
+# Technology Stack & Development Guidelines
 
-- **Build Tool**: Vite 5.4+ for fast development and optimized production builds
-- **Package Manager**: npm (Node.js 20+, npm 9+)
-- **TypeScript**: Full TypeScript implementation with strict mode enabled
-- **Linting**: ESLint with TypeScript and React plugins
-- **Testing**: Jest with React Testing Library and Supertest for API testing
+## Core Technology Stack
 
-## Frontend Stack
+### Frontend (client/)
 
-- **Framework**: React 18 with TypeScript
-- **Routing**: Wouter (lightweight client-side routing)
-- **State Management**:
-  - Zustand for client-side state
-  - TanStack Query for server state management
-- **Styling**:
-  - Tailwind CSS with custom design system
-  - shadcn/ui component library
-  - Radix UI primitives
-- **UI Components**: Comprehensive component library with Framer Motion animations
-- **Audio**: WaveSurfer.js for professional waveform visualization
+- **React 18** with TypeScript - Component-based UI with strict typing
+- **Vite 5.4+** - Fast development server and optimized builds
+- **Wouter** - Lightweight client-side routing (prefer over React Router)
+- **Zustand** - Client-side state management (prefer over Redux/Context)
+- **TanStack Query** - Server state management and caching
+- **Tailwind CSS** - Utility-first styling with custom design tokens
+- **shadcn/ui + Radix UI** - Accessible component primitives
+- **WaveSurfer.js** - Audio waveform visualization (core business feature)
 
-## Backend Stack
+### Backend (server/)
 
-- **Runtime**: Node.js with Express server
-- **Database**:
-  - Convex for real-time data and functions
-  - PostgreSQL with Supabase (legacy support)
-- **Authentication**: Clerk for user management and billing
-- **Payments**: Stripe and PayPal integration
-- **File Storage**: Supabase Storage with antivirus scanning
-- **Email**: Nodemailer with SMTP configuration
+- **Node.js 20+** with Express - RESTful API server
+- **TypeScript strict mode** - No `any` types, full type safety
+- **Convex** - Real-time database for new features (preferred)
+- **Supabase** - Legacy PostgreSQL support (maintain, don't extend)
+- **Clerk** - Authentication and user management
+- **Stripe + PayPal** - Payment processing with error handling
 
-## External Integrations
+### Development Tools
 
-- **CMS**: WordPress/WooCommerce REST API integration
-- **Analytics**: Custom analytics system with conversion tracking
-- **Security**: Row-Level Security (RLS) policies and rate limiting
+- **npm 9+** - Package management (no yarn/pnpm)
+- **ESLint** - Code linting with React and TypeScript rules
+- **Jest + React Testing Library** - Unit and integration testing
+- **Supertest** - API endpoint testing
 
-## Common Commands
+## Architecture Patterns
 
-### Development
+### Database Strategy
 
-```bash
-npm run dev              # Start development server (full-stack)
-npm run client           # Start frontend only (Vite dev server)
-npm run type-check       # TypeScript validation without emit
-npm run lint             # Run ESLint
-npm run lint:fix         # Fix ESLint issues automatically
+- **New features**: Use Convex mutations/queries for real-time capabilities
+- **Legacy features**: Maintain Supabase integration, don't extend
+- **Data flow**: Client → Convex (real-time) or Client → Express → External APIs
+
+### State Management Rules
+
+- **Client state**: Zustand stores in `client/src/stores/`
+- **Server state**: TanStack Query for caching and synchronization
+- **Form state**: React Hook Form with Zod validation
+- **Global state**: Minimize usage, prefer component composition
+
+### Import Aliases (Required)
+
+```typescript
+import { Component } from "@/components/Component"; // client/src/
+import { validateUser } from "@shared/validation"; // shared/
+import { getUserById } from "@convex/users"; // convex/
 ```
 
-### Testing
+## Code Quality Requirements
+
+### TypeScript Standards
+
+- Strict mode enabled - no `any` types allowed
+- Explicit return types for functions
+- Proper error handling with typed exceptions
+- Use Zod schemas for runtime validation
+
+### Component Patterns
+
+- Functional components with hooks only
+- Props interfaces with descriptive names
+- Error boundaries for robust UX
+- Lazy loading for performance optimization
+
+### Testing Requirements
+
+- Unit tests for business logic functions
+- Integration tests for API endpoints
+- Component tests with React Testing Library
+- Mock external dependencies (Stripe, WordPress)
+
+## Essential Commands
+
+### Development Workflow
+
+```bash
+npm run dev              # Full-stack development server
+npm run client           # Frontend-only development
+npm run type-check       # TypeScript validation
+npm run lint:fix         # Auto-fix linting issues
+npm run verify           # Pre-commit validation
+```
+
+### Testing & Quality
 
 ```bash
 npm test                 # Run Jest test suite
-npm run pre-check        # Type-check + lint (pre-commit validation)
-npm run verify           # Full verification (pre-commit check)
+npm run test:watch       # Watch mode for development
+npm run pre-check        # Type-check + lint validation
 ```
 
-### Build & Production
+### Build & Deployment
 
 ```bash
-npm run build            # Build for production (frontend + backend)
+npm run build            # Production build (client + server)
 npm run start            # Start production server
-npm run check            # TypeScript compilation check
+npm run clean:all        # Full cleanup and reinstall
 ```
 
-### Database & Cleanup
+## Performance & Security Guidelines
 
-```bash
-npm run clean            # Clean node_modules and reinstall
-npm run clean:all        # Run comprehensive cleanup script
-npm run clean:logs       # Clear application logs
-npm run clean:db         # Clear database (development only)
-```
+### Performance Rules
 
-## Development Environment
+- Lazy load components with React.lazy()
+- Use TanStack Query for efficient data fetching
+- Implement proper error boundaries
+- Optimize bundle size with Vite code splitting
 
-- **Node.js**: 20.0.0+ required
-- **Package Manager**: npm 9.0.0+ required
-- **Database**: Convex for new features, Supabase for legacy support
-- **Environment Files**: `.env` for development, `.env.production.example` for production template
+### Security Requirements
 
-## Code Quality Standards
+- Validate all user inputs with Zod schemas
+- Implement Row-Level Security (RLS) for data access
+- Use Clerk for authentication, never roll custom auth
+- Sanitize file uploads with antivirus scanning
 
-- **TypeScript**: Strict mode enabled, no explicit any warnings
-- **ESLint**: React hooks rules, TypeScript recommended rules
-- **Testing**: Jest with jsdom environment for React components
-- **File Structure**: Modular architecture with shared utilities
-- **Import Aliases**: `@/` for client, `@shared/` for shared code, `@convex/` for Convex functions
+### Error Handling Patterns
+
+- Use Result types for error-prone operations
+- Implement comprehensive error boundaries
+- Log errors with proper context for debugging
+- Provide user-friendly error messages

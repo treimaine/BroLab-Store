@@ -15,14 +15,14 @@ const PricingTableFallback = () => (
           key={i}
           className="bg-[var(--medium-gray)] border border-[var(--medium-gray)] rounded-xl p-6 animate-pulse"
         >
-          <div className="h-8 bg-gray-600 rounded mb-4"></div>
-          <div className="h-12 bg-gray-600 rounded mb-6"></div>
+          <div className="h-8 bg-gray-600 rounded mb-4" />
+          <div className="h-12 bg-gray-600 rounded mb-6" />
           <div className="space-y-3">
             {[1, 2, 3, 4].map(j => (
-              <div key={j} className="h-4 bg-gray-600 rounded"></div>
+              <div key={j} className="h-4 bg-gray-600 rounded" />
             ))}
           </div>
-          <div className="h-12 bg-gray-600 rounded mt-8"></div>
+          <div className="h-12 bg-gray-600 rounded mt-8" />
         </div>
       ))}
     </div>

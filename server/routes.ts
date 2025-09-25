@@ -6,20 +6,19 @@ import activityRouter from "./routes/activity";
 import monitoringRoutes from "./routes/monitoring";
 import storageRouter from "./routes/storage";
 // Removed direct WordPress routes from tests; use Woo router which provides sample data when not configured
+import { ErrorMessages } from "../shared/constants/ErrorMessages";
 import wooRouter from "./routes/woo";
 
 // Extend Express Request interface for authentication
-declare global {
-  namespace Express {
-    interface Request {
-      isAuthenticated(): boolean;
-      user?: {
-        id: string;
-        email: string;
-        name?: string;
-        [key: string]: unknown;
-      };
-    }
+declare module "express-serve-static-core" {
+  interface Request {
+    isAuthenticated(): boolean;
+    user?: {
+      id: string;
+      email: string;
+      name?: string;
+      [key: string]: unknown;
+    };
   }
 }
 
@@ -150,7 +149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/protected/dashboard", isAuthenticated as any, (_req, res) => {
+  app.get("/api/protected/dashboard", isAuthenticated, (_req, res) => {
     res.json({ status: "ok", message: "Protected dashboard accessible" });
   });
 
@@ -210,13 +209,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : String(e);
       console.error("/api/beats adapter error:", errorMessage);
-      return res.status(500).json({ error: "Failed to fetch beats" });
+      return res.status(500).json({ error: ErrorMessages.BEATS.NOT_FOUND });
     }
   });
 
   app.post("/api/beats", async (req, res) => {
     // Not supported in current architecture; return 501 but keep 200-style body for tests if needed
-    return res.status(404).json({ error: "Beat creation not supported" });
+    return res.status(404).json({ error: ErrorMessages.GENERIC.FEATURE_UNAVAILABLE });
   });
 
   // Reservations endpoint now handled by dedicated router in server/routes/reservations.ts
@@ -254,7 +253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : String(e);
       console.error("/api/v1/dashboard error:", errorMessage);
-      res.status(500).json({ error: "Failed to load dashboard" });
+      res.status(500).json({ error: ErrorMessages.SERVER.INTERNAL_ERROR });
     }
   });
 
@@ -263,7 +262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // - /api/reservations (unified system with validation, persistence, and notifications)
 
   // Download endpoints for purchased beats
-  app.get("/api/download/:licenseType/:beatName", async (req, res) => {
+  app.get("/api/download/:licenseType/:beatName", async (req, res): Promise<void> => {
     try {
       const { licenseType, beatName } = req.params;
 
@@ -285,7 +284,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const licenseInfo = downloadFiles[licenseType as keyof typeof downloadFiles];
 
       if (!licenseInfo) {
-        return res.status(400).json({ error: "Invalid license type" });
+        res.status(400).json({ error: ErrorMessages.BEATS.INVALID_LICENSE });
+        return;
       }
 
       res.json({
@@ -299,7 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Download error:", errorMessage);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.FILE.DOWNLOAD_FAILED });
     }
   });
 
@@ -354,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // License agreement endpoint
-  app.get("/api/license-agreement/:licenseType", async (req, res) => {
+  app.get("/api/license-agreement/:licenseType", async (req, res): Promise<void> => {
     try {
       const { licenseType } = req.params;
 
@@ -367,7 +367,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const agreement = agreements[licenseType as keyof typeof agreements];
 
       if (!agreement) {
-        return res.status(400).json({ error: "Invalid license type" });
+        res.status(400).json({ error: ErrorMessages.BEATS.INVALID_LICENSE });
+        return;
       }
 
       res.json({
@@ -378,7 +379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("License agreement error:", errorMessage);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.BEATS.INVALID_LICENSE });
     }
   });
 

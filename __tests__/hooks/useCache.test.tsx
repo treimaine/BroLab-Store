@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useCache, useCacheWithCleanup, useCachedData } from "../../client/src/hooks/useCache";
 import { cacheManager } from "../../shared/utils/cache-manager";
+import { createWrapper } from "../test-utils";
 
 // Mock the cache manager
 jest.mock("../../shared/utils/cache-manager", () => ({
@@ -45,7 +46,8 @@ describe("useCache Hook", () => {
 
     mockCacheManager.getStats.mockResolvedValue(mockStats);
 
-    const { result } = renderHook(() => useCache());
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCache(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.stats).toEqual(mockStats);
@@ -69,7 +71,8 @@ describe("useCache Hook", () => {
       memoryUsage: 100,
     });
 
-    const { result } = renderHook(() => useCache());
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCache(), { wrapper });
 
     let setResult: boolean | undefined;
     await act(async () => {
@@ -85,9 +88,10 @@ describe("useCache Hook", () => {
     const testValue = { data: "test-data" };
     mockCacheManager.get.mockResolvedValue(testValue);
 
-    const { result } = renderHook(() => useCache());
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCache(), { wrapper });
 
-    let getValue: any;
+    let getValue: unknown;
     await act(async () => {
       getValue = await result.current.get("test-key");
     });
@@ -99,7 +103,8 @@ describe("useCache Hook", () => {
   test("should remove cache values", async () => {
     mockCacheManager.delete.mockResolvedValue(true);
 
-    const { result } = renderHook(() => useCache());
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCache(), { wrapper });
 
     let removeResult: boolean | undefined;
     await act(async () => {
@@ -113,7 +118,8 @@ describe("useCache Hook", () => {
   test("should clear cache", async () => {
     mockCacheManager.clear.mockResolvedValue(undefined);
 
-    const { result } = renderHook(() => useCache());
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCache(), { wrapper });
 
     let clearResult: boolean | undefined;
     await act(async () => {
@@ -127,7 +133,8 @@ describe("useCache Hook", () => {
   test("should invalidate cache by pattern", async () => {
     mockCacheManager.invalidate.mockResolvedValue(3);
 
-    const { result } = renderHook(() => useCache());
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCache(), { wrapper });
 
     let invalidateResult: number | undefined;
     await act(async () => {
@@ -141,7 +148,8 @@ describe("useCache Hook", () => {
   test("should invalidate cache by tags", async () => {
     mockCacheManager.invalidateByTags.mockResolvedValue(2);
 
-    const { result } = renderHook(() => useCache());
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCache(), { wrapper });
 
     let invalidateResult: number | undefined;
     await act(async () => {
@@ -155,7 +163,8 @@ describe("useCache Hook", () => {
   test("should check if key exists", async () => {
     mockCacheManager.exists.mockResolvedValue(true);
 
-    const { result } = renderHook(() => useCache());
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCache(), { wrapper });
 
     let existsResult: boolean | undefined;
     await act(async () => {
@@ -169,7 +178,8 @@ describe("useCache Hook", () => {
   test("should touch cache entries", async () => {
     mockCacheManager.touch.mockResolvedValue(true);
 
-    const { result } = renderHook(() => useCache());
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCache(), { wrapper });
 
     let touchResult: boolean | undefined;
     await act(async () => {
@@ -184,7 +194,8 @@ describe("useCache Hook", () => {
     mockCacheManager.set.mockRejectedValue(new Error("Cache error"));
     const consoleSpy = jest.spyOn(console, "error").mockImplementation();
 
-    const { result } = renderHook(() => useCache());
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCache(), { wrapper });
 
     let setResult: boolean | undefined;
     await act(async () => {
@@ -217,7 +228,10 @@ describe("useCachedData Hook", () => {
 
     mockCacheManager.get.mockResolvedValue(cachedData);
 
-    const { result } = renderHook(() => useCachedData("test-key", fetcher, { enabled: true }));
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCachedData("test-key", fetcher, { enabled: true }), {
+      wrapper,
+    });
 
     await waitFor(() => {
       expect(result.current.data).toEqual(cachedData);
@@ -236,12 +250,15 @@ describe("useCachedData Hook", () => {
     mockCacheManager.get.mockResolvedValue(null);
     mockCacheManager.set.mockResolvedValue(undefined);
 
-    const { result } = renderHook(() =>
-      useCachedData("test-key", fetcher, {
-        ttl: 10000,
-        tags: ["test-tag"],
-        enabled: true,
-      })
+    const wrapper = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useCachedData("test-key", fetcher, {
+          ttl: 10000,
+          tags: ["test-tag"],
+          enabled: true,
+        }),
+      { wrapper }
     );
 
     await waitFor(() => {
@@ -257,7 +274,10 @@ describe("useCachedData Hook", () => {
   test("should not fetch when disabled", async () => {
     const fetcher = jest.fn();
 
-    const { result } = renderHook(() => useCachedData("test-key", fetcher, { enabled: false }));
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCachedData("test-key", fetcher, { enabled: false }), {
+      wrapper,
+    });
 
     await waitFor(() => {
       expect(result.current.data).toBeNull();
@@ -275,7 +295,10 @@ describe("useCachedData Hook", () => {
 
     mockCacheManager.get.mockResolvedValue(null);
 
-    const { result } = renderHook(() => useCachedData("test-key", fetcher, { enabled: true }));
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCachedData("test-key", fetcher, { enabled: true }), {
+      wrapper,
+    });
 
     await waitFor(() => {
       expect(result.current.error).toEqual(error);
@@ -299,7 +322,10 @@ describe("useCachedData Hook", () => {
     mockCacheManager.get.mockResolvedValue(null);
     mockCacheManager.set.mockResolvedValue(undefined);
 
-    const { result } = renderHook(() => useCachedData("test-key", fetcher, { enabled: true }));
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useCachedData("test-key", fetcher, { enabled: true }), {
+      wrapper,
+    });
 
     // Wait for initial fetch
     await waitFor(() => {
@@ -337,7 +363,8 @@ describe("useCacheWithCleanup Hook", () => {
   test("should setup cleanup interval", async () => {
     mockCacheManager.cleanup.mockResolvedValue(undefined);
 
-    const { unmount } = renderHook(() => useCacheWithCleanup(1000));
+    const wrapper = createWrapper();
+    const { unmount } = renderHook(() => useCacheWithCleanup(1000), { wrapper });
 
     // Fast-forward time to trigger cleanup
     act(() => {
@@ -354,7 +381,8 @@ describe("useCacheWithCleanup Hook", () => {
   test("should cleanup interval on unmount", () => {
     const clearIntervalSpy = jest.spyOn(global, "clearInterval");
 
-    const { unmount } = renderHook(() => useCacheWithCleanup(1000));
+    const wrapper = createWrapper();
+    const { unmount } = renderHook(() => useCacheWithCleanup(1000), { wrapper });
 
     unmount();
 
@@ -368,7 +396,8 @@ describe("useCacheWithCleanup Hook", () => {
 
     mockCacheManager.cleanup.mockRejectedValue(error);
 
-    renderHook(() => useCacheWithCleanup(1000));
+    const wrapper = createWrapper();
+    renderHook(() => useCacheWithCleanup(1000), { wrapper });
 
     // Fast-forward time to trigger cleanup
     act(() => {

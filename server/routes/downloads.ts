@@ -17,17 +17,19 @@ router.post(
   "/",
   isAuthenticated,
   createValidationMiddleware(insertDownloadSchema),
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       const user = await getCurrentUser(req);
       if (!user) {
-        return res.status(401).json({ error: "Authentication required" });
+        res.status(401).json({ error: "Authentication required" });
+      return;
       }
 
       // Get Clerk user for Clerk ID
       const clerkUser = getCurrentClerkUser(req);
       if (!clerkUser) {
-        return res.status(401).json({ error: "Clerk authentication required" });
+        res.status(401).json({ error: "Clerk authentication required" });
+      return;
       }
 
       const { productId, license, price, productName } = req.body;
@@ -71,17 +73,19 @@ router.post(
 );
 
 // GET /api/downloads - List user downloads using Convex
-router.get("/", isAuthenticated, async (req, res) => {
+router.get("/", isAuthenticated, async (req, res): Promise<void> => {
   try {
     const user = await getCurrentUser(req);
     if (!user) {
-      return res.status(401).json({ error: "Authentication required" });
+      res.status(401).json({ error: "Authentication required" });
+      return;
     }
 
     // Get Clerk user for Clerk ID
     const clerkUser = getCurrentClerkUser(req);
     if (!clerkUser) {
-      return res.status(401).json({ error: "Clerk authentication required" });
+      res.status(401).json({ error: "Clerk authentication required" });
+      return;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,17 +107,19 @@ router.get("/", isAuthenticated, async (req, res) => {
 });
 
 // GET /api/downloads/export - Export downloads as CSV
-router.get("/export", isAuthenticated, async (req, res) => {
+router.get("/export", isAuthenticated, async (req, res): Promise<void> => {
   try {
     const user = await getCurrentUser(req);
     if (!user) {
-      return res.status(401).json({ error: "Authentication required" });
+      res.status(401).json({ error: "Authentication required" });
+      return;
     }
 
     // Get Clerk user for Clerk ID
     const clerkUser = getCurrentClerkUser(req);
     if (!clerkUser) {
-      return res.status(401).json({ error: "Clerk authentication required" });
+      res.status(401).json({ error: "Clerk authentication required" });
+      return;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -147,17 +153,19 @@ router.get("/export", isAuthenticated, async (req, res) => {
 });
 
 // GET /api/downloads/quota - Get user's download quota using Convex
-router.get("/quota", isAuthenticated, async (req, res) => {
+router.get("/quota", isAuthenticated, async (req, res): Promise<void> => {
   try {
     const user = await getCurrentUser(req);
     if (!user) {
-      return res.status(401).json({ error: "Authentication required" });
+      res.status(401).json({ error: "Authentication required" });
+      return;
     }
 
     // Get Clerk user for Clerk ID
     const clerkUser = getCurrentClerkUser(req);
     if (!clerkUser) {
-      return res.status(401).json({ error: "Clerk authentication required" });
+      res.status(401).json({ error: "Clerk authentication required" });
+      return;
     }
 
     // Get download quota from Convex
@@ -187,7 +195,7 @@ router.get("/quota", isAuthenticated, async (req, res) => {
 });
 
 // GET /api/downloads/debug - Debug table structure using Convex
-router.get("/debug", async (req, res) => {
+router.get("/debug", async (req, res): Promise<void> => {
   try {
     // This endpoint requires authentication, so we'll return a basic response
     res.json({
@@ -207,7 +215,7 @@ router.get("/debug", async (req, res) => {
 });
 
 // GET /api/downloads/quota/test - Test endpoint without authentication
-router.get("/quota/test", async (req, res) => {
+router.get("/quota/test", async (req, res): Promise<void> => {
   try {
     // This endpoint requires authentication in Convex, so we'll return a test response
     res.json({
@@ -225,7 +233,7 @@ router.get("/quota/test", async (req, res) => {
 });
 
 // GET /api/downloads/file/:productId/:type - File download endpoint for free products
-router.get("/file/:productId/:type", async (req, res) => {
+router.get("/file/:productId/:type", async (req, res): Promise<void> => {
   try {
     const { productId, type } = req.params;
 

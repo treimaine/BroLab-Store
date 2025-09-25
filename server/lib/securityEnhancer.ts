@@ -30,11 +30,15 @@ export enum SecurityRiskLevel {
 // Enhanced authentication result
 export interface AuthenticationResult {
   success: boolean;
-  user?: any;
+  user?: {
+    userId: string;
+    sessionId?: string;
+    sessionClaims?: Record<string, unknown>;
+  };
   error?: string;
   riskLevel: SecurityRiskLevel;
   securityEvents: SecurityEventType[];
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 // Security configuration
@@ -231,7 +235,10 @@ export class SecurityEnhancer {
   /**
    * Validate session claims for security
    */
-  private validateSessionClaims(sessionClaims: any): { valid: boolean; errors: string[] } {
+  private validateSessionClaims(sessionClaims: Record<string, unknown> | null | undefined): {
+    valid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
 
     if (!sessionClaims) {
@@ -240,12 +247,20 @@ export class SecurityEnhancer {
     }
 
     // Check expiration
-    if (sessionClaims.exp && sessionClaims.exp < Math.floor(Date.now() / 1000)) {
+    if (
+      sessionClaims.exp &&
+      typeof sessionClaims.exp === "number" &&
+      sessionClaims.exp < Math.floor(Date.now() / 1000)
+    ) {
       errors.push("Session has expired");
     }
 
     // Check issued at time (not too far in the future)
-    if (sessionClaims.iat && sessionClaims.iat > Math.floor(Date.now() / 1000) + 300) {
+    if (
+      sessionClaims.iat &&
+      typeof sessionClaims.iat === "number" &&
+      sessionClaims.iat > Math.floor(Date.now() / 1000) + 300
+    ) {
       errors.push("Session issued in the future");
     }
 
@@ -377,12 +392,12 @@ export class SecurityEnhancer {
    * Enhanced input sanitization with security logging
    */
   sanitizeInput(
-    input: any,
+    input: unknown,
     context: string,
     req?: Request,
     visited = new WeakSet()
   ): {
-    sanitized: any;
+    sanitized: unknown;
     securityEvents: SecurityEventType[];
   } {
     const securityEvents: SecurityEventType[] = [];
@@ -443,8 +458,8 @@ export class SecurityEnhancer {
 
       // Sanitize the input
       const sanitized = input
-        .replace(/[<>\"'&]/g, "") // Remove dangerous characters
-        .replace(/\x00/g, "") // Remove null bytes
+        .replace(/[<>"'&]/g, "") // Remove dangerous characters
+        .replace(/[\u0000]/g, "") // Remove null bytes
         .trim()
         .slice(0, 10000); // Limit length
 
@@ -452,11 +467,15 @@ export class SecurityEnhancer {
     }
 
     if (typeof input === "object" && input !== null) {
-      const sanitized: any = Array.isArray(input) ? [] : {};
+      const sanitized: Record<string, unknown> | unknown[] = Array.isArray(input) ? [] : {};
 
       for (const [key, value] of Object.entries(input)) {
         const result = this.sanitizeInput(value, `${context}.${key}`, req, visited);
-        sanitized[key] = result.sanitized;
+        if (Array.isArray(sanitized)) {
+          (sanitized as unknown[])[Number(key)] = result.sanitized;
+        } else {
+          (sanitized as Record<string, unknown>)[key] = result.sanitized;
+        }
         securityEvents.push(...result.securityEvents);
       }
 
@@ -542,7 +561,6 @@ export class SecurityEnhancer {
     return (
       (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
       (req.headers["x-real-ip"] as string) ||
-      req.connection.remoteAddress ||
       req.socket.remoteAddress ||
       "unknown"
     );
@@ -586,7 +604,7 @@ export class SecurityEnhancer {
    * Create security middleware
    */
   createSecurityMiddleware() {
-    return async (req: Request, res: Response, next: NextFunction) => {
+    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
         // Enhanced authentication
         const authResult = await this.validateClerkToken(req);
@@ -613,12 +631,13 @@ export class SecurityEnhancer {
             req,
           });
 
-          return res.status(429).json({
+          res.status(429).json({
             error: "Too many failed attempts",
             retryAfter: bruteForceCheck.lockoutTime
               ? Math.ceil((bruteForceCheck.lockoutTime - Date.now()) / 1000)
               : undefined,
           });
+          return;
         }
 
         // Sanitize request body
@@ -634,10 +653,13 @@ export class SecurityEnhancer {
         // Sanitize query parameters
         if (req.query) {
           const sanitizationResult = this.sanitizeInput(req.query, "request.query", req);
-          req.query = sanitizationResult.sanitized;
+          // Only assign if the result is a valid query object
+          if (sanitizationResult.sanitized && typeof sanitizationResult.sanitized === "object") {
+            req.query = sanitizationResult.sanitized as any;
+          }
 
           if (sanitizationResult.securityEvents.length > 0) {
-            (req as any).security.securityEvents.push(...sanitizationResult.securityEvents);
+            (req as unknown).security.securityEvents.push(...sanitizationResult.securityEvents);
           }
         }
 

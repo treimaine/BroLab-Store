@@ -146,7 +146,7 @@ export const isAuthenticated = async (req: any, res: Response, next: NextFunctio
       });
     }
 
-    const { userId, sessionId, sessionClaims } = authResult.user;
+    const { userId, sessionId, sessionClaims } = authResult.user || {};
 
     if (userId) {
       // Clear failed attempts on successful authentication
@@ -325,11 +325,12 @@ export const getCurrentUser = async (req: any): Promise<User | null> => {
 // Authentication routes - Simplifié pour utiliser uniquement Clerk
 export function registerAuthRoutes(app: Express) {
   // Get current user (Clerk only)
-  app.get("/api/auth/user", isAuthenticated, async (req, res) => {
+  app.get("/api/auth/user", isAuthenticated, async (req, res): Promise<void> => {
     try {
       const user = await getCurrentUser(req);
       if (!user) {
-        return res.status(401).json({ error: "Not authenticated" });
+        res.status(401).json({ error: "Not authenticated" });
+        return;
       }
       const typedUser = user as User;
       res.json({

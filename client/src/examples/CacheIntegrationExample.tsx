@@ -121,7 +121,7 @@ export const CacheIntegrationExample: React.FC = () => {
         <CardContent>
           {isLoading && (
             <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500" />
               <span className="text-gray-400">Loading beats...</span>
             </div>
           )}

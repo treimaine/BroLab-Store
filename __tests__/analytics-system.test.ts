@@ -245,6 +245,9 @@ describe("Analytics Manager", () => {
         },
       });
 
+      // Explicitly set privacy settings to ensure tracking is enabled
+      await analyticsManager.setPrivacySettings({ trackingEnabled: true });
+
       const interaction = {
         sessionId: "test-session",
         type: "click" as InteractionType,

@@ -8,29 +8,29 @@
   - Update import paths in moved test files to reflect new locations
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 2. Fix TypeScript compilation errors in convex/orders.ts
+- [x] 2. Fix TypeScript compilation errors in convex/orders.ts
   - Fix order object type issues in `markOrderFromWebhook` function - add proper type annotation for order variable
   - Ensure order properties (\_id, notes, userId, paymentIntentId) are properly typed
   - _Requirements: 2.1, 2.2, 2.5_
 
-- [ ] 2.1 Fix TypeScript compilation errors in server/lib/dataConsistencyManager.ts
+- [x] 2.1 Fix TypeScript compilation errors in server/lib/dataConsistencyManager.ts
   - Fix Convex function reference type casting in `getAllResources` method
   - Use proper Convex API types instead of string casting
   - _Requirements: 2.1, 2.2, 2.5_
 
-- [ ] 3. Fix Jest configuration for import.meta environment variables
+- [x] 3. Fix Jest configuration for import.meta environment variables
   - Fix import.meta.env handling in Jest configuration to support Vite environment variables
   - Add proper module transformation for client-side code in Jest
   - Update Jest configuration to handle ES modules and Vite-specific syntax
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 3.1 Fix React hook test provider setup
+- [x] 3.1 Fix React hook test provider setup
   - Fix QueryClient and Convex provider setup in `__tests__/hooks/useFavorites.test.tsx`
   - Fix test wrapper configuration in `__tests__/hooks/useUserProfile.test.tsx`
   - Fix cache hook test provider setup in `__tests__/hooks/useCache.test.tsx`
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 4. Fix Convex mock setup in rate limiter tests
+- [x] 4. Fix Convex mock setup in rate limiter tests
   - Fix Convex client mock configuration in `__tests__/rate-limiter.test.ts` to properly mock mutation and query methods
   - Fix mockConvex object initialization and method mocking
   - Update test setup to properly initialize Convex client mocks

@@ -2,14 +2,21 @@ import { Router } from "express";
 import multer from "multer";
 import { deleteFile, getSignedUrl, STORAGE_BUCKETS, uploadUserFile } from "../lib/storage";
 // import { supabaseAdmin } from '../lib/supabaseAdmin'; // Removed - using Convex for storage
+import { z } from "zod";
 import type { InsertFile } from "../../shared/schema";
-import {
-  fileFilterValidation,
-  fileUploadValidation,
-  validateFileUpload,
-  createValidationMiddleware as validateRequest,
-} from "../lib/validation";
+import { createValidationMiddleware as validateRequest } from "../lib/validation";
 import { downloadRateLimit, uploadRateLimit } from "../middleware/rateLimiter";
+
+// Define validation schemas for file operations
+const fileUploadValidation = z.object({
+  file: z.any().optional(),
+});
+
+const fileFilterValidation = z.object({
+  type: z.string().optional(),
+  limit: z.number().min(1).max(100).optional().default(20),
+  offset: z.number().min(0).optional().default(0),
+});
 
 const router = Router();
 
@@ -25,23 +32,36 @@ router.post(
   uploadRateLimit,
   upload.single("file"),
   validateRequest(fileUploadValidation),
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: "Authentication required" });
+        res.status(401).json({ error: "Authentication required" });
+        return;
       }
 
       if (!req.file) {
-        return res.status(400).json({ error: "No file provided" });
+        res.status(400).json({ error: "No file provided" });
+        return;
       }
 
       // Validate file upload security
-      const fileValidation = validateFileUpload(req.file);
-      if (!fileValidation.valid) {
-        return res.status(400).json({
-          error: "File validation failed",
-          details: fileValidation.errors,
+      const allowedTypes = ["audio/mpeg", "audio/wav", "audio/flac", "image/jpeg", "image/png"];
+      const maxSize = 50 * 1024 * 1024; // 50MB
+
+      if (!allowedTypes.includes(req.file.mimetype)) {
+        res.status(400).json({
+          error: "File type not allowed",
+          details: [`File type ${req.file.mimetype} is not allowed`],
         });
+        return;
+      }
+
+      if (req.file.size > maxSize) {
+        res.status(400).json({
+          error: "File too large",
+          details: [`File size ${req.file.size} exceeds maximum of ${maxSize} bytes`],
+        });
+        return;
       }
 
       const { reservation_id, order_id, role = "upload" } = req.body;
@@ -102,10 +122,11 @@ router.post(
 );
 
 // Get signed URL for private file access with rate limiting
-router.get("/signed-url/:fileId", downloadRateLimit, async (req, res) => {
+router.get("/signed-url/:fileId", downloadRateLimit, async (req, res): Promise<void> => {
   try {
     if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Authentication required" });
+      res.status(401).json({ error: "Authentication required" });
+      return;
     }
 
     const { fileId } = req.params;
@@ -119,14 +140,16 @@ router.get("/signed-url/:fileId", downloadRateLimit, async (req, res) => {
     //   .single();
 
     // if (error || !file) {
-    //   return res.status(404).json({ error: 'File not found' });
+    //   res.status(404).json({ error: 'File not found' });
+    return;
     // }
 
     const file = { id: fileId, owner_id: userId, role: "upload", storage_path: "temp" };
 
     // Check ownership
     if (file.owner_id !== userId) {
-      return res.status(403).json({ error: "Access denied" });
+      res.status(403).json({ error: "Access denied" });
+      return;
     }
 
     // Determine bucket
@@ -145,10 +168,11 @@ router.get("/signed-url/:fileId", downloadRateLimit, async (req, res) => {
 });
 
 // List user files with validation
-router.get("/files", validateRequest(fileFilterValidation), async (req, res) => {
+router.get("/files", validateRequest(fileFilterValidation), async (req, res): Promise<void> => {
   try {
     if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Authentication required" });
+      res.status(401).json({ error: "Authentication required" });
+      return;
     }
 
     const userId = req.user!.id;
@@ -185,10 +209,11 @@ router.get("/files", validateRequest(fileFilterValidation), async (req, res) => 
 });
 
 // Delete file
-router.delete("/files/:fileId", async (req, res) => {
+router.delete("/files/:fileId", async (req, res): Promise<void> => {
   try {
     if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Authentication required" });
+      res.status(401).json({ error: "Authentication required" });
+      return;
     }
 
     const { fileId } = req.params;
@@ -202,14 +227,16 @@ router.delete("/files/:fileId", async (req, res) => {
     //   .single();
 
     // if (fetchError || !file) {
-    //   return res.status(404).json({ error: 'File not found' });
+    //   res.status(404).json({ error: 'File not found' });
+    return;
     // }
 
     const file = { id: fileId, owner_id: userId, role: "upload", storage_path: "temp" };
 
     // Check ownership
     if (file.owner_id !== userId) {
-      return res.status(403).json({ error: "Access denied" });
+      res.status(403).json({ error: "Access denied" });
+      return;
     }
 
     // Determine bucket

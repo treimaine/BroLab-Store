@@ -1,3 +1,7 @@
+---
+inclusion: always
+---
+
 # Product Overview
 
 BroLab Entertainment is a professional beats marketplace platform that revolutionizes music production and licensing. It's a modern React-based web application providing a comprehensive marketplace for music producers and artists.
@@ -13,19 +17,32 @@ BroLab Entertainment is a professional beats marketplace platform that revolutio
 - **Multi-Language Support**: 6 languages with automatic IP-based language detection
 - **Multi-Currency Support**: Automatic currency detection and conversion based on user location
 
-## Target Users
+## Architecture Patterns
 
-- Music producers looking to sell beats
-- Artists seeking high-quality beats for their projects
-- Studios offering professional audio services
-- Music industry professionals requiring licensing solutions
+- **Real-time First**: Use Convex for new features requiring real-time updates
+- **Legacy Support**: Maintain Supabase integration for existing functionality
+- **Type Safety**: Strict TypeScript with shared schemas between client/server
+- **Component Composition**: Prefer composition over inheritance for UI components
+- **State Management**: Zustand for client state, TanStack Query for server state
+- **Error Boundaries**: Implement comprehensive error handling at component boundaries
 
-## Business Model
+## Code Conventions
 
-- Beat sales with tiered licensing (Basic $29.99, Premium $49.99, Unlimited $149.99)
-- Subscription plans with download quotas
-- Professional audio services (mixing, mastering, recording)
-- Commission-based marketplace model
+- **Naming**: Use descriptive names that reflect business domain (Beat, License, Reservation)
+- **File Organization**: Group by feature, not by file type
+- **API Design**: RESTful endpoints with consistent error responses
+- **Database**: Use Convex mutations for data changes, queries for reads
+- **Authentication**: Always validate user permissions at both client and server levels
+- **Payments**: Handle all payment flows with proper error states and user feedback
+
+## Business Rules
+
+- **Licensing Tiers**: Basic ($29.99), Premium ($49.99), Unlimited ($149.99)
+- **Download Quotas**: Enforce subscription-based download limits
+- **File Security**: All uploads must pass antivirus scanning
+- **User Permissions**: Implement Row-Level Security for data access
+- **Currency**: Auto-detect user location for currency/language preferences
+- **Analytics**: Track conversion funnels and user behavior for optimization
 
 ## Key Differentiators
 

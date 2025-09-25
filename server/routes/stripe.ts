@@ -1,10 +1,19 @@
 import { ConvexHttpClient } from "convex/browser";
-import { Router } from "express";
+import { Request, Response, Router } from "express";
 import Stripe from "stripe";
 import { Id } from "../../convex/_generated/dataModel";
+import { LicenseType } from "../../shared/types/Beat";
+import type {
+  CreatePaymentIntentRequest,
+  CreatePaymentIntentResponse,
+  StripeWebhookResponse,
+} from "../../shared/types/apiEndpoints";
 import { BrandConfig, buildInvoicePdfStream } from "../lib/pdf";
 import { sendMail } from "../services/mail";
 import type { ConvexOrderData } from "../types/stripe";
+
+// Type alias for Convex client to avoid casting
+type ConvexClient = ConvexHttpClient;
 
 // Types for Stripe API responses
 interface StripePaymentIntentResponse {
@@ -28,42 +37,7 @@ interface StripePaymentIntentParams {
   metadata?: Record<string, string>;
 }
 
-interface ConvexOrderWithRelations {
-  order: {
-    _id: string;
-    items: Array<{
-      productId: number;
-      title: string;
-      type: string;
-      qty: number;
-      unitPrice: number;
-      totalPrice: number;
-    }>;
-    currency: string;
-    total: number;
-    email: string;
-    invoiceNumber?: string;
-  };
-  items: Array<{
-    productId: number;
-    title: string;
-    type: string;
-    qty: number;
-    unitPrice: number;
-    totalPrice: number;
-  }>;
-  payments: Array<{
-    _id: string;
-    status: string;
-    amount: number;
-    currency: string;
-  }>;
-  invoice?: {
-    _id: string;
-    number: string;
-    pdfUrl?: string;
-  } | null;
-}
+// Removed unused interface ConvexOrderWithRelations
 
 // Since package installation failed, we'll use curl/fetch to call Stripe API directly
 const createStripePaymentIntent = async (
@@ -98,21 +72,7 @@ const createStripePaymentIntent = async (
   return await response.json();
 };
 
-const retrieveStripePaymentIntent = async (id: string): Promise<StripePaymentIntentResponse> => {
-  const response = await fetch(`https://api.stripe.com/v1/payment_intents/${id}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
-    },
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Stripe API Error: ${error.error?.message || "Unknown error"}`);
-  }
-
-  return await response.json();
-};
+// Removed unused function retrieveStripePaymentIntent
 
 // Initialize official Stripe client
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -128,7 +88,7 @@ const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const router = Router();
 
 // Health check route
-router.get("/health", (req, res) => {
+router.get("/health", (req, res): void => {
   res.json({
     status: "ok",
     stripe: stripeClient ? "initialized" : "mock",
@@ -137,39 +97,46 @@ router.get("/health", (req, res) => {
 });
 
 // Create checkout session for an existing order
-router.post("/checkout", async (req, res) => {
+router.post("/checkout", async (req, res): Promise<void> => {
   try {
     const { orderId, successUrl, cancelUrl } = req.body as StripeCheckoutSessionParams;
     if (!orderId || !successUrl || !cancelUrl) {
-      return res.status(400).json({ error: "orderId, successUrl, cancelUrl required" });
+      res.status(400).json({ error: "orderId, successUrl, cancelUrl required" });
+      return;
     }
 
     const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL!);
 
     // Validate orderId format before using it
     if (!orderId || typeof orderId !== "string") {
-      return res.status(400).json({ error: "Invalid orderId format" });
+      res.status(400).json({ error: "Invalid orderId format" });
+      return;
     }
 
     // Convert string orderId to Convex Id type safely
     const convexOrderId = orderId as Id<"orders">;
 
-    // Use explicit typing to avoid type instantiation issues
-    const getOrderWithRelations = async (orderId: Id<"orders">) => {
-      return await (convex as any).query("orders:getOrderWithRelations", { orderId });
-    };
-    const orderData = (await getOrderWithRelations(convexOrderId)) as ConvexOrderData | null;
-    if (!orderData?.order) return res.status(404).json({ error: "Order not found" });
+    // Use string-based API calls to avoid type instantiation issues
+    const orderData = (await (convex as ConvexClient).query(
+      "orders:getOrderWithRelations" as never,
+      {
+        orderId: convexOrderId as never,
+      }
+    )) as unknown as ConvexOrderData | null;
+    if (!orderData?.order) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
 
     const { order } = orderData;
 
     const lineItems = (order.items || []).map((it: any) => ({
       price_data: {
         currency: (order.currency || "usd").toLowerCase(),
-        product_data: { name: it.title },
+        product_data: { name: it.title || "Unknown Item" },
         unit_amount: Number(it.unitPrice || it.totalPrice || 0) || 0,
       },
-      quantity: Number(it.qty || 1),
+      quantity: Number(it.qty || it.quantity || 1),
     }));
 
     const session = await stripeClient.checkout.sessions.create(
@@ -190,10 +157,10 @@ router.post("/checkout", async (req, res) => {
       checkoutSessionId: string,
       paymentIntentId?: string
     ) => {
-      return await (convex as any).mutation("orders:saveStripeCheckoutSession", {
-        orderId,
-        checkoutSessionId,
-        paymentIntentId,
+      return await (convex as ConvexClient).mutation("orders:saveStripeCheckoutSession" as never, {
+        orderId: orderId as never,
+        checkoutSessionId: checkoutSessionId as never,
+        paymentIntentId: paymentIntentId as never,
       });
     };
     await saveCheckoutSession(
@@ -203,14 +170,15 @@ router.post("/checkout", async (req, res) => {
     );
 
     res.json({ url: session.url, id: session.id });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ Error creating checkout session:", error);
-    res.status(500).json({ error: "Error creating checkout session", message: error.message });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: "Error creating checkout session", message: errorMessage });
   }
 });
 
 // Confirm payment and handle success
-router.post("/webhook", async (req, res) => {
+const stripeWebhook = async (req: Request, res: Response): Promise<void> => {
   try {
     const isTest = process.env.NODE_ENV === "test";
     const sig = req.headers["stripe-signature"] as string | undefined;
@@ -219,9 +187,12 @@ router.post("/webhook", async (req, res) => {
     let event: Stripe.Event;
     if (isTest) {
       // In tests, skip signature verification and use parsed body
-      event = req.body as Stripe.Event;
+      event = req.body as unknown as Stripe.Event;
     } else {
-      if (!sig || !endpointSecret) return res.status(400).send("Missing signature");
+      if (!sig || !endpointSecret) {
+        res.status(400).json({ error: "Missing signature" });
+        return;
+      }
 
       // Use enhanced webhook validator for additional security
       const { webhookValidator } = await import("../lib/webhookValidator");
@@ -236,17 +207,19 @@ router.post("/webhook", async (req, res) => {
 
       if (!validationResult.valid) {
         console.error("Webhook validation failed:", validationResult.errors);
-        return res.status(400).json({
+        res.status(400).json({
           error: "Webhook validation failed",
           details: validationResult.errors,
         });
+        return;
       }
 
       try {
         // Fallback to Stripe's built-in validation for compatibility
         event = stripeClient.webhooks.constructEvent(rawBody, sig, endpointSecret);
-      } catch (err: any) {
-        console.warn("⚠️ Stripe constructEvent failed, using validated payload:", err?.message);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.warn("⚠️ Stripe constructEvent failed, using validated payload:", errorMessage);
         event = validationResult.payload as Stripe.Event;
       }
     }
@@ -254,11 +227,17 @@ router.post("/webhook", async (req, res) => {
     const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL!);
 
     // Idempotency guard
-    const processed = await (convex as any).mutation("orders:markProcessedEvent", {
-      provider: "stripe",
-      eventId: event.id,
-    });
-    if (processed.alreadyProcessed) return res.status(204).end();
+    const processed = await (convex as ConvexClient).mutation(
+      "orders:markProcessedEvent" as never,
+      {
+        provider: "stripe" as never,
+        eventId: event.id as never,
+      }
+    );
+    if ((processed as { alreadyProcessed?: boolean }).alreadyProcessed) {
+      res.status(204).end();
+      return;
+    }
 
     switch (event.type) {
       case "checkout.session.completed": {
@@ -268,21 +247,24 @@ router.post("/webhook", async (req, res) => {
           // Convert string orderId to Convex Id type safely
           const convexOrderId = orderId as Id<"orders">;
 
-          await (convex as any).mutation("orders:recordPayment", {
-            orderId: convexOrderId,
-            provider: "stripe",
-            status: "succeeded",
-            amount: Number(session.amount_total || 0),
-            currency: String(session.currency || "usd").toUpperCase(),
-            stripeEventId: event.id,
-            stripePaymentIntentId: (session.payment_intent as string) || undefined,
-            stripeChargeId: undefined,
+          await (convex as ConvexClient).mutation("orders:recordPayment" as never, {
+            orderId: convexOrderId as never,
+            provider: "stripe" as never,
+            status: "succeeded" as never,
+            amount: Number(session.amount_total || 0) as never,
+            currency: String(session.currency || "usd").toUpperCase() as never,
+            stripeEventId: event.id as never,
+            stripePaymentIntentId: ((session.payment_intent as string) || undefined) as never,
+            stripeChargeId: undefined as never,
           });
 
           // Generate invoice PDF and upload to Convex storage
-          const data = (await (convex as any).query("orders:getOrderWithRelations", {
-            orderId: convexOrderId,
-          })) as ConvexOrderData | null;
+          const data = (await (convex as ConvexClient).query(
+            "orders:getOrderWithRelations" as never,
+            {
+              orderId: convexOrderId as never,
+            }
+          )) as unknown as ConvexOrderData | null;
           const order = data?.order;
           const items = data?.items || [];
           if (order) {
@@ -294,7 +276,6 @@ router.post("/webhook", async (req, res) => {
             };
 
             // Create order object compatible with PDF generation
-            const { status: _, ...orderWithoutStatus } = order;
             const orderForPdf = {
               id: 1, // PDF library expects number, not Convex Id
               status: "completed" as const,
@@ -308,7 +289,7 @@ router.post("/webhook", async (req, res) => {
               items: items.map(it => ({
                 id: it.productId,
                 beat_id: it.productId,
-                license_type: it.type as any,
+                license_type: it.type as LicenseType,
                 price: it.unitPrice,
                 quantity: it.qty,
                 session_id: null,
@@ -345,7 +326,10 @@ router.post("/webhook", async (req, res) => {
             }
             const buffer = Buffer.concat(chunks);
 
-            const { url } = await (convex as any).action("files:generateUploadUrl", {});
+            const { url } = (await (convex as ConvexClient).action(
+              "files:generateUploadUrl" as never,
+              {}
+            )) as { url: string };
             const uploadRes = await fetch(url, {
               method: "POST",
               headers: { "Content-Type": "application/pdf" },
@@ -354,22 +338,28 @@ router.post("/webhook", async (req, res) => {
             const uploadJson = await uploadRes.json();
             const storageId = uploadJson.storageId as string;
 
-            const result = await (convex as any).mutation("orders:setInvoiceForOrder", {
-              orderId: convexOrderId,
-              storageId,
-              amount: Number(order.total || session.amount_total || 0),
-              currency: String(order.currency || session.currency || "USD").toUpperCase(),
-              taxAmount: 0, // No tax in current implementation
-              billingInfo: { email: order.email },
-            });
+            const result = await (convex as ConvexClient).mutation(
+              "orders:setInvoiceForOrder" as never,
+              {
+                orderId: convexOrderId as never,
+                storageId: storageId as never,
+                amount: Number(order.total || session.amount_total || 0) as never,
+                currency: String(
+                  order.currency || session.currency || "USD"
+                ).toUpperCase() as never,
+                taxAmount: 0 as never, // No tax in current implementation
+                billingInfo: { email: order.email } as never,
+              }
+            );
 
             // Send email with invoice link
             const to = order.email || session.customer_details?.email;
-            if (to && result?.url) {
+            const resultData = result as { url?: string; number?: string };
+            if (to && resultData?.url) {
               await sendMail({
                 to,
-                subject: `Votre facture ${result.number}`,
-                html: `<p>Merci pour votre paiement.</p><p>Téléchargez votre facture: <a href="${result.url}">${result.url}</a></p>`,
+                subject: `Votre facture ${resultData.number}`,
+                html: `<p>Merci pour votre paiement.</p><p>Téléchargez votre facture: <a href="${resultData.url}">${resultData.url}</a></p>`,
               });
             }
           }
@@ -378,29 +368,29 @@ router.post("/webhook", async (req, res) => {
       }
       case "payment_intent.succeeded": {
         const pi = event.data.object as Stripe.PaymentIntent;
-        await (convex as any).mutation("orders:recordPayment", {
-          orderId: undefined as unknown as Id<"orders">, // resolved later via session link
-          provider: "stripe",
-          status: "succeeded",
-          amount: Number(pi.amount_received || pi.amount || 0),
-          currency: String(pi.currency || "usd").toUpperCase(),
-          stripeEventId: event.id,
-          stripePaymentIntentId: pi.id,
-          stripeChargeId: (pi.latest_charge as string) || undefined,
+        await (convex as ConvexClient).mutation("orders:recordPayment" as never, {
+          orderId: undefined as unknown as Id<"orders"> as never, // resolved later via session link
+          provider: "stripe" as never,
+          status: "succeeded" as never,
+          amount: Number(pi.amount_received || pi.amount || 0) as never,
+          currency: String(pi.currency || "usd").toUpperCase() as never,
+          stripeEventId: event.id as never,
+          stripePaymentIntentId: pi.id as never,
+          stripeChargeId: ((pi.latest_charge as string) || undefined) as never,
         });
         break;
       }
       case "payment_intent.payment_failed": {
         const pi = event.data.object as Stripe.PaymentIntent;
-        await (convex as any).mutation("orders:recordPayment", {
-          orderId: undefined as any as Id<"orders">,
-          provider: "stripe",
-          status: "failed",
-          amount: Number(pi.amount || 0),
-          currency: String(pi.currency || "usd").toUpperCase(),
-          stripeEventId: event.id,
-          stripePaymentIntentId: pi.id,
-          stripeChargeId: undefined,
+        await (convex as ConvexClient).mutation("orders:recordPayment" as never, {
+          orderId: undefined as unknown as Id<"orders"> as never,
+          provider: "stripe" as never,
+          status: "failed" as never,
+          amount: Number(pi.amount || 0) as never,
+          currency: String(pi.currency || "usd").toUpperCase() as never,
+          stripeEventId: event.id as never,
+          stripePaymentIntentId: pi.id as never,
+          stripeChargeId: undefined as never,
         });
         break;
       }
@@ -413,55 +403,54 @@ router.post("/webhook", async (req, res) => {
         break;
     }
 
-    res.json({ received: true });
-  } catch (error: any) {
+    const response: StripeWebhookResponse = { received: true, processed: true };
+    res.json(response);
+  } catch (error: unknown) {
     console.error("Stripe webhook error:", error);
-    res.status(400).send(`Webhook Error: ${error.message}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ error: `Webhook Error: ${errorMessage}` });
   }
-});
+};
+
+router.post("/webhook", stripeWebhook);
 
 // Create payment intent for services
-router.post("/create-payment-intent", async (req, res) => {
+const createPaymentIntent = async (req: Request, res: Response) => {
   try {
-    const {
-      amount,
-      currency = "usd",
-      metadata = {},
-    } = req.body as {
-      amount: number;
-      currency?: string;
-      metadata?: Record<string, string>;
-    };
+    const { amount, currency = "USD", metadata = {} } = req.body as CreatePaymentIntentRequest;
 
     if (!amount || amount <= 0) {
-      return res.status(400).json({ error: "Amount is required and must be greater than 0" });
+      res.status(400).json({ error: "Amount is required and must be greater than 0" });
+      return;
     }
 
     // Create payment intent using the existing function
     const paymentIntent = await createStripePaymentIntent({
       amount: Math.round(amount * 100), // Convert to cents
       currency: currency.toLowerCase(),
-      metadata,
+      metadata: metadata as Record<string, string>,
     });
 
-    res.json({
+    const response: CreatePaymentIntentResponse = {
       clientSecret: paymentIntent.client_secret,
-      id: paymentIntent.id,
-      status: paymentIntent.status,
-      amount: paymentIntent.amount,
-      currency: paymentIntent.currency,
-    });
-  } catch (error: any) {
+      paymentIntentId: paymentIntent.id,
+    };
+
+    res.json(response);
+  } catch (error: unknown) {
     console.error("Error creating payment intent:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     res.status(500).json({
       error: "Error creating payment intent",
-      message: error.message,
+      message: errorMessage,
     });
   }
-});
+};
+
+router.post("/create-payment-intent", createPaymentIntent);
 
 // Get payment intent status
-router.get("/payment-intent/:id", async (req, res) => {
+router.get("/payment-intent/:id", async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
     const paymentIntent = await stripeClient.paymentIntents.retrieve(id);
@@ -472,11 +461,12 @@ router.get("/payment-intent/:id", async (req, res) => {
       currency: paymentIntent.currency,
       metadata: paymentIntent.metadata,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error retrieving payment intent:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     res.status(500).json({
       error: "Error retrieving payment intent",
-      message: error.message,
+      message: errorMessage,
     });
   }
 });

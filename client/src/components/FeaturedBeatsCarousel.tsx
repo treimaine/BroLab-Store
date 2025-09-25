@@ -103,11 +103,11 @@ export function FeaturedBeatsCarousel({
       <section className="py-8 md:py-12" aria-label={title}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-6 md:mb-8">
-            <div className="h-8 md:h-10 lg:h-12 w-48 bg-gray-700/50 rounded animate-pulse"></div>
+            <div className="h-8 md:h-10 lg:h-12 w-48 bg-gray-700/50 rounded animate-pulse" />
             {!isMobile && (
               <div className="flex gap-2">
-                <div className="w-10 h-10 bg-gray-700/50 rounded animate-pulse"></div>
-                <div className="w-10 h-10 bg-gray-700/50 rounded animate-pulse"></div>
+                <div className="w-10 h-10 bg-gray-700/50 rounded animate-pulse" />
+                <div className="w-10 h-10 bg-gray-700/50 rounded animate-pulse" />
               </div>
             )}
           </div>

@@ -106,7 +106,12 @@ export function StatsCards({ stats, previousStats, isLoading, className }: Stats
 
   const formatCurrency = (value: number | string) => {
     const num = typeof value === "string" ? parseFloat(value) : value;
-    return `$${num.toFixed(2)}`;
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num);
   };
 
   const statsConfig = [
@@ -148,10 +153,10 @@ export function StatsCards({ stats, previousStats, isLoading, className }: Stats
           <Card key={i} className="bg-gray-900/50 border-gray-700/50 animate-pulse">
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center space-x-2 sm:space-x-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gray-700 rounded-lg"></div>
+                <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gray-700 rounded-lg" />
                 <div className="space-y-2 flex-1">
-                  <div className="h-3 sm:h-4 bg-gray-700 rounded w-16 sm:w-20"></div>
-                  <div className="h-4 sm:h-6 lg:h-8 bg-gray-700 rounded w-12 sm:w-16"></div>
+                  <div className="h-3 sm:h-4 bg-gray-700 rounded w-16 sm:w-20" />
+                  <div className="h-4 sm:h-6 lg:h-8 bg-gray-700 rounded w-12 sm:w-16" />
                 </div>
               </div>
             </CardContent>

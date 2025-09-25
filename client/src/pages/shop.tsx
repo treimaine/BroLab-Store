@@ -279,17 +279,17 @@ export default function Shop() {
               ? // Loading skeletons
                 Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="card-dark p-4 sm:p-6 animate-pulse">
-                    <div className="w-full h-48 bg-[var(--medium-gray)] rounded-lg mb-4"></div>
-                    <div className="h-4 bg-[var(--medium-gray)] rounded mb-2"></div>
-                    <div className="h-3 bg-[var(--medium-gray)] rounded w-2/3"></div>
+                    <div className="w-full h-48 bg-[var(--medium-gray)] rounded-lg mb-4" />
+                    <div className="h-4 bg-[var(--medium-gray)] rounded mb-2" />
+                    <div className="h-3 bg-[var(--medium-gray)] rounded w-2/3" />
                   </div>
                 ))
               : products.map(product => (
-                  <BeatCard
-                    key={product.id}
-                    id={product.id}
-                    title={product.name || "Untitled"}
-                    genre={
+                <BeatCard
+                  key={product.id}
+                  id={product.id}
+                  title={product.name || "Untitled"}
+                  genre={
                       (product as BeatProductWithWoo).categories?.[0]?.name ||
                       (product as BeatProductWithWoo).categories?.find(cat => cat.name)?.name ||
                       String(
@@ -315,7 +315,7 @@ export default function Shop() {
                       )?.options?.[0] ||
                       ""
                     }
-                    bpm={(() => {
+                  bpm={(() => {
                       if (typeof product.bpm === "number") return product.bpm;
                       const md = (product as BeatProductWithWoo).meta_data || [];
                       const bpmMeta =
@@ -327,10 +327,10 @@ export default function Shop() {
                       const parsed = Number(bpmMeta ?? attrVal);
                       return Number.isFinite(parsed) ? parsed : undefined;
                     })()}
-                    price={product.price}
-                    imageUrl={product.images?.[0]?.src || ""}
-                    audioUrl={product.audio_url || ""}
-                    tags={(() => {
+                  price={product.price}
+                  imageUrl={product.images?.[0]?.src || ""}
+                  audioUrl={product.audio_url || ""}
+                  tags={(() => {
                       const tags = [];
                       if (product.tags && Array.isArray(product.tags)) {
                         tags.push(...product.tags.map(t => (typeof t === "string" ? t : t.name)));
@@ -347,10 +347,10 @@ export default function Shop() {
                       }
                       return tags.filter(Boolean);
                     })()}
-                    featured={product.featured}
-                    downloads={product.downloads || 0}
-                    duration={product.duration}
-                    isFree={
+                  featured={product.featured}
+                  downloads={product.downloads || 0}
+                  duration={product.duration}
+                  isFree={
                       product.is_free ||
                       product.tags?.some(
                         tag => (typeof tag === "string" ? tag : tag.name)?.toLowerCase() === "free"
@@ -359,8 +359,8 @@ export default function Shop() {
                         (product.price === "0" || parseFloat(product.price) === 0)) ||
                       (typeof product.price === "number" && product.price === 0)
                     }
-                    onViewDetails={() => handleProductView(product.id)}
-                  />
+                  onViewDetails={() => handleProductView(product.id)}
+                />
                 ))}
           </div>
         ) : (

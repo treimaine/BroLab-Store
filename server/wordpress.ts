@@ -1,15 +1,51 @@
 import { config } from "dotenv";
 import type { Express } from "express";
+import { ErrorMessages } from "../shared/constants/ErrorMessages";
 import type {
-  TransformedProduct,
   WooCommerceAttribute,
   WooCommerceCategory,
   WooCommerceImage,
   WooCommerceMetaData,
-  WooCommerceMetaQuery,
   WooCommerceProduct,
   WooCommerceTag,
 } from "./types/woocommerce";
+
+// Define missing types
+interface WooCommerceMetaQuery {
+  key: string;
+  value: string;
+  compare?: string;
+  type?: string;
+}
+
+interface TransformedProduct {
+  id: number;
+  name: string;
+  slug: string;
+  price: number;
+  regular_price: number;
+  sale_price: number;
+  on_sale: boolean;
+  featured: boolean;
+  categories: WooCommerceCategory[];
+  tags: WooCommerceTag[];
+  images: WooCommerceImage[];
+  attributes: WooCommerceAttribute[];
+  meta_data: WooCommerceMetaData[];
+  // BroLab specific fields
+  audio_url?: string | null;
+  hasVocals?: boolean;
+  stems?: boolean;
+  bpm?: string;
+  key?: string;
+  mood?: string;
+  instruments?: string;
+  duration?: string;
+  is_free?: boolean;
+  artist?: string;
+  genre?: string;
+  total_sales?: number;
+}
 
 // Ensure environment variables are loaded
 config();
@@ -45,7 +81,7 @@ async function wpApiRequest(endpoint: string, options: RequestInit = {}) {
   });
 
   if (!response.ok) {
-    throw new Error(`WordPress API error: ${response.status} ${response.statusText}`);
+    throw new Error(ErrorMessages.WOOCOMMERCE.CONNECTION_ERROR);
   }
 
   return response.json();
@@ -144,7 +180,7 @@ async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
       env_key: process.env.WOOCOMMERCE_CONSUMER_KEY ? "present" : "missing",
       env_secret: process.env.WOOCOMMERCE_CONSUMER_SECRET ? "present" : "missing",
     });
-    throw new Error("WooCommerce API credentials not configured");
+    throw new Error(ErrorMessages.WOOCOMMERCE.CONNECTION_ERROR);
   }
 
   const url = new URL(`${WOOCOMMERCE_API_URL}${endpoint}`);
@@ -162,7 +198,7 @@ async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
   });
 
   if (!response.ok) {
-    throw new Error(`WooCommerce API error: ${response.status} ${response.statusText}`);
+    throw new Error(ErrorMessages.WOOCOMMERCE.SYNC_FAILED);
   }
 
   return response.json();
@@ -170,18 +206,20 @@ async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
 
 export function registerWordPressRoutes(app: Express) {
   // Image proxy route
-  app.get("/api/proxy/image", async (req, res) => {
+  app.get("/api/proxy/image", async (req, res): Promise<void> => {
     try {
       const { url } = req.query;
       if (!url || typeof url !== "string") {
-        return res.status(400).json({ error: "URL parameter is required" });
+        res.status(400).json({ error: ErrorMessages.VALIDATION.REQUIRED_FIELD });
+        return;
       }
 
       console.log("🖼️ Proxying image:", url);
 
       const response = await fetch(url);
       if (!response.ok) {
-        return res.status(response.status).json({ error: "Failed to fetch image" });
+        res.status(response.status).json({ error: ErrorMessages.FILE.DOWNLOAD_FAILED });
+        return;
       }
 
       const contentType = response.headers.get("content-type");
@@ -191,9 +229,10 @@ export function registerWordPressRoutes(app: Express) {
       res.setHeader("Cache-Control", "public, max-age=3600");
       res.send(Buffer.from(buffer));
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error proxying image:", error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.FILE.DOWNLOAD_FAILED });
     }
   });
 
@@ -203,23 +242,26 @@ export function registerWordPressRoutes(app: Express) {
       const pages = await wpApiRequest("/pages");
       res.json(pages);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching pages:", error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.WOOCOMMERCE.SYNC_FAILED });
     }
   });
 
-  app.get("/api/wordpress/pages/:slug", async (req, res) => {
+  app.get("/api/wordpress/pages/:slug", async (req, res): Promise<void> => {
     try {
       const pages = await wpApiRequest(`/pages?slug=${req.params.slug}`);
       if (pages.length === 0) {
-        return res.status(404).json({ error: "Page not found" });
+        res.status(404).json({ error: ErrorMessages.WOOCOMMERCE.PRODUCT_NOT_FOUND });
+        return;
       }
       res.json(pages[0]);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching page:", error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.WOOCOMMERCE.SYNC_FAILED });
     }
   });
 
@@ -230,9 +272,10 @@ export function registerWordPressRoutes(app: Express) {
       const posts = await wpApiRequest(`/posts?${queryString}`);
       res.json(posts);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching posts:", error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.WOOCOMMERCE.SYNC_FAILED });
     }
   });
 
@@ -241,9 +284,10 @@ export function registerWordPressRoutes(app: Express) {
       const post = await wpApiRequest(`/posts/${req.params.id}`);
       res.json(post);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching post:", error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.WOOCOMMERCE.SYNC_FAILED });
     }
   });
 
@@ -253,9 +297,10 @@ export function registerWordPressRoutes(app: Express) {
       const media = await wpApiRequest(`/media/${req.params.id}`);
       res.json(media);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching media:", error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.FILE.DOWNLOAD_FAILED });
     }
   });
 
@@ -282,10 +327,9 @@ export function registerWordPressRoutes(app: Express) {
       if (req.query.bpm_min || req.query.bpm_max) {
         const bpmQuery: WooCommerceMetaQuery = {
           key: "bpm",
+          value: (req.query.bpm_min || req.query.bpm_max || "") as string,
           type: "NUMERIC",
         };
-        if (req.query.bpm_min) bpmQuery.value = req.query.bpm_min as string;
-        if (req.query.bpm_max) bpmQuery.value = req.query.bpm_max as string;
         if (req.query.bpm_min && req.query.bpm_max) {
           bpmQuery.compare = "BETWEEN";
         } else if (req.query.bpm_min) {
@@ -327,10 +371,9 @@ export function registerWordPressRoutes(app: Express) {
       if (req.query.duration_min || req.query.duration_max) {
         const durationQuery: WooCommerceMetaQuery = {
           key: "duration",
+          value: (req.query.duration_min || req.query.duration_max || "") as string,
           type: "NUMERIC",
         };
-        if (req.query.duration_min) durationQuery.value = req.query.duration_min as string;
-        if (req.query.duration_max) durationQuery.value = req.query.duration_max as string;
         if (req.query.duration_min && req.query.duration_max) {
           durationQuery.compare = "BETWEEN";
         } else if (req.query.duration_min) {
@@ -648,17 +691,19 @@ export function registerWordPressRoutes(app: Express) {
 
       res.json(transformedProducts);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching products:", error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.BEATS.NOT_FOUND });
     }
   });
 
-  app.get("/api/woocommerce/products/:id", async (req, res) => {
+  app.get("/api/woocommerce/products/:id", async (req, res): Promise<void> => {
     try {
       const productId = req.params.id;
       if (!productId || productId === "0") {
-        return res.status(400).json({ error: "Invalid product ID" });
+        res.status(400).json({ error: ErrorMessages.BEATS.NOT_FOUND });
+        return;
       }
 
       const product = await wcApiRequest(`/products/${productId}`);
@@ -846,9 +891,10 @@ export function registerWordPressRoutes(app: Express) {
 
       res.json(transformedProduct);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching product:", error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.BEATS.NOT_FOUND });
     }
   });
 
@@ -858,9 +904,10 @@ export function registerWordPressRoutes(app: Express) {
       const categories = await wcApiRequest("/products/categories");
       res.json(categories);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching categories:", error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.WOOCOMMERCE.SYNC_FAILED });
     }
   });
 
@@ -873,9 +920,10 @@ export function registerWordPressRoutes(app: Express) {
       });
       res.json(order);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error creating order:", error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.ORDER.PROCESSING_FAILED });
     }
   });
 
@@ -888,9 +936,10 @@ export function registerWordPressRoutes(app: Express) {
       });
       res.json(customer);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error creating customer:", error);
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: ErrorMessages.USER.PROFILE_UPDATE_FAILED });
     }
   });
 }

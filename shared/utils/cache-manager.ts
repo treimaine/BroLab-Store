@@ -298,7 +298,7 @@ export class CacheManagerImpl implements CacheManager {
         keyToEvict = this.accessOrder[0];
         break;
 
-      case "LFU":
+      case "LFU": {
         let minFreq = Infinity;
         for (const [key, freq] of this.accessFrequency.entries()) {
           if (freq < minFreq) {
@@ -307,6 +307,7 @@ export class CacheManagerImpl implements CacheManager {
           }
         }
         break;
+      }
 
       case "FIFO":
         keyToEvict = this.insertionOrder[0];

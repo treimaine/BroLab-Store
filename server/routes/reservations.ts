@@ -1,6 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
 import { ReservationStatus } from "../../shared/schema";
+import {
+  CommonParams,
+  CreateReservationSchema,
+  createApiError,
+  validateBody,
+  validateParams,
+} from "../../shared/validation/index";
 import { isAuthenticated as requireAuth } from "../auth";
 import { createValidationMiddleware as validateRequest } from "../lib/validation";
 import { sendMail } from "../services/mail";
@@ -10,7 +17,7 @@ import { generateICS } from "../utils/calendar";
 const router = Router();
 
 // Create a new reservation - AVEC AUTHENTIFICATION ET VALIDATION
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireAuth, validateBody(CreateReservationSchema), async (req, res): Promise<void> => {
   try {
     console.log("🚀 Creating reservation with authentication");
     console.log("👤 Authenticated user:", req.user);
@@ -53,37 +60,48 @@ router.post("/", requireAuth, async (req, res) => {
     }
 
     res.status(201).json(reservation);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("❌ Error creating reservation:", error);
-    res.status(500).json({ error: error.message || "Failed to create reservation" });
+    const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
+
+    const errorResponse = createApiError("reservation_conflict", "Failed to create reservation", {
+      userMessage: "Unable to create your reservation. Please try again or contact support.",
+      requestId,
+    });
+
+    res.status(500).json(errorResponse);
   }
 });
 
 // Get user's reservations
-router.get("/me", requireAuth, async (req, res) => {
+router.get("/me", requireAuth, async (req, res): Promise<void> => {
   try {
     const reservations = await storage.getUserReservations(req.user!.id);
     res.json(reservations);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching user reservations:", error);
-    res.status(500).json({ error: error.message || "Failed to fetch reservations" });
+    const errorMessage = error instanceof Error ? error.message : "Failed to fetch reservations";
+    res.status(500).json({ error: errorMessage });
   }
 });
 
 // Get a specific reservation
-router.get("/:id", requireAuth, async (req, res) => {
+router.get("/:id", requireAuth, validateParams(CommonParams.id), async (req, res): Promise<void> => {
   try {
     const reservation = await storage.getReservation(req.params.id);
     if (!reservation) {
-      return res.status(404).json({ error: "Reservation not found" });
+      res.status(404).json({ error: "Reservation not found" });
+      return;
     }
     if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
-      return res.status(403).json({ error: "Unauthorized" });
+      res.status(403).json({ error: "Unauthorized" });
+      return;
     }
     res.json(reservation);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching reservation:", error);
-    res.status(500).json({ error: error.message || "Failed to fetch reservation" });
+    const errorMessage = error instanceof Error ? error.message : "Failed to fetch reservation";
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -92,14 +110,16 @@ router.patch(
   "/:id/status",
   requireAuth,
   validateRequest(z.object({ status: z.enum(ReservationStatus) })),
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       const reservation = await storage.getReservation(req.params.id);
       if (!reservation) {
-        return res.status(404).json({ error: "Reservation not found" });
+        res.status(404).json({ error: "Reservation not found" });
+      return;
       }
       if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
-        return res.status(403).json({ error: "Unauthorized" });
+        res.status(403).json({ error: "Unauthorized" });
+      return;
       }
 
       const updatedReservation = await storage.updateReservationStatus(
@@ -124,22 +144,26 @@ router.patch(
       });
 
       res.json(updatedReservation);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating reservation status:", error);
-      res.status(500).json({ error: error.message || "Failed to update reservation status" });
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to update reservation status";
+      res.status(500).json({ error: errorMessage });
     }
   }
 );
 
 // Get reservation ICS file
-router.get("/:id/calendar", requireAuth, async (req, res) => {
+router.get("/:id/calendar", requireAuth, async (req, res): Promise<void> => {
   try {
     const reservation = await storage.getReservation(req.params.id);
     if (!reservation) {
-      return res.status(404).json({ error: "Reservation not found" });
+      res.status(404).json({ error: "Reservation not found" });
+      return;
     }
     if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
-      return res.status(403).json({ error: "Unauthorized" });
+      res.status(403).json({ error: "Unauthorized" });
+      return;
     }
 
     const icsContent = generateICS({
@@ -155,23 +179,27 @@ router.get("/:id/calendar", requireAuth, async (req, res) => {
       `attachment; filename="reservation-${reservation.id}.ics"`
     );
     res.send(icsContent);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating calendar file:", error);
-    res.status(500).json({ error: error.message || "Failed to generate calendar file" });
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to generate calendar file";
+    res.status(500).json({ error: errorMessage });
   }
 });
 
 // Get reservations by date range (admin only)
-router.get("/range/:start/:end", requireAuth, async (req, res) => {
+router.get("/range/:start/:end", requireAuth, async (req, res): Promise<void> => {
   try {
     if (req.user!.role !== "service_role") {
-      return res.status(403).json({ error: "Unauthorized. Admin access required." });
+      res.status(403).json({ error: "Unauthorized. Admin access required." });
+      return;
     }
     const startDate = new Date(req.params.start);
     const endDate = new Date(req.params.end);
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      return res.status(400).json({ error: "Invalid date format" });
+      res.status(400).json({ error: "Invalid date format" });
+      return;
     }
 
     const reservations = await storage.getReservationsByDateRange(
@@ -179,9 +207,11 @@ router.get("/range/:start/:end", requireAuth, async (req, res) => {
       endDate.toISOString()
     );
     res.json(reservations);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching reservations by date range:", error);
-    res.status(500).json({ error: error.message || "Failed to fetch reservations" });
+    res
+      .status(500)
+      .json({ error: error instanceof Error ? error.message : "Failed to fetch reservations" });
   }
 });
 

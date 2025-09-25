@@ -105,7 +105,8 @@ interface CacheStats {
  */
 export function useDashboardCache() {
   const queryClient = useQueryClient();
-  const { cache: cacheConfig } = useDashboardConfig();
+  const { performance } = useDashboardConfig();
+  const cacheConfig = performance.cache;
   const statsRef = useRef<CacheStats>({
     hitRate: 0,
     missRate: 0,
@@ -118,10 +119,10 @@ export function useDashboardCache() {
   useEffect(() => {
     queryClient.setDefaultOptions({
       queries: {
-        staleTime: cacheConfig.defaultStaleTime,
-        gcTime: cacheConfig.defaultCacheTime, // Updated from cacheTime to gcTime
-        retry: cacheConfig.maxRetries,
-        retryDelay: cacheConfig.retryDelay,
+        staleTime: cacheConfig.ttl.userStats, // Use userStats as default
+        gcTime: cacheConfig.ttl.userStats * 2, // Set garbage collection time to 2x stale time
+        retry: 3, // Use a reasonable default
+        retryDelay: 1000, // Use a reasonable default
         refetchOnWindowFocus: false,
         refetchOnReconnect: true,
       },
@@ -168,13 +169,13 @@ export function useDashboardCache() {
       try {
         await queryClient.prefetchQuery({
           queryKey: [...CACHE_KEYS.DASHBOARD_DATA, options],
-          staleTime: cacheConfig.dashboardStaleTime,
+          staleTime: cacheConfig.ttl.userStats,
         });
       } catch (error) {
         console.error("Failed to prefetch dashboard data:", error);
       }
     },
-    [queryClient, cacheConfig.dashboardStaleTime]
+    [queryClient, cacheConfig.ttl.userStats]
   );
 
   // Prefetch user statistics
@@ -182,12 +183,12 @@ export function useDashboardCache() {
     try {
       await queryClient.prefetchQuery({
         queryKey: CACHE_KEYS.DASHBOARD_STATS,
-        staleTime: cacheConfig.statsStaleTime,
+        staleTime: cacheConfig.ttl.userStats,
       });
     } catch (error) {
       console.error("Failed to prefetch stats:", error);
     }
-  }, [queryClient, cacheConfig.statsStaleTime]);
+  }, [queryClient, cacheConfig.ttl.userStats]);
 
   // Clear all dashboard cache
   const clearCache = useCallback(

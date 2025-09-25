@@ -1,15 +1,20 @@
 // server/routes/woo.ts
-import { Router } from 'express';
-import { fetchWooCategories, fetchWooProduct, fetchWooProducts } from '../services/woo';
+import { Request, Response, Router } from "express";
+import { fetchWooCategories, fetchWooProduct, fetchWooProducts } from "../services/woo";
+import { WooCommerceMetaData, WooCommerceProduct } from "../types/woocommerce";
 
 const router = Router();
 
-router.get('/products', async (req, res, next) => {
+router.get("/products", async (req: Request, res: Response) => {
   try {
     // Check if WooCommerce is configured
-    if (!process.env.WOOCOMMERCE_API_URL || !process.env.VITE_WC_KEY || !process.env.WOOCOMMERCE_CONSUMER_SECRET) {
-      console.log('⚠️ WooCommerce not configured, returning sample data');
-      
+    if (
+      !process.env.WOOCOMMERCE_API_URL ||
+      !process.env.VITE_WC_KEY ||
+      !process.env.WOOCOMMERCE_CONSUMER_SECRET
+    ) {
+      console.log("⚠️ WooCommerce not configured, returning sample data");
+
       // Return sample data for testing
       const sampleProducts = [
         {
@@ -29,7 +34,7 @@ router.get('/products', async (req, res, next) => {
             { key: "instruments", value: "Drums, Bass, Synth" },
             { key: "duration", value: "3:45" },
             { key: "has_vocals", value: "no" },
-            { key: "stems", value: "yes" }
+            { key: "stems", value: "yes" },
           ],
           tags: [],
           total_sales: 0,
@@ -40,7 +45,7 @@ router.get('/products', async (req, res, next) => {
           mood: "Energetic",
           instruments: "Drums, Bass, Synth",
           duration: "3:45",
-          is_free: false
+          is_free: false,
         },
         {
           id: 2,
@@ -59,7 +64,7 @@ router.get('/products', async (req, res, next) => {
             { key: "instruments", value: "Drums, 808, Hi-hats" },
             { key: "duration", value: "2:30" },
             { key: "has_vocals", value: "yes" },
-            { key: "stems", value: "no" }
+            { key: "stems", value: "no" },
           ],
           tags: [],
           total_sales: 0,
@@ -70,44 +75,64 @@ router.get('/products', async (req, res, next) => {
           mood: "Dark",
           instruments: "Drums, 808, Hi-hats",
           duration: "2:30",
-          is_free: true
-        }
+          is_free: true,
+        },
       ];
-      
-      return res.json(sampleProducts);
+
+      res.json(sampleProducts);
+      return;
     }
-    
-    const wooProducts = await fetchWooProducts(req.query);
-    
+
+    const wooProducts = await fetchWooProducts(req.query as Record<string, unknown>);
+
     // Mapper les produits WooCommerce vers le format attendu
-    const beats = wooProducts.map((product: any) => {
+    const beats = wooProducts.map((product: WooCommerceProduct) => {
       // Extraction robuste de l'URL audio
-      let audioUrl = null;
-      const albTracklistMeta = product.meta_data?.find((meta: any) => meta.key === 'alb_tracklist');
-      const audioUrlMeta = product.meta_data?.find((meta: any) => meta.key === 'audio_url');
-      
+      let audioUrl: string | null = null;
+      const albTracklistMeta = product.meta_data?.find(
+        (meta: WooCommerceMetaData) => meta.key === "alb_tracklist"
+      );
+      const audioUrlMeta = product.meta_data?.find(
+        (meta: WooCommerceMetaData) => meta.key === "audio_url"
+      );
+
       console.log(`🔍 Product ${product.id} - alb_tracklist found:`, !!albTracklistMeta);
-      
+
       if (albTracklistMeta && albTracklistMeta.value) {
-        let sonaarData = albTracklistMeta.value;
+        let sonaarData: unknown = albTracklistMeta.value;
         try {
-          if (typeof sonaarData === 'string') {
+          if (typeof sonaarData === "string") {
             sonaarData = JSON.parse(sonaarData);
           }
         } catch (e) {
           console.error(`❌ Error parsing alb_tracklist for product ${product.id}:`, e);
         }
-        
-        console.log(`📊 Product ${product.id} - sonaarData type:`, typeof sonaarData, Array.isArray(sonaarData));
-        
+
+        console.log(
+          `📊 Product ${product.id} - sonaarData type:`,
+          typeof sonaarData,
+          Array.isArray(sonaarData)
+        );
+
         // Si c'est un tableau (plus courant)
         if (Array.isArray(sonaarData) && sonaarData.length > 0) {
-          const firstTrack = sonaarData[0];
-          audioUrl = firstTrack.audio_preview || firstTrack.track_mp3 || firstTrack.src || firstTrack.url;
+          const firstTrack = sonaarData[0] as Record<string, unknown>;
+          audioUrl =
+            (firstTrack.audio_preview as string) ||
+            (firstTrack.track_mp3 as string) ||
+            (firstTrack.src as string) ||
+            (firstTrack.url as string) ||
+            null;
           console.log(`🎵 Product ${product.id} - Found audio URL (array):`, audioUrl);
-        } else if (sonaarData && typeof sonaarData === 'object') {
+        } else if (sonaarData && typeof sonaarData === "object") {
           // Si c'est un objet unique
-          audioUrl = sonaarData.audio_preview || sonaarData.track_mp3 || sonaarData.src || sonaarData.url;
+          const trackData = sonaarData as Record<string, unknown>;
+          audioUrl =
+            (trackData.audio_preview as string) ||
+            (trackData.track_mp3 as string) ||
+            (trackData.src as string) ||
+            (trackData.url as string) ||
+            null;
           console.log(`🎵 Product ${product.id} - Found audio URL (object):`, audioUrl);
         } else {
           console.log(`❌ Product ${product.id} - No valid audio data found`);
@@ -115,96 +140,130 @@ router.get('/products', async (req, res, next) => {
       } else {
         console.log(`❌ Product ${product.id} - No alb_tracklist found`);
       }
-      
+
       // Fallback sur meta_data.audio_url si rien trouvé
       if (!audioUrl && audioUrlMeta) {
-        audioUrl = audioUrlMeta.value;
+        audioUrl = audioUrlMeta.value as string;
         console.log(`🎵 Product ${product.id} - Fallback audio URL:`, audioUrl);
       }
-      
+
       console.log(`✅ Product ${product.id} - Final audio_url:`, audioUrl);
-      
+
       // Extraction directe basée sur la structure connue
-      let directAudioUrl = null;
+      let directAudioUrl: string | null = null;
       if (product.meta_data) {
-        const albTracklistMeta = product.meta_data.find((meta: any) => meta.key === 'alb_tracklist');
+        const albTracklistMeta = product.meta_data.find(
+          (meta: WooCommerceMetaData) => meta.key === "alb_tracklist"
+        );
         if (albTracklistMeta && albTracklistMeta.value) {
           try {
-            let trackData = albTracklistMeta.value;
-            if (typeof trackData === 'string') {
+            let trackData: unknown = albTracklistMeta.value;
+            if (typeof trackData === "string") {
               trackData = JSON.parse(trackData);
             }
             if (Array.isArray(trackData) && trackData.length > 0) {
-              directAudioUrl = trackData[0].audio_preview || trackData[0].track_mp3;
+              const firstTrack = trackData[0] as Record<string, unknown>;
+              directAudioUrl =
+                (firstTrack.audio_preview as string) || (firstTrack.track_mp3 as string) || null;
             }
           } catch (e) {
             console.error(`Error parsing track data for product ${product.id}:`, e);
           }
         }
       }
-      
+
       // Extraction directe basée sur la structure connue
-      let finalAudioUrl = null;
-      
+      let finalAudioUrl: string | null = null;
+
       // Chercher directement dans alb_tracklist
       if (product.meta_data) {
-        const albTracklistMeta = product.meta_data.find((meta: any) => meta.key === 'alb_tracklist');
+        const albTracklistMeta = product.meta_data.find(
+          (meta: WooCommerceMetaData) => meta.key === "alb_tracklist"
+        );
         if (albTracklistMeta && albTracklistMeta.value) {
           try {
-            let trackData = albTracklistMeta.value;
-            if (typeof trackData === 'string') {
+            let trackData: unknown = albTracklistMeta.value;
+            if (typeof trackData === "string") {
               trackData = JSON.parse(trackData);
             }
             if (Array.isArray(trackData) && trackData.length > 0) {
-              finalAudioUrl = trackData[0].audio_preview || trackData[0].track_mp3;
+              const firstTrack = trackData[0] as Record<string, unknown>;
+              finalAudioUrl =
+                (firstTrack.audio_preview as string) || (firstTrack.track_mp3 as string) || null;
             }
           } catch (e) {
             console.error(`Error parsing track data for product ${product.id}:`, e);
           }
         }
       }
-      
+
       // Si pas trouvé, utiliser la logique précédente
       if (!finalAudioUrl) {
         finalAudioUrl = directAudioUrl || audioUrl || null;
       }
-      
+
       console.log(`🎯 Product ${product.id} - FINAL audio_url:`, finalAudioUrl);
-      
+
+      // Helper function to find metadata value
+      const findMetaValue = (key: string): string | number | boolean | null => {
+        const meta = product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === key);
+        return meta ? (meta.value as string | number | boolean | null) : null;
+      };
+
+      // Helper function to check tags
+      const hasTagWithName = (searchTerm: string): boolean => {
+        return (
+          product.tags?.some(
+            (tag: unknown) =>
+              tag &&
+              typeof tag === "object" &&
+              "name" in tag &&
+              String((tag as { name: unknown }).name)
+                .toLowerCase()
+                .includes(searchTerm.toLowerCase())
+          ) || false
+        );
+      };
+
       // Forcer l'ajout du champ audio_url
       const productWithAudio = {
         ...product,
         audio_url: finalAudioUrl,
-        hasVocals: product.meta_data?.find((meta: any) => meta.key === 'has_vocals')?.value === 'yes' || 
-                  product.tags?.some((tag: any) => tag.name.toLowerCase().includes('vocals')),
-        stems: product.meta_data?.find((meta: any) => meta.key === 'stems')?.value === 'yes' || 
-               product.tags?.some((tag: any) => tag.name.toLowerCase().includes('stems')),
-        bpm: product.meta_data?.find((meta: any) => meta.key === 'bpm')?.value,
-        key: product.meta_data?.find((meta: any) => meta.key === 'key')?.value,
-        mood: product.meta_data?.find((meta: any) => meta.key === 'mood')?.value,
-        instruments: product.meta_data?.find((meta: any) => meta.key === 'instruments')?.value,
-        duration: product.meta_data?.find((meta: any) => meta.key === 'duration')?.value,
-        is_free: product.price === '0' || product.price === ''
+        hasVocals: findMetaValue("has_vocals") === "yes" || hasTagWithName("vocals"),
+        stems: findMetaValue("stems") === "yes" || hasTagWithName("stems"),
+        bpm: findMetaValue("bpm") as string,
+        key: findMetaValue("key") as string,
+        mood: findMetaValue("mood") as string,
+        instruments: findMetaValue("instruments") as string,
+        duration: findMetaValue("duration") as string,
+        is_free: product.price === "0" || product.price === "",
       };
-      
-      console.log(`🎯 Product ${product.id} - audio_url field added:`, !!productWithAudio.audio_url);
-      
+
+      console.log(
+        `🎯 Product ${product.id} - audio_url field added:`,
+        !!productWithAudio.audio_url
+      );
+
       return productWithAudio;
     });
-    
+
     res.json(beats);
-  } catch (e) { 
-    console.error('Error fetching products:', e);
-    res.status(500).json({ error: 'Failed to fetch products' });
+  } catch (e) {
+    console.error("Error fetching products:", e);
+    res.status(500).json({ error: "Failed to fetch products" });
   }
 });
 
-router.get('/products/:id', async (req, res, next) => {
+router.get("/products/:id", async (req, res, next): Promise<void> => {
   try {
     // Check if WooCommerce is configured
-    if (!process.env.WOOCOMMERCE_API_URL || !process.env.VITE_WC_KEY || !process.env.WOOCOMMERCE_CONSUMER_SECRET) {
-      console.log('⚠️ WooCommerce not configured, returning sample product');
-      
+    if (
+      !process.env.WOOCOMMERCE_API_URL ||
+      !process.env.VITE_WC_KEY ||
+      !process.env.WOOCOMMERCE_CONSUMER_SECRET
+    ) {
+      console.log("⚠️ WooCommerce not configured, returning sample product");
+
       // Return sample product for testing
       const sampleProduct = {
         id: parseInt(req.params.id),
@@ -223,7 +282,7 @@ router.get('/products/:id', async (req, res, next) => {
           { key: "instruments", value: "Drums, Bass, Synth" },
           { key: "duration", value: "3:45" },
           { key: "has_vocals", value: "no" },
-          { key: "stems", value: "yes" }
+          { key: "stems", value: "yes" },
         ],
         tags: [],
         total_sales: 0,
@@ -235,120 +294,165 @@ router.get('/products/:id', async (req, res, next) => {
         instruments: "Drums, Bass, Synth",
         duration: "3:45",
         is_free: false,
-        audio_url: null
+        audio_url: null,
       };
-      
-      return res.json({ beat: sampleProduct });
+
+      res.json({ beat: sampleProduct });
+      return;
     }
-    
+
     const product = await fetchWooProduct(req.params.id);
-    
+
     if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+      res.status(404).json({ error: "Product not found" });
+      return;
     }
-    
+
     // Appliquer la même logique d'extraction audio que pour la liste des produits
-    let audioUrl = null;
-    const albTracklistMeta = product.meta_data?.find((meta: any) => meta.key === 'alb_tracklist');
-    const audioUrlMeta = product.meta_data?.find((meta: any) => meta.key === 'audio_url');
-    
+    let audioUrl: string | null = null;
+    const albTracklistMeta = product.meta_data?.find(
+      (meta: WooCommerceMetaData) => meta.key === "alb_tracklist"
+    );
+    const audioUrlMeta = product.meta_data?.find(
+      (meta: WooCommerceMetaData) => meta.key === "audio_url"
+    );
+
     if (albTracklistMeta && albTracklistMeta.value) {
-      let sonaarData = albTracklistMeta.value;
+      let sonaarData: unknown = albTracklistMeta.value;
       try {
-        if (typeof sonaarData === 'string') {
+        if (typeof sonaarData === "string") {
           sonaarData = JSON.parse(sonaarData);
         }
       } catch (e) {
         console.error(`❌ Error parsing alb_tracklist for product ${product.id}:`, e);
       }
-      
+
       // Si c'est un tableau (plus courant)
       if (Array.isArray(sonaarData) && sonaarData.length > 0) {
-        const firstTrack = sonaarData[0];
-        audioUrl = firstTrack.audio_preview || firstTrack.track_mp3 || firstTrack.src || firstTrack.url;
-      } else if (sonaarData && typeof sonaarData === 'object') {
+        const firstTrack = sonaarData[0] as Record<string, unknown>;
+        audioUrl =
+          (firstTrack.audio_preview as string) ||
+          (firstTrack.track_mp3 as string) ||
+          (firstTrack.src as string) ||
+          (firstTrack.url as string) ||
+          null;
+      } else if (sonaarData && typeof sonaarData === "object") {
         // Si c'est un objet unique
-        audioUrl = sonaarData.audio_preview || sonaarData.track_mp3 || sonaarData.src || sonaarData.url;
+        const trackData = sonaarData as Record<string, unknown>;
+        audioUrl =
+          (trackData.audio_preview as string) ||
+          (trackData.track_mp3 as string) ||
+          (trackData.src as string) ||
+          (trackData.url as string) ||
+          null;
       }
     }
-    
+
     // Fallback sur meta_data.audio_url si rien trouvé
     if (!audioUrl && audioUrlMeta) {
-      audioUrl = audioUrlMeta.value;
+      audioUrl = audioUrlMeta.value as string;
     }
-    
+
     // Extraction directe basée sur la structure connue
-    let finalAudioUrl = null;
+    let finalAudioUrl: string | null = null;
     if (product.meta_data) {
-      const albTracklistMeta = product.meta_data.find((meta: any) => meta.key === 'alb_tracklist');
+      const albTracklistMeta = product.meta_data.find(
+        (meta: WooCommerceMetaData) => meta.key === "alb_tracklist"
+      );
       if (albTracklistMeta && albTracklistMeta.value) {
         try {
-          let trackData = albTracklistMeta.value;
-          if (typeof trackData === 'string') {
+          let trackData: unknown = albTracklistMeta.value;
+          if (typeof trackData === "string") {
             trackData = JSON.parse(trackData);
           }
           if (Array.isArray(trackData) && trackData.length > 0) {
-            finalAudioUrl = trackData[0].audio_preview || trackData[0].track_mp3;
+            const firstTrack = trackData[0] as Record<string, unknown>;
+            finalAudioUrl =
+              (firstTrack.audio_preview as string) || (firstTrack.track_mp3 as string) || null;
           }
         } catch (e) {
           console.error(`Error parsing track data for product ${product.id}:`, e);
         }
       }
     }
-    
+
     // Si pas trouvé, utiliser la logique précédente
     if (!finalAudioUrl) {
       finalAudioUrl = audioUrl || null;
     }
-    
+
     console.log(`🎯 Product ${product.id} - FINAL audio_url:`, finalAudioUrl);
-    
+
+    // Helper function to find metadata value
+    const findMetaValue = (key: string): string | number | boolean | null => {
+      const meta = product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === key);
+      return meta ? (meta.value as string | number | boolean | null) : null;
+    };
+
+    // Helper function to check tags
+    const hasTagWithName = (searchTerm: string): boolean => {
+      return (
+        product.tags?.some(
+          (tag: unknown) =>
+            tag &&
+            typeof tag === "object" &&
+            "name" in tag &&
+            String((tag as { name: unknown }).name)
+              .toLowerCase()
+              .includes(searchTerm.toLowerCase())
+        ) || false
+      );
+    };
+
     // Mapper le produit avec la même logique que la liste
     const beat = {
       ...product,
       audio_url: finalAudioUrl,
-      hasVocals: product.meta_data?.find((meta: any) => meta.key === 'has_vocals')?.value === 'yes' || 
-                product.tags?.some((tag: any) => tag.name.toLowerCase().includes('vocals')),
-      stems: product.meta_data?.find((meta: any) => meta.key === 'stems')?.value === 'yes' || 
-             product.tags?.some((tag: any) => tag.name.toLowerCase().includes('stems')),
-      bpm: product.meta_data?.find((meta: any) => meta.key === 'bpm')?.value,
-      key: product.meta_data?.find((meta: any) => meta.key === 'key')?.value,
-      mood: product.meta_data?.find((meta: any) => meta.key === 'mood')?.value,
-      instruments: product.meta_data?.find((meta: any) => meta.key === 'instruments')?.value,
-      duration: product.meta_data?.find((meta: any) => meta.key === 'duration')?.value,
-      is_free: product.price === '0' || product.price === ''
+      hasVocals: findMetaValue("has_vocals") === "yes" || hasTagWithName("vocals"),
+      stems: findMetaValue("stems") === "yes" || hasTagWithName("stems"),
+      bpm: findMetaValue("bpm") as string,
+      key: findMetaValue("key") as string,
+      mood: findMetaValue("mood") as string,
+      instruments: findMetaValue("instruments") as string,
+      duration: findMetaValue("duration") as string,
+      is_free: product.price === "0" || product.price === "",
     };
-    
+
     res.json(beat);
-  } catch (e) { 
-    console.error('Error fetching product:', e);
-    res.status(500).json({ error: 'Failed to fetch product' });
+  } catch (e) {
+    console.error("Error fetching product:", e);
+    res.status(500).json({ error: "Failed to fetch product" });
   }
 });
 
-router.get('/categories', async (_req, res, next) => {
+router.get("/categories", async (_req, res, next) => {
   try {
     // Check if WooCommerce is configured
-    if (!process.env.WOOCOMMERCE_API_URL || !process.env.VITE_WC_KEY || !process.env.WOOCOMMERCE_CONSUMER_SECRET) {
-      console.log('⚠️ WooCommerce not configured, returning sample categories');
-      
+    if (
+      !process.env.WOOCOMMERCE_API_URL ||
+      !process.env.VITE_WC_KEY ||
+      !process.env.WOOCOMMERCE_CONSUMER_SECRET
+    ) {
+      console.log("⚠️ WooCommerce not configured, returning sample categories");
+
       // Return sample categories for testing
       const sampleCategories = [
         { id: 1, name: "Hip Hop", count: 15 },
         { id: 2, name: "Trap", count: 8 },
         { id: 3, name: "R&B", count: 12 },
-        { id: 4, name: "Pop", count: 6 }
+        { id: 4, name: "Pop", count: 6 },
       ];
-      
-      return res.json({ categories: sampleCategories });
+
+      res.json({ categories: sampleCategories });
+      return;
     }
-    
+
     const cats = await fetchWooCategories();
     res.json({ categories: cats });
-  } catch (e) { 
-    console.error('Error fetching categories:', e);
-    res.status(500).json({ error: 'Failed to fetch categories' });
+  } catch (e) {
+    console.error("Error fetching categories:", e);
+    res.status(500).json({ error: "Failed to fetch categories" });
   }
 });
 
-export default router; 
+export default router;

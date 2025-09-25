@@ -1,33 +1,92 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { QueryClient } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { useUserProfile } from "../../client/src/hooks/useUserProfile";
+import { createWrapper } from "../test-utils";
 
-jest.mock("convex/react", () => {
-  return {
-    useQuery: jest.fn(() => ({ _id: "users:1", clerkId: "user_1", email: "a@b.com" })),
-  } as any;
-});
+// Mock the Convex API
+jest.mock("@/lib/convex", () => ({
+  api: {
+    users: {
+      getUserByClerkId: "users:getUserByClerkId",
+    },
+  },
+}));
 
-jest.mock("@clerk/clerk-react", () => {
-  return {
-    useUser: () => ({ user: { id: "user_1" } }),
-  } as any;
-});
+// Mock Clerk
+jest.mock("@clerk/clerk-react", () => ({
+  useUser: jest.fn(() => ({
+    user: { id: "user_test123" },
+    isLoaded: true,
+    isSignedIn: true,
+  })),
+}));
+
+// Mock Convex React hooks
+jest.mock("convex/react", () => ({
+  useQuery: jest.fn(),
+}));
 
 describe("useUserProfile", () => {
-  let queryClient: QueryClient;
+  const mockUseQuery = jest.mocked(require("convex/react").useQuery);
+  const mockUseUser = jest.mocked(require("@clerk/clerk-react").useUser);
 
   beforeEach(() => {
-    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    jest.clearAllMocks();
+
+    // Reset Clerk mock
+    mockUseUser.mockReturnValue({
+      user: { id: "user_test123" },
+      isLoaded: true,
+      isSignedIn: true,
+    });
   });
 
-  const wrapper = ({ children }: any) => children;
+  it("returns user profile when user is signed in", async () => {
+    const mockUserProfile = {
+      _id: "users:1",
+      clerkId: "user_test123",
+      email: "test@example.com",
+      firstName: "Test",
+      lastName: "User",
+    };
 
-  it("returns user profile", async () => {
+    mockUseQuery.mockReturnValue(mockUserProfile);
+
+    const wrapper = createWrapper();
     const { result } = renderHook(() => useUserProfile(), { wrapper });
+
     await waitFor(() => {
+      expect(result.current).toEqual(mockUserProfile);
       expect(result.current?._id).toBeDefined();
+      expect(result.current?.clerkId).toBe("user_test123");
     });
+  });
+
+  it("returns undefined when user is not signed in", async () => {
+    // Mock no user signed in
+    mockUseUser.mockReturnValue({
+      user: null,
+      isLoaded: true,
+      isSignedIn: false,
+    });
+
+    mockUseQuery.mockReturnValue(undefined);
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useUserProfile(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current).toBeUndefined();
+    });
+  });
+
+  it("handles loading state", async () => {
+    mockUseQuery.mockReturnValue(undefined);
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useUserProfile(), { wrapper });
+
+    // Initially should be undefined (loading)
+    expect(result.current).toBeUndefined();
   });
 });

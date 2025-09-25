@@ -39,13 +39,9 @@ const EnhancedErrorContext = React.createContext<EnhancedErrorContextType>({
   networkStatus: "online",
 });
 
-export const EnhancedErrorProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const EnhancedErrorProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [errors, setErrors] = useState<ErrorInfo[]>([]);
-  const [networkStatus, setNetworkStatus] = useState<
-    "online" | "offline" | "slow"
-  >("online");
+  const [networkStatus, setNetworkStatus] = useState<"online" | "offline" | "slow">("online");
 
   // Monitor network status
   useEffect(() => {
@@ -78,10 +74,7 @@ export const EnhancedErrorProvider: React.FC<{ children: React.ReactNode }> = ({
   // Auto-remove errors after 10 seconds (except critical ones)
   useEffect(() => {
     errors.forEach((error, index) => {
-      if (
-        error.type !== ErrorType.PAYMENT &&
-        error.type !== ErrorType.AUTHENTICATION
-      ) {
+      if (error.type !== ErrorType.PAYMENT && error.type !== ErrorType.AUTHENTICATION) {
         setTimeout(() => {
           removeError(index);
         }, 10000);
@@ -90,11 +83,11 @@ export const EnhancedErrorProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [errors]);
 
   const addError = (error: ErrorInfo) => {
-    setErrors((prev) => [...prev, { ...error, timestamp: new Date() }]);
+    setErrors(prev => [...prev, { ...error, timestamp: new Date() }]);
   };
 
   const removeError = (index: number) => {
-    setErrors((prev) => prev.filter((_, i) => i !== index));
+    setErrors(prev => prev.filter((_, i) => i !== index));
   };
 
   const clearErrors = () => {
@@ -121,9 +114,7 @@ export const EnhancedErrorProvider: React.FC<{ children: React.ReactNode }> = ({
 export const useErrorHandler = () => {
   const context = React.useContext(EnhancedErrorContext);
   if (!context) {
-    throw new Error(
-      "useErrorHandler must be used within EnhancedErrorProvider"
-    );
+    throw new Error("useErrorHandler must be used within EnhancedErrorProvider");
   }
   return context;
 };
@@ -194,9 +185,7 @@ const ErrorDisplay: React.FC = () => {
                 </button>
               </div>
               <p className="text-sm">{error.message}</p>
-              {error.details && (
-                <p className="text-xs opacity-75">{error.details}</p>
-              )}
+              {error.details && <p className="text-xs opacity-75">{error.details}</p>}
               {error.retry && (
                 <Button
                   size="sm"
@@ -208,9 +197,7 @@ const ErrorDisplay: React.FC = () => {
                   {error.actionLabel || "Retry"}
                 </Button>
               )}
-              <p className="text-xs opacity-50">
-                {error.timestamp.toLocaleTimeString()}
-              </p>
+              <p className="text-xs opacity-50">{error.timestamp.toLocaleTimeString()}</p>
             </div>
           </AlertDescription>
         </Alert>
@@ -311,11 +298,11 @@ export class ErrorBoundary extends React.Component<
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Error Boundary caught an error:", error, errorInfo);
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-[var(--dark-bg)] flex items-center justify-center p-4">
@@ -328,8 +315,7 @@ export class ErrorBoundary extends React.Component<
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-red-200">
-                An unexpected error occurred. Please refresh the page or try
-                again later.
+                An unexpected error occurred. Please refresh the page or try again later.
               </p>
               <div className="space-y-2">
                 <Button
@@ -350,9 +336,7 @@ export class ErrorBoundary extends React.Component<
               {process.env.NODE_ENV === "development" && this.state.error && (
                 <details className="text-xs text-red-400 bg-red-950/50 p-2 rounded">
                   <summary>Error Details</summary>
-                  <pre className="mt-2 whitespace-pre-wrap">
-                    {this.state.error.stack}
-                  </pre>
+                  <pre className="mt-2 whitespace-pre-wrap">{this.state.error.stack}</pre>
                 </details>
               )}
             </CardContent>

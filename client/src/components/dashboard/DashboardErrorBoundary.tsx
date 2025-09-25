@@ -51,7 +51,7 @@ export class DashboardErrorBoundary extends Component<
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({
       errorInfo,
       errorId: this.generateErrorId(),
@@ -166,13 +166,13 @@ export class DashboardErrorBoundary extends Component<
     );
   }
 
-  componentWillUnmount() {
+  override componentWillUnmount() {
     if (this.retryTimeoutId) {
       clearTimeout(this.retryTimeoutId);
     }
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       // If a custom fallback is provided, use it
       if (this.props.fallback) {

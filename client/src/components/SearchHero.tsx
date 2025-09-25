@@ -124,7 +124,7 @@ export function SearchHero() {
           {/* Loading Indicator */}
           {isSearching && searchQuery.trim().length >= 2 && (
             <div className="absolute right-16 top-1/2 transform -translate-y-1/2">
-              <div className="w-4 h-4 border-2 border-[var(--accent-purple)] border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-4 h-4 border-2 border-[var(--accent-purple)] border-t-transparent rounded-full animate-spin" />
             </div>
           )}
           <Button
@@ -206,7 +206,7 @@ export function SearchHero() {
                           </div>
                           {/* Audio Waveform Indicator */}
                           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[var(--accent-cyan)] rounded-full flex items-center justify-center">
-                            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                            <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
                           </div>
                         </div>
 

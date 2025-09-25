@@ -1,10 +1,28 @@
 import { ConvexHttpClient } from "convex/browser";
 import { Router } from "express";
-import { z } from "zod";
+import type {
+  CreateOrderResponse,
+  GetInvoiceResponse,
+  GetMyOrdersResponse,
+  GetOrderResponse,
+} from "../../shared/types/apiEndpoints";
+import {
+  CommonParams,
+  CommonQueries,
+  CreateOrderSchema,
+  validateBody,
+  validateParams,
+  validateQuery,
+} from "../../shared/validation/index";
 import { isAuthenticated } from "../auth";
+import type {
+  CreateOrderHandler,
+  GetInvoiceHandler,
+  GetMyOrdersHandler,
+  GetOrderHandler,
+} from "../types/ApiTypes";
 
-// Interface simple et stable pour createOrderIdempotent
-// Basée sur la définition de la mutation Convex dans convex/orders.ts
+// Interface for Convex order creation
 interface CreateOrderIdempotentArgs {
   items: Array<{
     productId: number;
@@ -12,73 +30,80 @@ interface CreateOrderIdempotentArgs {
     type: string; // 'beat'|'subscription'|'service'
     qty: number;
     unitPrice: number; // cents
-    metadata?: any;
+    metadata?: Record<string, unknown>;
   }>;
   currency: string;
   email: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   idempotencyKey?: string;
 }
 
-// Type de retour simplifié
+// Simplified return type
 interface CreateOrderResult {
   orderId: string;
-  order: any;
+  order: Record<string, unknown>;
   idempotent?: boolean;
 }
 
 const ordersRouter = Router();
 const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL!);
 
-// Fonctions wrapper qui évitent complètement l'accès aux types Convex complexes
+// Wrapper functions to avoid complex Convex type access
 const createOrderIdempotent = async (
   args: CreateOrderIdempotentArgs
 ): Promise<CreateOrderResult> => {
-  // Utilisation de chaînes de caractères pour éviter la récursion infinie
-  return (await (convex.mutation as any)(
+  // Using string-based calls to avoid infinite recursion
+  return (await (convex.mutation as (name: string, args: unknown) => Promise<unknown>)(
     "orders:createOrderIdempotent",
     args
   )) as CreateOrderResult;
 };
 
-const listOrders = async (args: { limit: number }) => {
-  return await (convex.query as any)("orders:listOrders", args);
+const listOrders = async (args: {
+  limit: number;
+}): Promise<{
+  items: Record<string, unknown>[];
+  cursor?: string;
+  hasMore: boolean;
+}> => {
+  return (await (convex.query as (name: string, args: unknown) => Promise<unknown>)(
+    "orders:listOrders",
+    args
+  )) as {
+    items: Record<string, unknown>[];
+    cursor?: string;
+    hasMore: boolean;
+  };
 };
 
-const getOrderWithRelations = async (args: { orderId: string }) => {
-  return await (convex.query as any)("orders:getOrderWithRelations", args);
+const getOrderWithRelations = async (args: {
+  orderId: string;
+}): Promise<{
+  order?: Record<string, unknown>;
+  items?: Record<string, unknown>[];
+}> => {
+  return (await (convex.query as (name: string, args: unknown) => Promise<unknown>)(
+    "orders:getOrderWithRelations",
+    args
+  )) as {
+    order?: Record<string, unknown>;
+    items?: Record<string, unknown>[];
+  };
 };
 
-const createOrderBody = z.object({
-  items: z
-    .array(
-      z.object({
-        productId: z.number(),
-        title: z.string(),
-        type: z.enum(["beat", "subscription", "service"]),
-        qty: z.number().min(1),
-        unitPrice: z.number().min(0), // cents
-        metadata: z.record(z.any()).optional(),
-      })
-    )
-    .min(1),
-  currency: z.string().min(3),
-  metadata: z.record(z.any()).optional(),
-  idempotencyKey: z.string().optional(),
-});
+// Remove the old schema - using shared validation now
 
 ordersRouter.use(isAuthenticated);
 
 // POST /api/orders - Create a new order (idempotent)
-ordersRouter.post("/", isAuthenticated, async (req: any, res) => {
+const createOrder: CreateOrderHandler = async (req, res) => {
   try {
-    const body = createOrderBody.parse(req.body);
+    const body = req.body; // Already validated by middleware
     const idempotencyKey =
       body.idempotencyKey || (req.headers["x-idempotency-key"] as string | undefined);
 
-    // Mapping du résultat de schema.parse() vers l'interface simple
-    // Évite les unions complexes et réduit la profondeur d'inférence
-    const orderArgs = {
+    // Map parsed schema result to simple interface
+    const orderArgs: CreateOrderIdempotentArgs = {
       items: body.items.map(item => ({
         productId: item.productId,
         title: item.title,
@@ -91,107 +116,151 @@ ordersRouter.post("/", isAuthenticated, async (req: any, res) => {
       email: req.user?.email || "",
       metadata: body.metadata,
       idempotencyKey: idempotencyKey,
-    } satisfies CreateOrderIdempotentArgs;
+    };
 
-    // Utilisation de la fonction wrapper
+    // Use wrapper function
     const result = await createOrderIdempotent(orderArgs);
-    res.status(201).json(result);
-  } catch (error: any) {
+    const response: CreateOrderResponse = {
+      orderId: result.orderId,
+      order: result.order as unknown as CreateOrderResponse["order"],
+      idempotent: result.idempotent,
+    };
+    res.status(201).json(response);
+  } catch (error: unknown) {
     console.error("Create order error:", error);
-    if (error?.issues)
-      return res.status(400).json({ error: "Invalid order data", details: error.issues });
-    res.status(500).json({ error: error.message || "Failed to create order" });
+    const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
+
+    res.status(500).json({
+      error: "Failed to create order",
+      message: "Unable to process your order. Please try again.",
+      requestId,
+    });
   }
-});
+};
+
+ordersRouter.post("/", validateBody(CreateOrderSchema), createOrder as never);
 
 // GET /api/orders/me
-ordersRouter.get("/me", isAuthenticated, async (req: any, res) => {
+const getMyOrders: GetMyOrdersHandler = async (req, res) => {
   try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
+    const { page, limit } = req.query as { page: number; limit: number }; // Already validated by middleware
     const { items, cursor, hasMore } = await listOrders({ limit });
-    res.json({
-      orders: items,
+
+    const response: GetMyOrdersResponse = {
+      orders: items as unknown as GetMyOrdersResponse["orders"],
       page,
       total: items.length,
       totalPages: hasMore ? page + 1 : page,
       cursor,
       hasMore,
-    });
-  } catch (error: any) {
+    };
+    res.json(response);
+  } catch (error: unknown) {
     console.error("🚨 Error fetching orders:", error);
-    res.status(500).json({ error: "Failed to fetch orders" });
+    const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
+
+    res.status(500).json({
+      error: "Failed to fetch orders",
+      message: "Unable to load your orders. Please try again.",
+      requestId,
+    });
   }
-});
+};
+
+ordersRouter.get("/me", validateQuery(CommonQueries.pagination), getMyOrders as never);
 
 // GET /api/orders/:id
-ordersRouter.get("/:id", isAuthenticated, async (req: any, res) => {
+const getOrder: GetOrderHandler = async (req, res) => {
   try {
     const id = req.params.id as string;
     const data = await getOrderWithRelations({ orderId: id });
 
-    const user = req.user || {};
+    const user = req.user;
     const isAdmin =
       user?.role === "admin" ||
       user?.email === "admin@brolabentertainment.com" ||
       user?.username === "admin";
-    const isOwner = data?.order?.userId && String(data.order.userId) === String(user.id);
+    const isOwner = data?.order?.userId && String(data.order.userId) === String(user?.id);
 
     if (!isAdmin && !isOwner) {
-      return res.status(403).json({ error: "Forbidden" });
+      res.status(403).json({ error: "Forbidden" });
+      return;
     }
 
-    res.json(data);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || "Invalid order id" });
+    const response: GetOrderResponse = {
+      order: data?.order as unknown as GetOrderResponse["order"],
+      items: (data?.items || []) as unknown as GetOrderResponse["items"],
+      statusHistory: [], // TODO: Implement status history
+    };
+    res.json(response);
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : "Invalid order id";
+    res.status(400).json({ error: errorMessage });
   }
-});
+};
+
+ordersRouter.get("/:id", validateParams(CommonParams.id), getOrder as never);
 
 // GET /api/orders/:id/invoice
 // Signed URL already attached on order after webhook pipeline; just return stored URL
-ordersRouter.get("/:id/invoice", isAuthenticated, async (req: any, res) => {
+const getInvoice: GetInvoiceHandler = async (req, res) => {
   try {
     const id = req.params.id as string;
     const data = await getOrderWithRelations({ orderId: id });
 
-    const user = req.user || {};
+    const user = req.user;
     const isAdmin =
       user?.role === "admin" ||
       user?.email === "admin@brolabentertainment.com" ||
       user?.username === "admin";
-    const isOwner = data?.order?.userId && String(data.order.userId) === String(user.id);
+    const isOwner = data?.order?.userId && String(data.order.userId) === String(user?.id);
     if (!isAdmin && !isOwner) {
-      return res.status(403).json({ error: "Forbidden" });
+      res.status(403).json({ error: "Forbidden" });
+      return;
     }
 
-    if (!data?.order?.invoiceUrl) return res.status(404).json({ error: "Invoice not ready" });
-    res.json({ url: data.order.invoiceUrl });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || "Invalid order id" });
+    const invoiceUrl = data?.order?.invoiceUrl as string | undefined;
+    if (!invoiceUrl) {
+      res.status(404).json({ error: "Invoice not ready" });
+      return;
+    }
+
+    const response: GetInvoiceResponse = { url: invoiceUrl };
+    res.json(response);
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : "Invalid order id";
+    res.status(400).json({ error: errorMessage });
   }
-});
+};
+
+ordersRouter.get("/:id/invoice", validateParams(CommonParams.id), getInvoice as never);
 
 // GET /api/orders/:id/invoice/download
-ordersRouter.get("/:id/invoice/download", isAuthenticated, async (req: any, res) => {
+ordersRouter.get("/:id/invoice/download", validateParams(CommonParams.id), async (req, res) => {
   try {
     const id = req.params.id as string;
     const data = await getOrderWithRelations({ orderId: id });
 
-    const user = req.user || {};
+    const user = req.user;
     const isAdmin =
       user?.role === "admin" ||
       user?.email === "admin@brolabentertainment.com" ||
       user?.username === "admin";
-    const isOwner = data?.order?.userId && String(data.order.userId) === String(user.id);
+    const isOwner = data?.order?.userId && String(data.order.userId) === String(user?.id);
     if (!isAdmin && !isOwner) {
-      return res.status(403).json({ error: "Forbidden" });
+      res.status(403).json({ error: "Forbidden" });
+      return;
     }
 
-    if (!(data as any)?.invoice?.pdfUrl)
-      return res.status(404).json({ error: "Invoice not ready" });
-    res.redirect((data as any).invoice.pdfUrl);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || "Invalid order id" });
+    const invoice = data as { invoice?: { pdfUrl?: string } };
+    if (!invoice?.invoice?.pdfUrl) {
+      res.status(404).json({ error: "Invoice not ready" });
+      return;
+    }
+    res.redirect(invoice.invoice.pdfUrl);
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : "Invalid order id";
+    res.status(400).json({ error: errorMessage });
   }
 });
 

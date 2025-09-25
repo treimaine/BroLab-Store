@@ -1,23 +1,54 @@
-// User behavior analytics types and interfaces
+/**
+ * User Behavior Analytics Type Definitions for BroLab Entertainment
+ *
+ * This module contains all type definitions related to user behavior tracking,
+ * analytics, conversion funnels, and insights for the BroLab Entertainment
+ * marketplace platform.
+ */
 
+// ================================
+// CORE INTERFACES
+// ================================
+
+/**
+ * User interaction event for analytics tracking
+ */
 export interface UserInteraction {
+  /** Unique interaction identifier */
   id: string;
+  /** User ID if authenticated */
   userId?: string;
+  /** Session identifier */
   sessionId: string;
+  /** Timestamp when interaction occurred */
   timestamp: number;
+  /** Type of interaction */
   type: InteractionType;
+  /** Component where interaction occurred */
   component: string;
+  /** Action performed */
   action: string;
+  /** Target element or identifier */
   target?: string;
+  /** Additional interaction metadata */
   metadata: Record<string, unknown>;
+  /** URL where interaction occurred */
   url: string;
+  /** User agent string */
   userAgent?: string;
+  /** Device type */
   deviceType?: DeviceType;
+  /** Screen resolution */
   screenResolution?: string;
+  /** Duration of interaction in milliseconds */
   duration?: number;
+  /** Monetary value associated with interaction */
   value?: number;
 }
 
+/**
+ * Types of user interactions that can be tracked
+ */
 export type InteractionType =
   | "click"
   | "view"
@@ -40,45 +71,87 @@ export type InteractionType =
   | "page_load"
   | "page_unload";
 
+/**
+ * Device types for analytics categorization
+ */
 export type DeviceType = "desktop" | "tablet" | "mobile" | "unknown";
 
+/**
+ * User session information for analytics tracking
+ */
 export interface UserSession {
+  /** Unique session identifier */
   id: string;
+  /** User ID if authenticated */
   userId?: string;
+  /** Session start timestamp */
   startTime: number;
+  /** Session end timestamp */
   endTime?: number;
+  /** Total session duration in milliseconds */
   duration?: number;
+  /** Number of page views in session */
   pageViews: number;
+  /** Number of interactions in session */
   interactions: number;
+  /** Whether this was a bounce session */
   bounceRate: boolean;
+  /** Referrer URL */
   referrer?: string;
+  /** UTM source parameter */
   utmSource?: string;
+  /** UTM medium parameter */
   utmMedium?: string;
+  /** UTM campaign parameter */
   utmCampaign?: string;
+  /** Device type used */
   deviceType: DeviceType;
+  /** Browser name */
   browser?: string;
+  /** Operating system */
   os?: string;
+  /** User's country */
   country?: string;
+  /** User's city */
   city?: string;
 }
 
+/**
+ * Conversion funnel configuration for tracking user journeys
+ */
 export interface ConversionFunnel {
+  /** Unique funnel identifier */
   id: string;
+  /** Funnel name */
   name: string;
+  /** Ordered list of funnel steps */
   steps: FunnelStep[];
+  /** When funnel was created */
   createdAt: number;
+  /** When funnel was last updated */
   updatedAt: number;
+  /** Whether funnel is currently active */
   isActive: boolean;
 }
 
+/**
+ * Individual step within a conversion funnel
+ */
 export interface FunnelStep {
+  /** Unique step identifier */
   id: string;
+  /** Step name */
   name: string;
+  /** Step description */
   description: string;
+  /** Step order in funnel */
   order: number;
+  /** Conditions that must be met for this step */
   conditions: FunnelCondition[];
+  /** Required interaction types for step completion */
   requiredInteractions: InteractionType[];
-  timeLimit?: number; // milliseconds
+  /** Time limit for completing step in milliseconds */
+  timeLimit?: number;
 }
 
 export interface FunnelCondition {

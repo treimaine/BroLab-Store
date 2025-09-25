@@ -248,19 +248,19 @@ export default function PaymentDashboard() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full" />
                 <span className="text-gray-300">Stripe Connected</span>
               </div>
               <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full" />
                 <span className="text-gray-300">Tax API Ready</span>
               </div>
               <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full" />
                 <span className="text-gray-300">Invoice System Active</span>
               </div>
               <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full" />
                 <span className="text-gray-300">Multi-Currency Live</span>
               </div>
             </div>

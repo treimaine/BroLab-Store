@@ -141,6 +141,8 @@ export function useNewsletterModal() {
 
       return () => clearTimeout(timer);
     }
+
+    return undefined;
   }, []);
 
   const openModal = () => setIsOpen(true);

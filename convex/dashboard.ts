@@ -9,10 +9,15 @@ import type {
   Order,
   Reservation,
   TrendData,
-  TrendMetric,
   UserStats,
 } from "../shared/types/dashboard";
 import { query } from "./_generated/server";
+import {
+  CurrencyCalculator,
+  DateCalculator,
+  StatisticsCalculator,
+  TimePeriod,
+} from "./lib/statisticsCalculator";
 
 // Inline utility functions
 function sanitizeDashboardLimits(args: {
@@ -32,13 +37,6 @@ function sanitizeDashboardLimits(args: {
     favoritesLimit: Math.min(Math.max(args.favoritesLimit || 50, 1), maxLimit),
     reservationsLimit: Math.min(Math.max(args.reservationsLimit || defaultLimit, 1), maxLimit),
   };
-}
-
-function sanitizeCurrencyAmount(amount: number | undefined, fromCents = true): number {
-  if (typeof amount !== "number" || isNaN(amount) || amount < 0) {
-    return 0;
-  }
-  return fromCents ? Math.round(amount) / 100 : Math.round(amount * 100) / 100;
 }
 
 class DashboardError extends Error {
@@ -247,40 +245,14 @@ export const getDashboardData = query({
           : undefined,
       };
 
-      // Calculate statistics
-      const completedOrders = orders.filter(
-        order => order.status === "completed" || order.status === "paid"
-      );
-
-      const totalSpent = completedOrders.reduce((sum, order) => sum + (order.total || 0), 0);
-
-      // Get current month data for trends
-      const now = new Date();
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-
-      const monthlyOrders = orders.filter(order => order.createdAt >= currentMonthStart);
-      const monthlyDownloads = downloads.filter(
-        download => download.timestamp >= currentMonthStart
-      );
-      const monthlyRevenue = monthlyOrders
-        .filter(order => order.status === "completed" || order.status === "paid")
-        .reduce((sum, order) => sum + (order.total || 0), 0);
-
-      // Get quota information
-      const downloadQuota = quotas.find(q => q.quotaType === "downloads");
-
-      const stats: UserStats = {
-        totalFavorites: favorites.length,
-        totalDownloads: downloads.length,
-        totalOrders: orders.length,
-        totalSpent: sanitizeCurrencyAmount(totalSpent, true), // Convert cents to dollars
-        recentActivity: activityLog.length,
-        quotaUsed: downloadQuota?.used || 0,
-        quotaLimit: downloadQuota?.limit || 0,
-        monthlyDownloads: monthlyDownloads.length,
-        monthlyOrders: monthlyOrders.length,
-        monthlyRevenue: sanitizeCurrencyAmount(monthlyRevenue, true), // Convert cents to dollars
-      };
+      // Calculate comprehensive statistics using enhanced calculator
+      const stats: UserStats = StatisticsCalculator.calculateUserStats({
+        favorites,
+        downloads,
+        orders,
+        quotas,
+        activityLog,
+      });
 
       // Transform favorites with beat enrichment
       const enrichedFavorites: Favorite[] = favorites.map(fav => {
@@ -293,7 +265,7 @@ export const getDashboardData = query({
           beatImageUrl: beat?.imageUrl || undefined,
           beatGenre: beat?.genre || undefined,
           beatBpm: beat?.bpm || undefined,
-          beatPrice: beat?.price ? sanitizeCurrencyAmount(beat.price, true) : undefined, // Convert cents to dollars
+          beatPrice: beat?.price ? CurrencyCalculator.centsToDollars(beat.price) : undefined,
           createdAt: new Date(fav.createdAt).toISOString(),
         };
       });
@@ -304,15 +276,15 @@ export const getDashboardData = query({
         orderNumber: order.invoiceNumber,
         items: (order.items || []).map(item => ({
           productId: item.productId,
-          title: item.title,
-          price: item.price ? item.price / 100 : undefined, // Convert cents to dollars
+          title: item.title || item.name || `Product ${item.productId || "Unknown"}`,
+          price: item.price ? CurrencyCalculator.centsToDollars(item.price) : undefined,
           quantity: item.quantity,
           license: item.license,
           type: item.type,
           sku: item.sku,
           metadata: item.metadata,
         })),
-        total: (order.total || 0) / 100, // Convert cents to dollars
+        total: CurrencyCalculator.centsToDollars(order.total || 0),
         currency: order.currency || "USD",
         status: order.status as any,
         paymentMethod: order.paymentProvider,
@@ -349,7 +321,7 @@ export const getDashboardData = query({
         serviceType: reservation.serviceType as any,
         preferredDate: reservation.preferredDate,
         duration: reservation.durationMinutes,
-        totalPrice: reservation.totalPrice / 100, // Convert cents to dollars
+        totalPrice: CurrencyCalculator.centsToDollars(reservation.totalPrice),
         status: reservation.status as any,
         details: reservation.details as any,
         notes: reservation.notes,
@@ -378,13 +350,13 @@ export const getDashboardData = query({
         severity: activity.details?.severity || "info",
       }));
 
-      // Generate chart data if requested
+      // Generate chart data if requested (default to 30 days)
       let chartData: ChartDataPoint[] = [];
       if (args.includeChartData) {
-        chartData = await generateChartData(ctx, user._id);
+        chartData = await generateChartData(ctx, user._id, "30d");
       }
 
-      // Generate trends if requested
+      // Generate trends if requested (default to 30 days)
       let trends: TrendData = {
         orders: { period: "30d", value: 0, change: 0, changePercent: 0, isPositive: true },
         downloads: { period: "30d", value: 0, change: 0, changePercent: 0, isPositive: true },
@@ -392,7 +364,7 @@ export const getDashboardData = query({
         favorites: { period: "30d", value: 0, change: 0, changePercent: 0, isPositive: true },
       };
       if (args.includeTrends) {
-        trends = await generateTrends(ctx, user._id);
+        trends = await generateTrends(ctx, user._id, "30d");
       }
 
       return {
@@ -411,89 +383,53 @@ export const getDashboardData = query({
 });
 
 /**
- * Generate chart data for analytics
+ * Generate chart data for analytics with enhanced statistics
  */
-async function generateChartData(ctx: any, userId: string): Promise<ChartDataPoint[]> {
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+async function generateChartData(
+  ctx: any,
+  userId: string,
+  period: TimePeriod = "30d"
+): Promise<ChartDataPoint[]> {
+  const { start, end } = DateCalculator.getPeriodRange(period);
 
-  // Get data for the last 30 days
+  // Get data for the specified period
   const [orders, downloads, favorites] = await Promise.all([
     ctx.db
       .query("orders")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), thirtyDaysAgo.getTime()))
+      .filter((q: any) => q.gte(q.field("createdAt"), start.getTime()))
+      .filter((q: any) => q.lte(q.field("createdAt"), end.getTime()))
       .collect(),
 
     ctx.db
       .query("downloads")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("timestamp"), thirtyDaysAgo.getTime()))
+      .filter((q: any) => q.gte(q.field("timestamp"), start.getTime()))
+      .filter((q: any) => q.lte(q.field("timestamp"), end.getTime()))
       .collect(),
 
     ctx.db
       .query("favorites")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), thirtyDaysAgo.getTime()))
+      .filter((q: any) => q.gte(q.field("createdAt"), start.getTime()))
+      .filter((q: any) => q.lte(q.field("createdAt"), end.getTime()))
       .collect(),
   ]);
 
-  // Group by date
-  const dataByDate = new Map<string, ChartDataPoint>();
-
-  // Initialize all dates with zero values
-  for (let i = 0; i < 30; i++) {
-    const date = new Date(thirtyDaysAgo.getTime() + i * 24 * 60 * 60 * 1000);
-    const dateStr = date.toISOString().split("T")[0];
-    dataByDate.set(dateStr, {
-      date: dateStr,
-      orders: 0,
-      downloads: 0,
-      revenue: 0,
-      favorites: 0,
-    });
-  }
-
-  // Aggregate orders
-  orders.forEach((order: any) => {
-    const date = new Date(order.createdAt).toISOString().split("T")[0];
-    const existing = dataByDate.get(date);
-    if (existing) {
-      existing.orders += 1;
-      if (order.status === "completed" || order.status === "paid") {
-        existing.revenue += (order.total || 0) / 100; // Convert cents to dollars
-      }
-    }
-  });
-
-  // Aggregate downloads
-  downloads.forEach((download: any) => {
-    const date = new Date(download.timestamp).toISOString().split("T")[0];
-    const existing = dataByDate.get(date);
-    if (existing) {
-      existing.downloads += 1;
-    }
-  });
-
-  // Aggregate favorites
-  favorites.forEach((favorite: any) => {
-    const date = new Date(favorite.createdAt).toISOString().split("T")[0];
-    const existing = dataByDate.get(date);
-    if (existing) {
-      existing.favorites += 1;
-    }
-  });
-
-  return Array.from(dataByDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+  // Use enhanced statistics calculator to generate chart data
+  return StatisticsCalculator.generateChartData(orders, downloads, favorites, period);
 }
 
 /**
- * Generate trend data with period-over-period comparisons
+ * Generate trend data with period-over-period comparisons using enhanced statistics
  */
-async function generateTrends(ctx: any, userId: string): Promise<TrendData> {
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+async function generateTrends(
+  ctx: any,
+  userId: string,
+  period: TimePeriod = "30d"
+): Promise<TrendData> {
+  const { start: currentStart, end: currentEnd } = DateCalculator.getPeriodRange(period);
+  const { start: previousStart, end: previousEnd } = DateCalculator.getPreviousPeriodRange(period);
 
   // Get current and previous period data
   const [
@@ -508,80 +444,199 @@ async function generateTrends(ctx: any, userId: string): Promise<TrendData> {
     ctx.db
       .query("orders")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), thirtyDaysAgo.getTime()))
+      .filter((q: any) => q.gte(q.field("createdAt"), currentStart.getTime()))
+      .filter((q: any) => q.lte(q.field("createdAt"), currentEnd.getTime()))
       .collect(),
 
     // Previous period orders
     ctx.db
       .query("orders")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), sixtyDaysAgo.getTime()))
-      .filter((q: any) => q.lt(q.field("createdAt"), thirtyDaysAgo.getTime()))
+      .filter((q: any) => q.gte(q.field("createdAt"), previousStart.getTime()))
+      .filter((q: any) => q.lte(q.field("createdAt"), previousEnd.getTime()))
       .collect(),
 
     // Current period downloads
     ctx.db
       .query("downloads")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("timestamp"), thirtyDaysAgo.getTime()))
+      .filter((q: any) => q.gte(q.field("timestamp"), currentStart.getTime()))
+      .filter((q: any) => q.lte(q.field("timestamp"), currentEnd.getTime()))
       .collect(),
 
     // Previous period downloads
     ctx.db
       .query("downloads")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("timestamp"), sixtyDaysAgo.getTime()))
-      .filter((q: any) => q.lt(q.field("timestamp"), thirtyDaysAgo.getTime()))
+      .filter((q: any) => q.gte(q.field("timestamp"), previousStart.getTime()))
+      .filter((q: any) => q.lte(q.field("timestamp"), previousEnd.getTime()))
       .collect(),
 
     // Current period favorites
     ctx.db
       .query("favorites")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), thirtyDaysAgo.getTime()))
+      .filter((q: any) => q.gte(q.field("createdAt"), currentStart.getTime()))
+      .filter((q: any) => q.lte(q.field("createdAt"), currentEnd.getTime()))
       .collect(),
 
     // Previous period favorites
     ctx.db
       .query("favorites")
       .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), sixtyDaysAgo.getTime()))
-      .filter((q: any) => q.lt(q.field("createdAt"), thirtyDaysAgo.getTime()))
+      .filter((q: any) => q.gte(q.field("createdAt"), previousStart.getTime()))
+      .filter((q: any) => q.lte(q.field("createdAt"), previousEnd.getTime()))
       .collect(),
   ]);
 
-  // Calculate metrics
-  const currentRevenue =
+  // Calculate revenue using enhanced currency calculator
+  const currentRevenue = CurrencyCalculator.addAmounts(
     currentOrders
       .filter((order: any) => order.status === "completed" || order.status === "paid")
-      .reduce((sum: number, order: any) => sum + (order.total || 0), 0) / 100; // Convert to dollars
+      .map((order: any) => order.total || 0),
+    true // fromCents
+  );
 
-  const previousRevenue =
+  const previousRevenue = CurrencyCalculator.addAmounts(
     previousOrders
       .filter((order: any) => order.status === "completed" || order.status === "paid")
-      .reduce((sum: number, order: any) => sum + (order.total || 0), 0) / 100; // Convert to dollars
+      .map((order: any) => order.total || 0),
+    true // fromCents
+  );
 
-  // Helper function to calculate trend metric
-  const calculateTrend = (current: number, previous: number): TrendMetric => {
-    const change = current - previous;
-    const changePercent = previous > 0 ? (change / previous) * 100 : 0;
-
-    return {
-      period: "30d",
-      value: current,
-      change,
-      changePercent,
-      isPositive: change >= 0,
-    };
-  };
-
-  return {
-    orders: calculateTrend(currentOrders.length, previousOrders.length),
-    downloads: calculateTrend(currentDownloads.length, previousDownloads.length),
-    revenue: calculateTrend(currentRevenue, previousRevenue),
-    favorites: calculateTrend(currentFavorites.length, previousFavorites.length),
-  };
+  // Use enhanced statistics calculator for trend analysis
+  return StatisticsCalculator.calculateTrendData(
+    {
+      orders: currentOrders,
+      downloads: currentDownloads,
+      favorites: currentFavorites,
+      revenue: currentRevenue,
+    },
+    {
+      orders: previousOrders,
+      downloads: previousDownloads,
+      favorites: previousFavorites,
+      revenue: previousRevenue,
+    },
+    period
+  );
 }
+
+/**
+ * Get analytics data for specific time period
+ */
+export const getAnalyticsData = query({
+  args: {
+    period: v.optional(
+      v.union(v.literal("7d"), v.literal("30d"), v.literal("90d"), v.literal("1y"))
+    ),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    chartData: ChartDataPoint[];
+    trends: TrendData;
+    advancedMetrics: any;
+  }> => {
+    return executeDashboardQuery(async () => {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) {
+        throw new DashboardError("Not authenticated", "auth_error", false);
+      }
+
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
+        .first();
+
+      if (!user) {
+        return {
+          chartData: [],
+          trends: {
+            orders: {
+              period: args.period || "30d",
+              value: 0,
+              change: 0,
+              changePercent: 0,
+              isPositive: true,
+            },
+            downloads: {
+              period: args.period || "30d",
+              value: 0,
+              change: 0,
+              changePercent: 0,
+              isPositive: true,
+            },
+            revenue: {
+              period: args.period || "30d",
+              value: 0,
+              change: 0,
+              changePercent: 0,
+              isPositive: true,
+            },
+            favorites: {
+              period: args.period || "30d",
+              value: 0,
+              change: 0,
+              changePercent: 0,
+              isPositive: true,
+            },
+          },
+          advancedMetrics: {},
+        };
+      }
+
+      const period: TimePeriod = args.period || "30d";
+      const { start, end } = DateCalculator.getPeriodRange(period);
+
+      // Get all data for the period
+      const [orders, downloads, favorites] = await Promise.all([
+        ctx.db
+          .query("orders")
+          .withIndex("by_user", q => q.eq("userId", user._id))
+          .filter(q => q.gte(q.field("createdAt"), start.getTime()))
+          .filter(q => q.lte(q.field("createdAt"), end.getTime()))
+          .collect(),
+
+        ctx.db
+          .query("downloads")
+          .withIndex("by_user", q => q.eq("userId", user._id))
+          .filter(q => q.gte(q.field("timestamp"), start.getTime()))
+          .filter(q => q.lte(q.field("timestamp"), end.getTime()))
+          .collect(),
+
+        ctx.db
+          .query("favorites")
+          .withIndex("by_user", q => q.eq("userId", user._id))
+          .filter(q => q.gte(q.field("createdAt"), start.getTime()))
+          .filter(q => q.lte(q.field("createdAt"), end.getTime()))
+          .collect(),
+      ]);
+
+      // Generate analytics data
+      const chartData = StatisticsCalculator.generateChartData(
+        orders,
+        downloads,
+        favorites,
+        period
+      );
+      const trends = await generateTrends(ctx, user._id, period);
+      const advancedMetrics = StatisticsCalculator.calculateAdvancedMetrics({
+        orders,
+        downloads,
+        favorites,
+        period,
+      });
+
+      return {
+        chartData,
+        trends,
+        advancedMetrics,
+      };
+    }, "fetch analytics data");
+  },
+});
 
 /**
  * Get dashboard statistics only (lightweight version)
@@ -643,40 +698,16 @@ export const getDashboardStats = query({
         .query("activityLog")
         .withIndex("by_user", q => q.eq("userId", user._id))
         .collect()
-        .then((results: any[]) => results.length),
+        .then((results: unknown[]) => results.length),
     ]);
 
-    const completedOrders = orders.filter(
-      (order: any) => order.status === "completed" || order.status === "paid"
-    );
-
-    const totalSpent = completedOrders.reduce(
-      (sum: number, order: any) => sum + (order.total || 0),
-      0
-    );
-
-    // Get current month data
-    const now = new Date();
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-
-    const monthlyOrders = orders.filter((order: any) => order.createdAt >= currentMonthStart);
-    const monthlyRevenue = monthlyOrders
-      .filter((order: any) => order.status === "completed" || order.status === "paid")
-      .reduce((sum: number, order: any) => sum + (order.total || 0), 0);
-
-    const downloadQuota = quotas.find((q: any) => q.quotaType === "downloads");
-
-    return {
-      totalFavorites: favoritesCount,
-      totalDownloads: downloadsCount,
-      totalOrders: orders.length,
-      totalSpent: sanitizeCurrencyAmount(totalSpent, true), // Convert cents to dollars
-      recentActivity: activityCount,
-      quotaUsed: downloadQuota?.used || 0,
-      quotaLimit: downloadQuota?.limit || 0,
-      monthlyDownloads: 0, // Would need additional query for monthly downloads
-      monthlyOrders: monthlyOrders.length,
-      monthlyRevenue: sanitizeCurrencyAmount(monthlyRevenue, true), // Convert cents to dollars
-    };
+    // Use enhanced statistics calculator for consistent calculations
+    return StatisticsCalculator.calculateUserStats({
+      favorites: Array(favoritesCount).fill({}), // Mock array for count
+      downloads: Array(downloadsCount).fill({}), // Mock array for count
+      orders,
+      quotas,
+      activityLog: Array(activityCount).fill({}), // Mock array for count
+    });
   },
 });

@@ -1,8 +1,8 @@
 import { useUser } from "@clerk/clerk-react";
-import { api } from "@convex/_generated/api";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMutation as useConvexMutation, useQuery as useConvexQuery } from "convex/react";
 import { useCallback, useMemo } from "react";
+import { api } from "../../../convex/_generated/api";
 
 // Configuration des requêtes optimisées
 const QUERY_CONFIG = {

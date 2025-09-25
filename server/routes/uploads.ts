@@ -1,52 +1,79 @@
-import { Router } from 'express';
-import multer from 'multer';
-import { isAuthenticated } from '../auth';
-import { uploadRateLimit } from '../middleware/rateLimiter';
-import { validateFile, scanFile, uploadToSupabase } from '../lib/upload';
+import { Router } from "express";
+import multer from "multer";
+import { createApiError, getUserMessageForErrorType } from "../../shared/validation/index";
+import { isAuthenticated } from "../auth";
+import { scanFile, uploadToSupabase, validateFile } from "../lib/upload";
+import { uploadRateLimit } from "../middleware/rateLimiter";
+import { validateFileUpload } from "../middleware/validation";
 
 const router = Router();
 
 // Configuration multer pour stockage en mémoire
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB max
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
 });
 
 // Route d'upload sécurisée
-router.post('/upload', 
+router.post(
+  "/upload",
   isAuthenticated,
   uploadRateLimit,
-  upload.single('file'),
-  async (req, res) => {
+  upload.single("file"),
+  validateFileUpload({
+    maxSize: 50 * 1024 * 1024, // 50MB
+    allowedTypes: [
+      "audio/mpeg",
+      "audio/wav",
+      "audio/mp3",
+      "audio/aiff",
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "application/pdf",
+      "application/zip",
+    ],
+    required: true,
+  }),
+  async (req, res): Promise<void> => {
     try {
+      // File validation already handled by middleware
       if (!req.file) {
-        return res.status(400).json({ error: 'Aucun fichier fourni' });
+        const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
+        const errorResponse = createApiError("file_too_large", "No file provided", {
+          userMessage: "Please select a file to upload",
+          requestId,
+        });
+        res.status(400).json(errorResponse);
+      return;
       }
 
       // Validation du fichier
       const validation = await validateFile(req.file, {
-        category: req.body.category || 'audio'
+        category: req.body.category || "audio",
       });
 
       if (!validation.valid) {
-        return res.status(400).json({
-          error: 'Validation du fichier échouée',
-          details: validation.errors
+        res.status(400).json({
+          error: "Validation du fichier échouée",
+          details: validation.errors,
         });
+      return;
       }
 
       // Scan antivirus
       const isSafe = await scanFile(req.file);
       if (!isSafe) {
-        return res.status(400).json({
-          error: 'Le fichier n\'a pas passé le scan de sécurité'
+        res.status(400).json({
+          error: "Le fichier n'a pas passé le scan de sécurité",
         });
+      return;
       }
 
       // Génération du chemin de stockage
       const timestamp = Date.now();
       const userId = req.user!.id;
-      const extension = req.file.originalname.split('.').pop();
+      const extension = req.file.originalname.split(".").pop();
       const filePath = `${userId}/${timestamp}.${extension}`;
 
       // Upload vers Supabase
@@ -59,17 +86,21 @@ router.post('/upload',
           url,
           name: req.file.originalname,
           type: req.file.mimetype,
-          size: req.file.size
-        }
+          size: req.file.size,
+        },
+      });
+    } catch (error: unknown) {
+      console.error("Erreur upload:", error);
+      const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
+
+      const errorResponse = createApiError("upload_failed", "File upload failed", {
+        userMessage: getUserMessageForErrorType("upload_failed"),
+        requestId,
       });
 
-    } catch (error: any) {
-      console.error('Erreur upload:', error);
-      res.status(500).json({
-        error: 'Échec de l\'upload',
-        message: error.message
-      });
+      res.status(500).json(errorResponse);
     }
-});
+  }
+);
 
 export default router;

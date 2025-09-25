@@ -56,12 +56,12 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
     app.use("/api/payment/stripe", stripeRouter);
 
     // Mock global fetch used for upload
-    global.fetch = jest.fn(async (url: any, init?: any) => {
+    global.fetch = jest.fn(async (url: unknown, _init?: unknown) => {
       if (typeof url === "string" && url.startsWith("http")) {
         return {
           ok: true,
           json: async () => ({ storageId: "file_1" }),
-        } as any;
+        } as Response;
       }
       return { ok: true, json: async () => ({}) } as any;
     }) as any;

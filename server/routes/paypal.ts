@@ -78,11 +78,12 @@ router.post("/create-order", requireAuth, async (req: any, res: Response) => {
 
     // Validation des données requises
     if (!serviceType || !amount || !currency || !description || !reservationId || !customerEmail) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error:
           "Missing required fields: serviceType, amount, currency, description, reservationId, customerEmail",
       });
+      return;
     }
 
     // ✅ AUTHENTIFICATION VÉRIFIÉE - Utilisateur connecté
@@ -140,10 +141,11 @@ router.post("/capture-payment", async (req: any, res: Response) => {
     const { orderId } = req.body;
 
     if (!orderId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: "Missing orderId (PayPal token)",
       });
+      return;
     }
 
     console.log("🎯 Capturing PayPal payment for order:", orderId);
@@ -186,10 +188,11 @@ router.get("/capture/:token", async (req: Request, res: Response) => {
     const { PayerID } = req.query; // PayerID optionnel de PayPal
 
     if (!token) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: "Missing PayPal token",
       });
+      return;
     }
 
     console.log("🎯 Auto-capturing PayPal payment with token:", token);
@@ -238,7 +241,8 @@ router.post("/webhook", async (req: Request, res: Response) => {
 
     if (!webhookId || !transmissionId || !timestamp || !certUrl || !authAlgo || !transmissionSig) {
       console.error("❌ Missing PayPal webhook headers");
-      return res.status(400).json({ error: "Missing webhook headers" });
+      res.status(400).json({ error: "Missing webhook headers" });
+      return;
     }
 
     // Vérification de la signature
@@ -254,7 +258,8 @@ router.post("/webhook", async (req: Request, res: Response) => {
 
     if (!isValidSignature) {
       console.error("❌ Invalid webhook signature");
-      return res.status(400).json({ error: "Invalid webhook signature" });
+      res.status(400).json({ error: "Invalid webhook signature" });
+      return;
     }
 
     console.log("✅ Webhook signature verified successfully");
@@ -289,10 +294,11 @@ router.get("/order/:orderId", async (req: any, res: Response) => {
     const { orderId } = req.params;
 
     if (!orderId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: "Missing orderId",
       });
+      return;
     }
 
     console.log("📋 Getting PayPal order details:", orderId);

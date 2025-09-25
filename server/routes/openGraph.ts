@@ -61,7 +61,7 @@ const openGraphConfig: OpenGraphConfig = {
  * GET /api/opengraph/beat/:id
  * Génère les meta tags Open Graph pour un beat spécifique
  */
-router.get("/beat/:id", async (req, res) => {
+router.get("/beat/:id", async (req, res): Promise<void> => {
   try {
     const beatId = req.params.id;
 
@@ -71,13 +71,15 @@ router.get("/beat/:id", async (req, res) => {
       product = await wcApiRequest(`/products/${beatId}`);
     } catch (error: any) {
       if (error.message?.includes("404")) {
-        return res.status(404).json({ error: "Beat not found" });
+        res.status(404).json({ error: "Beat not found" });
+      return;
       }
       throw error;
     }
 
     if (!product) {
-      return res.status(404).json({ error: "Beat not found" });
+      res.status(404).json({ error: "Beat not found" });
+      return;
     }
 
     // Transformer les données WooCommerce
@@ -116,7 +118,7 @@ router.get("/beat/:id", async (req, res) => {
  * GET /api/opengraph/shop
  * Génère les meta tags Open Graph pour la page shop
  */
-router.get("/shop", async (req, res) => {
+router.get("/shop", async (req, res): Promise<void> => {
   try {
     const openGraphMeta = generateShopOpenGraph(openGraphConfig);
     const openGraphHTML = generateOpenGraphHTML(openGraphMeta);
@@ -134,7 +136,7 @@ router.get("/shop", async (req, res) => {
  * GET /api/opengraph/home
  * Génère les meta tags Open Graph pour la page d'accueil
  */
-router.get("/home", async (req, res) => {
+router.get("/home", async (req, res): Promise<void> => {
   try {
     const openGraphMeta = generateHomeOpenGraph(openGraphConfig);
     const openGraphHTML = generateOpenGraphHTML(openGraphMeta);
@@ -152,14 +154,15 @@ router.get("/home", async (req, res) => {
  * GET /api/opengraph/page/:pageName
  * Génère les meta tags Open Graph pour une page statique
  */
-router.get("/page/:pageName", async (req, res) => {
+router.get("/page/:pageName", async (req, res): Promise<void> => {
   try {
     const pageName = req.params.pageName as "about" | "contact" | "terms" | "privacy" | "license";
 
     // Vérifier que la page est valide
     const validPages = ["about", "contact", "terms", "privacy", "license"];
     if (!validPages.includes(pageName)) {
-      return res.status(400).json({ error: "Invalid page name" });
+      res.status(400).json({ error: "Invalid page name" });
+      return;
     }
 
     const openGraphMeta = generateStaticPageOpenGraph(pageName, openGraphConfig);

@@ -2,17 +2,15 @@ import { NextFunction, Request, Response } from "express";
 import { webhookValidator } from "../lib/webhookValidator";
 
 // Extend Express Request to include webhook validation results
-declare global {
-  namespace Express {
-    interface Request {
-      webhookValidation?: {
-        provider: string;
-        payload: any;
-        timestamp?: number;
-        isValid: boolean;
-        errors: string[];
-      };
-    }
+declare module "express-serve-static-core" {
+  interface Request {
+    webhookValidation?: {
+      provider: string;
+      payload: any;
+      timestamp?: number;
+      isValid: boolean;
+      errors: string[];
+    };
   }
 }
 

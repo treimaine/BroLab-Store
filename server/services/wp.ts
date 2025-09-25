@@ -1,4 +1,5 @@
 // WordPress Service Functions
+import { ErrorMessages } from "../../shared/constants/ErrorMessages";
 
 // Get WordPress products (beats)
 export async function getWordPressProducts(
@@ -30,7 +31,7 @@ export async function getWordPressProducts(
     });
 
     if (!response.ok) {
-      throw new Error(`WordPress API error: ${response.status}`);
+      throw new Error(ErrorMessages.WOOCOMMERCE.CONNECTION_ERROR);
     }
 
     const posts = await response.json();

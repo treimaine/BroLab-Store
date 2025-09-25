@@ -10,7 +10,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 // Health check route
-router.get("/health", (req, res) => {
+router.get("/health", (req, res): void => {
   res.json({
     status: "ok",
     clerk: "initialized",
@@ -19,7 +19,7 @@ router.get("/health", (req, res) => {
 });
 
 // Create checkout session for one-time purchases
-router.post("/create-checkout-session", async (req, res) => {
+router.post("/create-checkout-session", async (req, res): Promise<void> => {
   try {
     console.log("🎯 Clerk route hit - creating checkout session");
 
@@ -27,12 +27,14 @@ router.post("/create-checkout-session", async (req, res) => {
     console.log("📊 Payment data:", { amount, currency, metadata });
 
     if (!amount || amount <= 0) {
-      return res.status(400).json({ error: "Valid amount is required" });
+      res.status(400).json({ error: "Valid amount is required" });
+      return;
     }
 
     // Validate currency
     if (!["usd", "eur", "gbp"].includes(currency.toLowerCase())) {
-      return res.status(400).json({ error: "Unsupported currency" });
+      res.status(400).json({ error: "Unsupported currency" });
+      return;
     }
 
     try {
@@ -77,11 +79,12 @@ router.post("/create-checkout-session", async (req, res) => {
 
       // Handle specific Stripe errors
       if (stripeError.type) {
-        return res.status(400).json({
+        res.status(400).json({
           error: "Payment Error",
           message: stripeError.message || "Failed to create checkout session",
           code: stripeError.type,
         });
+        return;
       }
 
       throw stripeError;
@@ -96,7 +99,7 @@ router.post("/create-checkout-session", async (req, res) => {
 });
 
 // Get checkout session status
-router.get("/checkout-session/:id", async (req, res) => {
+router.get("/checkout-session/:id", async (req, res): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -122,14 +125,15 @@ router.get("/checkout-session/:id", async (req, res) => {
 });
 
 // Handle Stripe webhooks for payment events
-router.post("/webhooks", async (req, res) => {
+router.post("/webhooks", async (req, res): Promise<void> => {
   try {
     const sig = req.headers["stripe-signature"];
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!sig || !endpointSecret) {
       console.error("Missing webhook signature or secret");
-      return res.status(400).json({ error: "Missing webhook signature or secret" });
+      res.status(400).json({ error: "Missing webhook signature or secret" });
+      return;
     }
 
     let event;
@@ -138,7 +142,8 @@ router.post("/webhooks", async (req, res) => {
       event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
     } catch (err: any) {
       console.error("Webhook signature verification failed:", err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+      res.status(400).send(`Webhook Error: ${err.message}`);
+      return;
     }
 
     console.log("📡 Stripe webhook received:", event.type);

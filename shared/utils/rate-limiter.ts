@@ -1,3 +1,4 @@
+import { ConvexHttpClient } from "convex/browser";
 import {
   RateLimiter as IRateLimiter,
   RateLimit,
@@ -6,7 +7,6 @@ import {
 } from "../types/core";
 
 // In-memory rate limiting implementation for type safety
-// TODO: Replace with actual Convex implementation when rateLimits API is available
 class InMemoryRateLimitStore {
   private limits: Map<string, { count: number; resetTime: number; blocked: number }> = new Map();
 
@@ -115,6 +115,196 @@ class InMemoryRateLimitStore {
 
 const store = new InMemoryRateLimitStore();
 
+// Convex-based rate limiter implementation
+export class ConvexRateLimiterImpl implements IRateLimiter {
+  private convexClient: ConvexHttpClient;
+
+  constructor(convexClient: ConvexHttpClient) {
+    this.convexClient = convexClient;
+  }
+
+  async checkLimit(key: string, limit: RateLimit): Promise<RateLimitResult> {
+    try {
+      // Use direct function call to avoid type inference issues
+      const result = (await this.convexClient.mutation("rateLimits:checkRateLimit" as any, {
+        key,
+        windowMs: limit.windowMs,
+        maxRequests: limit.maxRequests,
+        metadata: {
+          action: key.split(":").pop(),
+        },
+      })) as RateLimitResult;
+
+      // Call onLimitReached callback if limit is exceeded
+      if (!result.allowed && limit.onLimitReached) {
+        limit.onLimitReached(key);
+      }
+
+      return result;
+    } catch (error) {
+      console.error("Rate limit check failed:", error);
+
+      // Fail open - allow request if rate limiter fails
+      return {
+        allowed: true,
+        remaining: limit.maxRequests,
+        resetTime: Date.now() + limit.windowMs,
+        totalRequests: 0,
+      };
+    }
+  }
+
+  async resetLimit(key: string): Promise<void> {
+    try {
+      await this.convexClient.mutation("rateLimits:resetRateLimit" as any, { key });
+    } catch (error) {
+      console.error("Failed to reset rate limit:", error);
+    }
+  }
+
+  async getStats(key: string): Promise<RateLimitStats> {
+    try {
+      const stats = (await this.convexClient.query("rateLimits:getRateLimitStats" as any, {
+        key,
+      })) as RateLimitStats | null;
+
+      if (!stats) {
+        return {
+          key,
+          requests: 0,
+          remaining: 0,
+          resetTime: Date.now(),
+          windowStart: Date.now(),
+          blocked: 0,
+        };
+      }
+
+      return stats;
+    } catch (error) {
+      console.error("Failed to get rate limit stats:", error);
+
+      return {
+        key,
+        requests: 0,
+        remaining: 0,
+        resetTime: Date.now(),
+        windowStart: Date.now(),
+        blocked: 0,
+      };
+    }
+  }
+
+  async incrementCounter(key: string): Promise<number> {
+    try {
+      const result = (await this.convexClient.mutation("rateLimits:incrementRateLimit" as any, {
+        key,
+        windowMs: 60 * 60 * 1000, // 1 hour
+        maxRequests: 1000,
+        metadata: {
+          action: key.split(":").pop(),
+        },
+      })) as number;
+      return result;
+    } catch (error) {
+      console.error("Failed to increment rate limit counter:", error);
+      return 0;
+    }
+  }
+
+  async getGlobalStats(): Promise<Record<string, RateLimitStats>> {
+    try {
+      return (await this.convexClient.query(
+        "rateLimits:getAllRateLimitStats" as any,
+        {}
+      )) as Record<string, RateLimitStats>;
+    } catch (error) {
+      console.error("Failed to get global rate limit stats:", error);
+      return {};
+    }
+  }
+
+  async getUserStats(userId: string): Promise<Record<string, RateLimitStats>> {
+    try {
+      return (await this.convexClient.query("rateLimits:getUserRateLimits" as any, {
+        userId,
+      })) as Record<string, RateLimitStats>;
+    } catch (error) {
+      console.error("Failed to get user rate limit stats:", error);
+      return {};
+    }
+  }
+
+  async getMetrics(_timeRange?: { start: number; end: number }) {
+    try {
+      const result = (await (this.convexClient.query as any)("rateLimits:getRateLimitMetrics", {
+        timeRange: _timeRange,
+      })) as {
+        totalKeys: number;
+        totalRequests: number;
+        totalBlocked: number;
+        activeWindows: number;
+        byAction: Record<string, { requests: number; blocked: number; keys: number }>;
+      };
+
+      // Transform byAction to match the interface
+      const transformedByAction: Record<string, number> = {};
+      Object.entries(result.byAction).forEach(([key, value]) => {
+        transformedByAction[key] = value.requests;
+      });
+
+      return {
+        totalKeys: result.totalKeys || 0,
+        totalRequests: result.totalRequests || 0,
+        totalBlocked: result.totalBlocked || 0,
+        activeWindows: result.activeWindows || 0,
+        byAction: transformedByAction,
+      };
+    } catch (error) {
+      console.error("Failed to get rate limit metrics:", error);
+
+      return {
+        totalKeys: 0,
+        totalRequests: 0,
+        totalBlocked: 0,
+        activeWindows: 0,
+        byAction: {},
+      };
+    }
+  }
+
+  async cleanupExpired(_olderThanMs?: number): Promise<{ deletedCount: number }> {
+    try {
+      return (await this.convexClient.mutation("rateLimits:cleanupExpiredRateLimits" as any, {
+        olderThanMs: _olderThanMs,
+      })) as { deletedCount: number };
+    } catch (error) {
+      console.error("Failed to cleanup expired rate limits:", error);
+      return { deletedCount: 0 };
+    }
+  }
+
+  // Helper method to generate rate limit keys
+  static generateKey(identifier: string, action: string): string {
+    return `${identifier}:${action}`;
+  }
+
+  // Helper method to create common rate limit configurations
+  static createConfig(
+    windowMs: number,
+    maxRequests: number,
+    options?: Partial<RateLimit>
+  ): RateLimit {
+    return {
+      windowMs,
+      maxRequests,
+      skipSuccessfulRequests: false,
+      skipFailedRequests: false,
+      ...options,
+    };
+  }
+}
+
+// In-memory implementation for fallback
 export class RateLimiterImpl implements IRateLimiter {
   async checkLimit(key: string, limit: RateLimit): Promise<RateLimitResult> {
     try {
@@ -184,8 +374,6 @@ export class RateLimiterImpl implements IRateLimiter {
     }
   }
 
-  // Additional utility methods for monitoring and maintenance
-
   async getUserStats(userId: string): Promise<Record<string, RateLimitStats>> {
     try {
       const allStats = store.getAllStats();
@@ -205,9 +393,9 @@ export class RateLimiterImpl implements IRateLimiter {
     }
   }
 
-  async getMetrics(timeRange?: { start: number; end: number }) {
+  async getMetrics(_timeRange?: { start: number; end: number }) {
     try {
-      // timeRange is ignored in this in-memory implementation
+      // _timeRange is ignored in this in-memory implementation
       return store.getMetrics();
     } catch (error) {
       console.error("Failed to get rate limit metrics:", error);
@@ -222,9 +410,9 @@ export class RateLimiterImpl implements IRateLimiter {
     }
   }
 
-  async cleanupExpired(olderThanMs?: number): Promise<{ deletedCount: number }> {
+  async cleanupExpired(_olderThanMs?: number): Promise<{ deletedCount: number }> {
     try {
-      // olderThanMs is ignored in this in-memory implementation
+      // _olderThanMs is ignored in this in-memory implementation
       return store.cleanupExpired();
     } catch (error) {
       console.error("Failed to cleanup expired rate limits:", error);
@@ -253,8 +441,13 @@ export class RateLimiterImpl implements IRateLimiter {
   }
 }
 
-// Export singleton instance
+// Export singleton instance (in-memory fallback)
 export const rateLimiter = new RateLimiterImpl();
+
+// Factory function to create Convex-based rate limiter
+export function createConvexRateLimiter(convexClient: ConvexHttpClient): ConvexRateLimiterImpl {
+  return new ConvexRateLimiterImpl(convexClient);
+}
 
 // Export common rate limit configurations
 export const RateLimitConfigs = {

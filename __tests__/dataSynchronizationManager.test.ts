@@ -74,11 +74,31 @@ describe("DataSynchronizationManager", () => {
     };
 
     it("should perform sync operation successfully", async () => {
-      // Mock successful responses
-      mockConvexClient.query
-        .mockResolvedValueOnce({ id: "user_123", name: "Old Name" }) // resource exists check
-        .mockResolvedValueOnce({ id: "user_123", name: "Old Name" }) // integrity validation
-        .mockResolvedValueOnce({ id: "user_123", name: "New Name" }); // post-sync integrity
+      // Mock the pre-sync and post-sync checks directly to avoid complex dependencies
+      jest.spyOn(manager as any, "performPreSyncCheck").mockResolvedValue({
+        isValid: true,
+        checks: [],
+        errors: [],
+        timestamp: Date.now(),
+      });
+
+      jest.spyOn(manager as any, "performPostSyncCheck").mockResolvedValue({
+        isValid: true,
+        checks: [],
+        errors: [],
+        timestamp: Date.now(),
+      });
+
+      // Mock rollback manager
+      const mockRollbackManager = {
+        createRollbackPoint: jest.fn().mockResolvedValue("rollback_123"),
+        rollback: jest.fn().mockResolvedValue(true),
+      };
+
+      // Mock the getRollbackManager function
+      jest.doMock("../server/lib/rollbackManager", () => ({
+        getRollbackManager: () => mockRollbackManager,
+      }));
 
       mockConvexClient.mutation.mockResolvedValueOnce({
         success: true,

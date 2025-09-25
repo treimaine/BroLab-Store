@@ -131,7 +131,8 @@ const MetricCard: React.FC<{
             )}
             <span className={`text-sm font-medium ${
               isPositive ? 'text-green-500' : 'text-red-500'
-            }`}>
+            }`}
+            >
               {isPositive ? '+' : ''}{change.toFixed(1)}%
             </span>
           </div>

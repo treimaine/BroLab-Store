@@ -85,24 +85,23 @@ export class RateLimiter {
       // Store original end function to track success/failure for conditional counting
       const originalEnd = res.end;
       let requestCompleted = false;
-      const self = this;
 
-      res.end = function (chunk?: any, encoding?: any) {
+      res.end = (chunk?: any, encoding?: any) => {
         if (!requestCompleted) {
           requestCompleted = true;
 
           const shouldCount = !(
-            (res.statusCode >= 200 && res.statusCode < 300 && self.config.skipSuccessfulRequests) ||
-            (res.statusCode >= 400 && self.config.skipFailedRequests)
+            (res.statusCode >= 200 && res.statusCode < 300 && this.config.skipSuccessfulRequests) ||
+            (res.statusCode >= 400 && this.config.skipFailedRequests)
           );
 
           // If we should skip this request, we need to decrement the counter
           if (!shouldCount) {
-            self.decrementCounter(key).catch(console.error);
+            this.decrementCounter(key).catch(console.error);
           }
         }
 
-        return originalEnd.call(this, chunk, encoding);
+        return originalEnd.call(res, chunk, encoding);
       };
 
       next();

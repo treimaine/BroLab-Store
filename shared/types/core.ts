@@ -1,19 +1,38 @@
-// Core system interfaces for performance optimization and type safety
+/**
+ * Core System Type Definitions for BroLab Entertainment
+ *
+ * This module contains core system interfaces for performance optimization,
+ * type safety, caching, error handling, and monitoring across the BroLab
+ * Entertainment marketplace platform.
+ */
 
 // ================================
 // PERFORMANCE OPTIMIZATION TYPES
 // ================================
 
+/**
+ * Synchronization operation for data consistency
+ */
 export interface SyncOperation {
+  /** Unique operation identifier */
   id: string;
+  /** Type of synchronization operation */
   type: "user" | "data" | "preferences" | "sync" | "cache_invalidation";
+  /** Operation payload data */
   payload: Record<string, unknown>;
+  /** Operation priority level */
   priority: "low" | "medium" | "high" | "critical";
+  /** Current retry attempt count */
   retryCount: number;
+  /** Maximum retry attempts allowed */
   maxRetries: number;
+  /** When operation was created */
   createdAt: number;
+  /** When operation is scheduled to run */
   scheduledAt?: number;
+  /** When operation was completed */
   completedAt?: number;
+  /** Error message if operation failed */
   errorMessage?: string;
 }
 
