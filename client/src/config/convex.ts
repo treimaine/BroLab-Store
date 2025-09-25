@@ -8,11 +8,11 @@ export const CONVEX_CONFIG = {
 
   // Configuration des fonctions
   functions: {
-    getUserStats: "users:getUserStats",
-    getRecentActivity: "users:getRecentActivity",
-    getFavorites: "favorites:getFavorites",
-    getDownloads: "downloads:record",
-    getRecommendations: "products:forYou",
+    getUserStats: "users/getUserStats",
+    getRecentActivity: "users/getRecentActivity",
+    getFavorites: "favorites/getFavorites",
+    getDownloads: "downloads/record",
+    getRecommendations: "products/forYou",
   },
 
   // Timeout pour les requêtes

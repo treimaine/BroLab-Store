@@ -19,6 +19,7 @@ import { useIsMobile, useIsTablet } from "@/hooks/useBreakpoint";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useDashboardConfig } from "@/hooks/useDashboardConfig";
 import { useUser } from "@clerk/clerk-react";
+import type { Download, Favorite } from "@shared/types/dashboard";
 import { motion } from "framer-motion";
 import { Music, Star } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
@@ -42,15 +43,17 @@ import {
 import { StatsCards } from "./StatsCards";
 
 // Import other dashboard tabs (removed lazy loading)
-import AnalyticsDashboard from "../AnalyticsDashboard";
 import DownloadsTable from "../DownloadsTable";
 import UserProfile from "../UserProfile";
+import EnhancedAnalytics from "./EnhancedAnalytics";
 import OrdersTab from "./OrdersTab";
 import ReservationsTab from "./ReservationsTab";
 
+// Import shared types
+
 // Recommendations component (simplified, no lazy loading)
 const RecommendationsPanel = memo(
-  ({ favorites, isLoading }: { favorites: any[]; isLoading: boolean }) => {
+  ({ favorites, isLoading }: { favorites: Favorite[]; isLoading: boolean }) => {
     const isMobile = useIsMobile();
 
     if (isLoading) {
@@ -80,7 +83,7 @@ const RecommendationsPanel = memo(
                     <p className="text-xs sm:text-sm font-medium text-white truncate">
                       {favorite.beatTitle || `Beat ${favorite.beatId}`}
                     </p>
-                    <p className="text-xs text-gray-400">Hip Hop</p>
+                    <p className="text-xs text-gray-400">{favorite.beatGenre || "Hip Hop"}</p>
                   </div>
                 </div>
               ))
@@ -105,10 +108,19 @@ export const ModernDashboard = memo(() => {
   const { user: clerkUser } = useUser();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
-  const config = useDashboardConfig();
+  const { config } = useDashboardConfig();
 
   // State management
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Note: Real-time functionality has been removed as part of cleanup
+
+  // Subscription status - will be populated from real data when available
+  const subscriptionStatus = {
+    isConnected: false, // This should come from actual subscription data
+    activeTab,
+    subscriptionCount: 0, // This should come from actual subscription count
+  };
 
   // Dashboard data with comprehensive error handling
   const {
@@ -119,8 +131,6 @@ export const ModernDashboard = memo(() => {
     downloads,
     reservations,
     activity,
-    chartData,
-    trends,
     isLoading,
     error,
     isAuthenticated,
@@ -203,8 +213,10 @@ export const ModernDashboard = memo(() => {
     <DashboardErrorBoundary onError={error => console.error("Dashboard error:", error)}>
       <div className="pt-16 sm:pt-20 min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800">
         <DashboardLayout activeTab={activeTab} onTabChange={handleTabChange}>
-          {/* Dashboard Header */}
-          <DashboardHeader user={user || clerkUser} className="space-y-2" />
+          {/* Dashboard Header with Connection Status */}
+          <div className="flex items-center justify-between mb-4">
+            <DashboardHeader user={user || clerkUser} className="space-y-2 flex-1" />
+          </div>
 
           {/* Statistics Cards */}
           {statsComponent}
@@ -238,7 +250,7 @@ export const ModernDashboard = memo(() => {
             {/* Analytics Tab */}
             <TabContentWrapper value="analytics">
               {config.features.analyticsCharts ? (
-                <AnalyticsDashboard />
+                <EnhancedAnalytics />
               ) : (
                 <Card className="bg-gray-900/50 border-gray-700/50">
                   <CardContent className="p-6 text-center">
@@ -277,12 +289,12 @@ export const ModernDashboard = memo(() => {
             {/* Downloads Tab */}
             <TabContentWrapper value="downloads">
               <DownloadsTable
-                downloads={downloads.map((d: unknown) => ({
+                downloads={downloads.map((d: Download) => ({
                   id: d.id || `download-${d.beatId}`,
                   beatTitle: d.beatTitle || `Beat ${d.beatId}`,
                   artist: d.beatArtist,
                   fileSize: d.fileSize || 0,
-                  format: d.format || "mp3",
+                  format: d.format as "mp3" | "wav" | "flac",
                   quality: d.quality || "320kbps",
                   downloadedAt: d.downloadedAt || new Date().toISOString(),
                   downloadCount: d.downloadCount || 0,
@@ -330,6 +342,14 @@ export const ModernDashboard = memo(() => {
                         </label>
                         <p className="text-muted-foreground text-xs sm:text-sm">
                           {config.features.analyticsCharts ? "Enabled" : "Disabled"}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-xs sm:text-sm font-medium text-white">
+                          Connection Status
+                        </label>
+                        <p className="text-muted-foreground text-xs sm:text-sm">
+                          {subscriptionStatus.isConnected ? "Connected" : "Disconnected"}
                         </p>
                       </div>
                     </div>

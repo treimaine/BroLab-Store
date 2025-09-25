@@ -31,6 +31,8 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/ban-ts-comment": "warn",
+      // Allow control character patterns in security-related regex
+      "no-control-regex": "off",
       // Règles supplémentaires pour détecter les erreurs de syntaxe JSX
       "react/jsx-no-undef": "error",
       "react/jsx-uses-react": "error",

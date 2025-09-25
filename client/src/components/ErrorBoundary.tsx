@@ -1,7 +1,7 @@
-import React, { Component, ErrorInfo, ReactNode } from "react";
-import { AlertTriangle, RefreshCw, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertTriangle, Mail, RefreshCw } from "lucide-react";
+import { Component, ErrorInfo, ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
@@ -15,7 +15,7 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
+  public override state: State = {
     hasError: false,
     error: null,
     errorInfo: null,
@@ -29,9 +29,9 @@ export class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  public override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
-    
+
     this.setState({
       error,
       errorInfo,
@@ -56,18 +56,18 @@ export class ErrorBoundary extends Component<Props, State> {
     const subject = encodeURIComponent("BroLab App Error Report");
     const body = encodeURIComponent(
       `I encountered an error while using the BroLab app:\n\n` +
-      `Error: ${this.state.error?.message}\n` +
-      `Stack: ${this.state.error?.stack}\n` +
-      `Component Stack: ${this.state.errorInfo?.componentStack}\n` +
-      `URL: ${window.location.href}\n` +
-      `User Agent: ${navigator.userAgent}\n` +
-      `Timestamp: ${new Date().toISOString()}`
+        `Error: ${this.state.error?.message}\n` +
+        `Stack: ${this.state.error?.stack}\n` +
+        `Component Stack: ${this.state.errorInfo?.componentStack}\n` +
+        `URL: ${window.location.href}\n` +
+        `User Agent: ${navigator.userAgent}\n` +
+        `Timestamp: ${new Date().toISOString()}`
     );
-    
+
     window.open(`mailto:support@brolabentertainment.com?subject=${subject}&body=${body}`);
   };
 
-  public render() {
+  public override render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
         return this.props.fallback;
@@ -80,14 +80,13 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="mx-auto w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
                 <AlertTriangle className="w-8 h-8 text-red-400" />
               </div>
-              <CardTitle className="text-xl text-white">
-                Something went wrong
-              </CardTitle>
+              <CardTitle className="text-xl text-white">Something went wrong</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6 text-center">
               <div className="space-y-2">
                 <p className="text-gray-400">
-                  We encountered an unexpected error. This has been logged and our team will investigate.
+                  We encountered an unexpected error while loading your BroLab experience. Our team
+                  has been notified and is working to resolve this issue.
                 </p>
                 {process.env.NODE_ENV === "development" && this.state.error && (
                   <details className="mt-4 text-left">
@@ -112,7 +111,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Try Again
                 </Button>
-                
+
                 <Button
                   variant="outline"
                   onClick={this.handleReportIssue}
@@ -126,11 +125,11 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="pt-4 border-t border-zinc-800">
                 <p className="text-sm text-gray-500">
                   You can also try refreshing the page or navigating back to the{" "}
-                  <a 
-                    href="/" 
+                  <a
+                    href="/"
                     className="text-[var(--color-accent)] hover:text-[var(--color-accent-alt)] underline"
                   >
-                    home page
+                    BroLab beats store
                   </a>
                   .
                 </p>
@@ -149,7 +148,7 @@ export class ErrorBoundary extends Component<Props, State> {
 export function useErrorHandler() {
   return (error: Error, errorInfo?: ErrorInfo) => {
     console.error("Manual error report:", error, errorInfo);
-    
+
     // You can integrate with error monitoring services here
     if (typeof window !== "undefined") {
       // Report to monitoring service

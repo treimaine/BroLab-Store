@@ -18,34 +18,40 @@ import { HelmetProvider } from "react-helmet-async";
 import { Route, Switch } from "wouter";
 import { queryClient } from "./lib/queryClient";
 
-// Pages
+// Core pages - loaded immediately for better UX
 import Cart from "@/pages/cart";
-import Checkout from "@/pages/checkout";
+import Dashboard from "@/pages/dashboard";
 import Home from "@/pages/home";
-import OrderConfirmation from "@/pages/order-confirmation";
+import Login from "@/pages/login";
 import Product from "@/pages/product";
 import Shop from "@/pages/shop";
 
-import About from "@/pages/about";
-import Contact from "@/pages/contact";
-import Copyright from "@/pages/copyright";
-import Dashboard from "@/pages/dashboard";
-import FAQ from "@/pages/faq";
-import Licensing from "@/pages/licensing";
-import Login from "@/pages/login";
-import MembershipPage from "@/pages/MembershipPageFixed";
-import Privacy from "@/pages/privacy";
-import Refund from "@/pages/refund";
-import Terms from "@/pages/terms";
-import WishlistPage from "@/pages/wishlist";
+// Secondary pages - lazy loaded for better bundle splitting
+const About = lazy(() => import("@/pages/about"));
+const Contact = lazy(() => import("@/pages/contact"));
+const Copyright = lazy(() => import("@/pages/copyright"));
+const FAQ = lazy(() => import("@/pages/faq"));
+const Licensing = lazy(() => import("@/pages/licensing"));
+const MembershipPage = lazy(() => import("@/pages/MembershipPageFixed"));
+const Privacy = lazy(() => import("@/pages/privacy"));
+const Refund = lazy(() => import("@/pages/refund"));
+const Terms = lazy(() => import("@/pages/terms"));
+const WishlistPage = lazy(() => import("@/pages/wishlist"));
 
-import CustomBeats from "@/pages/custom-beats";
-import MixingMastering from "@/pages/mixing-mastering";
-import PremiumDownloads from "@/pages/premium-downloads";
-import ProductionConsultation from "@/pages/production-consultation";
-import RecordingSessions from "@/pages/recording-sessions";
-import ResetPasswordPage from "@/pages/reset-password";
-import VerifyEmailPage from "@/pages/verify-email";
+// Service pages - lazy loaded
+const CustomBeats = lazy(() => import("@/pages/custom-beats"));
+const MixingMastering = lazy(() => import("@/pages/mixing-mastering"));
+const PremiumDownloads = lazy(() => import("@/pages/premium-downloads"));
+const ProductionConsultation = lazy(() => import("@/pages/production-consultation"));
+const RecordingSessions = lazy(() => import("@/pages/recording-sessions"));
+
+// Auth pages - lazy loaded
+const ResetPasswordPage = lazy(() => import("@/pages/reset-password"));
+const VerifyEmailPage = lazy(() => import("@/pages/verify-email"));
+
+// Checkout pages - lazy loaded as they're less frequently accessed
+const Checkout = lazy(() => import("@/pages/checkout"));
+const OrderConfirmation = lazy(() => import("@/pages/order-confirmation"));
 
 // PaymentTestComponent removed - using Clerk native interface
 import NotFound from "@/pages/not-found";
@@ -87,6 +93,7 @@ function Router() {
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/admin/files" component={lazy(() => import("./pages/admin/files"))} />
+      <Route path="/test-convex" component={lazy(() => import("./pages/test-convex"))} />
       {/* PaymentTestComponent removed - using Clerk native interface */}
 
       <Route component={NotFound} />

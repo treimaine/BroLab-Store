@@ -1,4 +1,10 @@
-// Core system optimization interfaces for performance, error handling, and monitoring
+/**
+ * System Optimization Type Definitions for BroLab Entertainment
+ *
+ * This module contains comprehensive interfaces for system optimization,
+ * including performance monitoring, error handling, caching, data consistency,
+ * and health monitoring for the BroLab Entertainment marketplace platform.
+ */
 
 import { ErrorType } from "../constants/errors";
 
@@ -6,18 +12,33 @@ import { ErrorType } from "../constants/errors";
 // SYNC MANAGER INTERFACES
 // ================================
 
+/**
+ * Synchronization operation for maintaining data consistency across the system
+ */
 export interface SyncOperation {
+  /** Unique operation identifier */
   id: string;
+  /** Type of synchronization operation */
   type: "user" | "data" | "preferences" | "sync" | "cache_invalidation";
+  /** Operation payload data */
   payload: Record<string, unknown>;
+  /** Operation priority level */
   priority: "low" | "medium" | "high" | "critical";
+  /** Current retry attempt count */
   retryCount: number;
+  /** Maximum retry attempts allowed */
   maxRetries: number;
+  /** When operation was created */
   createdAt: number;
+  /** When operation is scheduled to run */
   scheduledAt?: number;
+  /** When operation was completed */
   completedAt?: number;
+  /** Error message if operation failed */
   errorMessage?: string;
+  /** User ID associated with operation */
   userId?: string;
+  /** Session ID associated with operation */
   sessionId?: string;
 }
 
@@ -170,7 +191,7 @@ export interface ErrorBoundaryManager {
   getTopErrors(limit?: number): Promise<Array<{ error: string; count: number }>>;
   getErrorsByComponent(component: string): Promise<ErrorLog[]>;
   onErrorTrend(callback: (error: ErrorLog, trend: ErrorTrend) => void): void;
-  setPerformanceMonitor(monitor: any): void;
+  setPerformanceMonitor(monitor: unknown): void;
 }
 
 export interface ErrorLog {

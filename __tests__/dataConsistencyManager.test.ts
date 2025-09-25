@@ -79,7 +79,7 @@ describe("DataConsistencyManager", () => {
       const resolution: ConflictResolution = { strategy: "last_write_wins" };
       await manager.resolveConflict(conflict.id, resolution);
 
-      expect(mockConvexClient.mutation).toHaveBeenCalledWith("data:update", {
+      expect(mockConvexClient.mutation).toHaveBeenCalledWith("dataConsistency:update", {
         resourceType: "user_preferences",
         resourceId: "1",
         data: { id: "1", name: "Local", updatedAt: 2000 }, // Local wins because it's newer
@@ -103,7 +103,7 @@ describe("DataConsistencyManager", () => {
       const resolution: ConflictResolution = { strategy: "merge" };
       await manager.resolveConflict(conflict.id, resolution);
 
-      expect(mockConvexClient.mutation).toHaveBeenCalledWith("data:update", {
+      expect(mockConvexClient.mutation).toHaveBeenCalledWith("dataConsistency:update", {
         resourceType: "favorites",
         resourceId: "2",
         data: {
@@ -141,7 +141,7 @@ describe("DataConsistencyManager", () => {
 
       await manager.resolveConflict(conflict.id, resolution);
 
-      expect(mockConvexClient.mutation).toHaveBeenCalledWith("data:update", {
+      expect(mockConvexClient.mutation).toHaveBeenCalledWith("dataConsistency:update", {
         resourceType: "cart_items",
         resourceId: "3",
         data: { id: "3", quantity: 5 }, // Max of 5 and 3
@@ -216,7 +216,7 @@ describe("DataConsistencyManager", () => {
 
       await manager.rollback(rollbackId);
 
-      expect(mockConvexClient.mutation).toHaveBeenCalledWith("data:update", {
+      expect(mockConvexClient.mutation).toHaveBeenCalledWith("dataConsistency:update", {
         resourceType: "update_user",
         resourceId: "1",
         data: previousState,
@@ -258,7 +258,7 @@ describe("DataConsistencyManager", () => {
       const isConsistent = await manager.validateConsistency("user_preferences");
 
       expect(isConsistent).toBe(true);
-      expect(mockConvexClient.query).toHaveBeenCalledWith("data:list", {
+      expect(mockConvexClient.query).toHaveBeenCalledWith("dataConsistency:list", {
         resourceType: "user_preferences",
       });
     });

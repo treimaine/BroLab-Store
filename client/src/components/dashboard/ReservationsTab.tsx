@@ -2,13 +2,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@convex/_generated/api";
-import { useQuery as useConvexQuery } from "convex/react";
+import type { Reservation } from "@shared/types/dashboard";
 import { Calendar, CheckCircle, Clock, Clock4, CreditCard, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+/**
+ * Reservations Tab - Studio Service Bookings and Revenue Diversification
+ *
+ * Business Value:
+ * - Diversifies revenue beyond beat sales through premium services
+ * - Provides high-value mixing, mastering, and custom beat services
+ * - Builds long-term customer relationships through personalized services
+ * - Increases average customer lifetime value
+ *
+ * @see docs/dashboard-component-business-value.md for detailed analysis
+ */
 interface ReservationsTabProps {
-  reservations?: any[];
+  reservations?: Reservation[];
   isLoading?: boolean;
   error?: string | null;
 }
@@ -21,32 +31,24 @@ export default function ReservationsTab({
   const { toast } = useToast();
   const [limit, setLimit] = useState<number>(20);
 
-  // Convex realtime reservations
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const uqAny: any = useConvexQuery as unknown as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const getUserReservationsAny: any = (api as any)["reservations/listReservations"]
-    .getUserReservations;
-  const rtReservations = uqAny(getUserReservationsAny, { limit });
-
   const localReservations = useMemo(() => {
     if (reservations && reservations.length > 0) return reservations;
-    const raw = (rtReservations || []) as any[];
-    return raw.map((r: any) => ({
-      id: String(r._id || r.id),
-      serviceType: r.serviceType || r.service_type,
-      preferredDate: r.preferredDate || r.preferred_date,
-      duration: r.duration || r.durationMinutes || r.duration_minutes,
-      totalPrice: r.totalPrice || r.total_price,
+    const raw = [] as Reservation[];
+    return raw.map((r: Reservation) => ({
+      id: String(r.id),
+      serviceType: r.serviceType,
+      preferredDate: r.preferredDate,
+      duration: r.duration,
+      totalPrice: r.totalPrice,
       status: r.status,
-      details: r.details || {},
-      createdAt: new Date(r.createdAt || r.created_at || Date.now()).toISOString(),
-      updatedAt: new Date(r.updatedAt || r.updated_at || Date.now()).toISOString(),
+      details: r.details,
+      notes: r.notes,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
     }));
-  }, [reservations, rtReservations]);
+  }, [reservations]);
 
-  const isLoadingReservations =
-    (reservations.length === 0 && rtReservations === undefined) || isLoading;
+  const isLoadingReservations = reservations.length === 0 || isLoading;
 
   useEffect(() => {
     // When provided via props, pagination is external; otherwise controlled by limit
@@ -78,7 +80,7 @@ export default function ReservationsTab({
     }
   }, [toast]);
 
-  const loadMore = () => setLimit(prev => prev + 20);
+  // Removed unused loadMore function
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
@@ -205,10 +207,11 @@ export default function ReservationsTab({
                         ) && reservation.serviceType}
                       </CardTitle>
                       <p className="text-sm text-gray-400">
-                        {(reservation.details as any)?.trackCount &&
-                          `${(reservation.details as any).trackCount} pistes`}
-                        {(reservation.details as any)?.genre &&
-                          ` • ${(reservation.details as unknown).genre}`}
+                        {reservation.details.additionalServices &&
+                          reservation.details.additionalServices.length > 0 &&
+                          `${reservation.details.additionalServices.length} services`}
+                        {reservation.details.projectDescription &&
+                          ` • ${reservation.details.projectDescription.substring(0, 50)}...`}
                       </p>
                     </div>
                   </div>

@@ -9,11 +9,11 @@ export default function Terms() {
       <div className="pt-16 min-h-screen bg-[var(--deep-black)] text-white">
         <div className="max-w-4xl mx-auto px-4 py-20">
           <div className="animate-pulse">
-            <div className="h-12 bg-[var(--medium-gray)] rounded mb-8"></div>
+            <div className="h-12 bg-[var(--medium-gray)] rounded mb-8" />
             <div className="space-y-4">
-              <div className="h-4 bg-[var(--medium-gray)] rounded w-3/4"></div>
-              <div className="h-4 bg-[var(--medium-gray)] rounded w-1/2"></div>
-              <div className="h-4 bg-[var(--medium-gray)] rounded w-5/6"></div>
+              <div className="h-4 bg-[var(--medium-gray)] rounded w-3/4" />
+              <div className="h-4 bg-[var(--medium-gray)] rounded w-1/2" />
+              <div className="h-4 bg-[var(--medium-gray)] rounded w-5/6" />
             </div>
           </div>
         </div>

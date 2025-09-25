@@ -783,7 +783,13 @@ export const markOrderFromWebhook = mutation({
       const now = Date.now();
 
       // Try to find the order by provided identifiers
-      let order: any = null;
+      let order: {
+        _id: Id<"orders">;
+        userId?: Id<"users">;
+        paymentIntentId?: string;
+        notes?: string;
+        status: string;
+      } | null = null;
 
       if (args.sessionId) {
         order = await ctx.db

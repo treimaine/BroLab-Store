@@ -1,42 +1,84 @@
 /**
- * Dashboard Data Models
- * Comprehensive TypeScript interfaces for the unified dashboard system
+ * Dashboard Data Models for BroLab Entertainment
+ *
+ * This module contains comprehensive TypeScript interfaces for the unified
+ * dashboard system, including user data, statistics, orders, downloads,
+ * and analytics for the BroLab Entertainment marketplace platform.
  */
 
+// ================================
+// CORE DASHBOARD INTERFACES
+// ================================
+
+/**
+ * Dashboard user information with preferences and subscription details
+ */
 export interface DashboardUser {
+  /** Unique user identifier */
   id: string;
+  /** Clerk authentication ID */
   clerkId: string;
+  /** User email address */
   email: string;
+  /** User's first name */
   firstName?: string;
+  /** User's last name */
   lastName?: string;
+  /** Profile image URL */
   imageUrl?: string;
+  /** Username */
   username?: string;
+  /** User role in the system */
   role?: string;
+  /** Whether user account is active */
   isActive?: boolean;
+  /** Last login timestamp */
   lastLoginAt?: number;
+  /** User preferences */
   preferences?: UserPreferences;
+  /** Subscription information */
   subscription?: SubscriptionInfo;
 }
 
+/**
+ * User preferences for dashboard customization
+ */
 export interface UserPreferences {
+  /** Preferred language code */
   language: string;
+  /** Theme preference */
   theme: "light" | "dark" | "auto";
+  /** Notification preferences */
   notifications: {
+    /** Email notifications enabled */
     email: boolean;
+    /** Push notifications enabled */
     push: boolean;
+    /** SMS notifications enabled */
     sms: boolean;
+    /** Marketing emails enabled */
     marketing: boolean;
+    /** Product updates enabled */
     updates: boolean;
   };
+  /** Privacy preferences */
   privacy: {
+    /** Profile visibility level */
     profileVisibility: "public" | "private" | "friends";
+    /** Show activity to others */
     showActivity: boolean;
+    /** Allow analytics tracking */
     allowAnalytics: boolean;
   };
+  /** Audio preferences */
   audio: {
+    /** Default volume (0-100) */
     defaultVolume: number;
+    /** Auto-play beats */
     autoplay: boolean;
+    /** Audio quality preference */
     quality: "low" | "medium" | "high";
+    /** Preferred download format */
     downloadFormat: "mp3" | "wav" | "flac";
   };
 }
@@ -74,7 +116,11 @@ export interface Activity {
     | "download"
     | "order_placed"
     | "reservation_made"
-    | "subscription_updated";
+    | "subscription_updated"
+    | "license_purchased"
+    | "beat_played"
+    | "beat_paused"
+    | "beat_preview";
   description: string;
   timestamp: string;
   metadata: Record<string, any>;

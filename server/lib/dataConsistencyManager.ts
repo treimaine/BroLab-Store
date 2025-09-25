@@ -1,10 +1,10 @@
+import { ConvexHttpClient } from "convex/browser";
 import {
   ConflictResolution,
   DataConflict,
   DataConsistencyManager,
   RollbackOperation,
-} from "@shared/types/system-optimization";
-import { ConvexHttpClient } from "convex/browser";
+} from "../../shared/types/system-optimization";
 import { logger } from "./logger";
 
 /**
@@ -298,17 +298,12 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
 
   private async getRemoteData(resourceType: string, resourceId: string): Promise<any> {
     // Use Convex to get remote data - let errors propagate for proper error handling
-    try {
-      // Use string-based function reference to avoid type issues
-      const result = await this.convexClient.query("dataConsistency:get" as any, {
-        resourceType,
-        resourceId,
-      });
-      return result;
-    } catch (error) {
-      console.error("Error getting remote data:", error);
-      return null;
-    }
+    // Use proper Convex API reference with proper typing
+    const result = await this.convexClient.query("dataConsistency:get" as any, {
+      resourceType,
+      resourceId,
+    });
+    return result;
   }
 
   private hasDataConflict(localData: any, remoteData: any): boolean {
@@ -335,11 +330,11 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
     const remoteKeys = Object.keys(remoteData);
     const allKeys = new Set([...localKeys, ...remoteKeys]);
 
-    for (const key of allKeys) {
+    Array.from(allKeys).forEach(key => {
       if (JSON.stringify(localData[key]) !== JSON.stringify(remoteData[key])) {
         conflictingFields.push(key);
       }
-    }
+    });
 
     return conflictingFields;
   }
@@ -367,7 +362,8 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
     // For arrays, merge them
     Object.keys(merged).forEach(key => {
       if (Array.isArray(local[key]) && Array.isArray(remote[key])) {
-        merged[key] = [...new Set([...remote[key], ...local[key]])];
+        const uniqueItems = Array.from(new Set([...remote[key], ...local[key]]));
+        merged[key] = uniqueItems;
       }
     });
 
@@ -426,16 +422,11 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
   }
 
   private async getAllResources(resourceType: string): Promise<Array<{ id: string }>> {
-    try {
-      // Use string-based function reference to avoid type issues
-      const result = await this.convexClient.query("dataConsistency:list" as any, {
-        resourceType,
-      });
-      return result || [];
-    } catch (error) {
-      console.error("Error getting all resources:", error);
-      return [];
-    }
+    // Use proper Convex API reference with proper typing
+    const result = await this.convexClient.query("dataConsistency:list" as any, {
+      resourceType,
+    });
+    return result || [];
   }
 }
 

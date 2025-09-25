@@ -132,7 +132,8 @@ export default defineSchema({
     items: v.array(
       v.object({
         productId: v.optional(v.number()),
-        title: v.string(),
+        title: v.optional(v.string()),
+        name: v.optional(v.string()), // Legacy field for backward compatibility
         price: v.optional(v.number()),
         quantity: v.optional(v.number()),
         license: v.optional(v.string()),

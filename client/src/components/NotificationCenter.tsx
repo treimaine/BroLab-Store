@@ -318,7 +318,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           <h4 className="text-sm font-medium truncate">{notification.title}</h4>
                           <div className="flex items-center space-x-1">
                             {!notification.read && (
-                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              <div className="w-2 h-2 bg-blue-500 rounded-full" />
                             )}
                             <span className="text-xs text-muted-foreground">
                               {formatTimestamp(notification.timestamp)}

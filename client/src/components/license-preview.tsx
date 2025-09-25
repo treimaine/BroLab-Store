@@ -303,7 +303,7 @@ export default function LicensePreview({
                   <ul className="space-y-2">
                     {currentLicense.features.map((feature, index) => (
                       <li key={index} className="flex items-center text-sm text-gray-300">
-                        <div className="w-1.5 h-1.5 bg-[var(--accent-purple)] rounded-full mr-3"></div>
+                        <div className="w-1.5 h-1.5 bg-[var(--accent-purple)] rounded-full mr-3" />
                         {feature}
                       </li>
                     ))}
@@ -322,7 +322,7 @@ export default function LicensePreview({
                       <ul className="space-y-2">
                         {currentLicense.restrictions.map((restriction, index) => (
                           <li key={index} className="flex items-center text-sm text-gray-400">
-                            <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full mr-3"></div>
+                            <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full mr-3" />
                             {restriction}
                           </li>
                         ))}

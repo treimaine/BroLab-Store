@@ -7,11 +7,10 @@
   - Set up base error handling utilities and constants
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [x] 1.2 Fix remaining TypeScript compilation errors and type safety issues
-  - Fix type compatibility issues in system-manager.ts (RateLimiter interface conflicts)
-  - Fix unused parameter warnings in retry-manager.ts (\_monitoringPeriod)
-  - Resolve missing method errors in RateLimiter interface (getMetrics, cleanupExpired)
-  - Add proper typing for remaining 'any' types in server components
+- [ ] 1.2 Fix remaining TypeScript compilation errors and type safety issues
+  - Fix missing 'api' import in shared/utils/rate-limiter.ts (8 compilation errors)
+  - Fix type casting issue in server/app.ts line 729 (req.body as unknown).beat_id
+  - Resolve Convex API integration issues in rate limiter implementation
   - _Requirements: 3.1, 3.2, 3.3_
 
 - [x] 2. Implement performance optimization core systems
@@ -156,11 +155,14 @@
   - _Requirements: 8.3, 8.5_
 
 - [ ] 9. Integration testing and validation
-- [ ] 9.1 Create comprehensive test suite
-  - Write integration tests for all critical user flows using existing test infrastructure
-  - Add performance tests for load and memory usage using existing monitoring
-  - Create security tests for authentication and authorization
-  - Fix existing TestSprite test failures by implementing missing functionality
+- [ ] 9.1 Fix failing test suites and improve test reliability
+  - Fix rate-limiter.test.ts failures (Convex API mocking issues)
+  - Fix dataSynchronizationManager.test.ts pre-sync check errors
+  - Fix enhanced-error-tracking.test.ts metric collection issues
+  - Fix analytics-system.test.ts localStorage interaction tracking
+  - Fix api-service-orders.test.ts authentication issues (401 errors)
+  - Fix api-stripe-webhook.test.ts Jest parsing errors (async/await syntax)
+  - Fix useCache.test.tsx error handling and refresh functionality
   - _Requirements: All requirements validation_
 
 - [ ] 9.2 Implement continuous monitoring
@@ -170,9 +172,11 @@
   - _Requirements: 6.1, 6.2, 6.4, 6.5_
 
 - [ ] 10. Final optimization and cleanup
-- [ ] 10.1 Optimize production build
+- [ ] 10.1 Optimize production build and resolve remaining issues
+  - Fix Convex API integration in rate limiter (missing api imports)
+  - Implement proper error handling in data synchronization manager
+  - Resolve authentication middleware issues causing 401 errors in tests
   - Fine-tune existing bundle splitting and asset optimization
-  - Implement production-ready caching strategies using existing cache system
   - Add production monitoring and error reporting
   - _Requirements: 1.4, 6.1, 6.2_
 

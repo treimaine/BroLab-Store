@@ -1,7 +1,7 @@
 // Provide a supabaseAdmin stub for legacy tests
-const supabaseAdmin = {
+const _supabaseAdmin = {
   from: jest.fn(() => ({ delete: () => ({ like: () => ({}) }), insert: () => ({}) })),
-} as any;
+} as Record<string, unknown>;
 
 // Mock Clerk pour les tests
 jest.mock("@clerk/clerk-sdk-node", () => ({

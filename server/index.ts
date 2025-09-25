@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import express, { NextFunction, type Request, Response } from "express";
+import express, { NextFunction, Response, type Request } from "express";
 import { app } from "./app";
 import { choosePort } from "./lib/cliPort";
 import { env } from "./lib/env";
@@ -15,7 +15,7 @@ config();
 
 // Security middleware removed - using Convex for security
 // Rate limiting only for API routes, not for static assets/frontend
-app.use("/api", (req, res, next) => {
+app.use("/api", (req, res, next): void => {
   // Simple rate limiting - 1000 requests per 15 minutes for API only
   const clientIp = req.ip || req.connection.remoteAddress;
   const now = Date.now();
@@ -23,18 +23,25 @@ app.use("/api", (req, res, next) => {
   const maxRequests = 1000;
 
   // Simple in-memory rate limiting (for development)
-  if (!(global as any).rateLimitStore) {
-    (global as any).rateLimitStore = new Map();
+  interface GlobalWithRateLimit {
+    rateLimitStore?: Map<string, number>;
+  }
+
+  const globalWithRateLimit = globalThis as typeof globalThis & GlobalWithRateLimit;
+
+  if (!globalWithRateLimit.rateLimitStore) {
+    globalWithRateLimit.rateLimitStore = new Map();
   }
 
   const key = `${clientIp}-${Math.floor(now / windowMs)}`;
-  const currentCount = (global as any).rateLimitStore.get(key) || 0;
+  const currentCount = globalWithRateLimit.rateLimitStore.get(key) || 0;
 
   if (currentCount >= maxRequests) {
-    return res.status(429).json({ error: "Too many requests" });
+    res.status(429).json({ error: "Too many requests" });
+    return;
   }
 
-  (global as any).rateLimitStore.set(key, currentCount + 1);
+  globalWithRateLimit.rateLimitStore.set(key, currentCount + 1);
   next();
 });
 
@@ -47,7 +54,7 @@ app.use("/attached_assets", express.static("attached_assets"));
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  let capturedJsonResponse: Record<string, unknown> | undefined = undefined;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
@@ -84,12 +91,19 @@ if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
 
     // Routes are already registered in app.ts
 
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      res.status(status).json({ message });
-      throw err;
-    });
+    app.use(
+      (
+        err: Error & { status?: number; statusCode?: number },
+        _req: Request,
+        res: Response,
+        _next: NextFunction
+      ) => {
+        const status = err.status || err.statusCode || 500;
+        const message = err.message || "Internal Server Error";
+        res.status(status).json({ message });
+        throw err;
+      }
+    );
 
     const { port: flagPort, auto, maxTries } = parsePortFlags();
     const envPort = env.PORT ? Number(env.PORT) : undefined;
@@ -112,7 +126,7 @@ if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
     const serverInstance = server.listen(port, () => {
       logger.info("API running", { port, basePort, url: `http://localhost:${port}` });
     });
-    serverInstance.on("error", (err: any) => {
+    serverInstance.on("error", (err: Error & { code?: string }) => {
       if (err.code === "EADDRINUSE") {
         console.error(
           `\n❌ Port ${port} déjà utilisé (race condition). Un autre serveur est peut-être déjà lancé.`

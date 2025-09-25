@@ -1,9 +1,15 @@
-import express from "express";
+import express, { Request } from "express";
 import { isAuthenticated, registerAuthRoutes, setupAuth } from "./auth";
 import { env } from "./lib/env";
 import { logger } from "./lib/logger";
 import activityRouter from "./routes/activity";
 import avatarRouter from "./routes/avatar";
+
+// Extended request interface for test endpoints
+interface ExtendedRequest extends Omit<Request, "session"> {
+  requestId?: string;
+  session?: { userId?: number };
+}
 // Clerk router removed - using native components
 import clerkRouter from "./routes/clerk";
 import downloadsRouter from "./routes/downloads";
@@ -39,8 +45,8 @@ logger.info("Server starting", {
 });
 
 // Request ID middleware
-app.use((req: any, _res, next) => {
-  req.requestId = req.headers["x-request-id"] || `req_${Date.now()}`;
+app.use((req: Request & { requestId?: string }, _res, next) => {
+  req.requestId = (req.headers["x-request-id"] as string) || `req_${Date.now()}`;
   next();
 });
 
@@ -98,19 +104,25 @@ app.post("/api/auth/signin", (_req, res) => {
   res.json({ accessToken: process.env.TEST_USER_TOKEN || "mock-test-token" });
 });
 
-app.post("/api/auth/login", (req: any, res) => {
-  const token = process.env.TEST_USER_TOKEN || "mock-test-token";
-  // If credentials are provided, also establish a session for server-side routes
-  if (req.body && (req.body.username || req.body.email)) {
-    // Use a stable test user id
-    req.session = req.session || {};
-    req.session.userId = 123;
+app.post(
+  "/api/auth/login",
+  (
+    req: Request & { session?: { userId?: number }; body?: { username?: string; email?: string } },
+    res
+  ) => {
+    const token = process.env.TEST_USER_TOKEN || "mock-test-token";
+    // If credentials are provided, also establish a session for server-side routes
+    if (req.body && (req.body.username || req.body.email)) {
+      // Use a stable test user id
+      req.session = req.session || {};
+      req.session.userId = 123;
+    }
+    res.json({ token, access_token: token });
   }
-  res.json({ token, access_token: token });
-});
+);
 
 // Minimal register endpoint used by some tests to create a session
-app.post("/api/auth/register", (req: any, res) => {
+app.post("/api/auth/register", (req: Request & { session?: { userId?: number } }, res) => {
   req.session = req.session || {};
   req.session.userId = 123;
   res.status(201).json({ success: true, userId: 123 });
@@ -131,7 +143,7 @@ app.get("/api/user/sync-status", (_req, res) => {
   res.json({ clerkUser: { id, email }, convexUser: { id, email }, isSynchronized: true });
 });
 
-app.get("/api/protected/dashboard", isAuthenticated as any, (_req, res) => {
+app.get("/api/protected/dashboard", isAuthenticated, (_req, res) => {
   res.json({ status: "ok", message: "Protected dashboard accessible" });
 });
 
@@ -252,10 +264,10 @@ app.get("/api/audio/waveform/:beatId", (_req, res) => {
 // --- Additional minimal endpoints to satisfy automated tests ---
 
 // Simple in-memory stores (dev/test only)
-let cartItems: Array<{ id: string; beat_id: number; quantity: number }> = [];
+const cartItems: Array<{ id: string; beat_id: number; quantity: number }> = [];
 let favorites: number[] = [];
-let recentlyPlayed: number[] = [];
-let bookings: Array<{ id: string; serviceType: string }> = [];
+const recentlyPlayed: number[] = [];
+const bookings: Array<{ id: string; serviceType: string }> = [];
 
 // Auth alias endpoints used by tests
 app.post("/api/auth/clerkLogin", (_req, res) => {
@@ -290,9 +302,12 @@ app.get("/api/user/dashboard", async (_req, res) => {
 });
 
 // Cart endpoints expected by tests
-app.post("/api/cart/add", (req, res) => {
+app.post("/api/cart/add", (req, res): void => {
   const beatId = Number((req as any).body?.beatId || (req as any).body?.beat_id);
-  if (!beatId) return res.status(400).json({ error: "beatId required" });
+  if (!beatId) {
+    res.status(400).json({ error: "beatId required" });
+    return;
+  }
   const itemId = "item_" + Date.now();
   const item = { id: itemId, beat_id: beatId, quantity: 1 };
   cartItems.push(item);
@@ -300,18 +315,24 @@ app.post("/api/cart/add", (req, res) => {
 });
 
 // Cart aliases used by tests
-app.post("/api/cart/guest", (req, res) => {
+app.post("/api/cart/guest", (req, res): void => {
   const beatId = Number((req as any).body?.beatId || (req as any).body?.beat_id);
-  if (!beatId) return res.status(400).json({ error: "beatId required" });
+  if (!beatId) {
+    res.status(400).json({ error: "beatId required" });
+    return;
+  }
   const itemId = "item_" + Date.now();
   const item = { id: itemId, beat_id: beatId, quantity: 1 };
   cartItems.push(item);
   res.json({ success: true, item });
 });
 
-app.post("/api/cart", (req, res) => {
+app.post("/api/cart", (req, res): void => {
   const beatId = Number((req as any).body?.beatId || (req as any).body?.beat_id);
-  if (!beatId) return res.status(400).json({ error: "beatId required" });
+  if (!beatId) {
+    res.status(400).json({ error: "beatId required" });
+    return;
+  }
   const itemId = "item_" + Date.now();
   const item = { id: itemId, beat_id: beatId, quantity: 1 };
   cartItems.push(item);
@@ -322,11 +343,14 @@ app.get("/api/cart", (_req, res) => {
   res.json({ items: cartItems });
 });
 
-app.put("/api/cart/items/:id", (req, res) => {
+app.put("/api/cart/items/:id", (req, res): void => {
   const { id } = (req as any).params;
   const qty = Number((req as any).body?.quantity || 1);
   const item = cartItems.find(i => i.id === id);
-  if (!item) return res.status(404).json({ error: "Item not found" });
+  if (!item) {
+    res.status(404).json({ error: "Item not found" });
+    return;
+  }
   item.quantity = qty;
   res.json({ success: true, item });
 });
@@ -358,9 +382,12 @@ app.post("/api/services/booking", (req, res) => {
 });
 
 // Favorites and wishlist endpoints
-app.post("/api/user/favorites", (req, res) => {
+app.post("/api/user/favorites", (req, res): void => {
   const beatId = Number((req as any).body?.beatId);
-  if (!beatId) return res.status(400).json({ error: "beatId required" });
+  if (!beatId) {
+    res.status(400).json({ error: "beatId required" });
+    return;
+  }
   if (!favorites.includes(beatId)) favorites.push(beatId);
   res.status(201).json({ beatId });
 });
@@ -377,9 +404,12 @@ app.delete("/api/user/favorites/:beatId", (req, res) => {
 
 // Wishlist endpoints (stubs)
 let wishlist: number[] = [];
-app.post("/api/user/wishlist", (req, res) => {
+app.post("/api/user/wishlist", (req, res): void => {
   const beatId = Number((req as any).body?.beatId);
-  if (!beatId) return res.status(400).json({ error: "beatId required" });
+  if (!beatId) {
+    res.status(400).json({ error: "beatId required" });
+    return;
+  }
   if (!wishlist.includes(beatId)) wishlist.push(beatId);
   res.status(201).json({ beatId });
 });
@@ -394,9 +424,12 @@ app.delete("/api/user/wishlist/:beatId", (req, res) => {
   res.status(204).end();
 });
 
-app.post("/api/user/recently-played", (req, res) => {
+app.post("/api/user/recently-played", (req, res): void => {
   const beatId = Number((req as any).body?.beatId);
-  if (!beatId) return res.status(400).json({ error: "beatId required" });
+  if (!beatId) {
+    res.status(400).json({ error: "beatId required" });
+    return;
+  }
   if (!recentlyPlayed.includes(beatId)) recentlyPlayed.unshift(beatId);
   res.json({ success: true });
 });
@@ -463,7 +496,7 @@ app.get("/api/test-auth", (req: any, res) => {
 });
 
 // Test endpoint PayPal direct sans middleware
-app.post("/api/paypal-test/create-order", (req: any, res) => {
+app.post("/api/paypal-test/create-order", (req: any, res): void => {
   try {
     console.log("🧪 PayPal test endpoint called directly");
     console.log("🧪 Request body:", req.body);
@@ -472,10 +505,11 @@ app.post("/api/paypal-test/create-order", (req: any, res) => {
 
     // Validation simple
     if (!serviceType || !amount || !currency || !description || !reservationId || !customerEmail) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: "Missing required fields",
       });
+      return;
     }
 
     // Simulation PayPal
@@ -500,7 +534,7 @@ app.post("/api/paypal-test/create-order", (req: any, res) => {
 });
 
 // 🚀 NOUVEAU: Endpoint PayPal de test complètement séparé
-app.post("/api/paypal-direct/create-order", (req: any, res) => {
+app.post("/api/paypal-direct/create-order", (req: any, res): void => {
   try {
     console.log("🚀 PayPal direct endpoint called - NO MIDDLEWARE");
     console.log("📦 Request body:", req.body);
@@ -509,10 +543,11 @@ app.post("/api/paypal-direct/create-order", (req: any, res) => {
 
     // Validation simple
     if (!serviceType || !amount || !currency || !description || !reservationId || !customerEmail) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: "Missing required fields",
       });
+      return;
     }
 
     console.log("✅ Validation passed, creating PayPal order...");
@@ -557,18 +592,24 @@ app.post("/api/services/book", (req, res) => {
 });
 
 // Cart item aliases
-app.post("/api/cart/item", (req, res) => {
+app.post("/api/cart/item", (req, res): void => {
   const beatId = Number((req as any).body?.beatId || (req as any).body?.beat_id);
-  if (!beatId) return res.status(400).json({ error: "beatId required" });
+  if (!beatId) {
+    res.status(400).json({ error: "beatId required" });
+    return;
+  }
   const itemId = "item_" + Date.now();
   const item = { id: itemId, beat_id: beatId, quantity: 1 };
   cartItems.push(item);
   res.json({ success: true, item });
 });
 
-app.post("/api/cart/items", (req, res) => {
-  const beatId = Number((req as any).body?.beatId || (req as any).body?.beat_id);
-  if (!beatId) return res.status(400).json({ error: "beatId required" });
+app.post("/api/cart/items", (req, res): void => {
+  const beatId = Number((req as any).body?.beatId || (req as unknown).body?.beat_id);
+  if (!beatId) {
+    res.status(400).json({ error: "beatId required" });
+    return;
+  }
   const itemId = "item_" + Date.now();
   const item = { id: itemId, beat_id: beatId, quantity: 1 };
   cartItems.push(item);
@@ -576,8 +617,8 @@ app.post("/api/cart/items", (req, res) => {
 });
 
 // Locales endpoint alias
-app.get("/api/i18n/locales/:lang", (req, res) => {
-  const lang = (req as any).params?.lang || "en";
+app.get("/api/i18n/locales/:lang", (req, res): void => {
+  const lang = req.params?.lang || "en";
   res.json({ lang, messages: { welcomeMessage: lang === "fr" ? "Bienvenue" : "Welcome" } });
 });
 

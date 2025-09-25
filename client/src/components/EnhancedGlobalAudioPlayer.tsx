@@ -464,7 +464,7 @@ export function EnhancedGlobalAudioPlayer() {
                   className="w-8 h-8 p-0 text-gray-400 hover:text-white relative"
                 >
                   <ShoppingCart className="w-4 h-4" />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--accent-purple)] rounded-full"></span>
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--accent-purple)] rounded-full" />
                 </Button>
                 <span className="text-sm text-white font-medium">{getDisplayPrice()}</span>
               </div>

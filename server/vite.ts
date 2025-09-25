@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
 import { createLogger, createServer as createViteServer } from "vite";
+import { ErrorMessages } from "../shared/constants/ErrorMessages";
 import viteConfig from "../vite.config";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -75,9 +76,7 @@ export function serveStatic(app: Express) {
   const distPath = path.resolve(__dirname, "..", "dist", "public");
 
   if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`
-    );
+    throw new Error(ErrorMessages.SERVER.INTERNAL_ERROR);
   }
 
   app.use(express.static(distPath));

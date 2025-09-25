@@ -113,7 +113,7 @@ export function ClerkPaymentForm({
   if (!isLoaded) {
     return (
       <div className="py-8 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+        <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4" />
         <p className="text-gray-300">Loading payment system...</p>
       </div>
     );
@@ -190,7 +190,7 @@ export function ClerkPaymentForm({
       >
         {isProcessing || isLoading ? (
           <div className="flex items-center gap-2">
-            <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+            <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
             Processing Payment...
           </div>
         ) : (

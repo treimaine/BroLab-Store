@@ -63,7 +63,7 @@ console.log("🔐 Clerk configured with native PricingTable");
 // Loading component for Suspense boundaries
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-screen bg-[var(--deep-black)]">
-    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--accent-purple)]"></div>
+    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--accent-purple)]" />
   </div>
 );
 

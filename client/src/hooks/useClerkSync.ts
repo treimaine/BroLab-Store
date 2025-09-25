@@ -99,6 +99,8 @@ export function useClerkSync() {
         cancelled = true;
       };
     }
+
+    return undefined;
   }, [clerkLoaded, clerkUser, isAuthenticated, syncUser, isSynced]);
 
   // Reset sync status when user changes

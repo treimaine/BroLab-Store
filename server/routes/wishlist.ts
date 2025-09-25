@@ -5,11 +5,12 @@ import { getCurrentUser, isAuthenticated } from "../auth";
 const router = Router();
 
 // GET /api/wishlist - Récupérer la wishlist de l'utilisateur
-router.get("/", isAuthenticated, async (req, res) => {
+router.get("/", isAuthenticated, async (req, res): Promise<void> => {
   try {
     const user = await getCurrentUser(req);
     if (!user) {
-      return res.status(401).json({ error: "Authentication required" });
+      res.status(401).json({ error: "Authentication required" });
+      return;
     }
 
     // TODO: Implement with Convex
@@ -21,7 +22,8 @@ router.get("/", isAuthenticated, async (req, res) => {
 
     // if (error) {
     //   console.error('Error fetching wishlist:', error);
-    //   return res.status(500).json({ error: 'Failed to fetch wishlist' });
+    //   res.status(500).json({ error: 'Failed to fetch wishlist' });
+      return;
     // }
 
     // res.json(data || []);
@@ -33,17 +35,19 @@ router.get("/", isAuthenticated, async (req, res) => {
 });
 
 // POST /api/wishlist - Ajouter un beat à la wishlist
-router.post("/", isAuthenticated, async (req, res) => {
+router.post("/", isAuthenticated, async (req, res): Promise<void> => {
   try {
     const user = await getCurrentUser(req);
     if (!user) {
-      return res.status(401).json({ error: "Authentication required" });
+      res.status(401).json({ error: "Authentication required" });
+      return;
     }
 
     const { beat_id } = req.body;
 
     if (!beat_id || typeof beat_id !== "number") {
-      return res.status(400).json({ error: "Valid beat_id is required" });
+      res.status(400).json({ error: "Valid beat_id is required" });
+      return;
     }
 
     // TODO: Implement with Convex
@@ -55,7 +59,8 @@ router.post("/", isAuthenticated, async (req, res) => {
 
     // if (beatError || !beatData) {
     //   console.error('Beat not found in database:', beatError);
-    //   return res.status(404).json({ error: 'Beat not found in database' });
+    //   res.status(404).json({ error: 'Beat not found in database' });
+      return;
     // }
 
     // const { error } = await supabaseAdmin
@@ -67,10 +72,12 @@ router.post("/", isAuthenticated, async (req, res) => {
 
     // if (error) {
     //   if (error.code === '23505') { // Unique constraint violation
-    //     return res.status(409).json({ error: 'Beat is already in your wishlist' });
+    //     res.status(409).json({ error: 'Beat is already in your wishlist' });
+      return;
     //   }
     //   console.error('Error adding to wishlist:', error);
-    //   return res.status(500).json({ error: 'Failed to add to wishlist' });
+    //   res.status(500).json({ error: 'Failed to add to wishlist' });
+      return;
     // }
 
     res.status(201).json({ message: "Added to wishlist successfully" });
@@ -81,17 +88,19 @@ router.post("/", isAuthenticated, async (req, res) => {
 });
 
 // DELETE /api/wishlist/:beatId - Supprimer un beat de la wishlist
-router.delete("/:beatId", isAuthenticated, async (req, res) => {
+router.delete("/:beatId", isAuthenticated, async (req, res): Promise<void> => {
   try {
     const user = await getCurrentUser(req);
     if (!user) {
-      return res.status(401).json({ error: "Authentication required" });
+      res.status(401).json({ error: "Authentication required" });
+      return;
     }
 
     const beatId = parseInt(req.params.beatId);
 
     if (isNaN(beatId)) {
-      return res.status(400).json({ error: "Valid beat_id is required" });
+      res.status(400).json({ error: "Valid beat_id is required" });
+      return;
     }
 
     // TODO: Implement with Convex
@@ -103,7 +112,8 @@ router.delete("/:beatId", isAuthenticated, async (req, res) => {
 
     // if (error) {
     //   console.error('Error removing from wishlist:', error);
-    //   return res.status(500).json({ error: 'Failed to remove from wishlist' });
+    //   res.status(500).json({ error: 'Failed to remove from wishlist' });
+      return;
     // }
 
     res.json({ message: "Removed from wishlist successfully" });
@@ -114,11 +124,12 @@ router.delete("/:beatId", isAuthenticated, async (req, res) => {
 });
 
 // DELETE /api/wishlist - Vider toute la wishlist
-router.delete("/", isAuthenticated, async (req, res) => {
+router.delete("/", isAuthenticated, async (req, res): Promise<void> => {
   try {
     const user = await getCurrentUser(req);
     if (!user) {
-      return res.status(401).json({ error: "Authentication required" });
+      res.status(401).json({ error: "Authentication required" });
+      return;
     }
 
     // TODO: Implement with Convex
@@ -129,7 +140,8 @@ router.delete("/", isAuthenticated, async (req, res) => {
 
     // if (error) {
     //   console.error('Error clearing wishlist:', error);
-    //   return res.status(500).json({ error: 'Failed to clear wishlist' });
+    //   res.status(500).json({ error: 'Failed to clear wishlist' });
+      return;
     // }
 
     res.json({ message: "Wishlist cleared successfully" });

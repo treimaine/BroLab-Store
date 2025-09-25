@@ -53,11 +53,11 @@ export default function Checkout() {
 
   // Calculate total (cumulative: services + cart items)
   const total = useMemo(() => {
-    let cartTotal = cart.items.reduce((sum, item) => {
+    const cartTotal = cart.items.reduce((sum, item) => {
       return sum + (item.price || 0) * item.quantity;
     }, 0);
 
-    let servicesTotal = pendingServices.reduce((sum, service) => {
+    const servicesTotal = pendingServices.reduce((sum, service) => {
       return sum + (service.price || 0);
     }, 0);
 
@@ -117,7 +117,7 @@ export default function Checkout() {
     return (
       <div className="min-h-screen bg-[var(--deep-black)] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--accent-purple)] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--accent-purple)] mx-auto mb-4" />
           <p className="text-white text-lg">Loading checkout...</p>
         </div>
       </div>
@@ -130,7 +130,7 @@ export default function Checkout() {
     return (
       <div className="min-h-screen bg-[var(--deep-black)] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--accent-purple)] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--accent-purple)] mx-auto mb-4" />
           <p className="text-white text-lg">Redirecting to cart...</p>
         </div>
       </div>

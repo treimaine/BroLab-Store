@@ -1,334 +1,487 @@
-// API-specific type definitions to replace 'any' types
+/**
+ * Core API Type Definitions
+ *
+ * This module contains the fundamental API response types and utilities
+ * used across the BroLab Entertainment platform.
+ */
 
-import { ErrorType } from "../constants/errors";
-
-// ================================
-// REQUEST/RESPONSE TYPES
-// ================================
-
-export interface ApiRequest {
-  method: string;
-  url: string;
-  headers: Record<string, string>;
-  body?: unknown;
-  query?: Record<string, string>;
-  params?: Record<string, string>;
-  user?: AuthenticatedUser;
-  session?: SessionData;
-  requestId?: string;
-}
-
+/**
+ * Standard API response wrapper
+ */
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
-  error?: ApiError;
+  error?: string;
+  message?: string;
+  timestamp?: string;
+}
+
+/**
+ * Error response type
+ */
+export interface ErrorResponse {
+  error: {
+    type: string;
+    message: string;
+    code: string;
+    details?: Record<string, unknown>;
+  };
   message?: string;
   timestamp: number;
   requestId?: string;
 }
 
-export interface ApiError {
-  type: ErrorType;
-  message: string;
-  code?: string;
-  details?: Record<string, unknown>;
-  stack?: string;
+/**
+ * Success response type
+ */
+export interface SuccessResponse<T = unknown> {
+  success: true;
+  data?: T;
+  message?: string;
+  timestamp?: string;
 }
 
-// ================================
-// AUTHENTICATION TYPES
-// ================================
+/**
+ * Paginated response type
+ */
+export interface PaginatedApiResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  nextCursor?: string;
+}
 
+/**
+ * Generic API endpoint interface
+ */
+export interface ApiEndpoint<TRequest = unknown, TResponse = unknown> {
+  request: TRequest;
+  response: ApiResponse<TResponse>;
+}
+
+/**
+ * Typed API response wrapper
+ */
+export type TypedApiResponse<T> = ApiResponse<T>;
+
+/**
+ * Validation error response
+ */
+export interface ValidationErrorResponse {
+  success: false;
+  error: {
+    type: string;
+    message: string;
+    code: string;
+    details: {
+      errors: Array<{ field: string; message: string; code: string }>;
+      invalidFields: string[];
+    };
+  };
+  timestamp: number;
+  requestId?: string;
+}
+
+/**
+ * Authentication error response
+ */
+export interface AuthErrorResponse {
+  success: false;
+  error: {
+    type: string;
+    message: string;
+    code: string;
+    details?: {
+      requiredPermissions?: string[];
+      userPermissions?: string[];
+      sessionExpiresAt?: number;
+    };
+  };
+  timestamp: number;
+  requestId?: string;
+}
+
+/**
+ * Business error response
+ */
+export interface BusinessErrorResponse {
+  success: false;
+  error: {
+    type: string;
+    message: string;
+    code: string;
+    details?: Record<string, unknown>;
+  };
+  timestamp: number;
+  requestId?: string;
+}
+
+/**
+ * Rate limit error response
+ */
+export interface RateLimitErrorResponse {
+  success: false;
+  error: {
+    type: string;
+    message: string;
+    code: string;
+    details: {
+      limit: number;
+      remaining: number;
+      resetTime: number;
+      retryAfter: number;
+    };
+  };
+  timestamp: number;
+  requestId?: string;
+}
+
+/**
+ * File upload error response
+ */
+export interface FileUploadErrorResponse {
+  success: false;
+  error: {
+    type: string;
+    message: string;
+    code: string;
+    details?: {
+      fileSize?: number;
+      maxFileSize?: number;
+      uploadedFileType?: string;
+      allowedFileTypes?: string[];
+      scanResults?: {
+        threatFound: boolean;
+        threatName?: string;
+        scanEngine?: string;
+      };
+    };
+  };
+  timestamp: number;
+  requestId?: string;
+}
+
+/**
+ * External service error response
+ */
+export interface ExternalServiceErrorResponse {
+  success: false;
+  error: {
+    type: string;
+    message: string;
+    code: string;
+    details: {
+      serviceName: string;
+      serviceStatusCode?: number;
+      serviceErrorMessage?: string;
+      isTemporary: boolean;
+      estimatedRecoveryTime?: string;
+    };
+  };
+  timestamp: number;
+  requestId?: string;
+}
+
+/**
+ * Authenticated user type
+ */
 export interface AuthenticatedUser {
   id: string;
-  clerkId: string;
   email: string;
   username?: string;
   firstName?: string;
   lastName?: string;
-  imageUrl?: string;
-  role: string;
-  isActive: boolean;
-  lastLoginAt?: number;
-  preferences: UserPreferences;
-  metadata: UserMetadata;
+  role?: string;
+  permissions?: string[];
 }
 
-export interface UserPreferences {
-  language: string;
-  theme: "light" | "dark" | "auto";
-  notifications: NotificationPreferences;
-  privacy: PrivacyPreferences;
-  audio: AudioPreferences;
+/**
+ * API Error type
+ */
+export interface ApiError {
+  type: string;
+  message: string;
+  code: string;
+  details?: Record<string, unknown>;
 }
 
-export interface NotificationPreferences {
-  email: boolean;
-  push: boolean;
-  sms: boolean;
-  marketing: boolean;
-  updates: boolean;
+/**
+ * API Request type
+ */
+export interface ApiRequest<T = unknown> {
+  data: T;
+  headers?: Record<string, string>;
+  timestamp?: number;
+  requestId?: string;
 }
 
-export interface PrivacyPreferences {
-  profileVisibility: "public" | "private" | "friends";
-  showActivity: boolean;
-  allowAnalytics: boolean;
-}
-
-export interface AudioPreferences {
-  defaultVolume: number;
-  autoplay: boolean;
-  quality: "low" | "medium" | "high";
-  downloadFormat: "mp3" | "wav" | "flac";
-}
-
-export interface UserMetadata {
-  signupSource?: string;
-  referralCode?: string;
-  lastActiveAt?: number;
-  deviceInfo?: DeviceInfo;
-  locationInfo?: LocationInfo;
-  subscriptionHistory?: SubscriptionEvent[];
-}
-
-export interface DeviceInfo {
-  type: "desktop" | "mobile" | "tablet";
-  os: string;
-  browser: string;
-  version: string;
-  screenResolution?: string;
-}
-
-export interface LocationInfo {
-  country?: string;
-  region?: string;
-  city?: string;
-  timezone?: string;
-  ip?: string; // Hashed for privacy
-}
-
-export interface SubscriptionEvent {
-  type: "created" | "upgraded" | "downgraded" | "cancelled" | "renewed";
-  planId: string;
-  timestamp: number;
-  amount?: number;
-  currency?: string;
-}
-
-// ================================
-// SESSION TYPES
-// ================================
-
-export interface SessionData {
-  sessionId: string;
-  userId?: string;
-  createdAt: number;
-  lastActiveAt: number;
-  expiresAt: number;
-  ipAddress?: string;
-  userAgent?: string;
-  deviceFingerprint?: string;
-  isAuthenticated: boolean;
-  permissions: string[];
-  metadata: SessionMetadata;
-}
-
-export interface SessionMetadata {
-  loginMethod?: "email" | "oauth" | "sso";
-  mfaVerified?: boolean;
-  rememberMe?: boolean;
-  deviceTrusted?: boolean;
-  lastPasswordChange?: number;
-}
-
-// ================================
-// ORDER AND PAYMENT TYPES
-// ================================
-
-export interface OrderItem {
-  productId: number;
-  type: "beat" | "subscription" | "service";
-  title: string;
-  sku?: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-  licenseType?: string;
-  metadata: OrderItemMetadata;
-}
-
-export interface OrderItemMetadata {
-  beatGenre?: string;
-  beatBpm?: number;
-  beatKey?: string;
-  downloadFormat?: string;
-  licenseTerms?: string;
-  customizations?: Record<string, unknown>;
-}
-
-export interface OrderMetadata {
-  source: "web" | "mobile" | "api";
-  campaign?: string;
-  referrer?: string;
-  discountCode?: string;
-  giftMessage?: string;
-  deliveryInstructions?: string;
-  customFields?: Record<string, unknown>;
-}
-
-export interface PaymentMetadata {
-  paymentMethod: "stripe" | "paypal" | "apple_pay" | "google_pay";
-  last4?: string;
-  brand?: string;
-  country?: string;
-  fingerprint?: string;
-  riskScore?: number;
-  fraudCheck?: FraudCheckResult;
-}
-
-export interface FraudCheckResult {
-  score: number;
-  decision: "approve" | "review" | "decline";
-  reasons: string[];
-  timestamp: number;
-}
-
-// ================================
-// RESERVATION TYPES
-// ================================
-
-export interface ReservationDetails {
-  name: string;
-  email: string;
-  phone: string;
-  requirements?: string;
-  referenceLinks?: string[];
-  projectDescription?: string;
-  deadline?: string;
-  budget?: {
-    min: number;
-    max: number;
-    currency: string;
-  };
-  additionalServices?: string[];
-  communicationPreference?: "email" | "phone" | "video";
-}
-
-// ================================
-// ACTIVITY LOG TYPES
-// ================================
-
+/**
+ * Activity details
+ */
 export interface ActivityDetails {
   action: string;
   resource: string;
   resourceId?: string;
-  changes?: Record<string, { from: unknown; to: unknown }>;
-  metadata: ActivityMetadata;
+  metadata?: Record<string, unknown>;
 }
 
+/**
+ * Activity metadata
+ */
 export interface ActivityMetadata {
+  userId?: string;
+  sessionId?: string;
   ipAddress?: string;
   userAgent?: string;
-  location?: LocationInfo;
-  duration?: number;
-  success: boolean;
-  errorMessage?: string;
-  additionalContext?: Record<string, unknown>;
+  timestamp: number;
 }
 
-// ================================
-// AUDIT LOG TYPES
-// ================================
-
-export interface AuditDetails {
-  operation: string;
-  resource: string;
-  resourceId: string;
-  changes: AuditChange[];
-  context: AuditContext;
-}
-
+/**
+ * Audit change
+ */
 export interface AuditChange {
   field: string;
   oldValue: unknown;
   newValue: unknown;
-  changeType: "create" | "update" | "delete";
 }
 
+/**
+ * Audit context
+ */
 export interface AuditContext {
-  requestId: string;
+  userId?: string;
   sessionId?: string;
+  requestId?: string;
   ipAddress?: string;
   userAgent?: string;
-  apiVersion?: string;
-  clientVersion?: string;
-  correlationId?: string;
 }
 
-// ================================
-// WEBHOOK TYPES
-// ================================
+/**
+ * Audit details
+ */
+export interface AuditDetails {
+  changes: AuditChange[];
+  context: AuditContext;
+  timestamp: number;
+}
 
+/**
+ * Payment metadata
+ */
+export interface PaymentMetadata {
+  paymentIntentId?: string;
+  customerId?: string;
+  amount: number;
+  currency: string;
+  status: string;
+}
+
+/**
+ * Quota usage metadata
+ */
+export interface QuotaUsageMetadata {
+  used: number;
+  limit: number;
+  resetDate?: string;
+  quotaType: string;
+}
+
+/**
+ * Session data
+ */
+export interface SessionData {
+  userId?: string;
+  sessionId: string;
+  expiresAt: number;
+  data?: Record<string, unknown>;
+}
+
+/**
+ * Session metadata
+ */
+export interface SessionMetadata {
+  createdAt: number;
+  lastAccessedAt: number;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+/**
+ * Webhook data
+ */
+export interface WebhookData {
+  event: string;
+  data: Record<string, unknown>;
+  timestamp: number;
+}
+
+/**
+ * Webhook metadata
+ */
+export interface WebhookMetadata {
+  source: string;
+  signature?: string;
+  deliveryId?: string;
+  attempt: number;
+}
+
+/**
+ * Webhook payload
+ */
 export interface WebhookPayload {
   id: string;
   type: string;
-  version: string;
-  timestamp: number;
   data: WebhookData;
   metadata: WebhookMetadata;
 }
 
-export interface WebhookData {
-  object: Record<string, unknown>;
-  previousAttributes?: Record<string, unknown>;
+/**
+ * Apple Pay line item
+ */
+export interface ApplePayLineItem {
+  label: string;
+  amount: string;
+  type?: "final" | "pending";
 }
 
-export interface WebhookMetadata {
-  source: string;
-  environment: "production" | "staging" | "development";
-  retryCount?: number;
-  originalTimestamp?: number;
+/**
+ * Apple Pay payment request
+ */
+export interface ApplePayPaymentRequest {
+  countryCode: string;
+  currencyCode: string;
+  merchantCapabilities: string[];
+  supportedNetworks: string[];
+  total: ApplePayLineItem;
+  lineItems?: ApplePayLineItem[];
 }
 
-// ================================
-// BILLING TYPES
-// ================================
+/**
+ * Apple Pay shipping method
+ */
+export interface ApplePayShippingMethod {
+  label: string;
+  amount: string;
+  type: string;
+  identifier: string;
+}
 
-export interface BillingInfo {
+/**
+ * Google Pay merchant info
+ */
+export interface GooglePayMerchantInfo {
+  merchantId: string;
+  merchantName: string;
+}
+
+/**
+ * Google Pay payment method
+ */
+export interface GooglePayPaymentMethod {
+  type: string;
+  parameters: Record<string, unknown>;
+  tokenizationSpecification: GooglePayTokenizationSpecification;
+}
+
+/**
+ * Google Pay payment request
+ */
+export interface GooglePayPaymentRequest {
+  apiVersion: number;
+  apiVersionMinor: number;
+  allowedPaymentMethods: GooglePayPaymentMethod[];
+  merchantInfo: GooglePayMerchantInfo;
+  transactionInfo: GooglePayTransactionInfo;
+}
+
+/**
+ * Google Pay tokenization specification
+ */
+export interface GooglePayTokenizationSpecification {
+  type: string;
+  parameters: Record<string, unknown>;
+}
+
+/**
+ * Google Pay transaction info
+ */
+export interface GooglePayTransactionInfo {
+  totalPriceStatus: string;
+  totalPrice: string;
+  currencyCode: string;
+  countryCode: string;
+}
+
+// Re-export WooCommerce types from the woocommerce types file
+export interface WooCommerceMetaData {
+  id: number;
+  key: string;
+  value: string | number | boolean | string[] | null;
+}
+
+export interface WooCommerceImage {
+  id: number;
+  date_created: string;
+  date_created_gmt: string;
+  date_modified: string;
+  date_modified_gmt: string;
+  src: string;
   name: string;
-  email: string;
-  address: BillingAddress;
-  taxId?: string;
-  companyName?: string;
-  phone?: string;
+  alt: string;
 }
 
-export interface BillingAddress {
-  line1: string;
-  line2?: string;
-  city: string;
-  state?: string;
-  postalCode: string;
-  country: string;
+export interface WooCommerceCategory {
+  id: number;
+  name: string;
+  slug: string;
+  parent?: number;
+  description?: string;
+  display?: string;
+  image?: WooCommerceImage | null;
+  menu_order?: number;
+  count?: number;
 }
 
-// ================================
-// QUOTA USAGE TYPES
-// ================================
-
-export interface QuotaUsageMetadata {
-  resourceType: "download" | "upload" | "api_call" | "storage";
-  resourceSize?: number;
-  resourceFormat?: string;
-  clientInfo?: DeviceInfo;
-  location?: LocationInfo;
-  timestamp: number;
+export interface WooCommerceTag {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  count?: number;
 }
 
-// ================================
-// EXTERNAL API TYPES
-// ================================
+export interface WooCommerceAttribute {
+  id: number;
+  name: string;
+  slug?: string;
+  type?: string;
+  order_by?: string;
+  has_archives?: boolean;
+  options: string[];
+  position: number;
+  visible: boolean;
+  variation: boolean;
+}
+
+export interface WooCommerceDimensions {
+  length: string;
+  width: string;
+  height: string;
+}
+
+export interface WooCommerceDownload {
+  id: string;
+  name: string;
+  file: string;
+}
+
+export interface WooCommerceDefaultAttribute {
+  id: number;
+  name: string;
+  option: string;
+}
 
 export interface WooCommerceProduct {
   id: number;
@@ -336,11 +489,13 @@ export interface WooCommerceProduct {
   slug: string;
   permalink: string;
   date_created: string;
+  date_created_gmt: string;
   date_modified: string;
-  type: string;
-  status: string;
+  date_modified_gmt: string;
+  type: "simple" | "grouped" | "external" | "variable";
+  status: "draft" | "pending" | "private" | "publish";
   featured: boolean;
-  catalog_visibility: string;
+  catalog_visibility: "visible" | "catalog" | "search" | "hidden";
   description: string;
   short_description: string;
   sku: string;
@@ -348,8 +503,9 @@ export interface WooCommerceProduct {
   regular_price: string;
   sale_price: string;
   date_on_sale_from: string | null;
+  date_on_sale_from_gmt: string | null;
   date_on_sale_to: string | null;
-  price_html: string;
+  date_on_sale_to_gmt: string | null;
   on_sale: boolean;
   purchasable: boolean;
   total_sales: number;
@@ -360,14 +516,14 @@ export interface WooCommerceProduct {
   download_expiry: number;
   external_url: string;
   button_text: string;
-  tax_status: string;
+  tax_status: "taxable" | "shipping" | "none";
   tax_class: string;
   manage_stock: boolean;
   stock_quantity: number | null;
-  stock_status: string;
-  backorders: string;
+  backorders: "no" | "notify" | "yes";
   backorders_allowed: boolean;
   backordered: boolean;
+  low_stock_amount: number | null;
   sold_individually: boolean;
   weight: string;
   dimensions: WooCommerceDimensions;
@@ -378,7 +534,6 @@ export interface WooCommerceProduct {
   reviews_allowed: boolean;
   average_rating: string;
   rating_count: number;
-  related_ids: number[];
   upsell_ids: number[];
   cross_sell_ids: number[];
   parent_id: number;
@@ -391,119 +546,18 @@ export interface WooCommerceProduct {
   variations: number[];
   grouped_products: number[];
   menu_order: number;
+  price_html: string;
+  related_ids: number[];
   meta_data: WooCommerceMetaData[];
-}
-
-export interface WooCommerceDownload {
-  id: string;
-  name: string;
-  file: string;
-}
-
-export interface WooCommerceDimensions {
-  length: string;
-  width: string;
-  height: string;
-}
-
-export interface WooCommerceCategory {
-  id: number;
-  name: string;
-  slug: string;
-}
-
-export interface WooCommerceTag {
-  id: number;
-  name: string;
-  slug: string;
-}
-
-export interface WooCommerceImage {
-  id: number;
-  date_created: string;
-  date_modified: string;
-  src: string;
-  name: string;
-  alt: string;
-}
-
-export interface WooCommerceAttribute {
-  id: number;
-  name: string;
-  position: number;
-  visible: boolean;
-  variation: boolean;
-  options: string[];
-}
-
-export interface WooCommerceDefaultAttribute {
-  id: number;
-  name: string;
-  option: string;
-}
-
-export interface WooCommerceMetaData {
-  id: number;
-  key: string;
-  value: string | number | boolean | string[] | null;
-}
-
-// ================================
-// PAYMENT PROVIDER TYPES
-// ================================
-
-export interface ApplePayPaymentRequest {
-  countryCode: string;
-  currencyCode: string;
-  supportedNetworks: string[];
-  merchantCapabilities: string[];
-  total: ApplePayLineItem;
-  lineItems?: ApplePayLineItem[];
-  shippingMethods?: ApplePayShippingMethod[];
-  requiredBillingContactFields?: string[];
-  requiredShippingContactFields?: string[];
-}
-
-export interface ApplePayLineItem {
-  label: string;
-  amount: string;
-  type?: "final" | "pending";
-}
-
-export interface ApplePayShippingMethod {
-  label: string;
-  detail: string;
-  amount: string;
-  identifier: string;
-}
-
-export interface GooglePayPaymentRequest {
-  apiVersion: number;
-  apiVersionMinor: number;
-  allowedPaymentMethods: GooglePayPaymentMethod[];
-  transactionInfo: GooglePayTransactionInfo;
-  merchantInfo: GooglePayMerchantInfo;
-}
-
-export interface GooglePayPaymentMethod {
-  type: string;
-  parameters: Record<string, unknown>;
-  tokenizationSpecification: GooglePayTokenizationSpecification;
-}
-
-export interface GooglePayTokenizationSpecification {
-  type: string;
-  parameters: Record<string, unknown>;
-}
-
-export interface GooglePayTransactionInfo {
-  totalPriceStatus: string;
-  totalPrice: string;
-  currencyCode: string;
-  countryCode: string;
-}
-
-export interface GooglePayMerchantInfo {
-  merchantName: string;
-  merchantId?: string;
+  stock_status: "instock" | "outofstock" | "onbackorder";
+  // BroLab Entertainment specific fields
+  audio_url?: string | null;
+  hasVocals?: boolean;
+  stems?: boolean;
+  bpm?: string;
+  key?: string;
+  mood?: string;
+  instruments?: string;
+  duration?: string;
+  is_free?: boolean;
 }

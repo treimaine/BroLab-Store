@@ -1,115 +1,283 @@
-// WooCommerce API type definitions
+/**
+ * WooCommerce API Type Definitions for BroLab Entertainment
+ *
+ * This module contains comprehensive type definitions for WooCommerce API responses,
+ * replacing all 'any' types with proper TypeScript interfaces.
+ */
 
 // ================================
 // WOOCOMMERCE PRODUCT TYPES
 // ================================
 
+/**
+ * WooCommerce product metadata entry
+ */
 export interface WooCommerceMetaData {
+  id: number;
   key: string;
-  value: string | number | boolean | object;
+  value: string | number | boolean | string[] | null;
 }
 
-export interface WooCommerceTag {
-  id: number;
-  name: string;
-  slug: string;
-}
-
-export interface WooCommerceCategory {
-  id: number;
-  name: string;
-  slug: string;
-}
-
-export interface WooCommerceAttribute {
-  id: number;
-  name: string;
-  position: number;
-  visible: boolean;
-  variation: boolean;
-  options: string[];
-}
-
+/**
+ * WooCommerce product image
+ */
 export interface WooCommerceImage {
   id: number;
+  date_created: string;
+  date_created_gmt: string;
+  date_modified: string;
+  date_modified_gmt: string;
   src: string;
   name: string;
   alt: string;
 }
 
+/**
+ * WooCommerce product category
+ */
+export interface WooCommerceCategory {
+  id: number;
+  name: string;
+  slug: string;
+  parent?: number;
+  description?: string;
+  display?: string;
+  image?: WooCommerceImage | null;
+  menu_order?: number;
+  count?: number;
+}
+
+/**
+ * WooCommerce product tag
+ */
+export interface WooCommerceTag {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  count?: number;
+}
+
+/**
+ * WooCommerce product attribute
+ */
+export interface WooCommerceAttribute {
+  id: number;
+  name: string;
+  slug?: string;
+  type?: string;
+  order_by?: string;
+  has_archives?: boolean;
+  options: string[];
+  position: number;
+  visible: boolean;
+  variation: boolean;
+}
+
+/**
+ * WooCommerce product dimensions
+ */
+export interface WooCommerceDimensions {
+  length: string;
+  width: string;
+  height: string;
+}
+
+/**
+ * WooCommerce product download
+ */
+export interface WooCommerceDownload {
+  id: string;
+  name: string;
+  file: string;
+}
+
+/**
+ * WooCommerce default attribute
+ */
+export interface WooCommerceDefaultAttribute {
+  id: number;
+  name: string;
+  option: string;
+}
+
+/**
+ * Complete WooCommerce product interface
+ */
 export interface WooCommerceProduct {
+  // Core product fields
   id: number;
   name: string;
   slug: string;
   permalink: string;
   date_created: string;
+  date_created_gmt: string;
   date_modified: string;
-  type: string;
-  status: string;
+  date_modified_gmt: string;
+  type: "simple" | "grouped" | "external" | "variable";
+  status: "draft" | "pending" | "private" | "publish";
   featured: boolean;
-  catalog_visibility: string;
+  catalog_visibility: "visible" | "catalog" | "search" | "hidden";
   description: string;
   short_description: string;
   sku: string;
+
+  // Pricing
   price: string;
   regular_price: string;
   sale_price: string;
   date_on_sale_from: string | null;
+  date_on_sale_from_gmt: string | null;
   date_on_sale_to: string | null;
-  price_html: string;
+  date_on_sale_to_gmt: string | null;
   on_sale: boolean;
+
+  // Inventory
   purchasable: boolean;
   total_sales: number;
   virtual: boolean;
   downloadable: boolean;
-  downloads: unknown[];
+  downloads: WooCommerceDownload[];
   download_limit: number;
   download_expiry: number;
   external_url: string;
   button_text: string;
-  tax_status: string;
+
+  // Tax and shipping
+  tax_status: "taxable" | "shipping" | "none";
   tax_class: string;
   manage_stock: boolean;
   stock_quantity: number | null;
-  stock_status: string;
-  backorders: string;
+  backorders: "no" | "notify" | "yes";
   backorders_allowed: boolean;
   backordered: boolean;
+  low_stock_amount: number | null;
   sold_individually: boolean;
   weight: string;
-  dimensions: {
-    length: string;
-    width: string;
-    height: string;
-  };
+  dimensions: WooCommerceDimensions;
   shipping_required: boolean;
   shipping_taxable: boolean;
   shipping_class: string;
   shipping_class_id: number;
+
+  // Reviews
   reviews_allowed: boolean;
   average_rating: string;
   rating_count: number;
-  related_ids: number[];
+
+  // Related products
   upsell_ids: number[];
   cross_sell_ids: number[];
   parent_id: number;
   purchase_note: string;
+
+  // Taxonomies
   categories: WooCommerceCategory[];
   tags: WooCommerceTag[];
   images: WooCommerceImage[];
   attributes: WooCommerceAttribute[];
-  default_attributes: unknown[];
+  default_attributes: WooCommerceDefaultAttribute[];
   variations: number[];
   grouped_products: number[];
   menu_order: number;
+  price_html: string;
+  related_ids: number[];
+
+  // Metadata
   meta_data: WooCommerceMetaData[];
+
+  // Stock status
+  stock_status: "instock" | "outofstock" | "onbackorder";
+
+  // BroLab Entertainment specific fields (extracted from meta_data)
+  audio_url?: string | null;
+  hasVocals?: boolean;
+  stems?: boolean;
+  bpm?: string;
+  key?: string;
+  mood?: string;
+  instruments?: string;
+  duration?: string;
+  is_free?: boolean;
+}
+
+/**
+ * WooCommerce product query parameters
+ */
+export interface WooCommerceProductQuery {
+  context?: "view" | "edit";
+  page?: number;
+  per_page?: number;
+  search?: string;
+  after?: string;
+  before?: string;
+  exclude?: number[];
+  include?: number[];
+  offset?: number;
+  order?: "asc" | "desc";
+  orderby?: "date" | "id" | "include" | "title" | "slug" | "price" | "popularity" | "rating";
+  parent?: number[];
+  parent_exclude?: number[];
+  slug?: string;
+  status?: "any" | "draft" | "pending" | "private" | "publish";
+  type?: "simple" | "grouped" | "external" | "variable";
+  sku?: string;
+  featured?: boolean;
+  category?: string;
+  tag?: string;
+  shipping_class?: string;
+  attribute?: string;
+  attribute_term?: string;
+  tax_class?: string;
+  on_sale?: boolean;
+  min_price?: string;
+  max_price?: string;
+  stock_status?: "instock" | "outofstock" | "onbackorder";
+}
+
+/**
+ * WooCommerce category query parameters
+ */
+export interface WooCommerceCategoryQuery {
+  context?: "view" | "edit";
+  page?: number;
+  per_page?: number;
+  search?: string;
+  exclude?: number[];
+  include?: number[];
+  order?: "asc" | "desc";
+  orderby?: "id" | "include" | "name" | "slug" | "term_group" | "description" | "count";
+  hide_empty?: boolean;
+  parent?: number;
+  product?: number;
+  slug?: string;
 }
 
 // ================================
 // WOOCOMMERCE ORDER TYPES
 // ================================
 
-export interface WooCommerceOrderLineItem {
+/**
+ * WooCommerce billing/shipping address
+ */
+export interface WooCommerceAddress {
+  first_name: string;
+  last_name: string;
+  company: string;
+  address_1: string;
+  address_2: string;
+  city: string;
+  state: string;
+  postcode: string;
+  country: string;
+  email?: string;
+  phone?: string;
+}
+
+/**
+ * WooCommerce order line item
+ */
+export interface WooCommerceLineItem {
   id: number;
   name: string;
   product_id: number;
@@ -120,49 +288,122 @@ export interface WooCommerceOrderLineItem {
   subtotal_tax: string;
   total: string;
   total_tax: string;
-  taxes: unknown[];
+  taxes: Array<{
+    id: number;
+    total: string;
+    subtotal: string;
+  }>;
   meta_data: WooCommerceMetaData[];
   sku: string;
   price: number;
+  image?: {
+    id: string;
+    src: string;
+  };
+  parent_name?: string | null;
 }
 
-export interface WooCommerceBilling {
-  first_name: string;
-  last_name: string;
-  company: string;
-  address_1: string;
-  address_2: string;
-  city: string;
-  state: string;
-  postcode: string;
-  country: string;
-  email: string;
-  phone: string;
+/**
+ * WooCommerce tax line
+ */
+export interface WooCommerceTaxLine {
+  id: number;
+  rate_code: string;
+  rate_id: number;
+  label: string;
+  compound: boolean;
+  tax_total: string;
+  shipping_tax_total: string;
+  rate_percent: number;
+  meta_data: WooCommerceMetaData[];
 }
 
-export interface WooCommerceShipping {
-  first_name: string;
-  last_name: string;
-  company: string;
-  address_1: string;
-  address_2: string;
-  city: string;
-  state: string;
-  postcode: string;
-  country: string;
+/**
+ * WooCommerce shipping line
+ */
+export interface WooCommerceShippingLine {
+  id: number;
+  method_title: string;
+  method_id: string;
+  instance_id: string;
+  total: string;
+  total_tax: string;
+  taxes: Array<{
+    id: number;
+    total: string;
+  }>;
+  meta_data: WooCommerceMetaData[];
 }
 
+/**
+ * WooCommerce fee line
+ */
+export interface WooCommerceFeeLine {
+  id: number;
+  name: string;
+  tax_class: string;
+  tax_status: "taxable" | "none";
+  total: string;
+  total_tax: string;
+  taxes: Array<{
+    id: number;
+    total: string;
+    subtotal: string;
+  }>;
+  meta_data: WooCommerceMetaData[];
+}
+
+/**
+ * WooCommerce coupon line
+ */
+export interface WooCommerceCouponLine {
+  id: number;
+  code: string;
+  discount: string;
+  discount_tax: string;
+  meta_data: WooCommerceMetaData[];
+}
+
+/**
+ * WooCommerce refund
+ */
+export interface WooCommerceRefund {
+  id: number;
+  date_created: string;
+  date_created_gmt: string;
+  amount: string;
+  reason: string;
+  refunded_by: number;
+  refunded_payment?: boolean;
+  meta_data: WooCommerceMetaData[];
+  line_items: WooCommerceLineItem[];
+}
+
+/**
+ * Complete WooCommerce order interface
+ */
 export interface WooCommerceOrder {
+  // Core order fields
   id: number;
   parent_id: number;
-  number: string;
-  order_key: string;
-  created_via: string;
-  version: string;
-  status: string;
+  status:
+    | "pending"
+    | "processing"
+    | "on-hold"
+    | "completed"
+    | "cancelled"
+    | "refunded"
+    | "failed"
+    | "trash";
   currency: string;
+  version: string;
+  prices_include_tax: boolean;
   date_created: string;
+  date_created_gmt: string;
   date_modified: string;
+  date_modified_gmt: string;
+
+  // Pricing
   discount_total: string;
   discount_tax: string;
   shipping_total: string;
@@ -170,184 +411,153 @@ export interface WooCommerceOrder {
   cart_tax: string;
   total: string;
   total_tax: string;
-  prices_include_tax: boolean;
+
+  // Customer
   customer_id: number;
-  customer_ip_address: string;
-  customer_user_agent: string;
-  customer_note: string;
-  billing: WooCommerceBilling;
-  shipping: WooCommerceShipping;
+  order_key: string;
+  billing: WooCommerceAddress;
+  shipping: WooCommerceAddress;
+
+  // Payment
   payment_method: string;
   payment_method_title: string;
   transaction_id: string;
-  date_paid: string | null;
+
+  // Additional info
+  customer_ip_address: string;
+  customer_user_agent: string;
+  created_via: string;
+  customer_note: string;
   date_completed: string | null;
+  date_paid: string | null;
   cart_hash: string;
+  number: string;
+
+  // Order items
+  line_items: WooCommerceLineItem[];
+  tax_lines: WooCommerceTaxLine[];
+  shipping_lines: WooCommerceShippingLine[];
+  fee_lines: WooCommerceFeeLine[];
+  coupon_lines: WooCommerceCouponLine[];
+  refunds: WooCommerceRefund[];
+
+  // Metadata
   meta_data: WooCommerceMetaData[];
-  line_items: WooCommerceOrderLineItem[];
-  tax_lines: unknown[];
-  shipping_lines: unknown[];
-  fee_lines: unknown[];
-  coupon_lines: unknown[];
-  refunds: unknown[];
+
+  // Additional fields
+  payment_url?: string;
+  is_editable?: boolean;
+  needs_payment?: boolean;
+  needs_processing?: boolean;
+}
+
+/**
+ * WooCommerce order query parameters
+ */
+export interface WooCommerceOrderQuery {
+  context?: "view" | "edit";
+  page?: number;
+  per_page?: number;
+  search?: string;
+  after?: string;
+  before?: string;
+  exclude?: number[];
+  include?: number[];
+  offset?: number;
+  order?: "asc" | "desc";
+  orderby?: "date" | "id" | "include" | "title" | "slug";
+  parent?: number[];
+  parent_exclude?: number[];
+  status?: string[];
+  customer?: number;
+  product?: number;
+  dp?: number;
 }
 
 // ================================
-// WOOCOMMERCE CUSTOMER TYPES
+// BROLAB METADATA EXTRACTION TYPES
 // ================================
 
-export interface WooCommerceCustomer {
-  id: number;
-  date_created: string;
-  date_modified: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  role: string;
-  username: string;
-  billing: WooCommerceBilling;
-  shipping: WooCommerceShipping;
-  is_paying_customer: boolean;
-  avatar_url: string;
-  meta_data: WooCommerceMetaData[];
-}
-
-// ================================
-// METADATA EXTRACTION TYPES
-// ================================
-
-export interface ProductMetadata {
+/**
+ * BroLab specific metadata extracted from WooCommerce products
+ */
+export interface BroLabProductMetadata {
+  audio_url?: string | null;
+  hasVocals?: boolean;
+  stems?: boolean;
   bpm?: string;
   key?: string;
   mood?: string;
-  artist?: string;
-  genre?: string;
+  instruments?: string;
   duration?: string;
-  instruments?: string;
-  hasVocals?: boolean;
-  stems?: boolean;
-  timeSignature?: string;
+  is_free?: boolean;
+}
+
+/**
+ * Raw WooCommerce API response (before validation)
+ */
+export interface RawWooCommerceResponse {
+  [key: string]: unknown;
+}
+
+/**
+ * WooCommerce API error response
+ */
+export interface WooCommerceApiError {
+  code: string;
+  message: string;
+  data?: {
+    status: number;
+    params?: Record<string, unknown>;
+    details?: Record<string, unknown>;
+  };
 }
 
 // ================================
-// QUERY PARAMETER TYPES
+// VALIDATION RESULT TYPES
 // ================================
 
-export interface WooCommerceProductQuery {
-  search?: string;
-  category?: string;
-  min_price?: string;
-  max_price?: string;
-  per_page?: string;
-  page?: string;
-  orderby?: string;
-  order?: string;
-  bpm_min?: string;
-  bpm_max?: string;
-  key?: string;
-  mood?: string;
-  producer?: string;
-  duration_min?: string;
-  duration_max?: string;
-  has_vocals?: string;
-  stems?: string;
-  is_free?: string;
-  tags?: string;
-  keys?: string;
-  moods?: string;
-  producers?: string;
-  instruments?: string;
-  time_signature?: string;
+/**
+ * Product validation result
+ */
+export interface ProductValidationResult {
+  isValid: boolean;
+  product?: WooCommerceProduct;
+  errors?: string[];
 }
 
-export interface WooCommerceMetaQuery {
-  key: string;
-  value?: string | number;
-  compare?: string;
-  type?: string;
+/**
+ * Order validation result
+ */
+export interface OrderValidationResult {
+  isValid: boolean;
+  order?: WooCommerceOrder;
+  errors?: string[];
 }
 
 // ================================
-// TRANSFORMED PRODUCT TYPES
+// API RESPONSE WRAPPER TYPES
 // ================================
 
-export interface TransformedProduct
-  extends Omit<WooCommerceProduct, "price" | "regular_price" | "sale_price"> {
-  price: number;
-  regular_price: number;
-  sale_price: number;
-  audio_url: string | null;
-  bpm: string;
-  key: string;
-  mood: string;
-  artist: string;
-  genre: string;
-  duration: string;
-  instruments: string;
-  is_free: boolean;
-  hasVocals: boolean;
-  stems: boolean;
+/**
+ * WooCommerce API response wrapper
+ */
+export interface WooCommerceApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: WooCommerceApiError;
+  headers?: Record<string, string>;
+  statusCode?: number;
 }
 
-// ================================
-// ERROR TYPES
-// ================================
-
-export interface WooCommerceError extends Error {
-  status?: number;
-  code?: string;
-  data?: unknown;
-}
-
-// ================================
-// HELPER FUNCTIONS FOR METADATA EXTRACTION
-// ================================
-
-export interface MetadataExtractor {
-  extractInstruments(product: WooCommerceProduct): string[] | null;
-  extractTags(product: WooCommerceProduct): string[] | null;
-  extractTimeSignature(product: WooCommerceProduct): string | null;
-  extractDuration(product: WooCommerceProduct): number | null;
-  extractHasVocals(product: WooCommerceProduct): boolean;
-  extractStems(product: WooCommerceProduct): boolean;
-  extractBpm(product: WooCommerceProduct): string;
-  extractKey(product: WooCommerceProduct): string;
-  extractMood(product: WooCommerceProduct): string;
-  extractArtist(product: WooCommerceProduct): string;
-  extractGenre(product: WooCommerceProduct): string;
-}
-
-// ================================
-// AUDIO URL EXTRACTION TYPES
-// ================================
-
-export interface SonaarTrackData {
-  track_mp3?: string;
-  audio_preview?: string;
-  src?: string;
-  url?: string;
-}
-
-export interface AudioUrlExtractor {
-  extractAudioUrl(product: WooCommerceProduct): string | null;
-  parseAlbTracklist(tracklistValue: string | object): SonaarTrackData | null;
-}
-
-// ================================
-// PRODUCT TRANSFORMATION TYPES
-// ================================
-
-export interface ProductTransformer {
-  transformProduct(product: WooCommerceProduct): TransformedProduct;
-  transformProducts(products: WooCommerceProduct[]): TransformedProduct[];
-}
-
-// ================================
-// QUERY BUILDER TYPES
-// ================================
-
-export interface QueryBuilder {
-  buildMetaQuery(query: WooCommerceProductQuery): WooCommerceMetaQuery[];
-  buildAttributeQuery(query: WooCommerceProductQuery): Record<string, unknown>;
-  buildTagQuery(query: WooCommerceProductQuery): string;
+/**
+ * Paginated WooCommerce response
+ */
+export interface WooCommercePaginatedResponse<T> {
+  data: T[];
+  total: number;
+  totalPages: number;
+  page: number;
+  perPage: number;
+  hasMore: boolean;
 }

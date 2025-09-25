@@ -702,6 +702,8 @@ export class ErrorBoundaryManagerImpl implements ErrorBoundaryManager {
     this.performanceMonitor.trackMetric("error_resolved", 1, {
       error_type: errorLog.errorType,
       component: errorLog.component,
+      severity: errorLog.severity,
+      has_notes: notes ? "true" : "false",
     });
   }
 

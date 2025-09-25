@@ -93,7 +93,7 @@ export default function PaymentErrorPage() {
     return (
       <div className="min-h-screen bg-[var(--deep-black)] text-white flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-gray-600 border-t-[var(--accent-purple)] rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-gray-600 border-t-[var(--accent-purple)] rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-400">Analyse de l'erreur de paiement...</p>
         </div>
       </div>

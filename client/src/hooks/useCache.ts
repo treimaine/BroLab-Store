@@ -216,7 +216,6 @@ export function useCachedData<T>(
           const cachedData = await get<T>(key);
           if (cachedData !== null) {
             setData(cachedData);
-            setIsLoading(false);
             return cachedData;
           }
         }
@@ -232,8 +231,9 @@ export function useCachedData<T>(
       } catch (err) {
         const error = err instanceof Error ? err : new Error("Unknown error");
         setError(error);
+        setData(null); // Clear data on error
         console.error("Failed to fetch cached data:", error);
-        return null;
+        throw error; // Re-throw to allow proper error handling in tests
       } finally {
         setIsLoading(false);
       }

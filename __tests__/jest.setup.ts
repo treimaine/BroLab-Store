@@ -14,6 +14,36 @@ global.TextDecoder = TextDecoder as any;
 global.setImmediate =
   global.setImmediate || ((fn: Function, ...args: any[]) => setTimeout(fn, 0, ...args));
 
+// Mock import.meta for Vite environment variables
+Object.defineProperty(globalThis, "import", {
+  value: {
+    meta: {
+      env: {
+        NODE_ENV: "test",
+        VITE_CONVEX_URL: "https://test.convex.cloud",
+        VITE_CLERK_PUBLISHABLE_KEY: "pk_test_mock_key",
+        VITE_API_BASE_URL: "http://localhost:3000/api",
+        VITE_WORDPRESS_URL: "http://localhost:8080",
+        VITE_WOOCOMMERCE_URL: "http://localhost:8080/wp-json/wc/v3",
+        VITE_PAYPAL_CLIENT_ID: "test_paypal_client_id",
+        VITE_FEATURE_REALTIME_UPDATES: "true",
+        VITE_FEATURE_ANALYTICS_CHARTS: "true",
+        VITE_FEATURE_ADVANCED_FILTERS: "true",
+        VITE_FEATURE_PERFORMANCE_MONITORING: "true",
+        VITE_FEATURE_ERROR_TRACKING: "true",
+        VITE_FEATURE_OFFLINE_SUPPORT: "true",
+        VITE_LOG_LEVEL: "error",
+        VITE_SHOW_PERFORMANCE: "false",
+        VITE_USE_MOCK_DATA: "true",
+        VITE_PERFORMANCE_PROFILER: "false",
+        DEV: false,
+        PROD: false,
+      },
+    },
+  },
+  writable: true,
+});
+
 // Lightweight fetch stub for tests (avoid ESM node-fetch)
 // @ts-ignore
 global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({}) }));

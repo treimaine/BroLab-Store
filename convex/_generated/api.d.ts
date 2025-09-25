@@ -35,6 +35,7 @@ import type * as http from "../http.js";
 import type * as integrity from "../integrity.js";
 import type * as lib_dashboardConfig from "../lib/dashboardConfig.js";
 import type * as lib_dashboardValidation from "../lib/dashboardValidation.js";
+import type * as lib_statisticsCalculator from "../lib/statisticsCalculator.js";
 import type * as lib_validation from "../lib/validation.js";
 import type * as messages from "../messages.js";
 import type * as migrations_cleanOrders from "../migrations/cleanOrders.js";
@@ -96,6 +97,7 @@ declare const fullApi: ApiFromModules<{
   integrity: typeof integrity;
   "lib/dashboardConfig": typeof lib_dashboardConfig;
   "lib/dashboardValidation": typeof lib_dashboardValidation;
+  "lib/statisticsCalculator": typeof lib_statisticsCalculator;
   "lib/validation": typeof lib_validation;
   messages: typeof messages;
   "migrations/cleanOrders": typeof migrations_cleanOrders;

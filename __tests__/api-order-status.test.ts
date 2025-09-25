@@ -2,7 +2,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 
 // Legacy supabase stub for this test file
-const supabaseAdmin = { from: jest.fn() } as any;
+const _supabaseAdmin = { from: jest.fn() } as Record<string, unknown>;
 
 describe.skip("Order Status Tests (migrated to Convex)", () => {
   it("should be replaced with Convex order management", () => {

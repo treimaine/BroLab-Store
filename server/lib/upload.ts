@@ -1,6 +1,5 @@
 import { fileTypeFromBuffer } from "file-type";
 // import { supabaseAdmin } from './supabaseAdmin'; // Removed - using Convex for data
-import { validateFileUpload } from "./validation";
 
 // Configuration des types de fichiers autorisés
 const ALLOWED_MIME_TYPES = {
@@ -27,27 +26,22 @@ export async function validateFile(
 ): Promise<{ valid: boolean; errors: string[] }> {
   const errors: string[] = [];
 
-  // Validation de base avec le système existant
-  const baseValidation = validateFileUpload(file);
-  if (!baseValidation.valid) {
-    return baseValidation;
-  }
+  // Determine category and limits
+  const category = options.category || "audio";
+  const allowedTypes = options.allowedTypes || ALLOWED_MIME_TYPES[category];
+  const maxSize = options.maxSize || SIZE_LIMITS[category];
 
   // Détection du type de fichier réel
   const fileBuffer = file.buffer;
   const detectedType = await fileTypeFromBuffer(fileBuffer);
-
-  // Vérification du type MIME
-  const category = options.category || "audio";
-  const allowedTypes = options.allowedTypes || ALLOWED_MIME_TYPES[category];
   const detectedMime = detectedType?.mime || file.mimetype;
 
+  // Vérification du type MIME
   if (!allowedTypes.includes(detectedMime)) {
     errors.push(`Type de fichier non autorisé. Types acceptés: ${allowedTypes.join(", ")}`);
   }
 
   // Vérification de la taille
-  const maxSize = options.maxSize || SIZE_LIMITS[category];
   if (file.size > maxSize) {
     errors.push(`Taille de fichier dépassée. Maximum: ${maxSize / (1024 * 1024)}MB`);
   }

@@ -319,7 +319,7 @@ export class WebhookValidator {
         // Enhanced character filtering for security
         let sanitized = payload
           // Remove control characters and potentially dangerous characters
-          .replace(/[\x00-\x1f\x7f-\x9f]/g, "")
+          .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
           // Remove HTML/XML tags
           .replace(/<[^>]*>/g, "")
           // Remove JavaScript protocol
@@ -429,7 +429,7 @@ export class WebhookValidator {
 
           // Sanitize key name with enhanced filtering
           const sanitizedKey = key
-            .replace(/[<>"'&\x00-\x1f\x7f-\x9f]/g, "")
+            .replace(/[<>"'&\u0000-\u001f\u007f-\u009f]/g, "")
             .replace(/\s+/g, "_") // Replace spaces with underscores
             .substring(0, 100); // Limit key length
 

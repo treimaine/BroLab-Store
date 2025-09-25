@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { RateLimit } from "../shared/types/system-optimization";
-import { RateLimitConfigs, RateLimiterImpl } from "../shared/utils/rate-limiter";
+import { ConvexRateLimiterImpl, RateLimitConfigs } from "../shared/utils/rate-limiter";
 
 // Mock Convex client
+const mockConvexClient = {
+  mutation: jest.fn(),
+  query: jest.fn(),
+};
+
 jest.mock("convex/browser", () => ({
-  ConvexHttpClient: jest.fn().mockImplementation(() => ({
-    mutation: jest.fn(),
-    query: jest.fn(),
-  })),
+  ConvexHttpClient: jest.fn().mockImplementation(() => mockConvexClient),
 }));
 
 // Mock performance monitor
@@ -20,15 +22,18 @@ jest.mock("../shared/utils/system-manager", () => ({
   },
 }));
 
-describe("RateLimiterImpl", () => {
-  let rateLimiter: RateLimiterImpl;
+describe("ConvexRateLimiterImpl", () => {
+  let rateLimiter: ConvexRateLimiterImpl;
   let mockConvex: any;
 
   beforeEach(() => {
-    rateLimiter = new RateLimiterImpl();
-    // Get the mocked convex instance
-    const { ConvexHttpClient } = require("convex/browser");
-    mockConvex = new ConvexHttpClient();
+    // Reset all mocks
+    jest.clearAllMocks();
+    mockConvexClient.mutation.mockReset();
+    mockConvexClient.query.mockReset();
+
+    // Use the mocked convex client directly
+    rateLimiter = new ConvexRateLimiterImpl(mockConvexClient as any);
   });
 
   describe("checkLimit", () => {
@@ -40,7 +45,7 @@ describe("RateLimiterImpl", () => {
         totalRequests: 1,
       };
 
-      mockConvex.mutation.mockResolvedValue(mockResult);
+      mockConvexClient.mutation.mockResolvedValue(mockResult);
 
       const limit: RateLimit = {
         windowMs: 60000,
@@ -50,12 +55,15 @@ describe("RateLimiterImpl", () => {
       const result = await rateLimiter.checkLimit("user:123:api", limit);
 
       expect(result).toEqual(mockResult);
-      expect(mockConvex.mutation).toHaveBeenCalledWith(
-        expect.any(Object),
+      expect(mockConvexClient.mutation).toHaveBeenCalledWith(
+        "rateLimits:checkRateLimit",
         expect.objectContaining({
           key: "user:123:api",
           windowMs: 60000,
           maxRequests: 10,
+          metadata: {
+            action: "api",
+          },
         })
       );
     });
@@ -69,7 +77,7 @@ describe("RateLimiterImpl", () => {
         retryAfter: 60,
       };
 
-      mockConvex.mutation.mockResolvedValue(mockResult);
+      mockConvexClient.mutation.mockResolvedValue(mockResult);
 
       const onLimitReached = jest.fn();
       const limit: RateLimit = {
@@ -85,7 +93,7 @@ describe("RateLimiterImpl", () => {
     });
 
     it("should fail open when Convex call fails", async () => {
-      mockConvex.mutation.mockRejectedValue(new Error("Network error"));
+      mockConvexClient.mutation.mockRejectedValue(new Error("Network error"));
 
       const limit: RateLimit = {
         windowMs: 60000,
@@ -101,15 +109,17 @@ describe("RateLimiterImpl", () => {
 
   describe("resetLimit", () => {
     it("should reset rate limit successfully", async () => {
-      mockConvex.mutation.mockResolvedValue(true);
+      mockConvexClient.mutation.mockResolvedValue(true);
 
       await rateLimiter.resetLimit("user:123:api");
 
-      expect(mockConvex.mutation).toHaveBeenCalledWith(expect.any(Object), { key: "user:123:api" });
+      expect(mockConvexClient.mutation).toHaveBeenCalledWith("rateLimits:resetRateLimit", {
+        key: "user:123:api",
+      });
     });
 
     it("should handle reset errors gracefully", async () => {
-      mockConvex.mutation.mockRejectedValue(new Error("Database error"));
+      mockConvexClient.mutation.mockRejectedValue(new Error("Database error"));
 
       // Should not throw
       await expect(rateLimiter.resetLimit("user:123:api")).resolves.toBeUndefined();
@@ -127,15 +137,18 @@ describe("RateLimiterImpl", () => {
         blocked: 2,
       };
 
-      mockConvex.query.mockResolvedValue(mockStats);
+      mockConvexClient.query.mockResolvedValue(mockStats);
 
       const result = await rateLimiter.getStats("user:123:api");
 
       expect(result).toEqual(mockStats);
+      expect(mockConvexClient.query).toHaveBeenCalledWith("rateLimits:getRateLimitStats", {
+        key: "user:123:api",
+      });
     });
 
     it("should return default stats when key not found", async () => {
-      mockConvex.query.mockResolvedValue(null);
+      mockConvexClient.query.mockResolvedValue(null);
 
       const result = await rateLimiter.getStats("user:123:api");
 
@@ -148,17 +161,20 @@ describe("RateLimiterImpl", () => {
 
   describe("incrementCounter", () => {
     it("should increment counter and return new count", async () => {
-      mockConvex.mutation.mockResolvedValue(5);
+      mockConvexClient.mutation.mockResolvedValue(5);
 
       const result = await rateLimiter.incrementCounter("user:123:api");
 
       expect(result).toBe(5);
-      expect(mockConvex.mutation).toHaveBeenCalledWith(
-        expect.any(Object),
+      expect(mockConvexClient.mutation).toHaveBeenCalledWith(
+        "rateLimits:incrementRateLimit",
         expect.objectContaining({
           key: "user:123:api",
           windowMs: 60 * 60 * 1000,
           maxRequests: 1000,
+          metadata: {
+            action: "api",
+          },
         })
       );
     });
@@ -185,11 +201,12 @@ describe("RateLimiterImpl", () => {
         },
       };
 
-      mockConvex.query.mockResolvedValue(mockGlobalStats);
+      mockConvexClient.query.mockResolvedValue(mockGlobalStats);
 
       const result = await rateLimiter.getGlobalStats();
 
       expect(result).toEqual(mockGlobalStats);
+      expect(mockConvexClient.query).toHaveBeenCalledWith("rateLimits:getAllRateLimitStats", {});
     });
   });
 
@@ -207,11 +224,14 @@ describe("RateLimiterImpl", () => {
         },
       };
 
-      mockConvex.query.mockResolvedValue(mockUserStats);
+      mockConvexClient.query.mockResolvedValue(mockUserStats);
 
       const result = await rateLimiter.getUserStats("123");
 
       expect(result).toEqual(mockUserStats);
+      expect(mockConvexClient.query).toHaveBeenCalledWith("rateLimits:getUserRateLimits", {
+        userId: "123",
+      });
     });
   });
 
@@ -228,11 +248,14 @@ describe("RateLimiterImpl", () => {
         },
       };
 
-      mockConvex.query.mockResolvedValue(mockMetrics);
+      mockConvexClient.query.mockResolvedValue(mockMetrics);
 
       const result = await rateLimiter.getMetrics();
 
       expect(result).toEqual(mockMetrics);
+      expect(mockConvexClient.query).toHaveBeenCalledWith("rateLimits:getRateLimitMetrics", {
+        timeRange: undefined,
+      });
     });
 
     it("should accept time range parameter", async () => {
@@ -241,7 +264,7 @@ describe("RateLimiterImpl", () => {
         end: Date.now(),
       };
 
-      mockConvex.query.mockResolvedValue({
+      mockConvexClient.query.mockResolvedValue({
         totalKeys: 5,
         totalRequests: 50,
         totalBlocked: 1,
@@ -251,32 +274,37 @@ describe("RateLimiterImpl", () => {
 
       await rateLimiter.getMetrics(timeRange);
 
-      expect(mockConvex.query).toHaveBeenCalledWith(expect.any(Object), { timeRange });
+      expect(mockConvexClient.query).toHaveBeenCalledWith("rateLimits:getRateLimitMetrics", {
+        timeRange,
+      });
     });
   });
 
   describe("cleanupExpired", () => {
     it("should cleanup expired rate limits", async () => {
       const mockResult = { deletedCount: 5, cutoff: Date.now() - 86400000 };
-      mockConvex.mutation.mockResolvedValue(mockResult);
+      mockConvexClient.mutation.mockResolvedValue(mockResult);
 
       const result = await rateLimiter.cleanupExpired(86400000);
 
       expect(result).toEqual(mockResult);
-      expect(mockConvex.mutation).toHaveBeenCalledWith(expect.any(Object), {
-        olderThanMs: 86400000,
-      });
+      expect(mockConvexClient.mutation).toHaveBeenCalledWith(
+        "rateLimits:cleanupExpiredRateLimits",
+        {
+          olderThanMs: 86400000,
+        }
+      );
     });
   });
 
   describe("static helper methods", () => {
     it("should generate correct rate limit keys", () => {
-      const key = RateLimiterImpl.generateKey("user:123", "api_request");
+      const key = ConvexRateLimiterImpl.generateKey("user:123", "api_request");
       expect(key).toBe("user:123:api_request");
     });
 
     it("should create rate limit config with defaults", () => {
-      const config = RateLimiterImpl.createConfig(60000, 100);
+      const config = ConvexRateLimiterImpl.createConfig(60000, 100);
 
       expect(config).toEqual({
         windowMs: 60000,
@@ -287,7 +315,7 @@ describe("RateLimiterImpl", () => {
     });
 
     it("should create rate limit config with custom options", () => {
-      const config = RateLimiterImpl.createConfig(60000, 100, {
+      const config = ConvexRateLimiterImpl.createConfig(60000, 100, {
         skipSuccessfulRequests: true,
         message: "Custom message",
       });

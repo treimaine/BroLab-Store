@@ -18,10 +18,11 @@ router.post('/upload',
   isAuthenticated,
   uploadRateLimit,
   upload.single('avatar'),
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: 'Aucun fichier fourni' });
+        res.status(400).json({ error: 'Aucun fichier fourni' });
+      return;
       }
 
       // Validation du fichier (images uniquement)
@@ -32,18 +33,20 @@ router.post('/upload',
       });
 
       if (!validation.valid) {
-        return res.status(400).json({
+        res.status(400).json({
           error: 'Validation du fichier échouée',
           details: validation.errors
         });
+      return;
       }
 
       // Scan antivirus
       const isSafe = await scanFile(req.file);
       if (!isSafe) {
-        return res.status(400).json({
+        res.status(400).json({
           error: 'Le fichier n\'a pas passé le scan de sécurité'
         });
+      return;
       }
 
       // Génération du chemin de stockage pour l'avatar

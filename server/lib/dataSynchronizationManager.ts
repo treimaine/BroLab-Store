@@ -40,7 +40,8 @@ export class DataSynchronizationManager {
       // Pre-sync consistency check
       const preCheckResult = await this.performPreSyncCheck(operation);
       if (!preCheckResult.isValid) {
-        throw new Error(`Pre-sync check failed: ${preCheckResult.errors.join(", ")}`);
+        const errorMessages = preCheckResult.errors || [];
+        throw new Error(`Pre-sync check failed: ${errorMessages.join(", ")}`);
       }
 
       // Create rollback point

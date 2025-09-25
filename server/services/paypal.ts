@@ -213,7 +213,7 @@ export class PayPalService {
       console.log("📡 Processing REAL PayPal webhook event:", event.event_type);
 
       switch (event.event_type) {
-        case "PAYMENT.CAPTURE.COMPLETED":
+        case "PAYMENT.CAPTURE.COMPLETED": {
           // Paiement complété avec succès
           const transactionId = event.resource.id;
           const customId = event.resource.custom_id; // ✅ CORRECTION: customId contient le reservationId
@@ -231,8 +231,9 @@ export class PayPalService {
             success: true,
             message: `Payment completed for reservation ${customId}`,
           };
+        }
 
-        case "PAYMENT.CAPTURE.DENIED":
+        case "PAYMENT.CAPTURE.DENIED": {
           // Paiement refusé
           const deniedCustomId = event.resource.custom_id;
           console.log("❌ Payment denied for reservation:", deniedCustomId);
@@ -244,8 +245,9 @@ export class PayPalService {
             success: true,
             message: `Payment denied for reservation ${deniedCustomId}`,
           };
+        }
 
-        case "PAYMENT.CAPTURE.REFUNDED":
+        case "PAYMENT.CAPTURE.REFUNDED": {
           // Paiement remboursé
           const refundedCustomId = event.resource.custom_id;
           console.log("↩️ Payment refunded for reservation:", refundedCustomId);
@@ -257,6 +259,7 @@ export class PayPalService {
             success: true,
             message: `Payment refunded for reservation ${refundedCustomId}`,
           };
+        }
 
         default:
           console.log("ℹ️ Unhandled webhook event type:", event.event_type);
@@ -278,7 +281,7 @@ export class PayPalService {
    * Obtient les détails d'une vraie commande PayPal
    * ✅ CORRECTION: Utilise l'orderId PayPal
    */
-  static async getOrderDetails(orderId: string): Promise<any> {
+  static async getOrderDetails(orderId: string): Promise<unknown> {
     try {
       console.log("📋 Getting REAL PayPal order details:", orderId);
 

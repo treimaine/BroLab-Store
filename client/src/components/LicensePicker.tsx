@@ -135,7 +135,8 @@ export function LicensePicker({
                 selectedLicenseId === license.id
                   ? 'border-[var(--accent-purple)] bg-[var(--accent-purple)]'
                   : 'border-gray-400'
-              }`}>
+              }`}
+              >
                 {selectedLicenseId === license.id && (
                   <Check className="w-3 h-3 text-white" />
                 )}

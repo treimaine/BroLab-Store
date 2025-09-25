@@ -24,11 +24,10 @@ export const withClerkAuth = ClerkExpressWithAuth({
 });
 
 // Middleware pour vérifier l'authentification Clerk
-export const requireClerkAuth = (req: ClerkRequest, res: Response, next: NextFunction) => {
+export const requireClerkAuth = (req: ClerkRequest, res: Response, next: NextFunction): void => {
   if (!req.auth?.userId) {
-    return res
-      .status(401)
-      .json({ error: "Non autorisé", message: "Authentification Clerk requise" });
+    res.status(401).json({ error: "Non autorisé", message: "Authentification Clerk requise" });
+    return;
   }
   next();
 };

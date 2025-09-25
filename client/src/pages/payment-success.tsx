@@ -162,7 +162,7 @@ export default function PaymentSuccessPage() {
     return (
       <div className="min-h-screen bg-[var(--deep-black)] text-white flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-gray-600 border-t-[var(--accent-purple)] rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-gray-600 border-t-[var(--accent-purple)] rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-400">Chargement des informations de paiement...</p>
         </div>
       </div>
@@ -243,7 +243,7 @@ export default function PaymentSuccessPage() {
           {/* Statut du traitement */}
           {isProcessing && (
             <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4 text-center">
-              <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+              <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               <p className="text-blue-300">Confirmation du paiement en cours...</p>
             </div>
           )}

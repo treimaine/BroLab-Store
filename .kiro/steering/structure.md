@@ -1,103 +1,135 @@
-# Project Structure
+---
+inclusion: always
+---
 
-## Root Level Organization
+# Project Structure & Code Organization
 
-```
-brolab-beats/
-├── client/                 # React frontend application
-├── server/                 # Express backend application
-├── convex/                 # Convex database functions
-├── shared/                 # Shared TypeScript definitions
-├── scripts/                # Development and deployment scripts
-├── __tests__/              # Test files
-├── docs/                   # Documentation files
-└── components/             # Shared UI components
-```
+## Architecture Overview
 
-## Frontend Structure (client/)
+This is a full-stack TypeScript application with React frontend, Express backend, and Convex real-time database. Follow these structural patterns when creating or modifying code.
+
+### Root Directory Structure
 
 ```
-client/
-├── src/
-│   ├── components/         # Reusable UI components
-│   ├── pages/             # Route components
-│   ├── hooks/             # Custom React hooks
-│   ├── lib/               # Utilities and configurations
-│   ├── stores/            # Zustand state stores
-│   └── types/             # Frontend-specific types
-├── public/                # Static assets
-└── index.html             # Entry HTML file
+├── client/                 # React frontend (Vite + TypeScript)
+├── server/                 # Express backend API
+├── convex/                 # Convex database functions & schema
+├── shared/                 # Shared types, utils, validation
+├── components/             # Shared UI components (shadcn/ui)
+├── __tests__/              # Test files and utilities
+├── scripts/                # Build, deployment, maintenance scripts
+└── docs/                   # Documentation and reports
 ```
 
-## Backend Structure (server/)
+## File Placement Rules
+
+### Frontend Files (client/src/)
+
+- **Components**: `client/src/components/[feature]/ComponentName.tsx`
+- **Pages**: `client/src/pages/PageName.tsx`
+- **Hooks**: `client/src/hooks/useFeatureName.ts`
+- **Stores**: `client/src/stores/featureStore.ts` (Zustand)
+- **Types**: `client/src/types/` (frontend-specific only)
+
+### Backend Files (server/)
+
+- **Routes**: `server/routes/featureName.ts` (Express routers)
+- **Services**: `server/services/FeatureService.ts` (business logic)
+- **Middleware**: `server/middleware/middlewareName.ts`
+- **Utils**: `server/utils/utilityName.ts`
+
+### Database Files (convex/)
+
+- **Schema**: `convex/schema.ts` (single source of truth)
+- **Functions**: `convex/[feature]/functionName.ts`
+- **Mutations**: Use for data writes, always validate permissions
+- **Queries**: Use for data reads, implement proper filtering
+
+### Shared Code (shared/)
+
+- **Types**: `shared/types/FeatureName.ts` (cross-platform interfaces)
+- **Validation**: `shared/validation.ts` (Zod schemas)
+- **Constants**: `shared/constants/` (API endpoints, enums)
+- **Utils**: `shared/utils/` (pure functions used by client/server)
+
+## Naming Conventions
+
+### Files & Directories
+
+- **Components**: PascalCase (`AudioPlayer.tsx`, `BeatCard.tsx`)
+- **Hooks**: camelCase with `use` prefix (`useAudioPlayer.ts`)
+- **Services**: PascalCase with Service suffix (`PaymentService.ts`)
+- **Utils**: camelCase (`formatPrice.ts`, `validateEmail.ts`)
+- **Types**: PascalCase (`User.ts`, `Beat.ts`, `Order.ts`)
+- **Constants**: UPPER_SNAKE_CASE (`API_ENDPOINTS.ts`)
+
+### Code Elements
+
+- **Interfaces**: PascalCase (`User`, `Beat`, `PaymentIntent`)
+- **Enums**: PascalCase (`OrderStatus`, `LicenseType`)
+- **Functions**: camelCase (`getUserById`, `processPayment`)
+- **Variables**: camelCase (`currentUser`, `beatList`)
+
+## Import Aliases (tsconfig.json)
+
+```typescript
+// Use these exact aliases in imports
+import { Component } from "@/components/Component"; // client/src/
+import { validateUser } from "@shared/validation"; // shared/
+import { getUserById } from "@convex/users"; // convex/
+```
+
+## Component Organization Patterns
+
+### Feature-Based Grouping
 
 ```
-server/
-├── routes/                # API route handlers
-├── lib/                   # Core libraries and utilities
-├── middleware/            # Express middleware
-├── services/              # Business logic services
-├── types/                 # Backend-specific types
-├── templates/             # Email templates
-└── utils/                 # Server utilities
+client/src/components/
+├── audio/              # AudioPlayer, WaveForm, PlayButton
+├── beats/              # BeatCard, BeatGrid, BeatFilters
+├── cart/               # CartItem, CartSummary, Checkout
+├── dashboard/          # UserStats, DownloadHistory
+└── ui/                 # Button, Input, Modal (shadcn/ui)
 ```
 
-## Database Structure (convex/)
-
-```
-convex/
-├── schema.ts              # Database schema definition
-├── auth/                  # Authentication functions
-├── orders/                # Order management functions
-├── products/              # Product/beats functions
-├── users/                 # User management functions
-└── _generated/            # Auto-generated Convex files
-```
-
-## Shared Code (shared/)
-
-```
-shared/
-├── types/                 # Common TypeScript interfaces
-├── constants/             # Application constants
-├── utils/                 # Shared utility functions
-├── validation.ts          # Zod validation schemas
-└── schema.ts              # Database schema types
-```
-
-## Key Conventions
-
-### File Naming
-
-- **Components**: PascalCase (e.g., `AudioPlayer.tsx`)
-- **Hooks**: camelCase with `use` prefix (e.g., `useAudioPlayer.ts`)
-- **Utilities**: camelCase (e.g., `formatPrice.ts`)
-- **Types**: PascalCase interfaces (e.g., `User`, `Beat`)
-- **Constants**: UPPER_SNAKE_CASE (e.g., `API_ENDPOINTS`)
-
-### Import Aliases
-
-- `@/` → `client/src/`
-- `@shared/` → `shared/`
-- `@convex/` → `convex/`
-
-### Component Organization
+### Component Structure
 
 - One component per file
 - Co-locate related components in feature folders
-- Separate presentation and logic components
-- Use index.ts files for clean imports
+- Separate container (logic) from presentation components
+- Use index.ts for clean imports: `export { default } from './Component'`
 
-### API Structure
+## API & Database Patterns
 
-- RESTful endpoints in `server/routes/`
-- Convex functions for real-time features
-- Shared validation schemas in `shared/validation.ts`
-- Type-safe API contracts using shared types
+### Convex Functions
 
-### Testing Structure
+- **Queries**: Read operations, no side effects
+- **Mutations**: Write operations, validate user permissions
+- **Actions**: External API calls, file uploads
 
-- Test files adjacent to source files or in `__tests__/`
-- Integration tests in `__tests__/integration/`
-- Mocks and factories in `__tests__/mocks/`
-- Test utilities in `__tests__/test-utils.tsx`
+### Express Routes
+
+- RESTful endpoints: `/api/beats`, `/api/orders/:id`
+- Use middleware for auth, validation, rate limiting
+- Return consistent error responses
+
+### Data Flow
+
+1. Client → Convex (real-time features)
+2. Client → Express → External APIs (payments, WordPress)
+3. Shared validation schemas for type safety
+
+## Testing Organization
+
+### Test File Placement
+
+- **Unit tests**: Adjacent to source files (`Component.test.tsx`)
+- **Integration tests**: `__tests__/integration/`
+- **API tests**: `__tests__/server/`
+- **Utilities**: `__tests__/test-utils.tsx`, `__tests__/factories.ts`
+
+### Test Naming
+
+- Test files: `FeatureName.test.ts`
+- Test suites: `describe('FeatureName', () => {})`
+- Test cases: `it('should do something when condition', () => {})`

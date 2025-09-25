@@ -1,5 +1,6 @@
 import { useUser } from "@clerk/clerk-react";
 import { useQuery } from "convex/react";
+import { api } from "../lib/convex-api";
 
 // Types pour les données
 interface Activity {
@@ -31,15 +32,21 @@ export function useDashboardData() {
   const { user: clerkUser, isLoaded } = useUser();
 
   // Récupérer les statistiques utilisateur avec type casting pour éviter les erreurs
-  const userStats = useQuery("users/getUserStats:getUserStats" as any, clerkUser ? {} : "skip");
+  const userStats = useQuery(
+    api.users.getUserStats.getUserStats,
+    clerkUser && isLoaded ? {} : "skip"
+  );
 
   // Récupérer les favoris avec type casting pour éviter les erreurs
-  const favorites = useQuery("favorites/getFavorites:getFavorites" as any, clerkUser ? {} : "skip");
+  const favorites = useQuery(
+    api.favorites.getFavorites.getFavorites,
+    clerkUser && isLoaded ? {} : "skip"
+  );
 
   // Récupérer les recommandations avec type casting pour éviter les erreurs
   const recommendations = useQuery(
-    "products/forYou:getForYouBeats" as any,
-    clerkUser ? { limit: 6 } : "skip"
+    api.products.forYou.getForYouBeats,
+    clerkUser && isLoaded ? { limit: 6 } : "skip"
   );
 
   // Données par défaut si les requêtes échouent
@@ -98,11 +105,11 @@ export function useDashboardData() {
 
 // Hook pour les recommandations basées sur l'activité
 export function useRecommendations() {
-  const { user: clerkUser } = useUser();
+  const { user: clerkUser, isLoaded } = useUser();
 
   const recommendations = useQuery(
-    "products/forYou:getForYouBeats" as any,
-    clerkUser ? { limit: 6 } : "skip"
+    api.products.forYou.getForYouBeats,
+    clerkUser && isLoaded ? { limit: 6 } : "skip"
   );
 
   return {
@@ -114,9 +121,12 @@ export function useRecommendations() {
 
 // Hook pour l'activité utilisateur
 export function useUserActivity() {
-  const { user: clerkUser } = useUser();
+  const { user: clerkUser, isLoaded } = useUser();
 
-  const userStats = useQuery("users/getUserStats:getUserStats" as any, clerkUser ? {} : "skip");
+  const userStats = useQuery(
+    api.users.getUserStats.getUserStats,
+    clerkUser && isLoaded ? {} : "skip"
+  );
 
   return {
     activity: userStats?.recentActivity || [],

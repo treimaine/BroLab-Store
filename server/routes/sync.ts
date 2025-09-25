@@ -12,7 +12,7 @@ import {
 const router = express.Router();
 
 // POST /api/sync/wordpress - Synchroniser les produits WordPress
-router.post("/wordpress", isAuthenticated, async (req, res) => {
+router.post("/wordpress", isAuthenticated, async (req, res): Promise<void> => {
   try {
     console.log("🔄 WordPress sync requested");
 
@@ -36,13 +36,13 @@ router.post("/wordpress", isAuthenticated, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error during WordPress sync",
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 });
 
 // POST /api/sync/woocommerce - Synchroniser les commandes WooCommerce
-router.post("/woocommerce", isAuthenticated, async (req, res) => {
+router.post("/woocommerce", isAuthenticated, async (req, res): Promise<void> => {
   try {
     console.log("🔄 WooCommerce sync requested");
 
@@ -66,13 +66,13 @@ router.post("/woocommerce", isAuthenticated, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error during WooCommerce sync",
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 });
 
 // POST /api/sync/full - Synchronisation complète
-router.post("/full", isAuthenticated, async (req, res) => {
+router.post("/full", isAuthenticated, async (req, res): Promise<void> => {
   try {
     console.log("🔄 Full sync requested");
 
@@ -96,13 +96,13 @@ router.post("/full", isAuthenticated, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error during full sync",
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 });
 
 // GET /api/sync/stats - Obtenir les statistiques de synchronisation
-router.get("/stats", isAuthenticated, async (req, res) => {
+router.get("/stats", isAuthenticated, async (req, res): Promise<void> => {
   try {
     console.log("📊 Sync stats requested");
 
@@ -124,20 +124,21 @@ router.get("/stats", isAuthenticated, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error retrieving sync stats",
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 });
 
 // POST /api/sync/user - Synchroniser un utilisateur Clerk
-router.post("/user", isAuthenticated, async (req, res) => {
+router.post("/user", isAuthenticated, async (req, res): Promise<void> => {
   try {
     const clerkUser = getCurrentClerkUser(req);
     if (!clerkUser) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         message: "Clerk authentication required",
       });
+      return;
     }
 
     console.log(`🔄 User sync requested for: ${clerkUser.id}`);
@@ -162,13 +163,13 @@ router.post("/user", isAuthenticated, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error during user sync",
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 });
 
 // GET /api/sync/status - Statut de la synchronisation
-router.get("/status", async (req, res) => {
+router.get("/status", async (req, res): Promise<void> => {
   try {
     const stats = await getSyncStats();
 
@@ -190,7 +191,7 @@ router.get("/status", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to get sync status",
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 });

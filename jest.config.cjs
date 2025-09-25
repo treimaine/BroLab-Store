@@ -40,6 +40,14 @@ module.exports = {
     "^.*/lib/openGraphGenerator$": "<rootDir>/__tests__/mocks/openGraph-generator.mock.js",
     "^../lib/schemaMarkup$": "<rootDir>/__tests__/mocks/schema-markup.mock.js",
   },
+  // Handle import.meta.env for Vite environment variables (mocked in jest.setup.ts)
+  globals: {
+    "ts-jest": {
+      tsconfig: "tsconfig.jest.json",
+      diagnostics: false,
+      useESM: false,
+    },
+  },
   // Force exit after tests complete to avoid hanging
   forceExit: true,
   // Detect open handles to help identify async operations

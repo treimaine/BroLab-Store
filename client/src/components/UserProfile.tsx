@@ -156,15 +156,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
         <CardContent className="p-6">
           <div className="animate-pulse space-y-4">
             <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-gray-200 rounded-full"></div>
+              <div className="w-16 h-16 bg-gray-200 rounded-full" />
               <div className="space-y-2">
-                <div className="h-4 bg-gray-200 rounded w-32"></div>
-                <div className="h-3 bg-gray-200 rounded w-24"></div>
+                <div className="h-4 bg-gray-200 rounded w-32" />
+                <div className="h-3 bg-gray-200 rounded w-24" />
               </div>
             </div>
             <div className="space-y-2">
-              <div className="h-3 bg-gray-200 rounded w-full"></div>
-              <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+              <div className="h-3 bg-gray-200 rounded w-full" />
+              <div className="h-3 bg-gray-200 rounded w-3/4" />
             </div>
           </div>
         </CardContent>

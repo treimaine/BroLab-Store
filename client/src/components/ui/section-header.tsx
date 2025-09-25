@@ -25,11 +25,13 @@ export function SectionHeader({
       "space-y-4",
       centered && "text-center",
       className
-    )}>
+    )}
+    >
       <h2 className={cn(
         "text-3xl lg:text-4xl font-bold text-white",
         titleClassName
-      )}>
+      )}
+      >
         {title}
       </h2>
       
@@ -38,7 +40,8 @@ export function SectionHeader({
           "text-xl text-gray-300",
           centered && "max-w-2xl mx-auto",
           subtitleClassName
-        )}>
+        )}
+        >
           {subtitle}
         </p>
       )}
