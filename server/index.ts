@@ -123,8 +123,20 @@ if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
       serveStatic(app);
     }
 
-    const serverInstance = server.listen(port, () => {
+    const serverInstance = server.listen(port, async () => {
       logger.info("API running", { port, basePort, url: `http://localhost:${port}` });
+
+      // Warm cache on server startup
+      try {
+        // Import cache warming service dynamically to avoid circular dependencies
+        const { warmingUtils } = await import("./services/cacheWarmingService");
+        await warmingUtils.warmOnStartup();
+        logger.info("Cache warming completed on startup");
+      } catch (error) {
+        logger.warn("Cache warming failed on startup", {
+          error: error instanceof Error ? error.message : error,
+        });
+      }
     });
     serverInstance.on("error", (err: Error & { code?: string }) => {
       if (err.code === "EADDRINUSE") {

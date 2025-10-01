@@ -2,6 +2,7 @@ import { CustomBeatRequest } from "@/components/CustomBeatRequest";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import { CheckCircle, Clock, Music, Star } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -29,19 +30,31 @@ export default function CustomBeats() {
   const [submittedRequests, setSubmittedRequests] = useState<BeatRequest[]>([]);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { getToken } = useAuth();
+  const { user, isSignedIn } = useUser();
 
   const handleSubmitRequest = async (request: BeatRequest) => {
     setIsSubmitting(true);
 
     try {
-      // Convert custom beat request to reservation format
+      // Convert custom beat request to reservation format using new schema
       const reservationData = {
-        service_type: "custom_beat" as const,
-        details: {
-          name: "Custom Beat Request", // Will be filled by user in form
-          email: "user@example.com", // Will be filled by user in form
-          phone: "+1234567890", // Will be filled by user in form
-          requirements: `Genre: ${request.genre}${request.subGenre ? ` (${request.subGenre})` : ""}
+        serviceType: "custom_beat" as const,
+        clientInfo: {
+          firstName: "Custom Beat", // TODO: Get from user form
+          lastName: "Request",
+          email: "user@example.com", // TODO: Get from user form
+          phone: "0000000000", // Default phone number
+        },
+        preferredDate: new Date().toISOString(), // Will be set by user
+        preferredDuration: 480, // 8 hours for custom beat production
+        serviceDetails: {
+          genre: request.genre,
+          bpm: request.bpm,
+          includeRevisions: request.revisions,
+          rushDelivery: request.priority === "express",
+        },
+        notes: `Genre: ${request.genre}${request.subGenre ? ` (${request.subGenre})` : ""}
 BPM: ${request.bpm}
 Key: ${request.key}
 Mood: ${request.mood.join(", ")}
@@ -53,20 +66,21 @@ Priority: ${request.priority}
 Deadline: ${request.deadline}
 Revisions: ${request.revisions}
 Additional Notes: ${request.additionalNotes || "None"}
-Uploaded Files: ${request.uploadedFiles?.length ? `${request.uploadedFiles.length} file(s) uploaded` : "None"}`,
-        },
-        preferred_date: new Date().toISOString(), // Will be set by user
-        duration_minutes: 480, // 8 hours for custom beat production
-        total_price:
+Uploaded Files: ${request.uploadedFiles?.length ? `${request.uploadedFiles.length} file(s) uploaded` : "None"}
+
+Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadline}`,
+        budget:
           (request.budget +
             (request.priority === "express" ? 100 : request.priority === "priority" ? 50 : 0)) *
           100, // Convert to cents
-        notes: `Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadline}`,
       };
 
       const response = await fetch("/api/reservations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${await getToken()}`
+        },
         body: JSON.stringify(reservationData),
       });
 
@@ -80,7 +94,7 @@ Uploaded Files: ${request.uploadedFiles?.length ? `${request.uploadedFiles.lengt
           serviceName: "Custom Beat Production",
           serviceDetails: `${request.genre} beat - ${request.priority} priority (${request.duration}s)`,
           reservationId: reservation.id,
-          price: reservationData.total_price / 100, // Convert cents to dollars
+          price: reservationData.budget / 100, // Convert cents to dollars
           quantity: 1,
         };
 
@@ -131,7 +145,7 @@ Uploaded Files: ${request.uploadedFiles?.length ? `${request.uploadedFiles.lengt
               <Music className="w-12 h-12 mx-auto mb-4 text-[var(--accent-purple)]" />
               <h3 className="text-lg font-semibold mb-2">Submit Request</h3>
               <p className="text-gray-400 text-sm">
-                Tell us exactly what you're looking for with detailed specifications
+                Tell us exactly what you&apos;re looking for with detailed specifications
               </p>
             </CardContent>
           </Card>
@@ -171,7 +185,7 @@ Uploaded Files: ${request.uploadedFiles?.length ? `${request.uploadedFiles.lengt
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Star className="w-5 h-5" />
-                  What's Included
+                  What&apos;s Included
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -257,7 +271,7 @@ Uploaded Files: ${request.uploadedFiles?.length ? `${request.uploadedFiles.lengt
                 <div>
                   <h4 className="font-medium text-white mb-1">Can I request changes?</h4>
                   <p className="text-gray-400">
-                    Yes! 2 revisions are included to ensure you're completely satisfied
+                    Yes! 2 revisions are included to ensure you&apos;re completely satisfied
                   </p>
                 </div>
                 <div>

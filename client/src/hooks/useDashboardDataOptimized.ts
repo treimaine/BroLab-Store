@@ -56,16 +56,12 @@ export function useDashboardDataOptimized() {
   const [ordersCursor, setOrdersCursor] = useState<number | undefined>(undefined);
   const [ordersPages, setOrdersPages] = useState<any[]>([]);
 
-  // Simplified approach to avoid deep type instantiation issues
-  // Use runtime property access to avoid TypeScript deep instantiation
-
-  // Queries with mock data to avoid type instantiation issues
-  // TODO: Re-enable Convex queries once type issues are resolved
-  const userStatsRes = null; // useQuery(api.users.getUserStats, clerkUser ? {} : "skip");
-  const favoritesRes = null; // useQuery(api.favorites.getFavorites, clerkUser ? {} : "skip");
-  const downloadsRes = null; // useQuery(api.downloads.getUserDownloadsEnriched, clerkUser ? {} : "skip");
-  const ordersPage = null; // useQuery(api.orders.listOrders, clerkUser ? { limit: 20, cursor: ordersCursor } : "skip");
-  const reservationsRes = null; // useQuery(api.reservations.getUserReservations, clerkUser ? { limit: 50 } : "skip");
+  // Mock data to avoid Convex type instantiation issues
+  const userStatsRes = null;
+  const favoritesRes = null;
+  const downloadsRes = null;
+  const ordersPage = null;
+  const reservationsRes = null;
 
   // État de chargement optimisé
   const isLoading = useMemo(() => {
@@ -299,7 +295,6 @@ export function useDashboardDataOptimized() {
 
   // Récupérer les recommandations from WordPress/WooCommerce
   const recommendations: any[] = useMemo(() => {
-    // TODO: Intégrer les recommandations depuis WooCommerce
     return [];
   }, []);
 

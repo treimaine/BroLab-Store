@@ -1,10 +1,10 @@
+import { OfflineManagerImpl } from "../shared/utils/offline-manager";
+import { OptimisticUpdateManagerImpl } from "../shared/utils/optimistic-update-manager";
+import { SyncManager } from "../shared/utils/syncManager";
 /**
  * Tests for OfflineManager and OptimisticUpdateManager
  */
 
-import { OfflineManagerImpl } from "../shared/utils/offline-manager";
-import { OptimisticUpdateManagerImpl } from "../shared/utils/optimistic-update-manager";
-import { SyncManager } from "../shared/utils/syncManager";
 
 // Mock localStorage
 const localStorageMock = {
@@ -25,7 +25,7 @@ Object.defineProperty(navigator, "onLine", {
 
 // Mock window events
 const eventListeners: { [key: string]: EventListenerOrEventListenerObject[] } = {};
-window.addEventListener = jest.fn((event: string, callback: EventListenerOrEventListenerObject) => {
+window.addEventListener = jest.fn(_(event: string, _callback: EventListenerOrEventListenerObject) => {
   if (!eventListeners[event]) {
     eventListeners[event] = [];
   }
@@ -33,7 +33,7 @@ window.addEventListener = jest.fn((event: string, callback: EventListenerOrEvent
 });
 
 window.removeEventListener = jest.fn(
-  (event: string, callback: EventListenerOrEventListenerObject) => {
+  (_event: string, _callback: EventListenerOrEventListenerObject) => {
     if (eventListeners[event]) {
       const index = eventListeners[event].indexOf(callback);
       if (index > -1) {
@@ -43,11 +43,11 @@ window.removeEventListener = jest.fn(
   }
 );
 
-describe("OfflineManager", () => {
+describe(_"OfflineManager", _() => {
   let offlineManager: OfflineManagerImpl;
   let syncManager: SyncManager;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     jest.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
 
@@ -58,16 +58,16 @@ describe("OfflineManager", () => {
     (navigator as any).onLine = true;
   });
 
-  afterEach(() => {
+  afterEach_(() => {
     offlineManager.destroy();
   });
 
-  describe("initialization", () => {
-    it("should initialize with online status", () => {
+  describe(_"initialization", _() => {
+    it(_"should initialize with online status", _() => {
       expect(offlineManager.isOnline()).toBe(true);
     });
 
-    it("should load persisted operations from localStorage", () => {
+    it(_"should load persisted operations from localStorage", _() => {
       const mockOperations = [
         {
           id: "test-1",
@@ -89,8 +89,8 @@ describe("OfflineManager", () => {
     });
   });
 
-  describe("queueOperation", () => {
-    it("should queue an operation successfully", async () => {
+  describe(_"queueOperation", _() => {
+    it(_"should queue an operation successfully", _async () => {
       const operation = {
         type: "cart_add",
         data: { productId: "123", quantity: 1 },
@@ -102,7 +102,7 @@ describe("OfflineManager", () => {
       expect(localStorageMock.setItem).toHaveBeenCalled();
     });
 
-    it("should sync immediately if online", async () => {
+    it(_"should sync immediately if online", _async () => {
       const syncSpy = jest.spyOn(offlineManager, "syncPendingOperations");
 
       await offlineManager.queueOperation({
@@ -113,7 +113,7 @@ describe("OfflineManager", () => {
       expect(syncSpy).toHaveBeenCalled();
     });
 
-    it("should not sync if offline", async () => {
+    it(_"should not sync if offline", _async () => {
       (navigator as any).onLine = false;
       const syncSpy = jest.spyOn(offlineManager, "syncPendingOperations");
 
@@ -126,8 +126,8 @@ describe("OfflineManager", () => {
     });
   });
 
-  describe("syncPendingOperations", () => {
-    it("should not sync if offline", async () => {
+  describe(_"syncPendingOperations", _() => {
+    it(_"should not sync if offline", _async () => {
       (navigator as any).onLine = false;
 
       await offlineManager.queueOperation({
@@ -142,7 +142,7 @@ describe("OfflineManager", () => {
       expect(pendingBefore.length).toBe(pendingAfter.length);
     });
 
-    it("should sync operations when online", async () => {
+    it(_"should sync operations when online", _async () => {
       const scheduleSync = jest.spyOn(syncManager, "scheduleSync").mockResolvedValue("sync-id");
 
       await offlineManager.queueOperation({
@@ -163,19 +163,19 @@ describe("OfflineManager", () => {
     });
   });
 
-  describe("event handling", () => {
-    it("should register callbacks for online/offline events", () => {
+  describe(_"event handling", _() => {
+    it(_"should register callbacks for online/offline events", _() => {
       const offlineCallback = jest.fn();
       const onlineCallback = jest.fn();
 
       // Should not throw when registering callbacks
-      expect(() => {
+      expect_(() => {
         offlineManager.onOffline(offlineCallback);
         offlineManager.onOnline(onlineCallback);
       }).not.toThrow();
     });
 
-    it("should handle network status changes", () => {
+    it(_"should handle network status changes", _() => {
       expect(offlineManager.isOnline()).toBe(true);
 
       // Change navigator.onLine
@@ -186,8 +186,8 @@ describe("OfflineManager", () => {
     });
   });
 
-  describe("operation statistics", () => {
-    it("should return correct statistics structure", async () => {
+  describe(_"operation statistics", _() => {
+    it(_"should return correct statistics structure", _async () => {
       const stats = await offlineManager.getOperationStats();
 
       expect(stats).toHaveProperty("total");
@@ -204,8 +204,8 @@ describe("OfflineManager", () => {
     });
   });
 
-  describe("cleanup", () => {
-    it("should clear completed operations", async () => {
+  describe(_"cleanup", _() => {
+    it(_"should clear completed operations", _async () => {
       // This would require mocking the internal state
       // For now, just test that the method doesn't throw
       await expect(offlineManager.clearCompletedOperations()).resolves.not.toThrow();
@@ -213,20 +213,20 @@ describe("OfflineManager", () => {
   });
 });
 
-describe("OptimisticUpdateManager", () => {
+describe(_"OptimisticUpdateManager", _() => {
   let optimisticManager: OptimisticUpdateManagerImpl;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     optimisticManager = new OptimisticUpdateManagerImpl();
     jest.useFakeTimers();
   });
 
-  afterEach(() => {
+  afterEach_(() => {
     jest.useRealTimers();
   });
 
-  describe("applyOptimisticUpdate", () => {
-    it("should apply an optimistic update", () => {
+  describe(_"applyOptimisticUpdate", _() => {
+    it(_"should apply an optimistic update", _() => {
       const update = {
         operation: "cart_add",
         optimisticData: { productId: "123", quantity: 1 },
@@ -242,7 +242,7 @@ describe("OptimisticUpdateManager", () => {
       expect(pendingUpdates[0].operation).toBe("cart_add");
     });
 
-    it("should auto-rollback after timeout", () => {
+    it(_"should auto-rollback after timeout", _() => {
       const rollbackSpy = jest.spyOn(optimisticManager, "rollbackUpdate");
 
       optimisticManager.applyOptimisticUpdate({
@@ -258,8 +258,8 @@ describe("OptimisticUpdateManager", () => {
     });
   });
 
-  describe("confirmUpdate", () => {
-    it("should confirm an optimistic update", () => {
+  describe(_"confirmUpdate", _() => {
+    it(_"should confirm an optimistic update", _() => {
       const updateId = optimisticManager.applyOptimisticUpdate({
         operation: "cart_add",
         optimisticData: { productId: "123" },
@@ -272,15 +272,15 @@ describe("OptimisticUpdateManager", () => {
       expect(pendingUpdates).toHaveLength(0); // Confirmed updates are not pending
     });
 
-    it("should handle non-existent update ID", () => {
-      expect(() => {
+    it(_"should handle non-existent update ID", _() => {
+      expect_(() => {
         optimisticManager.confirmUpdate("non-existent");
       }).not.toThrow();
     });
   });
 
-  describe("rollbackUpdate", () => {
-    it("should rollback an optimistic update", () => {
+  describe(_"rollbackUpdate", _() => {
+    it(_"should rollback an optimistic update", _() => {
       const updateId = optimisticManager.applyOptimisticUpdate({
         operation: "cart_add",
         optimisticData: { productId: "123" },
@@ -294,8 +294,8 @@ describe("OptimisticUpdateManager", () => {
     });
   });
 
-  describe("convenience methods", () => {
-    it("should create cart add optimistic update", async () => {
+  describe(_"convenience methods", _() => {
+    it(_"should create cart add optimistic update", _async () => {
       await optimisticManager.addToCartOptimistic("123", 2);
 
       const pendingUpdates = optimisticManager.getPendingUpdates();
@@ -303,7 +303,7 @@ describe("OptimisticUpdateManager", () => {
       expect(pendingUpdates[0].operation).toBe("cart_add");
     });
 
-    it("should create favorite toggle optimistic update", async () => {
+    it(_"should create favorite toggle optimistic update", _async () => {
       await optimisticManager.toggleFavoriteOptimistic("123", true);
 
       const pendingUpdates = optimisticManager.getPendingUpdates();
@@ -311,7 +311,7 @@ describe("OptimisticUpdateManager", () => {
       expect(pendingUpdates[0].operation).toBe("favorite_toggle");
     });
 
-    it("should create download start optimistic update", async () => {
+    it(_"should create download start optimistic update", _async () => {
       await optimisticManager.startDownloadOptimistic("123", "mp3");
 
       const pendingUpdates = optimisticManager.getPendingUpdates();
@@ -320,8 +320,8 @@ describe("OptimisticUpdateManager", () => {
     });
   });
 
-  describe("callbacks", () => {
-    it("should call update callbacks", () => {
+  describe(_"callbacks", _() => {
+    it(_"should call update callbacks", _() => {
       const updateCallback = jest.fn();
       optimisticManager.onUpdate("cart_add", updateCallback);
 
@@ -334,7 +334,7 @@ describe("OptimisticUpdateManager", () => {
       expect(updateCallback).toHaveBeenCalled();
     });
 
-    it("should call rollback callbacks", () => {
+    it(_"should call rollback callbacks", _() => {
       const rollbackCallback = jest.fn();
       optimisticManager.onRollback("cart_add", rollbackCallback);
 
@@ -350,8 +350,8 @@ describe("OptimisticUpdateManager", () => {
     });
   });
 
-  describe("statistics", () => {
-    it("should return correct update statistics", () => {
+  describe(_"statistics", _() => {
+    it(_"should return correct update statistics", _() => {
       optimisticManager.applyOptimisticUpdate({
         operation: "cart_add",
         optimisticData: { productId: "123" },
@@ -378,8 +378,8 @@ describe("OptimisticUpdateManager", () => {
     });
   });
 
-  describe("cleanup", () => {
-    it("should cleanup old confirmed updates", () => {
+  describe(_"cleanup", _() => {
+    it(_"should cleanup old confirmed updates", _() => {
       const updateId = optimisticManager.applyOptimisticUpdate({
         operation: "cart_add",
         optimisticData: { productId: "123" },

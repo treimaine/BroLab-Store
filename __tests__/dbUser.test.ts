@@ -6,15 +6,15 @@ const supabaseAdmin = {
 } as any;
 
 describe.skip("getUserByEmail (legacy Supabase) — skipped: migrated to Clerk", () => {
-  it("should be replaced with Clerk user management", () => {
+  it(_"should be replaced with Clerk user management", _() => {
     // TODO: Implement new tests using Clerk user management
     expect(true).toBe(true);
   });
 });
 
 // Nouveau test pour Clerk User Management
-describe("Clerk User Management", () => {
-  it("should get user by email from Clerk", async () => {
+describe(_"Clerk User Management", _() => {
+  it(_"should get user by email from Clerk", _async () => {
     const mockUser = {
       id: "user_123",
       emailAddresses: [{ emailAddress: "test@example.com" }],
@@ -27,7 +27,7 @@ describe("Clerk User Management", () => {
     expect(mockUser.emailAddresses[0].emailAddress).toBe("test@example.com");
   });
 
-  it("should sync user data with Convex", async () => {
+  it(_"should sync user data with Convex", _async () => {
     const mockConvexUser = {
       _id: "users:1",
       clerkId: "user_123",
@@ -42,7 +42,7 @@ describe("Clerk User Management", () => {
     expect(mockConvexUser.email).toBe("test@example.com");
   });
 
-  it("should handle user not found in Clerk", async () => {
+  it(_"should handle user not found in Clerk", _async () => {
     const mockUserNotFound = null;
 
     expect(mockUserNotFound).toBeNull();

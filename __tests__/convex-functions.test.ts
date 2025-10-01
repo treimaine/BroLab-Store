@@ -3,22 +3,22 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
 
 // Mock Convex
-jest.mock("convex/browser", () => ({
+jest.mock(_"convex/browser", _() => ({
   ConvexHttpClient: jest.fn(),
 }));
 
-describe("Convex Functions", () => {
+describe(_"Convex Functions", _() => {
   let mockConvex: any;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     mockConvex = {
       query: jest.fn(),
       mutation: jest.fn(),
     };
-    (ConvexHttpClient as jest.Mock).mockImplementation(() => mockConvex);
+    (ConvexHttpClient as jest.Mock).mockImplementation_(() => mockConvex);
   });
 
-  it("should get user by clerk ID", async () => {
+  it(_"should get user by clerk ID", _async () => {
     const mockUser = {
       _id: "users:123",
       clerkId: "clerk_123",
@@ -38,7 +38,7 @@ describe("Convex Functions", () => {
     });
   });
 
-  it("should get current user", async () => {
+  it(_"should get current user", _async () => {
     const mockUser = {
       _id: "users:123",
       clerkId: "clerk_123",
@@ -58,7 +58,7 @@ describe("Convex Functions", () => {
     });
   });
 
-  it("should upsert user", async () => {
+  it(_"should upsert user", _async () => {
     const mockUser = {
       _id: "users:123",
       clerkId: "clerk_123",
@@ -82,7 +82,7 @@ describe("Convex Functions", () => {
     });
   });
 
-  it("should add to favorites", async () => {
+  it(_"should add to favorites", _async () => {
     const mockFavorite = {
       _id: "favorites:123",
       userId: "users:123",
@@ -102,7 +102,7 @@ describe("Convex Functions", () => {
     });
   });
 
-  it("should remove from favorites", async () => {
+  it(_"should remove from favorites", _async () => {
     mockConvex.mutation.mockResolvedValue(true);
 
     const result = await mockConvex.mutation(api.favorites.remove.removeFromFavorites, {
@@ -115,7 +115,7 @@ describe("Convex Functions", () => {
     });
   });
 
-  it("should get favorites", async () => {
+  it(_"should get favorites", _async () => {
     const mockFavorites = [
       { _id: "favorites:1", beatId: 123 },
       { _id: "favorites:2", beatId: 456 },
@@ -129,7 +129,7 @@ describe("Convex Functions", () => {
     expect(mockConvex.query).toHaveBeenCalledWith(api.favorites.getFavorites.getFavorites);
   });
 
-  it("should record download", async () => {
+  it(_"should record download", _async () => {
     const mockDownload = {
       _id: "downloads:123",
       userId: "users:123",
@@ -152,7 +152,7 @@ describe("Convex Functions", () => {
     });
   });
 
-  it("should get for you beats", async () => {
+  it(_"should get for you beats", _async () => {
     const mockBeats = [
       { _id: "beats:1", title: "Beat 1", genre: "hip-hop" },
       { _id: "beats:2", title: "Beat 2", genre: "trap" },
@@ -172,7 +172,7 @@ describe("Convex Functions", () => {
     });
   });
 
-  it("should get featured beats", async () => {
+  it(_"should get featured beats", _async () => {
     const mockBeats = [
       { _id: "beats:1", title: "Featured Beat 1", featured: true },
       { _id: "beats:2", title: "Featured Beat 2", featured: true },
@@ -190,7 +190,7 @@ describe("Convex Functions", () => {
     });
   });
 
-  it("should get subscription status", async () => {
+  it(_"should get subscription status", _async () => {
     const mockSubscription = {
       hasBasicPlan: true,
       hasArtistPlan: false,

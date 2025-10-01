@@ -1,3 +1,4 @@
+import { StandardHero } from "@/components/ui/StandardHero";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StandardHero } from "@/components/ui/StandardHero";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/convex";
@@ -72,6 +72,23 @@ const services = [
 
 const timeSlots = ["9:00 AM", "10:00 AM", "11:00 AM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM"];
 
+// Helper function to convert time slot to 24-hour format
+const convertTimeSlotTo24Hour = (timeSlot: string): string => {
+  if (!timeSlot) return "09:00";
+
+  const timeMap: Record<string, string> = {
+    "9:00 AM": "09:00",
+    "10:00 AM": "10:00",
+    "11:00 AM": "11:00",
+    "1:00 PM": "13:00",
+    "2:00 PM": "14:00",
+    "3:00 PM": "15:00",
+    "4:00 PM": "16:00",
+  };
+
+  return timeMap[timeSlot] || "09:00";
+};
+
 export default function MixingMastering() {
   const [, setLocation] = useLocation();
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
@@ -131,14 +148,50 @@ export default function MixingMastering() {
     setIsSubmitting(true);
 
     try {
-      // Create reservation first
-      const reservationResponse = await apiRequest("POST", "/api/reservations", {
-        service: selectedService,
-        ...formData,
-        price: selectedServiceData?.price,
-        clerkUserId: clerkUser?.id,
-        convexUserId: convexUser?._id,
-      });
+      // Check if user is authenticated
+      if (!clerkUser) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to make a reservation.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      console.log("👤 Current user:", clerkUser.id, clerkUser.fullName);
+      // Create reservation with correct schema format
+      const reservationData = {
+        serviceType:
+          selectedService === "mixing-mastering"
+            ? "mixing"
+            : (selectedService as "mixing" | "mastering"),
+        clientInfo: {
+          firstName: formData.name.split(" ")[0] || formData.name,
+          lastName: formData.name.split(" ").slice(1).join(" ") || "User",
+          email: formData.email,
+          phone: formData.phone || "0000000000", // Provide default phone if empty
+        },
+        preferredDate: new Date(
+          `${formData.preferredDate}T${convertTimeSlotTo24Hour(formData.timeSlot)}`
+        ).toISOString(),
+        preferredDuration: 180, // 3 hours default for mixing/mastering
+        serviceDetails: {
+          trackCount: parseInt(formData.trackCount) || 1,
+          genre: formData.genre || undefined,
+          includeRevisions: 3,
+          rushDelivery: false,
+        },
+        notes:
+          `${formData.projectDetails}\n\nSpecial Requests: ${formData.specialRequests}\n\nReference Track: ${formData.reference}`.trim(),
+        budget: (selectedServiceData?.price || 0) * 100, // Convert to cents
+        acceptTerms: true,
+      };
+
+      console.log("🚀 Sending reservation data:", reservationData);
+      const reservationResponse = await apiRequest("POST", "/api/reservations", reservationData);
+
+      console.log("📡 Reservation response status:", reservationResponse.status);
 
       if (reservationResponse.ok) {
         const reservationData = await reservationResponse.json();
@@ -188,13 +241,18 @@ export default function MixingMastering() {
           throw new Error("Failed to create payment intent");
         }
       } else {
-        throw new Error("Failed to create reservation");
+        const errorText = await reservationResponse.text();
+        console.error("❌ Reservation failed:", reservationResponse.status, errorText);
+        throw new Error(
+          `Failed to create reservation: ${reservationResponse.status} - ${errorText}`
+        );
       }
     } catch (error) {
       console.error("Submission error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       toast({
         title: "Submission Failed",
-        description: "Please try again or contact support.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -450,10 +508,10 @@ export default function MixingMastering() {
                     onUploadSuccess={(file: File) => {
                       setUploadedFiles(prev => [...prev, file]);
                     }}
-                    onUploadError={(error: any) => {
+                    onUploadError={(error: unknown) => {
                       toast({
                         title: "Erreur d'upload",
-                        description: error.message,
+                        description: error instanceof Error ? error.message : "Upload failed",
                         variant: "destructive",
                       });
                     }}
@@ -506,7 +564,7 @@ export default function MixingMastering() {
                     : `Reserve Session - $${selectedServiceData?.price}`}
                 </Button>
                 <p className="text-sm text-gray-400 mt-2">
-                  We'll contact you within 24 hours to confirm your booking and provide payment
+                  We&apos;ll contact you within 24 hours to confirm your booking and provide payment
                   details.
                 </p>
               </div>

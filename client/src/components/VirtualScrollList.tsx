@@ -11,7 +11,7 @@
  */
 
 import { cn } from "@/lib/utils";
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface VirtualScrollListProps<T> {
   items: T[];
@@ -168,5 +168,37 @@ export const VirtualListItem = memo<{
 });
 
 VirtualListItem.displayName = "VirtualListItem";
+
+// Hook for intersection observer based lazy loading
+export function useIntersectionObserver(
+  targetRef: React.RefObject<HTMLElement>,
+  options: IntersectionObserverInit = {}
+) {
+  const [isIntersecting, setIsIntersecting] = useState(false);
+
+  useEffect(() => {
+    const target = targetRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsIntersecting(entry.isIntersecting);
+      },
+      {
+        threshold: 0.1,
+        rootMargin: "50px",
+        ...options,
+      }
+    );
+
+    observer.observe(target);
+
+    return () => {
+      observer.unobserve(target);
+    };
+  }, [targetRef, options]);
+
+  return isIntersecting;
+}
 
 export default VirtualScrollList;

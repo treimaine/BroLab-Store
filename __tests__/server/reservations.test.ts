@@ -1,11 +1,11 @@
 import { memStorage } from "../../server/storage";
 import { ReservationStatus, ServiceType } from "../../shared/schema";
 
-describe("Reservation System", () => {
+describe(_"Reservation System", _() => {
   // Use memStorage directly for tests and clear it between tests
   const storage = memStorage;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     // Clear all reservations before each test
     (storage as any).reservations.clear();
   });
@@ -25,8 +25,8 @@ describe("Reservation System", () => {
     notes: "Test reservation",
   };
 
-  describe("createReservation", () => {
-    it("should create a new reservation", async () => {
+  describe(_"createReservation", _() => {
+    it(_"should create a new reservation", _async () => {
       const reservation = await storage.createReservation(mockReservation);
       expect(reservation).toMatchObject({
         ...mockReservation,
@@ -37,21 +37,21 @@ describe("Reservation System", () => {
     });
   });
 
-  describe("getReservation", () => {
-    it("should retrieve a reservation by id", async () => {
+  describe(_"getReservation", _() => {
+    it(_"should retrieve a reservation by id", _async () => {
       const created = await storage.createReservation(mockReservation);
       const retrieved = await storage.getReservation(created.id);
       expect(retrieved).toEqual(created);
     });
 
-    it("should return undefined for non-existent reservation", async () => {
+    it(_"should return undefined for non-existent reservation", _async () => {
       const retrieved = await storage.getReservation("non-existent-id");
       expect(retrieved).toBeUndefined();
     });
   });
 
-  describe("getUserReservations", () => {
-    it("should retrieve all reservations for a user", async () => {
+  describe(_"getUserReservations", _() => {
+    it(_"should retrieve all reservations for a user", _async () => {
       const reservation1 = await storage.createReservation(mockReservation);
       const reservation2 = await storage.createReservation({
         ...mockReservation,
@@ -63,14 +63,14 @@ describe("Reservation System", () => {
       expect(userReservations).toEqual(expect.arrayContaining([reservation1, reservation2]));
     });
 
-    it("should return empty array for user with no reservations", async () => {
+    it(_"should return empty array for user with no reservations", _async () => {
       const userReservations = await storage.getUserReservations(999);
       expect(userReservations).toEqual([]);
     });
   });
 
-  describe("updateReservationStatus", () => {
-    it("should update reservation status", async () => {
+  describe(_"updateReservationStatus", _() => {
+    it(_"should update reservation status", _async () => {
       const created = await storage.createReservation(mockReservation);
       const updated = await storage.updateReservationStatus(created.id, "confirmed");
       expect(updated).toMatchObject({
@@ -80,15 +80,15 @@ describe("Reservation System", () => {
       });
     });
 
-    it("should throw error for non-existent reservation", async () => {
+    it(_"should throw error for non-existent reservation", _async () => {
       await expect(storage.updateReservationStatus("non-existent-id", "confirmed")).rejects.toThrow(
         "Reservation not found"
       );
     });
   });
 
-  describe("getReservationsByDateRange", () => {
-    beforeEach(async () => {
+  describe(_"getReservationsByDateRange", _() => {
+    beforeEach(_async () => {
       await storage.createReservation({
         ...mockReservation,
         preferred_date: new Date("2024-02-01T10:00:00Z").toISOString(),
@@ -103,7 +103,7 @@ describe("Reservation System", () => {
       });
     });
 
-    it("should retrieve reservations within date range", async () => {
+    it(_"should retrieve reservations within date range", _async () => {
       const startDate = new Date("2024-02-01T00:00:00Z").toISOString();
       const endDate = new Date("2024-02-28T23:59:59Z").toISOString();
       const reservations = await storage.getReservationsByDateRange(startDate, endDate);
@@ -114,7 +114,7 @@ describe("Reservation System", () => {
       });
     });
 
-    it("should return empty array for date range with no reservations", async () => {
+    it(_"should return empty array for date range with no reservations", _async () => {
       const startDate = new Date("2025-01-01T00:00:00Z").toISOString();
       const endDate = new Date("2025-01-31T23:59:59Z").toISOString();
       const reservations = await storage.getReservationsByDateRange(startDate, endDate);

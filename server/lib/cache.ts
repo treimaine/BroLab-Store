@@ -245,17 +245,41 @@ export const cache = new Cache();
 // Cache middleware for Express
 import { NextFunction, Request, Response } from "express";
 
-export function cacheMiddleware(ttl: number = 5 * 60 * 1000) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const key = `cache:${req.method}:${req.originalUrl}`;
+export function cacheMiddleware(
+  options: {
+    ttl?: number;
+    keyGenerator?: (req: Request) => string;
+    condition?: (req: Request) => boolean;
+    tags?: string[];
+    varyBy?: string[];
+  } = {}
+) {
+  const { ttl = 5 * 60 * 1000, keyGenerator, condition, tags = [], varyBy = [] } = options;
 
+  return (req: Request, res: Response, next: NextFunction) => {
     // Skip cache for non-GET requests
     if (req.method !== "GET") {
       return next();
     }
 
+    // Check condition if provided
+    if (condition && !condition(req)) {
+      return next();
+    }
+
+    // Generate cache key
+    let key: string;
+    if (keyGenerator) {
+      key = keyGenerator(req);
+    } else {
+      const varyParams = varyBy.map(param => req.get(param) || req.query[param] || "").join(":");
+      key = `cache:${req.method}:${req.originalUrl}${varyParams ? ":" + varyParams : ""}`;
+    }
+
     const cached = cache.get(key);
     if (cached) {
+      res.setHeader("X-Cache", "HIT");
+      res.setHeader("X-Cache-Key", key);
       return res.json(cached);
     }
 
@@ -264,7 +288,12 @@ export function cacheMiddleware(ttl: number = 5 * 60 * 1000) {
 
     // Override send method to cache response
     res.json = function (data: unknown) {
-      cache.set(key, data, ttl);
+      // Only cache successful responses
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        cache.set(key, data, ttl, tags);
+        res.setHeader("X-Cache", "MISS");
+        res.setHeader("X-Cache-Key", key);
+      }
       return originalSend.call(this, data);
     };
 
@@ -272,22 +301,55 @@ export function cacheMiddleware(ttl: number = 5 * 60 * 1000) {
   };
 }
 
-// Cache keys for common data
-export const CACHE_KEYS = {
-  PRODUCTS: "products:all",
-  CATEGORIES: "categories:all",
-  SUBSCRIPTION_PLANS: "subscription:plans",
-  USER_PROFILE: (userId: number) => `user:profile:${userId}`,
-  USER_SUBSCRIPTION: (userId: number) => `user:subscription:${userId}`,
-  BEAT_DETAILS: (beatId: number) => `beat:details:${beatId}`,
-  WISHLIST: (userId: number) => `wishlist:${userId}`,
-  DOWNLOADS: (userId: number) => `downloads:${userId}`,
-};
-
 // Cache durations
 export const CACHE_TTL = {
   SHORT: 1 * 60 * 1000, // 1 minute
   MEDIUM: 5 * 60 * 1000, // 5 minutes
   LONG: 15 * 60 * 1000, // 15 minutes
   VERY_LONG: 60 * 60 * 1000, // 1 hour
+};
+
+// Cache keys for common data
+export const CACHE_KEYS = {
+  PRODUCTS: "products:all",
+  CATEGORIES: "categories:all",
+  SUBSCRIPTION_PLANS: "subscription:plans",
+  USER_PROFILE: (userId: string) => `user:profile:${userId}`,
+  USER_SUBSCRIPTION: (userId: string) => `user:subscription:${userId}`,
+  BEAT_DETAILS: (beatId: string) => `beat:details:${beatId}`,
+  WISHLIST: (userId: string) => `wishlist:${userId}`,
+  DOWNLOADS: (userId: string) => `downloads:${userId}`,
+};
+
+// Specialized middleware for different data types
+export const cacheMiddlewares = {
+  // Static data (subscription plans, categories)
+  static: cacheMiddleware({
+    ttl: CACHE_TTL.VERY_LONG,
+    tags: ["static"],
+    condition: req => !req.headers.authorization, // Don't cache authenticated requests
+  }),
+
+  // User-specific data
+  userSpecific: (userId?: string) =>
+    cacheMiddleware({
+      ttl: CACHE_TTL.MEDIUM,
+      keyGenerator: req => `user:${userId || req.user?.id}:${req.originalUrl}`,
+      tags: ["user", userId || "unknown"],
+      condition: req => !!req.user,
+    }),
+
+  // Dynamic content (beats, search results)
+  dynamic: cacheMiddleware({
+    ttl: CACHE_TTL.SHORT,
+    tags: ["dynamic"],
+    varyBy: ["accept-language", "user-agent"],
+  }),
+
+  // API responses
+  api: cacheMiddleware({
+    ttl: CACHE_TTL.MEDIUM,
+    keyGenerator: req => `api:${req.originalUrl}:${JSON.stringify(req.query)}`,
+    tags: ["api"],
+  }),
 };

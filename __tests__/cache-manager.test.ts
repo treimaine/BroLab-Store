@@ -1,10 +1,10 @@
 import { CacheConfig } from "../shared/types/system-optimization";
 import { CacheManagerImpl, createCacheManager } from "../shared/utils/cache-manager";
 
-describe("CacheManager", () => {
+describe(_"CacheManager", _() => {
   let cacheManager: CacheManagerImpl;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     cacheManager = new CacheManagerImpl({
       defaultTTL: 1000, // 1 second for testing
       maxSize: 1024 * 1024, // 1MB
@@ -14,12 +14,12 @@ describe("CacheManager", () => {
     });
   });
 
-  afterEach(() => {
+  afterEach_(() => {
     cacheManager.destroy();
   });
 
-  describe("Basic Operations", () => {
-    test("should set and get values", async () => {
+  describe(_"Basic Operations", _() => {
+    test(_"should set and get values", _async () => {
       const key = "test-key";
       const value = { data: "test-data", number: 42 };
 
@@ -29,12 +29,12 @@ describe("CacheManager", () => {
       expect(retrieved).toEqual(value);
     });
 
-    test("should return null for non-existent keys", async () => {
+    test(_"should return null for non-existent keys", _async () => {
       const result = await cacheManager.get("non-existent");
       expect(result).toBeNull();
     });
 
-    test("should delete values", async () => {
+    test(_"should delete values", _async () => {
       const key = "test-key";
       const value = "test-value";
 
@@ -46,12 +46,12 @@ describe("CacheManager", () => {
       expect(await cacheManager.get(key)).toBeNull();
     });
 
-    test("should return false when deleting non-existent key", async () => {
+    test(_"should return false when deleting non-existent key", _async () => {
       const deleted = await cacheManager.delete("non-existent");
       expect(deleted).toBe(false);
     });
 
-    test("should clear all values", async () => {
+    test(_"should clear all values", _async () => {
       await cacheManager.set("key1", "value1");
       await cacheManager.set("key2", "value2");
 
@@ -63,15 +63,15 @@ describe("CacheManager", () => {
   });
 
   describe("TTL (Time To Live)", () => {
-    beforeEach(() => {
+    beforeEach_(() => {
       jest.useFakeTimers();
     });
 
-    afterEach(() => {
+    afterEach_(() => {
       jest.useRealTimers();
     });
 
-    test("should expire values after TTL", async () => {
+    test(_"should expire values after TTL", _async () => {
       const key = "expiring-key";
       const value = "expiring-value";
       const ttl = 100; // 100ms
@@ -84,7 +84,7 @@ describe("CacheManager", () => {
       expect(await cacheManager.get(key)).toBeNull();
     });
 
-    test("should use default TTL when not specified", async () => {
+    test(_"should use default TTL when not specified", _async () => {
       const key = "default-ttl-key";
       const value = "default-ttl-value";
 
@@ -96,7 +96,7 @@ describe("CacheManager", () => {
       expect(await cacheManager.get(key)).toBe(value);
     });
 
-    test("should touch entries to extend TTL", async () => {
+    test(_"should touch entries to extend TTL", _async () => {
       const key = "touch-key";
       const value = "touch-value";
       const shortTTL = 100;
@@ -114,8 +114,8 @@ describe("CacheManager", () => {
     });
   });
 
-  describe("Tags and Invalidation", () => {
-    test("should set values with tags", async () => {
+  describe(_"Tags and Invalidation", _() => {
+    test(_"should set values with tags", _async () => {
       const key = "tagged-key";
       const value = "tagged-value";
       const tags = ["user-data", "profile"];
@@ -124,7 +124,7 @@ describe("CacheManager", () => {
       expect(await cacheManager.get(key)).toBe(value);
     });
 
-    test("should invalidate by pattern", async () => {
+    test(_"should invalidate by pattern", _async () => {
       await cacheManager.set("user:1:profile", "profile1");
       await cacheManager.set("user:2:profile", "profile2");
       await cacheManager.set("beat:1:data", "beat1");
@@ -137,7 +137,7 @@ describe("CacheManager", () => {
       expect(await cacheManager.get("beat:1:data")).toBe("beat1");
     });
 
-    test("should invalidate by tags", async () => {
+    test(_"should invalidate by tags", _async () => {
       await cacheManager.set("key1", "value1", undefined, ["user-data"]);
       await cacheManager.set("key2", "value2", undefined, ["user-data", "profile"]);
       await cacheManager.set("key3", "value3", undefined, ["beat-data"]);
@@ -151,7 +151,7 @@ describe("CacheManager", () => {
     });
   });
 
-  describe("Eviction Strategies", () => {
+  describe(_"Eviction Strategies", _() => {
     test("should evict entries when max entries exceeded (LRU)", async () => {
       const lruCache = new CacheManagerImpl({
         maxEntries: 3,
@@ -201,7 +201,7 @@ describe("CacheManager", () => {
       fifoCache.destroy();
     });
 
-    test("should evict entries when max size exceeded", async () => {
+    test(_"should evict entries when max size exceeded", _async () => {
       const smallCache = new CacheManagerImpl({
         maxSize: 100, // Very small size
         maxEntries: 100,
@@ -224,8 +224,8 @@ describe("CacheManager", () => {
     });
   });
 
-  describe("Statistics", () => {
-    test("should track cache statistics", async () => {
+  describe(_"Statistics", _() => {
+    test(_"should track cache statistics", _async () => {
       await cacheManager.set("key1", "value1");
       await cacheManager.set("key2", "value2");
 
@@ -241,7 +241,7 @@ describe("CacheManager", () => {
       expect(stats.hitRate).toBeGreaterThan(0);
     });
 
-    test("should update stats after operations", async () => {
+    test(_"should update stats after operations", _async () => {
       const initialStats = await cacheManager.getStats();
       expect(initialStats.totalEntries).toBe(0);
 
@@ -255,8 +255,8 @@ describe("CacheManager", () => {
     });
   });
 
-  describe("Utility Methods", () => {
-    test("should check if key exists", async () => {
+  describe(_"Utility Methods", _() => {
+    test(_"should check if key exists", _async () => {
       const key = "existence-key";
       const value = "existence-value";
 
@@ -269,7 +269,7 @@ describe("CacheManager", () => {
       expect(await cacheManager.exists(key)).toBe(false);
     });
 
-    test("should handle expired entries in exists check", async () => {
+    test(_"should handle expired entries in exists check", _async () => {
       jest.useFakeTimers();
 
       const key = "expiring-existence-key";
@@ -285,7 +285,7 @@ describe("CacheManager", () => {
       jest.useRealTimers();
     });
 
-    test("should cleanup expired entries", async () => {
+    test(_"should cleanup expired entries", _async () => {
       jest.useFakeTimers();
 
       const key1 = "cleanup-key1";
@@ -308,8 +308,8 @@ describe("CacheManager", () => {
     });
   });
 
-  describe("Error Handling", () => {
-    test("should handle invalid JSON gracefully", async () => {
+  describe(_"Error Handling", _() => {
+    test(_"should handle invalid JSON gracefully", _async () => {
       // This test simulates corruption or invalid data
       const key = "invalid-json-key";
 
@@ -332,8 +332,8 @@ describe("CacheManager", () => {
     });
   });
 
-  describe("Factory Function", () => {
-    test("should create cache manager with custom config", () => {
+  describe(_"Factory Function", _() => {
+    test(_"should create cache manager with custom config", _() => {
       const customConfig: Partial<CacheConfig> = {
         defaultTTL: 2000,
         maxEntries: 50,
@@ -346,7 +346,7 @@ describe("CacheManager", () => {
       // Test that it works
       customCache
         .set("test", "value")
-        .then(() => {
+        .then_(() => {
           return customCache.get("test");
         })
         .then(value => {
@@ -355,8 +355,8 @@ describe("CacheManager", () => {
     });
   });
 
-  describe("Memory Management", () => {
-    test("should track memory usage accurately", async () => {
+  describe(_"Memory Management", _() => {
+    test(_"should track memory usage accurately", _async () => {
       const initialStats = await cacheManager.getStats();
       const initialMemory = initialStats.memoryUsage;
 
@@ -372,8 +372,8 @@ describe("CacheManager", () => {
     });
   });
 
-  describe("Concurrent Operations", () => {
-    test("should handle concurrent operations safely", async () => {
+  describe(_"Concurrent Operations", _() => {
+    test(_"should handle concurrent operations safely", _async () => {
       const promises = [];
 
       // Simulate concurrent sets
@@ -390,7 +390,7 @@ describe("CacheManager", () => {
       }
     });
 
-    test("should handle concurrent gets safely", async () => {
+    test(_"should handle concurrent gets safely", _async () => {
       await cacheManager.set("concurrent-get-key", "concurrent-value");
 
       const promises = [];

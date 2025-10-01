@@ -14,7 +14,7 @@ async function migrateUsers() {
   console.log("🔄 Migrating users...");
 
   try {
-    const { data: supabaseUsers, error } = await supabase.from("users").select("*");
+    const { data: supabaseUsers, _error} = await supabase.from("users").select("*");
 
     if (error) throw error;
 
@@ -44,7 +44,7 @@ async function migrateBeats() {
   console.log("🔄 Migrating beats...");
 
   try {
-    const { data: supabaseBeats, error } = await supabase.from("beats").select("*");
+    const { data: supabaseBeats, _error} = await supabase.from("beats").select("*");
 
     if (error) throw error;
 
@@ -87,7 +87,7 @@ async function migrateReservations() {
   console.log("🔄 Migrating reservations...");
 
   try {
-    const { data: supabaseReservations, error } = await supabase.from("reservations").select("*");
+    const { data: supabaseReservations, _error} = await supabase.from("reservations").select("*");
 
     if (error) throw error;
 
@@ -123,7 +123,7 @@ async function migrateDownloads() {
   console.log("🔄 Migrating downloads...");
 
   try {
-    const { data: supabaseDownloads, error } = await supabase.from("downloads").select("*");
+    const { data: supabaseDownloads, _error} = await supabase.from("downloads").select("*");
 
     if (error) throw error;
 
@@ -153,7 +153,7 @@ async function migrateOrders() {
   console.log("🔄 Migrating orders...");
 
   try {
-    const { data: supabaseOrders, error } = await supabase.from("orders").select("*");
+    const { data: supabaseOrders, _error} = await supabase.from("orders").select("*");
 
     if (error) throw error;
 

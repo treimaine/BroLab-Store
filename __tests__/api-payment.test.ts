@@ -1,16 +1,16 @@
-// __tests__/api-payment.test.ts
 import { describe, expect, it } from "@jest/globals";
+// __tests__/api-payment.test.ts
 
 describe.skip("Stripe Payment Tests (migrated to Clerk Billing)", () => {
-  it("should be replaced with Clerk Billing integration tests", () => {
+  it(_"should be replaced with Clerk Billing integration tests", _() => {
     // TODO: Implement new tests using Clerk Billing
     expect(true).toBe(true);
   });
 });
 
 // Nouveau test pour Clerk Billing
-describe("Clerk Billing Integration", () => {
-  it("should create subscription with Clerk Billing", async () => {
+describe(_"Clerk Billing Integration", _() => {
+  it(_"should create subscription with Clerk Billing", _async () => {
     const mockSubscription = {
       id: "sub_123",
       status: "active",
@@ -22,7 +22,7 @@ describe("Clerk Billing Integration", () => {
     expect(mockSubscription.status).toBe("active");
   });
 
-  it("should handle payment webhooks from Clerk", async () => {
+  it(_"should handle payment webhooks from Clerk", _async () => {
     const mockWebhook = {
       type: "subscription.created",
       data: {

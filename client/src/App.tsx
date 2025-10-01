@@ -1,30 +1,57 @@
-import { CartProvider } from "@/components/cart-provider";
-import { EnhancedGlobalAudioPlayer } from "@/components/EnhancedGlobalAudioPlayer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Footer } from "@/components/layout/footer";
-import { Navbar } from "@/components/layout/navbar";
-import { LoadingFallback } from "@/components/LoadingFallback";
-import { MobileBottomNav } from "@/components/MobileBottomNav";
-import { NewsletterModal, useNewsletterModal } from "@/components/NewsletterModal";
-import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { CartProvider } from "@/components/cart-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { GlobalLoadingIndicator, LoadingStateProvider } from "./components/LoadingStateProvider";
-// AuthLoading removed to fix infinite loading issues
-import { lazy, Suspense } from "react";
+import React, { Suspense, lazy, useState } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Route, Switch } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { GlobalLoadingIndicator, LoadingStateProvider } from "./components/LoadingStateProvider";
+import { queryClient, warmCache } from "./lib/queryClient";
 
-// Core pages - loaded immediately for better UX
-import Cart from "@/pages/cart";
-import Dashboard from "@/pages/dashboard";
+// Critical components - loaded immediately for core UX
+import { Navbar } from "@/components/layout/navbar";
+
+import { ComponentPreloader, useInteractionPreloader } from "@/components/ComponentPreloader";
+import {
+  bundleOptimization,
+  createLazyComponent,
+  createRouteLazyComponent,
+} from "@/utils/lazyLoading";
+
+// Layout components - lazy loaded for better performance
+const Footer = createLazyComponent(() =>
+  import("@/components/layout/footer").then(module => ({ default: module.Footer }))
+);
+const MobileBottomNav = createLazyComponent(() =>
+  import("@/components/MobileBottomNav").then(module => ({ default: module.MobileBottomNav }))
+);
+const OfflineIndicator = createLazyComponent(() =>
+  import("@/components/OfflineIndicator").then(module => ({ default: module.OfflineIndicator }))
+);
+const NewsletterModal = createLazyComponent(() =>
+  import("@/components/NewsletterModal").then(module => ({ default: module.NewsletterModal }))
+);
+
+// Audio player - lazy loaded as it's heavy and not immediately needed
+const EnhancedGlobalAudioPlayer = createLazyComponent(
+  () =>
+    import("@/components/EnhancedGlobalAudioPlayer").then(module => ({
+      default: module.EnhancedGlobalAudioPlayer,
+    })),
+  { preloadDelay: 2000 } // Preload after 2 seconds
+);
+
+// Core pages - only Home loaded immediately, others lazy loaded for better initial load
 import Home from "@/pages/home";
-import Login from "@/pages/login";
-import Product from "@/pages/product";
-import Shop from "@/pages/shop";
+
+// High-priority pages - route-based lazy loading with preloading
+const Shop = createRouteLazyComponent(() => import("@/pages/shop"), "/shop");
+const Product = createRouteLazyComponent(() => import("@/pages/product"), "/product");
+const Cart = createRouteLazyComponent(() => import("@/pages/cart"), "/cart");
+const Login = createRouteLazyComponent(() => import("@/pages/login"), "/login");
+const Dashboard = createRouteLazyComponent(() => import("@/pages/dashboard"), "/dashboard");
 
 // Secondary pages - lazy loaded for better bundle splitting
 const About = lazy(() => import("@/pages/about"));
@@ -55,6 +82,13 @@ const OrderConfirmation = lazy(() => import("@/pages/order-confirmation"));
 
 // PaymentTestComponent removed - using Clerk native interface
 import NotFound from "@/pages/not-found";
+import {
+  MinimalLoadingFallback,
+  OptimizedLoadingFallback,
+  RouteLoadingFallback,
+} from "./components/OptimizedLoadingFallback";
+import { BundleSizeAnalyzer, PerformanceMonitor } from "./components/PerformanceMonitor";
+import { CacheProvider } from "./providers/CacheProvider";
 
 function Router() {
   return (
@@ -101,64 +135,111 @@ function Router() {
   );
 }
 
+// Custom hook for newsletter modal with lazy loading
+function useNewsletterModalLazy() {
+  const [isOpen, setIsOpen] = useState(false);
+  const closeModal = () => setIsOpen(false);
+  return { isOpen, closeModal };
+}
+
 function App() {
-  const { isOpen, closeModal } = useNewsletterModal();
+  const { isOpen, closeModal } = useNewsletterModalLazy();
 
   console.log("🎨 App component rendering...");
 
+  // Use interaction-based preloading
+  useInteractionPreloader();
+
+  // Initialize performance optimizations
+  React.useEffect(() => {
+    // Preload critical components after initial render
+    bundleOptimization.preloadCriticalComponents();
+
+    // Setup user interaction-based preloading
+    bundleOptimization.preloadOnUserInteraction();
+
+    // Warm cache with critical data
+    warmCache().catch(console.error);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <HelmetProvider>
-        <TooltipProvider>
-          <LoadingStateProvider>
-            <CartProvider>
-              <ScrollToTop />
-              <div className="min-h-screen bg-[var(--deep-black)] text-white">
-                <a
-                  href="#main-content"
-                  className="skip-to-content sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[var(--color-accent)] text-white px-4 py-2 rounded-lg z-50"
-                  aria-label="Skip to main content"
-                >
-                  Skip to content
-                </a>
+      <CacheProvider>
+        <HelmetProvider>
+          <TooltipProvider>
+            <LoadingStateProvider>
+              <CartProvider>
+                <ScrollToTop />
+                <div className="min-h-screen bg-[var(--deep-black)] text-white">
+                  <a
+                    href="#main-content"
+                    className="skip-to-content sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[var(--color-accent)] text-white px-4 py-2 rounded-lg z-50"
+                    aria-label="Skip to main content"
+                  >
+                    Skip to content
+                  </a>
 
-                {/* Global loading indicator */}
-                <GlobalLoadingIndicator />
+                  {/* Global loading indicator */}
+                  <GlobalLoadingIndicator />
 
-                {/* Offline indicator */}
-                <div className="fixed bottom-4 right-4 z-40">
-                  <OfflineIndicator showDetails />
-                </div>
-
-                {/* Navbar always visible */}
-                <Navbar />
-
-                <main id="main-content" role="main">
-                  <ErrorBoundary>
-                    <Suspense fallback={<LoadingFallback message="Loading page..." />}>
-                      <Router />
+                  {/* Offline indicator - lazy loaded */}
+                  <div className="fixed bottom-4 right-4 z-40">
+                    <Suspense fallback={null}>
+                      <OfflineIndicator showDetails />
                     </Suspense>
-                  </ErrorBoundary>
-                </main>
+                  </div>
 
-                <Footer />
+                  {/* Navbar always visible for navigation */}
+                  <Navbar />
 
-                {/* Mobile bottom navigation */}
-                <MobileBottomNav />
+                  <main id="main-content" role="main">
+                    <ErrorBoundary>
+                      <Suspense fallback={<RouteLoadingFallback />}>
+                        <Router />
+                      </Suspense>
+                      {/* Component preloader for route-based optimization */}
+                      <ComponentPreloader />
 
-                {/* Global audio player */}
-                <EnhancedGlobalAudioPlayer />
+                      {/* Performance monitoring (development only) */}
+                      {process.env.NODE_ENV === "development" && (
+                        <>
+                          <PerformanceMonitor />
+                          <BundleSizeAnalyzer />
+                        </>
+                      )}
+                    </ErrorBoundary>
+                  </main>
 
-                {/* Newsletter modal */}
-                <NewsletterModal isOpen={isOpen} onClose={closeModal} />
+                  {/* Footer - lazy loaded */}
+                  <Suspense fallback={<MinimalLoadingFallback />}>
+                    <Footer />
+                  </Suspense>
 
-                {/* Toaster for notifications */}
-                <Toaster />
-              </div>
-            </CartProvider>
-          </LoadingStateProvider>
-        </TooltipProvider>
-      </HelmetProvider>
+                  {/* Mobile bottom navigation - lazy loaded */}
+                  <Suspense fallback={null}>
+                    <MobileBottomNav />
+                  </Suspense>
+
+                  {/* Global audio player - lazy loaded as it's heavy */}
+                  <Suspense fallback={<OptimizedLoadingFallback type="audio" />}>
+                    <EnhancedGlobalAudioPlayer />
+                  </Suspense>
+
+                  {/* Newsletter modal - lazy loaded */}
+                  {isOpen && (
+                    <Suspense fallback={null}>
+                      <NewsletterModal isOpen={isOpen} onClose={closeModal} />
+                    </Suspense>
+                  )}
+
+                  {/* Toaster for notifications */}
+                  <Toaster />
+                </div>
+              </CartProvider>
+            </LoadingStateProvider>
+          </TooltipProvider>
+        </HelmetProvider>
+      </CacheProvider>
     </QueryClientProvider>
   );
 }

@@ -1,12 +1,12 @@
+import { DashboardErrorType, useDashboard, useDashboardStats } from "@/hooks/useDashboard";
+import { useUser } from "@clerk/clerk-react";
+import { renderHook } from "@testing-library/react";
 /**
  * Tests for the unified dashboard hook
  *
  * Verifies proper TypeScript typing, error handling, and caching behavior
  */
 
-import { DashboardErrorType, useDashboard, useDashboardStats } from "@/hooks/useDashboard";
-import { useUser } from "@clerk/clerk-react";
-import { renderHook } from "@testing-library/react";
 
 // Mock dependencies
 jest.mock("@clerk/clerk-react");
@@ -15,20 +15,20 @@ jest.mock("@tanstack/react-query");
 
 const mockUseUser = useUser as jest.MockedFunction<typeof useUser>;
 
-describe("useDashboard", () => {
-  beforeEach(() => {
+describe(_"useDashboard", _() => {
+  beforeEach_(() => {
     jest.clearAllMocks();
   });
 
-  describe("Authentication handling", () => {
-    it("should return auth error when user is not authenticated", () => {
+  describe(_"Authentication handling", _() => {
+    it(_"should return auth error when user is not authenticated", _() => {
       mockUseUser.mockReturnValue({
         user: null,
         isLoaded: true,
         isSignedIn: false,
       } as any);
 
-      const { result } = renderHook(() => useDashboard());
+      const { _result} = renderHook_(() => useDashboard());
 
       expect(result.current.isAuthenticated).toBe(false);
       expect(result.current.error).toEqual({
@@ -41,20 +41,20 @@ describe("useDashboard", () => {
       });
     });
 
-    it("should show loading state when Clerk is not loaded", () => {
+    it(_"should show loading state when Clerk is not loaded", _() => {
       mockUseUser.mockReturnValue({
         user: null,
         isLoaded: false,
         isSignedIn: false,
       } as any);
 
-      const { result } = renderHook(() => useDashboard());
+      const { _result} = renderHook_(() => useDashboard());
 
       expect(result.current.isLoading).toBe(true);
       expect(result.current.error).toBeNull();
     });
 
-    it("should be authenticated when user is present", () => {
+    it(_"should be authenticated when user is present", _() => {
       const mockUser = {
         id: "user_123",
         emailAddresses: [{ emailAddress: "test@example.com" }],
@@ -70,7 +70,7 @@ describe("useDashboard", () => {
         isSignedIn: true,
       } as any);
 
-      const { result } = renderHook(() => useDashboard());
+      const { _result} = renderHook_(() => useDashboard());
 
       expect(result.current.isAuthenticated).toBe(true);
       expect(result.current.user.id).toBe("user_123");
@@ -78,8 +78,8 @@ describe("useDashboard", () => {
     });
   });
 
-  describe("Data structure", () => {
-    beforeEach(() => {
+  describe(_"Data structure", _() => {
+    beforeEach_(() => {
       const mockUser = {
         id: "user_123",
         emailAddresses: [{ emailAddress: "test@example.com" }],
@@ -94,8 +94,8 @@ describe("useDashboard", () => {
       } as any);
     });
 
-    it("should return properly typed dashboard data structure", () => {
-      const { result } = renderHook(() => useDashboard());
+    it(_"should return properly typed dashboard data structure", _() => {
+      const { _result} = renderHook_(() => useDashboard());
 
       // Verify all required properties exist with correct types
       expect(typeof result.current.user).toBe("object");
@@ -109,8 +109,8 @@ describe("useDashboard", () => {
       expect(typeof result.current.trends).toBe("object");
     });
 
-    it("should provide action functions", () => {
-      const { result } = renderHook(() => useDashboard());
+    it(_"should provide action functions", _() => {
+      const { _result} = renderHook_(() => useDashboard());
 
       expect(typeof result.current.refetch).toBe("function");
       expect(typeof result.current.optimisticUpdate).toBe("function");
@@ -118,8 +118,8 @@ describe("useDashboard", () => {
       expect(typeof result.current.clearError).toBe("function");
     });
 
-    it("should have proper stats structure", () => {
-      const { result } = renderHook(() => useDashboard());
+    it(_"should have proper stats structure", _() => {
+      const { _result} = renderHook_(() => useDashboard());
 
       const stats = result.current.stats;
       expect(typeof stats.totalFavorites).toBe("number");
@@ -135,8 +135,8 @@ describe("useDashboard", () => {
     });
   });
 
-  describe("Configuration options", () => {
-    beforeEach(() => {
+  describe(_"Configuration options", _() => {
+    beforeEach_(() => {
       const mockUser = {
         id: "user_123",
         emailAddresses: [{ emailAddress: "test@example.com" }],
@@ -149,7 +149,7 @@ describe("useDashboard", () => {
       } as any);
     });
 
-    it("should accept configuration options", () => {
+    it(_"should accept configuration options", _() => {
       const options = {
         includeChartData: false,
         includeTrends: false,
@@ -157,15 +157,15 @@ describe("useDashboard", () => {
         ordersLimit: 5,
       };
 
-      const { result } = renderHook(() => useDashboard(options));
+      const { _result} = renderHook_(() => useDashboard(options));
 
       // Should not throw and should return valid structure
       expect(result.current).toBeDefined();
       expect(typeof result.current.isLoading).toBe("boolean");
     });
 
-    it("should use default configuration when no options provided", () => {
-      const { result } = renderHook(() => useDashboard());
+    it(_"should use default configuration when no options provided", _() => {
+      const { _result} = renderHook_(() => useDashboard());
 
       // Should work with defaults
       expect(result.current).toBeDefined();
@@ -174,12 +174,12 @@ describe("useDashboard", () => {
   });
 });
 
-describe("useDashboardStats", () => {
-  beforeEach(() => {
+describe(_"useDashboardStats", _() => {
+  beforeEach_(() => {
     jest.clearAllMocks();
   });
 
-  it("should return stats-only interface", () => {
+  it(_"should return stats-only interface", _() => {
     const mockUser = {
       id: "user_123",
       emailAddresses: [{ emailAddress: "test@example.com" }],
@@ -191,7 +191,7 @@ describe("useDashboardStats", () => {
       isSignedIn: true,
     } as any);
 
-    const { result } = renderHook(() => useDashboardStats());
+    const { _result} = renderHook_(() => useDashboardStats());
 
     expect(result.current.stats).toBeDefined();
     expect(typeof result.current.isLoading).toBe("boolean");
@@ -199,14 +199,14 @@ describe("useDashboardStats", () => {
     expect(typeof result.current.refetch).toBe("function");
   });
 
-  it("should return auth error when not authenticated", () => {
+  it(_"should return auth error when not authenticated", _() => {
     mockUseUser.mockReturnValue({
       user: null,
       isLoaded: true,
       isSignedIn: false,
     } as any);
 
-    const { result } = renderHook(() => useDashboardStats());
+    const { _result} = renderHook_(() => useDashboardStats());
 
     expect(result.current.error?.type).toBe(DashboardErrorType.AUTH_ERROR);
   });

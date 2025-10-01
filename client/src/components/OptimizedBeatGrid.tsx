@@ -1,9 +1,9 @@
-import { BeatCard } from "@/components/beat-card";
 import { BeatCardSkeleton } from "@/components/LoadingSpinner";
 import { ResponsiveBeatCard } from "@/components/ResponsiveBeatCard";
+import { useIntersectionObserver } from "@/components/VirtualScrollList";
+import { BeatCard } from "@/components/beat-card";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { cn } from "@/lib/utils";
-import { useIntersectionObserver } from "@/utils/virtualScrolling";
 import type { BeatProduct as Beat } from "@shared/schema";
 import React, { useCallback, useRef, useState } from "react";
 

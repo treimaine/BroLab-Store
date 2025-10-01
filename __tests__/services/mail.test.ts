@@ -3,15 +3,15 @@ import { sendMail, sendAdminNotification } from '../../server/services/mail';
 import nodemailer from 'nodemailer';
 
 // Mock nodemailer
-jest.mock('nodemailer', () => ({
+jest.mock(_'nodemailer', _() => ({
   createTransport: jest.fn(),
 }));
 const mockedNodemailer = jest.mocked(nodemailer);
 
-describe('Mail Service', () => {
+describe(_'Mail Service', _() => {
   let mockTransporter: jest.Mocked<nodemailer.Transporter>;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     // Mock direct sans typage strict
     mockTransporter = {
       sendMail: jest.fn(),
@@ -20,7 +20,7 @@ describe('Mail Service', () => {
     } as any;
     
     // Configuration mock manual
-    mockTransporter.sendMail = jest.fn(() => Promise.resolve({ messageId: 'test-message-id' }));
+    mockTransporter.sendMail = jest.fn_(() => Promise.resolve({ messageId: 'test-message-id' }));
     
     mockedNodemailer.createTransport.mockReturnValue(mockTransporter);
     
@@ -34,12 +34,12 @@ describe('Mail Service', () => {
     process.env.MAIL_DRY_RUN = 'false';
   });
 
-  afterEach(() => {
+  afterEach_(() => {
     jest.clearAllMocks();
   });
 
-  describe('sendMail', () => {
-    it('should send email successfully', async () => {
+  describe(_'sendMail', _() => {
+    it(_'should send email successfully', _async () => {
       const payload = {
         to: 'test@example.com',
         subject: 'Test Subject',
@@ -58,9 +58,9 @@ describe('Mail Service', () => {
       });
     });
 
-    it('should handle DRY_RUN mode', async () => {
+    it(_'should handle DRY_RUN mode', _async () => {
       process.env.MAIL_DRY_RUN = 'true';
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation_(() => {});
 
       const payload = {
         to: 'test@example.com',
@@ -80,14 +80,14 @@ describe('Mail Service', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should strip HTML for text fallback', async () => {
+    it(_'should strip HTML for text fallback', _async () => {
       // Test simplifié pour éviter les problèmes de mock
       expect(mockTransporter.sendMail).toBeDefined();
     });
   });
 
-  describe('sendAdminNotification', () => {
-    it('should send notification to admin emails', async () => {
+  describe(_'sendAdminNotification', _() => {
+    it(_'should send notification to admin emails', _async () => {
       // Test simplifié pour éviter les problèmes de mock
       expect(mockTransporter).toBeDefined();
     });

@@ -9,25 +9,43 @@ export const createReservation = mutation({
     durationMinutes: v.number(),
     totalPrice: v.number(),
     notes: v.optional(v.string()),
+    clerkId: v.optional(v.string()), // For server-side calls
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    let userId;
 
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    if (args.clerkId) {
+      // Server-side call with explicit clerkId
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", q => q.eq("clerkId", args.clerkId))
+        .first();
 
-    const userId = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .unique();
+      if (!user) {
+        throw new Error("User not found");
+      }
+      userId = user._id;
+    } else {
+      // Client-side call with authentication
+      const identity = await ctx.auth.getUserIdentity();
 
-    if (!userId) {
-      throw new Error("User not found");
+      if (!identity) {
+        throw new Error("Not authenticated");
+      }
+
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
+        .first();
+
+      if (!user) {
+        throw new Error("User not found");
+      }
+      userId = user._id;
     }
 
     const reservationId = await ctx.db.insert("reservations", {
-      userId: userId._id,
+      userId: userId,
       serviceType: args.serviceType,
       status: "pending",
       details: args.details,

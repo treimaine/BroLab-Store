@@ -9,7 +9,7 @@ const mockConvexClient = {
 };
 
 // Mock logger
-jest.mock("../server/lib/logger", () => ({
+jest.mock(_"../server/lib/logger", _() => ({
   logger: {
     info: jest.fn(),
     warn: jest.fn(),
@@ -22,8 +22,8 @@ const mockDataConsistencyManager = {
   detectConflicts: jest.fn().mockResolvedValue([]),
 };
 
-jest.mock("../server/lib/dataConsistencyManager", () => ({
-  getDataConsistencyManager: jest.fn(() => mockDataConsistencyManager),
+jest.mock(_"../server/lib/dataConsistencyManager", _() => ({
+  getDataConsistencyManager: jest.fn_(() => mockDataConsistencyManager),
 }));
 
 // Mock RollbackManager
@@ -33,8 +33,8 @@ const mockRollbackManager = {
   executeRollback: jest.fn().mockResolvedValue(undefined),
 };
 
-jest.mock("../server/lib/rollbackManager", () => ({
-  getRollbackManager: jest.fn(() => mockRollbackManager),
+jest.mock(_"../server/lib/rollbackManager", _() => ({
+  getRollbackManager: jest.fn_(() => mockRollbackManager),
 }));
 
 // Mock timers
@@ -42,10 +42,10 @@ jest.useFakeTimers();
 const mockSetInterval = jest.fn();
 global.setInterval = mockSetInterval;
 
-describe("DataSynchronizationManager", () => {
+describe(_"DataSynchronizationManager", _() => {
   let manager: DataSynchronizationManager;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     jest.clearAllMocks();
     mockSetInterval.mockClear();
     mockDataConsistencyManager.detectConflicts.mockClear();
@@ -60,11 +60,11 @@ describe("DataSynchronizationManager", () => {
     manager = new DataSynchronizationManager(mockConvexClient as any);
   });
 
-  afterEach(() => {
+  afterEach_(() => {
     jest.clearAllTimers();
   });
 
-  describe("performSyncOperation", () => {
+  describe(_"performSyncOperation", _() => {
     const mockOperation = {
       type: "users",
       resourceId: "user_123",
@@ -73,7 +73,7 @@ describe("DataSynchronizationManager", () => {
       metadata: { source: "api" },
     };
 
-    it("should perform sync operation successfully", async () => {
+    it(_"should perform sync operation successfully", _async () => {
       // Mock the pre-sync and post-sync checks directly to avoid complex dependencies
       jest.spyOn(manager as any, "performPreSyncCheck").mockResolvedValue({
         isValid: true,
@@ -96,7 +96,7 @@ describe("DataSynchronizationManager", () => {
       };
 
       // Mock the getRollbackManager function
-      jest.doMock("../server/lib/rollbackManager", () => ({
+      jest.doMock(_"../server/lib/rollbackManager", _() => ({
         getRollbackManager: () => mockRollbackManager,
       }));
 
@@ -113,7 +113,7 @@ describe("DataSynchronizationManager", () => {
       expect(result.consistencyChecks.postSync.isValid).toBe(true);
     });
 
-    it("should fail when pre-sync check fails", async () => {
+    it(_"should fail when pre-sync check fails", _async () => {
       // Mock resource not found
       mockConvexClient.query.mockResolvedValueOnce(null);
 
@@ -122,7 +122,7 @@ describe("DataSynchronizationManager", () => {
       );
     });
 
-    it("should rollback when post-sync check fails", async () => {
+    it(_"should rollback when post-sync check fails", _async () => {
       // Mock successful pre-sync but failed post-sync
       mockConvexClient.query
         .mockResolvedValueOnce({ id: "user_123", name: "Old Name" }) // resource exists
@@ -139,7 +139,7 @@ describe("DataSynchronizationManager", () => {
       );
     });
 
-    it("should handle sync operation errors", async () => {
+    it(_"should handle sync operation errors", _async () => {
       // Mock successful pre-sync but failed sync
       mockConvexClient.query
         .mockResolvedValueOnce({ id: "user_123", name: "Old Name" })
@@ -151,8 +151,8 @@ describe("DataSynchronizationManager", () => {
     });
   });
 
-  describe("validateDataIntegrity", () => {
-    it("should validate data integrity successfully", async () => {
+  describe(_"validateDataIntegrity", _() => {
+    it(_"should validate data integrity successfully", _async () => {
       const mockResource = { id: "user_123", userId: "user_123", email: "test@example.com" };
       mockConvexClient.query.mockResolvedValueOnce(mockResource);
       mockConvexClient.mutation.mockResolvedValueOnce({ id: "validation_123" });
@@ -164,7 +164,7 @@ describe("DataSynchronizationManager", () => {
       expect(result.checkedCount).toBe(1);
     });
 
-    it("should detect integrity violations", async () => {
+    it(_"should detect integrity violations", _async () => {
       const mockResource = { id: "user_123" }; // Missing required fields
       mockConvexClient.query.mockResolvedValueOnce(mockResource);
       mockConvexClient.mutation.mockResolvedValueOnce({ id: "validation_123" });
@@ -176,7 +176,7 @@ describe("DataSynchronizationManager", () => {
       expect(result.violations[0].rule).toBe("required_fields");
     });
 
-    it("should validate multiple resources when no resourceId provided", async () => {
+    it(_"should validate multiple resources when no resourceId provided", _async () => {
       const mockResources = [
         { id: "user_1", userId: "user_1", email: "user1@example.com" },
         { id: "user_2", userId: "user_2", email: "user2@example.com" },
@@ -190,7 +190,7 @@ describe("DataSynchronizationManager", () => {
       expect(result.isValid).toBe(true);
     });
 
-    it("should handle validation errors gracefully", async () => {
+    it(_"should handle validation errors gracefully", _async () => {
       mockConvexClient.query.mockRejectedValueOnce(new Error("Database error"));
 
       await expect(manager.validateDataIntegrity("users", "user_123")).rejects.toThrow(
@@ -199,8 +199,8 @@ describe("DataSynchronizationManager", () => {
     });
   });
 
-  describe("repairIntegrityViolations", () => {
-    it("should repair integrity violations successfully", async () => {
+  describe(_"repairIntegrityViolations", _() => {
+    it(_"should repair integrity violations successfully", _async () => {
       const violations = [
         {
           resourceId: "user_123",
@@ -222,7 +222,7 @@ describe("DataSynchronizationManager", () => {
       expect(result.failedRepairs).toBe(0);
     });
 
-    it("should handle repair failures", async () => {
+    it(_"should handle repair failures", _async () => {
       const violations = [
         {
           resourceId: "user_123",
@@ -243,8 +243,8 @@ describe("DataSynchronizationManager", () => {
     });
   });
 
-  describe("getConsistencyMetrics", () => {
-    it("should return consistency metrics", async () => {
+  describe(_"getConsistencyMetrics", _() => {
+    it(_"should return consistency metrics", _async () => {
       mockConvexClient.query.mockResolvedValueOnce({
         totalChecks: 100,
         passedChecks: 95,
@@ -266,20 +266,20 @@ describe("DataSynchronizationManager", () => {
       expect(metrics.timeRange).toBeDefined();
     });
 
-    it("should handle metrics query errors", async () => {
+    it(_"should handle metrics query errors", _async () => {
       mockConvexClient.query.mockRejectedValueOnce(new Error("Query failed"));
 
       await expect(manager.getConsistencyMetrics()).rejects.toThrow("Query failed");
     });
   });
 
-  describe("integrity rules management", () => {
-    it("should add custom integrity rule", () => {
+  describe(_"integrity rules management", _() => {
+    it(_"should add custom integrity rule", _() => {
       const rule = {
         name: "custom_rule",
         description: "Custom validation rule",
         severity: "medium" as const,
-        validator: (data: any) => !!data.customField,
+        validator: (_data: any) => !!data.customField,
       };
 
       manager.addIntegrityRule("custom_type", rule);
@@ -289,7 +289,7 @@ describe("DataSynchronizationManager", () => {
       expect(rules).toContain(rule);
     });
 
-    it("should remove integrity rule", () => {
+    it(_"should remove integrity rule", _() => {
       const rule = {
         name: "removable_rule",
         description: "Rule to be removed",
@@ -303,17 +303,17 @@ describe("DataSynchronizationManager", () => {
       expect(removed).toBe(true);
 
       const rules = (manager as any).integrityRules.get("test_type");
-      expect(rules.find((r: any) => r.name === "removable_rule")).toBeUndefined();
+      expect(_rules.find((r: any) => r.name === "removable_rule")).toBeUndefined();
     });
 
-    it("should return false when removing non-existent rule", () => {
+    it(_"should return false when removing non-existent rule", _() => {
       const removed = manager.removeIntegrityRule("test_type", "non_existent");
       expect(removed).toBe(false);
     });
   });
 
-  describe("monitoring configuration", () => {
-    it("should enable/disable monitoring", () => {
+  describe(_"monitoring configuration", _() => {
+    it(_"should enable/disable monitoring", _() => {
       manager.setMonitoringEnabled(false);
       expect((manager as any).monitoringEnabled).toBe(false);
 
@@ -321,7 +321,7 @@ describe("DataSynchronizationManager", () => {
       expect((manager as any).monitoringEnabled).toBe(true);
     });
 
-    it("should update alert thresholds", () => {
+    it(_"should update alert thresholds", _() => {
       const newThresholds = {
         maxFailureRate: 0.2,
         maxConsistencyErrors: 10,
@@ -335,8 +335,8 @@ describe("DataSynchronizationManager", () => {
     });
   });
 
-  describe("default integrity rules", () => {
-    it("should have default user integrity rules", async () => {
+  describe(_"default integrity rules", _() => {
+    it(_"should have default user integrity rules", _async () => {
       const validUser = { userId: "user_123", email: "test@example.com" };
       const invalidUser = { id: "user_123" }; // Missing email
 
@@ -353,7 +353,7 @@ describe("DataSynchronizationManager", () => {
       expect(invalidResult.isValid).toBe(false);
     });
 
-    it("should have default order integrity rules", async () => {
+    it(_"should have default order integrity rules", _async () => {
       const validOrder = { userId: "user_123", items: [{ id: "item_1" }] };
       const invalidOrder = { userId: "user_123" }; // Missing items
 
@@ -370,7 +370,7 @@ describe("DataSynchronizationManager", () => {
       expect(invalidResult.isValid).toBe(false);
     });
 
-    it("should have default product integrity rules", async () => {
+    it(_"should have default product integrity rules", _async () => {
       const validProduct = { id: "product_123", name: "Test Product" };
       const invalidProduct = { id: "product_123" }; // Missing name
 
@@ -388,12 +388,12 @@ describe("DataSynchronizationManager", () => {
     });
   });
 
-  describe("consistency monitoring", () => {
-    it("should start consistency monitoring timer", () => {
+  describe(_"consistency monitoring", _() => {
+    it(_"should start consistency monitoring timer", _() => {
       expect(mockSetInterval).toHaveBeenCalledWith(expect.any(Function), 5 * 60 * 1000);
     });
 
-    it("should trigger alerts when thresholds are exceeded", async () => {
+    it(_"should trigger alerts when thresholds are exceeded", _async () => {
       // Mock metrics that exceed thresholds
       mockConvexClient.query.mockResolvedValueOnce({
         totalChecks: 100,
@@ -417,7 +417,7 @@ describe("DataSynchronizationManager", () => {
       expect(mockConvexClient.mutation).toHaveBeenCalledWith("alerts:create", expect.any(Object));
     });
 
-    it("should not trigger alerts when monitoring is disabled", async () => {
+    it(_"should not trigger alerts when monitoring is disabled", _async () => {
       manager.setMonitoringEnabled(false);
 
       mockConvexClient.query.mockResolvedValueOnce({
@@ -439,8 +439,8 @@ describe("DataSynchronizationManager", () => {
     });
   });
 
-  describe("private helper methods", () => {
-    it("should calculate average duration correctly", () => {
+  describe(_"private helper methods", _() => {
+    it(_"should calculate average duration correctly", _() => {
       const operations = [
         { id: "1", startTime: 1000, endTime: 2000 },
         { id: "2", startTime: 2000, endTime: 3500 },
@@ -451,7 +451,7 @@ describe("DataSynchronizationManager", () => {
       expect(avgDuration).toBe((1000 + 1500 + 1000) / 3);
     });
 
-    it("should return 0 for average duration when no completed operations", () => {
+    it(_"should return 0 for average duration when no completed operations", _() => {
       const operations = [
         { id: "1", startTime: 1000 }, // No endTime
         { id: "2", startTime: 2000 }, // No endTime

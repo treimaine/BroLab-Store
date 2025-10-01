@@ -12,7 +12,7 @@ import {
 import { StandardHero } from "@/components/ui/StandardHero";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useUser } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import { Calendar, Clock, Mail, MapPin, Mic, Phone, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -35,6 +35,7 @@ export default function RecordingSessions() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user, isSignedIn } = useUser();
+  const { getToken } = useAuth();
   const [formData, setFormData] = useState<BookingFormData>({
     name: "",
     email: "",
@@ -68,35 +69,71 @@ export default function RecordingSessions() {
     e.preventDefault();
 
     try {
-      // Convert form data to reservation format
+      // Check authentication
+      if (!isSignedIn || !user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to make a reservation.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("🚀 Starting reservation submission for recording session");
+      // Convert form data to reservation format using new schema
+      const budgetAmount =
+        formData.budget === "300-500"
+          ? 40000 // $400 in cents
+          : formData.budget === "500-1000"
+            ? 75000 // $750 in cents
+            : formData.budget === "1000-2000"
+              ? 150000 // $1500 in cents
+              : 250000; // $2500+ in cents
+
       const reservationData = {
-        service_type: "recording" as const,
-        details: {
-          name: formData.name,
+        serviceType: "recording" as const,
+        clientInfo: {
+          firstName: formData.name.split(" ")[0] || formData.name,
+          lastName: formData.name.split(" ").slice(1).join(" ") || "User",
           email: formData.email,
-          phone: formData.phone,
-          requirements: formData.message,
+          phone: formData.phone || "0000000000",
         },
-        preferred_date: new Date(
+        preferredDate: new Date(
           `${formData.preferredDate}T${formData.preferredTime}`
         ).toISOString(),
-        duration_minutes: parseInt(formData.duration) * 60, // Convert hours to minutes
-        total_price:
-          formData.budget === "300-500"
-            ? 40000 // $400 in cents
-            : formData.budget === "500-1000"
-              ? 75000 // $750 in cents
-              : formData.budget === "1000-2000"
-                ? 150000 // $1500 in cents
-                : 250000, // $2500+ in cents
-        notes: `Session Type: ${formData.sessionType}, Location: ${formData.location}, Budget: ${formData.budget}`,
+        preferredDuration: parseInt(formData.duration) * 60, // Convert hours to minutes
+        serviceDetails: {
+          includeRevisions: 2,
+          rushDelivery: false,
+        },
+        notes: `Session Type: ${formData.sessionType}, Location: ${formData.location}, Budget: ${formData.budget}, Message: ${formData.message}`,
+        budget: budgetAmount,
+        acceptTerms: true,
       };
+
+      console.log("🚀 Sending reservation data:", reservationData);
+      
+      // Get authentication token from Clerk
+      const token = await getToken();
+      if (!token) {
+        toast({
+          title: "Authentication Error",
+          description: "Unable to get authentication token. Please try signing in again.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       const response = await fetch("/api/reservations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(reservationData),
       });
+
+      console.log("📡 Reservation response status:", response.status);
 
       if (response.ok) {
         const reservation = await response.json();
@@ -107,7 +144,7 @@ export default function RecordingSessions() {
           serviceName: "Recording Session",
           serviceDetails: `${formData.sessionType} - ${formData.duration} hour${parseInt(formData.duration) > 1 ? "s" : ""} (${formData.location})`,
           reservationId: reservation.id,
-          price: reservationData.total_price / 100, // Convert cents to dollars
+          price: reservationData.budget / 100, // Convert cents to dollars
           quantity: 1,
         };
 
@@ -124,19 +161,20 @@ export default function RecordingSessions() {
         // Redirect to checkout
         setLocation("/checkout");
       } else {
-        const error = await response.json();
-        console.error("Error creating reservation:", error);
+        const errorText = await response.text();
+        console.error("❌ Reservation failed:", response.status, errorText);
         toast({
           title: "Booking Failed",
-          description: error.error || "Please try again later.",
+          description: `Failed to create reservation: ${response.status} - ${errorText}`,
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Error submitting form:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       toast({
         title: "Booking Failed",
-        description: "Please try again later.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -182,7 +220,7 @@ export default function RecordingSessions() {
                 </div>
 
                 <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
-                  <h4 className="font-semibold text-white mb-2">What's Included:</h4>
+                  <h4 className="font-semibold text-white mb-2">What&apos;s Included:</h4>
                   <ul className="text-gray-300 text-sm space-y-1">
                     <li>• Professional studio environment</li>
                     <li>• Industry-standard recording equipment</li>

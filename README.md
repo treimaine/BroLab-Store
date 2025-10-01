@@ -9,6 +9,7 @@ BroLab Entertainment is a modern React-based web application that provides a pro
 ## ✨ Key Features
 
 ### Core Functionality
+
 - **Professional Audio Preview System**: Waveform visualization with individual preview controls for each beat
 - **WooCommerce Integration**: Full product catalog sync with WordPress backend
 - **Multi-Payment Processing**: Stripe and PayPal integration with comprehensive error handling
@@ -20,6 +21,7 @@ BroLab Entertainment is a modern React-based web application that provides a pro
 - **Advanced Security**: RLS policies, rate limiting, and comprehensive validation
 
 ### Advanced Features
+
 - **Geolocation & Multi-Currency**: Automatic currency detection and conversion based on user location
 - **Multi-Language Support**: 6 languages with automatic IP-based language detection
 - **Professional Waveform Audio Player**: Table view with individual audio previews per product
@@ -30,6 +32,7 @@ BroLab Entertainment is a modern React-based web application that provides a pro
 - **Email System**: Comprehensive email templates and delivery management
 
 ### Technical Excellence
+
 - **Type-Safe Development**: Full TypeScript implementation with Drizzle ORM
 - **Modern State Management**: Zustand for client state, TanStack Query for server state
 - **Accessibility Compliant**: WCAG AA standards with reduced motion support
@@ -39,6 +42,7 @@ BroLab Entertainment is a modern React-based web application that provides a pro
 ## 🏗️ Technical Architecture
 
 ### Frontend Stack
+
 - **React 18** with TypeScript and Vite build system
 - **Tailwind CSS** with shadcn/ui component library
 - **Wouter** for lightweight client-side routing
@@ -46,8 +50,26 @@ BroLab Entertainment is a modern React-based web application that provides a pro
 - **Zustand** for client-side state management
 
 ### Backend Stack
+
 - **Node.js + Express** server with TypeScript
 - **PostgreSQL** database with Supabase and Drizzle ORM
+
+## 📚 Documentation
+
+All project documentation has been organized in the `docs/` directory:
+
+- **Development**: Setup guides, coding standards, and development workflows
+- **Deployment**: Production deployment checklists and hosting guides
+- **Testing**: Testing strategies, guides, and specifications
+- **Specifications**: Feature specs, API documentation, and system requirements
+- **Archive**: Historical documentation, completed migrations, and fix summaries
+
+For quick access:
+
+- 🚀 **Getting Started**: `docs/development/LOCAL_DEVELOPMENT_GUIDE.md`
+- 🔧 **Deployment**: `docs/deployment/DEPLOYMENT_CHECKLIST.md`
+- 🧪 **Testing**: `docs/testing/TESTING_GUIDE.md`
+- 📋 **Full Index**: `docs/README.md`
 - **WordPress/WooCommerce** REST API integration
 - **Stripe + PayPal** payment processing
 - **Session-based authentication** with bcrypt
@@ -56,6 +78,7 @@ BroLab Entertainment is a modern React-based web application that provides a pro
 - **Comprehensive validation** with Zod schemas
 
 ### Development & Deployment
+
 - **Local Development**: Docker PostgreSQL setup with automated scripts
 - **Production Ready**: Optimized builds for o2switch cPanel hosting
 - **CI/CD Ready**: Comprehensive deployment checklist and automation scripts
@@ -134,6 +157,7 @@ npm run format             # Format code
 ## 🌐 Environment Configuration
 
 ### Development (.env)
+
 ```env
 # Database Configuration (Supabase)
 DATABASE_URL="postgresql://postgres:password@db.your-project.supabase.co:5432/postgres"
@@ -168,6 +192,7 @@ NODE_ENV="development"
 ```
 
 ### Production
+
 - Use live API keys and production database
 - Enable SSL and security headers
 - Configure domain and DNS settings
@@ -176,11 +201,13 @@ NODE_ENV="development"
 ## 📱 Responsive Design
 
 ### Breakpoint System
+
 - **Mobile**: 320px - 640px (xs, sm)
 - **Tablet**: 641px - 1024px (md, lg)
 - **Desktop**: 1025px+ (xl, 2xl)
 
 ### Key Features
+
 - Touch-friendly interactions (44px+ tap targets)
 - Safe-area support for iOS/Android notch devices
 - Network-aware loading optimizations
@@ -189,6 +216,7 @@ NODE_ENV="development"
 ## 🎵 Audio System
 
 ### Waveform Audio Player
+
 - Professional waveform visualization with Canvas rendering
 - Individual audio controls for each product in table view
 - Click-to-seek functionality with visual progress tracking
@@ -196,6 +224,7 @@ NODE_ENV="development"
 - Mobile-optimized controls with backdrop blur effects
 
 ### Table View Layout
+
 - Professional layout matching industry standards
 - Thumbnails, waveforms, genre, duration, and actions per row
 - Independent audio preview for each beat
@@ -231,6 +260,7 @@ NODE_ENV="development"
 3. **Testing**: Build and test production builds locally
 4. **Deployment**: Automated scripts for cPanel deployment
 5. **Monitoring**: Comprehensive logging and error tracking
+
 - **Database Management**: Use Drizzle Studio for schema management
 - **Security Testing**: Validate RLS policies and access controls
 
@@ -246,6 +276,7 @@ NODE_ENV="development"
 ## 🏆 Production Ready
 
 This application is production-ready with:
+
 - Comprehensive error handling and logging
 - Security best practices implementation
 - Performance optimization strategies
@@ -258,6 +289,7 @@ This application is production-ready with:
 ## 🤝 Support
 
 For development support and questions:
+
 - Check documentation files in the project root
 - Review troubleshooting sections in guides
 - Consult deployment checklist for production issues
@@ -275,6 +307,7 @@ Ce projet utilise la librairie [json2csv](https://www.npmjs.com/package/json2csv
 - `server/types/json2csv.d.ts` : expose la classe `Parser` et ses options principales.
 
 **À savoir** :
+
 - Si l'API de json2csv évolue, il faudra mettre à jour ce fichier.
 - Si un paquet de types officiel apparaît, il est recommandé de le préférer et de supprimer ce .d.ts custom.
 - Ce fichier est référencé dans `tsconfig.json` via `typeRoots`.
@@ -282,6 +315,7 @@ Ce projet utilise la librairie [json2csv](https://www.npmjs.com/package/json2csv
 ### Changelog
 
 **2025-01-23** - Documentation Update
+
 - Added Supabase database integration details
 - Updated environment variables for new services
 - Added Row-Level Security (RLS) documentation

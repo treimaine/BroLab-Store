@@ -1,0 +1,72 @@
+# Docker Compose Override for Local Development
+# This file is automatically loaded by docker-compose
+# and provides local development optimizations
+
+version: "3.8"
+
+services:
+  app:
+    # Enable development optimizations
+    environment:
+      # Development-specific environment variables
+      - VITE_DEV_TOOLS=true
+      - VITE_LOG_LEVEL=debug
+      - VITE_SHOW_PERFORMANCE=true
+      - VITE_USE_MOCK_DATA=false
+
+      # Hot reload configuration
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+
+    # Development volume mounts for hot reload
+    volumes:
+      - .:/app:cached
+      - /app/node_modules
+      - ./attached_assets:/app/attached_assets:cached
+      - ./logs:/app/logs:delegated
+
+    # Development command with hot reload
+    command: >
+      sh -c "
+        echo 'Starting BroLab Entertainment development server...' &&
+        npm run dev
+      "
+
+    # Development-specific labels
+    labels:
+      - "traefik.enable=false"
+      - "com.brolab.environment=development"
+      - "com.brolab.service=app"
+
+  # Development-specific Redis configuration
+  redis:
+    # Use smaller memory footprint for development
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+    # Development labels
+    labels:
+      - "com.brolab.environment=development"
+      - "com.brolab.service=cache"
+
+  # Development-specific PostgreSQL configuration
+  postgres:
+    # Development-specific settings
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=100
+      -c shared_buffers=128MB
+      -c effective_cache_size=256MB
+
+    # Development labels
+    labels:
+      - "com.brolab.environment=development"
+      - "com.brolab.service=database"
+
+# Development-specific network configuration
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1450

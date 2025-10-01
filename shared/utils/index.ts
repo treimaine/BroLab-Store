@@ -2,6 +2,7 @@
 
 // Core utilities
 export * from "./analytics-manager";
+export * from "./business-logic";
 export * from "./error-handler";
 export * from "./offline-manager";
 export * from "./optimistic-update-manager";

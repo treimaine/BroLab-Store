@@ -8,7 +8,7 @@ const mockConvexClient = {
 };
 
 // Mock logger
-jest.mock("../server/lib/logger", () => ({
+jest.mock(_"../server/lib/logger", _() => ({
   logger: {
     info: jest.fn(),
     warn: jest.fn(),
@@ -16,16 +16,16 @@ jest.mock("../server/lib/logger", () => ({
   },
 }));
 
-describe("DataConsistencyManager", () => {
+describe(_"DataConsistencyManager", _() => {
   let manager: DataConsistencyManagerImpl;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     jest.clearAllMocks();
     manager = new DataConsistencyManagerImpl(mockConvexClient as any);
   });
 
-  describe("detectConflicts", () => {
-    it("should detect conflicts when local and remote data differ", async () => {
+  describe(_"detectConflicts", _() => {
+    it(_"should detect conflicts when local and remote data differ", _async () => {
       const localData = { id: "1", name: "Local Name", updatedAt: 1000 };
       const remoteData = { id: "1", name: "Remote Name", updatedAt: 2000 };
 
@@ -40,7 +40,7 @@ describe("DataConsistencyManager", () => {
       expect(conflicts).toEqual([]);
     });
 
-    it("should return empty array when no conflicts exist", async () => {
+    it(_"should return empty array when no conflicts exist", _async () => {
       const sameData = { id: "1", name: "Same Name", updatedAt: 1000 };
 
       mockConvexClient.query.mockResolvedValue(sameData);
@@ -49,7 +49,7 @@ describe("DataConsistencyManager", () => {
       expect(conflicts).toEqual([]);
     });
 
-    it("should handle errors gracefully", async () => {
+    it(_"should handle errors gracefully", _async () => {
       // Mock getRemoteData to fail
       mockConvexClient.query.mockRejectedValue(new Error("Network error"));
 
@@ -59,8 +59,8 @@ describe("DataConsistencyManager", () => {
     });
   });
 
-  describe("resolveConflict", () => {
-    it("should resolve conflict with last_write_wins strategy", async () => {
+  describe(_"resolveConflict", _() => {
+    it(_"should resolve conflict with last_write_wins strategy", _async () => {
       const conflict: DataConflict = {
         id: "conflict_1",
         resourceType: "user_preferences",
@@ -86,7 +86,7 @@ describe("DataConsistencyManager", () => {
       });
     });
 
-    it("should resolve conflict with merge strategy", async () => {
+    it(_"should resolve conflict with merge strategy", _async () => {
       const conflict: DataConflict = {
         id: "conflict_2",
         resourceType: "favorites",
@@ -115,7 +115,7 @@ describe("DataConsistencyManager", () => {
       });
     });
 
-    it("should resolve conflict with custom strategy", async () => {
+    it(_"should resolve conflict with custom strategy", _async () => {
       const conflict: DataConflict = {
         id: "conflict_3",
         resourceType: "cart_items",
@@ -129,7 +129,7 @@ describe("DataConsistencyManager", () => {
       (manager as any).conflicts.set(conflict.id, conflict);
       mockConvexClient.mutation.mockResolvedValue({ success: true });
 
-      const customResolver = (local: any, remote: any) => ({
+      const customResolver = (_local: any, _remote: any) => ({
         ...local,
         quantity: Math.max(local.quantity, remote.quantity),
       });
@@ -148,7 +148,7 @@ describe("DataConsistencyManager", () => {
       });
     });
 
-    it("should throw error for non-existent conflict", async () => {
+    it(_"should throw error for non-existent conflict", _async () => {
       const resolution: ConflictResolution = { strategy: "last_write_wins" };
 
       await expect(manager.resolveConflict("non_existent", resolution)).rejects.toThrow(
@@ -156,7 +156,7 @@ describe("DataConsistencyManager", () => {
       );
     });
 
-    it("should throw error for custom strategy without resolver", async () => {
+    it(_"should throw error for custom strategy without resolver", _async () => {
       const conflict: DataConflict = {
         id: "conflict_4",
         resourceType: "user_preferences",
@@ -177,8 +177,8 @@ describe("DataConsistencyManager", () => {
     });
   });
 
-  describe("createRollbackPoint", () => {
-    it("should create rollback point successfully", async () => {
+  describe(_"createRollbackPoint", _() => {
+    it(_"should create rollback point successfully", _async () => {
       const state = { id: "1", name: "Original State" };
 
       const rollbackId = await manager.createRollbackPoint("update_user", "1", state);
@@ -196,7 +196,7 @@ describe("DataConsistencyManager", () => {
       expect(rollbackOperation.canRollback).toBe(true);
     });
 
-    it("should handle errors when creating rollback point", async () => {
+    it(_"should handle errors when creating rollback point", _async () => {
       // Test with invalid state that might cause JSON serialization issues
       const circularState = {};
       (circularState as any).self = circularState;
@@ -207,8 +207,8 @@ describe("DataConsistencyManager", () => {
     });
   });
 
-  describe("rollback", () => {
-    it("should execute rollback successfully", async () => {
+  describe(_"rollback", _() => {
+    it(_"should execute rollback successfully", _async () => {
       const previousState = { id: "1", name: "Previous State" };
       const rollbackId = await manager.createRollbackPoint("update_user", "1", previousState);
 
@@ -228,13 +228,13 @@ describe("DataConsistencyManager", () => {
       expect(rollbackOperation.metadata.rolledBackAt).toBeDefined();
     });
 
-    it("should throw error for non-existent rollback operation", async () => {
+    it(_"should throw error for non-existent rollback operation", _async () => {
       await expect(manager.rollback("non_existent")).rejects.toThrow(
         "Rollback operation not found: non_existent"
       );
     });
 
-    it("should throw error when rollback is not allowed", async () => {
+    it(_"should throw error when rollback is not allowed", _async () => {
       const rollbackId = await manager.createRollbackPoint("update_user", "1", {});
 
       // Manually mark as not rollbackable
@@ -248,8 +248,8 @@ describe("DataConsistencyManager", () => {
     });
   });
 
-  describe("validateConsistency", () => {
-    it("should validate consistency successfully when no conflicts exist", async () => {
+  describe(_"validateConsistency", _() => {
+    it(_"should validate consistency successfully when no conflicts exist", _async () => {
       mockConvexClient.query.mockResolvedValue([
         { id: "1", name: "Resource 1" },
         { id: "2", name: "Resource 2" },
@@ -263,7 +263,7 @@ describe("DataConsistencyManager", () => {
       });
     });
 
-    it("should return false when consistency validation fails", async () => {
+    it(_"should return false when consistency validation fails", _async () => {
       // Mock getAllResources to fail (first call to query)
       mockConvexClient.query.mockRejectedValueOnce(new Error("Database error"));
 
@@ -273,8 +273,8 @@ describe("DataConsistencyManager", () => {
     });
   });
 
-  describe("getConflictHistory", () => {
-    it("should return all conflicts when no resourceId specified", async () => {
+  describe(_"getConflictHistory", _() => {
+    it(_"should return all conflicts when no resourceId specified", _async () => {
       const conflict1: DataConflict = {
         id: "conflict_1",
         resourceType: "user_preferences",
@@ -305,7 +305,7 @@ describe("DataConsistencyManager", () => {
       expect(history[1].timestamp).toBe(1000);
     });
 
-    it("should filter conflicts by resourceId when specified", async () => {
+    it(_"should filter conflicts by resourceId when specified", _async () => {
       const conflict1: DataConflict = {
         id: "conflict_1",
         resourceType: "user_preferences",
@@ -336,8 +336,8 @@ describe("DataConsistencyManager", () => {
     });
   });
 
-  describe("autoResolveConflicts", () => {
-    it("should auto-resolve all pending conflicts", async () => {
+  describe(_"autoResolveConflicts", _() => {
+    it(_"should auto-resolve all pending conflicts", _async () => {
       const conflict1: DataConflict = {
         id: "conflict_1",
         resourceType: "user_preferences",
@@ -369,7 +369,7 @@ describe("DataConsistencyManager", () => {
       expect(mockConvexClient.mutation).toHaveBeenCalledTimes(2);
     });
 
-    it("should handle errors during auto-resolution gracefully", async () => {
+    it(_"should handle errors during auto-resolution gracefully", _async () => {
       const conflict: DataConflict = {
         id: "conflict_1",
         resourceType: "user_preferences",
@@ -390,8 +390,8 @@ describe("DataConsistencyManager", () => {
     });
   });
 
-  describe("private helper methods", () => {
-    it("should detect conflicts correctly in hasDataConflict", () => {
+  describe(_"private helper methods", _() => {
+    it(_"should detect conflicts correctly in hasDataConflict", _() => {
       const localData = { id: "1", name: "Local", updatedAt: 1000 };
       const remoteData = { id: "1", name: "Remote", updatedAt: 2000 };
 
@@ -399,14 +399,14 @@ describe("DataConsistencyManager", () => {
       expect(hasConflict).toBe(true);
     });
 
-    it("should not detect conflicts for identical data", () => {
+    it(_"should not detect conflicts for identical data", _() => {
       const sameData = { id: "1", name: "Same", updatedAt: 1000 };
 
       const hasConflict = (manager as any).hasDataConflict(sameData, sameData);
       expect(hasConflict).toBe(false);
     });
 
-    it("should identify conflicting fields correctly", () => {
+    it(_"should identify conflicting fields correctly", _() => {
       const localData = { id: "1", name: "Local", setting: "A" };
       const remoteData = { id: "1", name: "Remote", setting: "A" };
 
@@ -414,7 +414,7 @@ describe("DataConsistencyManager", () => {
       expect(conflictingFields).toEqual(["name"]);
     });
 
-    it("should resolve last-write-wins correctly", () => {
+    it(_"should resolve last-write-wins correctly", _() => {
       const conflict: DataConflict = {
         id: "test",
         resourceType: "test",
@@ -429,7 +429,7 @@ describe("DataConsistencyManager", () => {
       expect(resolved).toEqual({ updatedAt: 2000, data: "local" });
     });
 
-    it("should merge data correctly", () => {
+    it(_"should merge data correctly", _() => {
       const conflict: DataConflict = {
         id: "test",
         resourceType: "test",

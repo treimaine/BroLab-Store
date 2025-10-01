@@ -1,3 +1,4 @@
+import {
 /**
  * Enhanced Statistics System Tests
  *
@@ -13,62 +14,61 @@
  * - 7.4: Handle cents vs dollars consistently
  */
 
-import {
   CurrencyCalculator,
   DateCalculator,
   PERIOD_CONFIGS,
   StatisticsCalculator,
 } from "../convex/lib/statisticsCalculator";
 
-describe("CurrencyCalculator", () => {
-  describe("centsToDollars", () => {
-    it("should convert cents to dollars correctly", () => {
+describe(_"CurrencyCalculator", _() => {
+  describe(_"centsToDollars", _() => {
+    it(_"should convert cents to dollars correctly", _() => {
       expect(CurrencyCalculator.centsToDollars(2999)).toBe(29.99);
       expect(CurrencyCalculator.centsToDollars(0)).toBe(0);
       expect(CurrencyCalculator.centsToDollars(1)).toBe(0.01);
       expect(CurrencyCalculator.centsToDollars(100)).toBe(1.0);
     });
 
-    it("should handle invalid inputs", () => {
+    it(_"should handle invalid inputs", _() => {
       expect(CurrencyCalculator.centsToDollars(NaN)).toBe(0);
       expect(CurrencyCalculator.centsToDollars(-100)).toBe(0);
       expect(CurrencyCalculator.centsToDollars(undefined as any)).toBe(0);
     });
 
-    it("should round properly", () => {
+    it(_"should round properly", _() => {
       expect(CurrencyCalculator.centsToDollars(2999.7)).toBe(30.0);
       expect(CurrencyCalculator.centsToDollars(2999.3)).toBe(29.99);
     });
   });
 
-  describe("dollarsToCents", () => {
-    it("should convert dollars to cents correctly", () => {
+  describe(_"dollarsToCents", _() => {
+    it(_"should convert dollars to cents correctly", _() => {
       expect(CurrencyCalculator.dollarsToCents(29.99)).toBe(2999);
       expect(CurrencyCalculator.dollarsToCents(0)).toBe(0);
       expect(CurrencyCalculator.dollarsToCents(0.01)).toBe(1);
       expect(CurrencyCalculator.dollarsToCents(1.0)).toBe(100);
     });
 
-    it("should handle invalid inputs", () => {
+    it(_"should handle invalid inputs", _() => {
       expect(CurrencyCalculator.dollarsToCents(NaN)).toBe(0);
       expect(CurrencyCalculator.dollarsToCents(-10)).toBe(0);
       expect(CurrencyCalculator.dollarsToCents(undefined as any)).toBe(0);
     });
   });
 
-  describe("formatDollars", () => {
-    it("should format currency with symbols", () => {
+  describe(_"formatDollars", _() => {
+    it(_"should format currency with symbols", _() => {
       expect(CurrencyCalculator.formatDollars(29.99)).toBe("$29.99");
       expect(CurrencyCalculator.formatDollars(0)).toBe("$0.00");
       expect(CurrencyCalculator.formatDollars(1000.5)).toBe("$1000.50");
     });
 
-    it("should format without symbols when requested", () => {
+    it(_"should format without symbols when requested", _() => {
       expect(CurrencyCalculator.formatDollars(29.99, false)).toBe("29.99");
       expect(CurrencyCalculator.formatDollars(0, false)).toBe("0.00");
     });
 
-    it("should handle cents input", () => {
+    it(_"should handle cents input", _() => {
       // formatDollars expects dollars, not cents
       expect(CurrencyCalculator.formatDollars(CurrencyCalculator.centsToDollars(2999))).toBe(
         "$29.99"
@@ -76,33 +76,33 @@ describe("CurrencyCalculator", () => {
     });
   });
 
-  describe("addAmounts", () => {
-    it("should add amounts correctly from cents", () => {
+  describe(_"addAmounts", _() => {
+    it(_"should add amounts correctly from cents", _() => {
       const amounts = [2999, 1500, 500]; // $29.99, $15.00, $5.00
       expect(CurrencyCalculator.addAmounts(amounts, true)).toBe(49.99);
     });
 
-    it("should add amounts correctly from dollars", () => {
+    it(_"should add amounts correctly from dollars", _() => {
       const amounts = [29.99, 15.0, 5.0];
       expect(CurrencyCalculator.addAmounts(amounts, false)).toBeCloseTo(49.99, 2);
     });
 
-    it("should handle invalid amounts", () => {
+    it(_"should handle invalid amounts", _() => {
       const amounts = [2999, NaN, undefined as unknown, 1500];
       expect(CurrencyCalculator.addAmounts(amounts, true)).toBe(44.99);
     });
 
-    it("should handle empty array", () => {
+    it(_"should handle empty array", _() => {
       expect(CurrencyCalculator.addAmounts([], true)).toBe(0);
     });
   });
 });
 
-describe("DateCalculator", () => {
+describe(_"DateCalculator", _() => {
   const testDate = new Date("2024-01-15T12:00:00Z");
 
-  describe("getPeriodRange", () => {
-    it("should calculate correct date ranges", () => {
+  describe(_"getPeriodRange", _() => {
+    it(_"should calculate correct date ranges", _() => {
       const range7d = DateCalculator.getPeriodRange("7d", testDate);
       expect(range7d.end).toEqual(testDate);
       expect(range7d.start).toEqual(new Date("2024-01-08T12:00:00Z"));
@@ -113,16 +113,16 @@ describe("DateCalculator", () => {
     });
   });
 
-  describe("getPreviousPeriodRange", () => {
-    it("should calculate correct previous period ranges", () => {
+  describe(_"getPreviousPeriodRange", _() => {
+    it(_"should calculate correct previous period ranges", _() => {
       const range = DateCalculator.getPreviousPeriodRange("7d", testDate);
       expect(range.end).toEqual(new Date("2024-01-08T12:00:00Z"));
       expect(range.start).toEqual(new Date("2024-01-01T12:00:00Z"));
     });
   });
 
-  describe("generateDateBuckets", () => {
-    it("should generate daily buckets correctly", () => {
+  describe(_"generateDateBuckets", _() => {
+    it(_"should generate daily buckets correctly", _() => {
       const start = new Date("2024-01-01");
       const end = new Date("2024-01-03");
       const buckets = DateCalculator.generateDateBuckets(start, end, "day");
@@ -130,7 +130,7 @@ describe("DateCalculator", () => {
       expect(buckets).toEqual(["2024-01-01", "2024-01-02"]);
     });
 
-    it("should generate weekly buckets correctly", () => {
+    it(_"should generate weekly buckets correctly", _() => {
       const start = new Date("2024-01-01");
       const end = new Date("2024-01-15");
       const buckets = DateCalculator.generateDateBuckets(start, end, "week");
@@ -140,8 +140,8 @@ describe("DateCalculator", () => {
     });
   });
 
-  describe("getBucketKey", () => {
-    it("should generate correct bucket keys", () => {
+  describe(_"getBucketKey", _() => {
+    it(_"should generate correct bucket keys", _() => {
       const date = new Date("2024-01-15T15:30:00Z");
 
       expect(DateCalculator.getBucketKey(date, "day")).toBe("2024-01-15");
@@ -150,7 +150,7 @@ describe("DateCalculator", () => {
   });
 });
 
-describe("StatisticsCalculator", () => {
+describe(_"StatisticsCalculator", _() => {
   const mockData = {
     favorites: [
       { _id: "1", createdAt: Date.now() - 86400000 }, // 1 day ago
@@ -185,8 +185,8 @@ describe("StatisticsCalculator", () => {
     activityLog: [{ _id: "1" }, { _id: "2" }],
   };
 
-  describe("calculateUserStats", () => {
-    it("should calculate comprehensive user statistics", () => {
+  describe(_"calculateUserStats", _() => {
+    it(_"should calculate comprehensive user statistics", _() => {
       const stats = StatisticsCalculator.calculateUserStats(mockData);
 
       expect(stats.totalFavorites).toBe(2);
@@ -198,7 +198,7 @@ describe("StatisticsCalculator", () => {
       expect(stats.quotaLimit).toBe(100);
     });
 
-    it("should handle empty data", () => {
+    it(_"should handle empty data", _() => {
       const emptyData = {
         favorites: [],
         downloads: [],
@@ -217,7 +217,7 @@ describe("StatisticsCalculator", () => {
       expect(stats.quotaLimit).toBe(0);
     });
 
-    it("should only count completed orders in revenue", () => {
+    it(_"should only count completed orders in revenue", _() => {
       const dataWithPendingOrders = {
         ...mockData,
         orders: [
@@ -232,8 +232,8 @@ describe("StatisticsCalculator", () => {
     });
   });
 
-  describe("calculateTrendMetric", () => {
-    it("should calculate positive trends correctly", () => {
+  describe(_"calculateTrendMetric", _() => {
+    it(_"should calculate positive trends correctly", _() => {
       const trend = StatisticsCalculator.calculateTrendMetric(120, 100, "30d");
 
       expect(trend.period).toBe("30d");
@@ -243,7 +243,7 @@ describe("StatisticsCalculator", () => {
       expect(trend.isPositive).toBe(true);
     });
 
-    it("should calculate negative trends correctly", () => {
+    it(_"should calculate negative trends correctly", _() => {
       const trend = StatisticsCalculator.calculateTrendMetric(80, 100, "30d");
 
       expect(trend.value).toBe(80);
@@ -252,7 +252,7 @@ describe("StatisticsCalculator", () => {
       expect(trend.isPositive).toBe(false);
     });
 
-    it("should handle zero previous value", () => {
+    it(_"should handle zero previous value", _() => {
       const trend = StatisticsCalculator.calculateTrendMetric(50, 0, "30d");
 
       expect(trend.value).toBe(50);
@@ -262,8 +262,8 @@ describe("StatisticsCalculator", () => {
     });
   });
 
-  describe("calculateTrendData", () => {
-    it("should calculate comprehensive trend data", () => {
+  describe(_"calculateTrendData", _() => {
+    it(_"should calculate comprehensive trend data", _() => {
       const currentData = {
         orders: mockData.orders.slice(0, 2), // 2 orders
         downloads: mockData.downloads, // 3 downloads
@@ -294,8 +294,8 @@ describe("StatisticsCalculator", () => {
     });
   });
 
-  describe("generateChartData", () => {
-    it("should generate chart data for specified period", () => {
+  describe(_"generateChartData", _() => {
+    it(_"should generate chart data for specified period", _() => {
       const chartData = StatisticsCalculator.generateChartData(
         mockData.orders,
         mockData.downloads,
@@ -311,7 +311,7 @@ describe("StatisticsCalculator", () => {
       expect(chartData[0]).toHaveProperty("favorites");
     });
 
-    it("should aggregate data correctly by date", () => {
+    it(_"should aggregate data correctly by date", _() => {
       // Create test data with recent dates that will be in the 7-day range
       const now = new Date();
       const testDate = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
@@ -353,8 +353,8 @@ describe("StatisticsCalculator", () => {
     });
   });
 
-  describe("calculateAdvancedMetrics", () => {
-    it("should calculate conversion rates correctly", () => {
+  describe(_"calculateAdvancedMetrics", _() => {
+    it(_"should calculate conversion rates correctly", _() => {
       const metrics = StatisticsCalculator.calculateAdvancedMetrics({
         orders: mockData.orders.slice(0, 1), // 1 order
         downloads: mockData.downloads.slice(0, 2), // 2 downloads
@@ -366,7 +366,7 @@ describe("StatisticsCalculator", () => {
       expect(metrics.conversionRates.downloadToOrder).toBe(50); // 1 order / 2 downloads
     });
 
-    it("should calculate average order value", () => {
+    it(_"should calculate average order value", _() => {
       const completedOrders = mockData.orders.filter(o => o.status === "completed");
       const totalRevenue = CurrencyCalculator.addAmounts(
         completedOrders.map(o => o.total),
@@ -384,7 +384,7 @@ describe("StatisticsCalculator", () => {
       expect(metrics.averageOrderValue).toBeCloseTo(expectedAOV, 2);
     });
 
-    it("should calculate daily averages", () => {
+    it(_"should calculate daily averages", _() => {
       const metrics = StatisticsCalculator.calculateAdvancedMetrics({
         orders: mockData.orders,
         downloads: mockData.downloads,
@@ -398,7 +398,7 @@ describe("StatisticsCalculator", () => {
       expect(metrics.periodDays).toBe(30);
     });
 
-    it("should handle zero values gracefully", () => {
+    it(_"should handle zero values gracefully", _() => {
       const metrics = StatisticsCalculator.calculateAdvancedMetrics({
         orders: [],
         downloads: [],
@@ -414,8 +414,8 @@ describe("StatisticsCalculator", () => {
   });
 });
 
-describe("PERIOD_CONFIGS", () => {
-  it("should have correct period configurations", () => {
+describe(_"PERIOD_CONFIGS", _() => {
+  it(_"should have correct period configurations", _() => {
     expect(PERIOD_CONFIGS["7d"]).toEqual({
       days: 7,
       label: "Last 7 days",
@@ -442,8 +442,8 @@ describe("PERIOD_CONFIGS", () => {
   });
 });
 
-describe("Integration Tests", () => {
-  it("should maintain consistency between currency calculations", () => {
+describe(_"Integration Tests", _() => {
+  it(_"should maintain consistency between currency calculations", _() => {
     const centsValue = 2999;
     const dollarsValue = CurrencyCalculator.centsToDollars(centsValue);
     const backToCents = CurrencyCalculator.dollarsToCents(dollarsValue);
@@ -451,7 +451,7 @@ describe("Integration Tests", () => {
     expect(backToCents).toBe(centsValue);
   });
 
-  it("should generate consistent chart data across different periods", () => {
+  it(_"should generate consistent chart data across different periods", _() => {
     const integrationMockData = {
       favorites: [
         { _id: "1", createdAt: Date.now() - 86400000 }, // 1 day ago
@@ -499,7 +499,7 @@ describe("Integration Tests", () => {
     expect(Object.keys(chartData7d[0])).toEqual(Object.keys(chartData30d[0]));
   });
 
-  it("should calculate trends that match manual calculations", () => {
+  it(_"should calculate trends that match manual calculations", _() => {
     const currentRevenue = 100;
     const previousRevenue = 80;
     const expectedChange = 20;

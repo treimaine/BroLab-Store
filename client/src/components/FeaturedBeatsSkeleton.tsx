@@ -4,7 +4,7 @@ export function FeaturedBeatsSkeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
       {Array.from({ length: 3 }).map((_, index) => (
-        <div key={index} className="card-dark p-6 group relative overflow-hidden">
+        <div key={index} className="card-dark p-6 group relative overflow-hidden min-h-[500px]">
           {/* Image Skeleton */}
           <div className="aspect-square relative overflow-hidden rounded-lg mb-6 bg-gray-800">
             <Skeleton className="w-full h-full" />
@@ -55,9 +55,9 @@ export function FeaturedBeatsSkeleton() {
 
 export function CarouselBeatSkeleton() {
   return (
-    <div className="flex gap-6 overflow-hidden">
+    <div className="flex gap-6 overflow-hidden min-h-[400px]">
       {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="flex-shrink-0 w-80">
+        <div key={index} className="flex-shrink-0 w-80 h-[380px]">
           <div className="card-dark p-4 group relative overflow-hidden">
             {/* Image Skeleton */}
             <div className="aspect-square relative overflow-hidden rounded-lg mb-4 bg-gray-800">
