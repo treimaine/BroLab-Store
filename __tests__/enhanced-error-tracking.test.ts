@@ -1,18 +1,18 @@
 import { ErrorType } from "../shared/constants/errors";
 import {
+import { PerformanceMonitorImpl } from "../shared/utils/system-manager";
   ErrorBoundaryManagerImpl,
   NetworkError,
   SystemError,
   ValidationError,
   createErrorContext,
 } from "../shared/utils/error-handler";
-import { PerformanceMonitorImpl } from "../shared/utils/system-manager";
 
-describe("Enhanced Error Tracking and Analytics", () => {
+describe(_"Enhanced Error Tracking and Analytics", _() => {
   let errorBoundaryManager: ErrorBoundaryManagerImpl;
   let performanceMonitor: PerformanceMonitorImpl;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     errorBoundaryManager = new ErrorBoundaryManagerImpl();
     performanceMonitor = new PerformanceMonitorImpl();
     errorBoundaryManager.setPerformanceMonitor(performanceMonitor);
@@ -21,8 +21,8 @@ describe("Enhanced Error Tracking and Analytics", () => {
     errorBoundaryManager.clearErrors();
   });
 
-  describe("Error Pattern Detection", () => {
-    it("should detect recurring error patterns", async () => {
+  describe(_"Error Pattern Detection", _() => {
+    it(_"should detect recurring error patterns", _async () => {
       const context = createErrorContext("TestComponent", "test_action");
       const error = new NetworkError("Connection timeout");
 
@@ -39,7 +39,7 @@ describe("Enhanced Error Tracking and Analytics", () => {
       expect(topErrors[0].error).toContain("Connection timeout");
     });
 
-    it("should categorize errors by type and component", async () => {
+    it(_"should categorize errors by type and component", _async () => {
       const networkContext = createErrorContext("NetworkComponent", "fetch_data");
       const validationContext = createErrorContext("FormComponent", "validate_input");
 
@@ -62,7 +62,7 @@ describe("Enhanced Error Tracking and Analytics", () => {
       expect(stats.errorsByComponent["FormComponent"]).toBe(1);
     });
 
-    it("should track error trends over time", async () => {
+    it(_"should track error trends over time", _async () => {
       const context = createErrorContext("TrendComponent", "trend_action");
       const baseTime = Date.now();
 
@@ -88,8 +88,8 @@ describe("Enhanced Error Tracking and Analytics", () => {
     });
   });
 
-  describe("Enhanced Recovery Options", () => {
-    it("should provide enhanced recovery options for recurring errors", async () => {
+  describe(_"Enhanced Recovery Options", _() => {
+    it(_"should provide enhanced recovery options for recurring errors", _async () => {
       const context = createErrorContext("RecurringComponent", "recurring_action");
       const error = new NetworkError("Recurring network issue");
 
@@ -110,7 +110,7 @@ describe("Enhanced Error Tracking and Analytics", () => {
       expect(networkCheck).toBeDefined();
     });
 
-    it("should provide component-specific recovery options", async () => {
+    it(_"should provide component-specific recovery options", _async () => {
       const context = createErrorContext("NetworkComponent", "api_call");
       const networkError = new NetworkError("fetch failed");
 
@@ -122,8 +122,8 @@ describe("Enhanced Error Tracking and Analytics", () => {
     });
   });
 
-  describe("Performance Integration", () => {
-    it("should track error metrics in performance monitor", async () => {
+  describe(_"Performance Integration", _() => {
+    it(_"should track error metrics in performance monitor", _async () => {
       const context = createErrorContext("MetricsComponent", "track_error");
       const error = new SystemError(ErrorType.VALIDATION_ERROR, "Validation failed");
 
@@ -140,7 +140,7 @@ describe("Enhanced Error Tracking and Analytics", () => {
       expect(errorMetric.tags.component).toBe("MetricsComponent");
     });
 
-    it("should track critical errors separately", async () => {
+    it(_"should track critical errors separately", _async () => {
       const context = createErrorContext("CriticalComponent", "critical_action");
       const criticalError = new SystemError(ErrorType.SERVER_ERROR, "Critical server failure");
 
@@ -152,7 +152,7 @@ describe("Enhanced Error Tracking and Analytics", () => {
       expect(criticalMetrics.length).toBeGreaterThan(0);
     });
 
-    it("should track error resolution metrics", async () => {
+    it(_"should track error resolution metrics", _async () => {
       const context = createErrorContext("ResolutionComponent", "resolve_error");
       const error = new ValidationError("Input validation failed");
 
@@ -174,8 +174,8 @@ describe("Enhanced Error Tracking and Analytics", () => {
     });
   });
 
-  describe("Error Statistics and Analytics", () => {
-    it("should calculate accurate error statistics", async () => {
+  describe(_"Error Statistics and Analytics", _() => {
+    it(_"should calculate accurate error statistics", _async () => {
       // Clear any existing errors first
       errorBoundaryManager.clearErrors();
 
@@ -205,7 +205,7 @@ describe("Enhanced Error Tracking and Analytics", () => {
       expect(stats.recentErrors).toBeGreaterThanOrEqual(2); // At least 2 recent
     });
 
-    it("should filter errors by component", async () => {
+    it(_"should filter errors by component", _async () => {
       const context1 = createErrorContext("Component1", "action1");
       const context2 = createErrorContext("Component2", "action2");
 
@@ -227,13 +227,13 @@ describe("Enhanced Error Tracking and Analytics", () => {
     });
   });
 
-  describe("Error Notification System", () => {
+  describe(_"Error Notification System", _() => {
     it("should notify when error trends are detected", done => {
       const context = createErrorContext("TrendComponent", "trend_detection");
       let notificationReceived = false;
 
       // Set up notification callback
-      errorBoundaryManager.onErrorTrend((error, trend) => {
+      errorBoundaryManager.onErrorTrend(_(error, _trend) => {
         if (!notificationReceived) {
           expect(error).toBeDefined();
           expect(trend).toBeDefined();
@@ -251,7 +251,7 @@ describe("Enhanced Error Tracking and Analytics", () => {
       }
 
       // If no notification is received within 1 second, fail the test
-      setTimeout(() => {
+      setTimeout_(() => {
         if (!notificationReceived) {
           done(new Error("Expected error trend notification was not received"));
         }
@@ -259,8 +259,8 @@ describe("Enhanced Error Tracking and Analytics", () => {
     });
   });
 
-  describe("Error Resolution Workflow", () => {
-    it("should track resolution time accurately", async () => {
+  describe(_"Error Resolution Workflow", _() => {
+    it(_"should track resolution time accurately", _async () => {
       const context = createErrorContext("WorkflowComponent", "resolution_workflow");
       const error = new ValidationError("Workflow validation error");
 
@@ -283,7 +283,7 @@ describe("Enhanced Error Tracking and Analytics", () => {
       expect(resolutionTimeMetrics[0].value).toBeGreaterThan(100); // Should be at least 100ms
     });
 
-    it("should provide suggested fixes for recurring patterns", async () => {
+    it(_"should provide suggested fixes for recurring patterns", _async () => {
       const context = createErrorContext("PatternComponent", "pattern_action");
       const error = new NetworkError("Pattern network error");
 

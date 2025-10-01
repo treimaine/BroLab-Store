@@ -9,29 +9,29 @@ const mockConvexInstance = {
   action: jest.fn(),
 };
 
-jest.mock("convex/browser", () => ({
-  ConvexHttpClient: jest.fn(() => mockConvexInstance),
+jest.mock(_"convex/browser", _() => ({
+  ConvexHttpClient: jest.fn_(() => mockConvexInstance),
 }));
 
 // Mock mail service
-jest.mock("../server/services/mail", () => ({ sendMail: jest.fn().mockResolvedValue(undefined) }));
+jest.mock(_"../server/services/mail", _() => ({ sendMail: jest.fn().mockResolvedValue(undefined) }));
 
 // Mock PDF generator
-jest.mock("../server/lib/pdf", () => {
-  const { Readable } = require("stream");
+jest.mock(_"../server/lib/pdf", _() => {
+  const { _Readable} = require("stream");
   return {
-    buildInvoicePdfStream: jest.fn(() => Readable.from([Buffer.from("PDF")])),
+    buildInvoicePdfStream: jest.fn_(() => Readable.from([Buffer.from("PDF")])),
   };
 });
 
 // Under test: Stripe router
 let stripeRouter: any;
 
-describe("Stripe webhook idempotency and invoice pipeline", () => {
+describe(_"Stripe webhook idempotency and invoice pipeline", _() => {
   let app: express.Express;
   let mockConvex: any;
 
-  beforeEach(async () => {
+  beforeEach(_async () => {
     jest.resetModules();
     process.env.NODE_ENV = "test";
     process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_dummy";
@@ -56,7 +56,7 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
     app.use("/api/payment/stripe", stripeRouter);
 
     // Mock global fetch used for upload
-    global.fetch = jest.fn(async (url: unknown, _init?: unknown) => {
+    global.fetch = jest.fn(_async (url: unknown, _init?: unknown) => {
       if (typeof url === "string" && url.startsWith("http")) {
         return {
           ok: true,
@@ -67,14 +67,14 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
     }) as any;
   });
 
-  it("prevents duplicate processing via idempotency guard", async () => {
+  it(_"prevents duplicate processing via idempotency guard", _async () => {
     // First call: not processed
-    mockConvex.mutation.mockImplementationOnce(async (_fn: any, args: any) => {
+    mockConvex.mutation.mockImplementationOnce(_async (_fn: any, _args: any) => {
       if (args && args.provider === "stripe") return { alreadyProcessed: false };
       return {};
     });
     // Second call: already processed
-    mockConvex.mutation.mockImplementationOnce(async (_fn: any, args: any) => {
+    mockConvex.mutation.mockImplementationOnce(_async (_fn: any, _args: any) => {
       if (args && args.provider === "stripe") return { alreadyProcessed: true };
       return {};
     });
@@ -99,15 +99,15 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
     expect(res2.status).toBe(204);
   });
 
-  it("generates invoice and sends email on checkout.session.completed", async () => {
+  it(_"generates invoice and sends email on checkout.session.completed", _async () => {
     // Idempotency first call
-    mockConvex.mutation.mockImplementationOnce(async (_fn: any, args: any) => {
+    mockConvex.mutation.mockImplementationOnce(_async (_fn: any, _args: any) => {
       if (args && args.provider === "stripe") return { alreadyProcessed: false };
       return {};
     });
 
     // recordPayment
-    mockConvex.mutation.mockImplementationOnce(async () => ({ success: true }));
+    mockConvex.mutation.mockImplementationOnce(_async () => ({ success: true }));
 
     // getOrderWithRelations
     mockConvex.query.mockResolvedValueOnce({
@@ -136,7 +136,7 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
     mockConvex.action.mockResolvedValueOnce({ url: "http://upload.local" });
 
     // setInvoiceForOrder
-    mockConvex.mutation.mockImplementationOnce(async () => ({
+    mockConvex.mutation.mockImplementationOnce(_async () => ({
       invoiceId: "inv:1",
       number: "BRL-2025-0001",
       url: "http://cdn/invoice.pdf",

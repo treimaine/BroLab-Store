@@ -1,3 +1,4 @@
+import { StandardHero } from "@/components/ui/StandardHero";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,14 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StandardHero } from "@/components/ui/StandardHero";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import { Calendar, Clock, Mail, MessageCircle, Phone, User, Video } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useUser } from "@clerk/clerk-react";
-import { nanoid } from "nanoid";
 
 interface ConsultationFormData {
   name: string;
@@ -38,6 +37,7 @@ export default function ProductionConsultation() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user, isSignedIn } = useUser();
+  const { getToken } = useAuth();
   const [formData, setFormData] = useState<ConsultationFormData>({
     name: "",
     email: "",
@@ -73,58 +73,87 @@ export default function ProductionConsultation() {
     e.preventDefault();
 
     try {
-      // Convert form data to reservation format
+      // Check authentication
+      if (!isSignedIn || !user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to make a reservation.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("🚀 Starting consultation reservation");
+      // Convert form data to reservation format using new schema
+      const priceAmount =
+        formData.duration === "30"
+          ? 7500 // $75 in cents
+          : formData.duration === "60"
+            ? 15000 // $150 in cents
+            : formData.duration === "90"
+              ? 20000 // $200 in cents
+              : 40000; // $400 for monthly mentorship
+
       const reservationData = {
-        service_type: "consultation" as const,
-        details: {
-          name: formData.name,
+        serviceType: "consultation" as const,
+        clientInfo: {
+          firstName: formData.name.split(" ")[0] || formData.name,
+          lastName: formData.name.split(" ").slice(1).join(" ") || "User",
           email: formData.email,
-          phone: formData.phone,
-          requirements: `Experience Level: ${formData.experience}
+          phone: formData.phone || "0000000000",
+          experienceLevel: formData.experience as
+            | "beginner"
+            | "intermediate"
+            | "advanced"
+            | "professional",
+        },
+        preferredDate: new Date(
+          `${formData.preferredDate}T${formData.preferredTime}`
+        ).toISOString(),
+        preferredDuration: parseInt(formData.duration),
+        serviceDetails: {
+          includeRevisions: 1,
+          rushDelivery: false,
+        },
+        notes: `Experience Level: ${formData.experience}
 Project Type: ${formData.projectType}
 Consultation Type: ${formData.consultationType}
 Goals: ${formData.goals}
 Challenges: ${formData.challenges}
 Additional Message: ${formData.message}`,
-        },
-        preferred_date: new Date(
-          `${formData.preferredDate}T${formData.preferredTime}`
-        ).toISOString(),
-        duration_minutes: parseInt(formData.duration),
-        total_price:
-          formData.duration === "30"
-            ? 7500 // $75 in cents
-            : formData.duration === "60"
-            ? 15000 // $150 in cents
-            : formData.duration === "90"
-            ? 20000 // $200 in cents
-            : 40000, // $400 for monthly mentorship
-        notes: `Consultation Type: ${formData.consultationType}, Duration: ${formData.duration} minutes`,
+        budget: priceAmount,
+        acceptTerms: true,
       };
 
+      console.log("🚀 Sending consultation reservation data:", reservationData);
       const response = await fetch("/api/reservations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${await getToken()}`
+        },
         body: JSON.stringify(reservationData),
       });
 
+      console.log("📡 Consultation response status:", response.status);
+
       if (response.ok) {
         const reservation = await response.json();
-        
+
         // Create pending payment for checkout
         const pendingPayment = {
-          service: 'consultation',
-          serviceName: 'Production Consultation',
-          serviceDetails: `${formData.consultationType === 'video' ? 'Video' : 'Audio'} consultation - ${formData.duration} minutes`,
+          service: "consultation",
+          serviceName: "Production Consultation",
+          serviceDetails: `${formData.consultationType === "video" ? "Video" : "Audio"} consultation - ${formData.duration} minutes`,
           reservationId: reservation.id,
-          price: reservationData.total_price / 100, // Convert cents to dollars
+          price: reservationData.budget / 100, // Convert cents to dollars
           quantity: 1,
         };
-        
+
         // Add to existing services array
-        const existingServices = JSON.parse(sessionStorage.getItem('pendingServices') || '[]');
+        const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
         const updatedServices = [...existingServices, pendingPayment];
-        sessionStorage.setItem('pendingServices', JSON.stringify(updatedServices));
+        sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
         toast({
           title: "Consultation Booked!",
           description: "We'll contact you within 24 hours to confirm your consultation session.",

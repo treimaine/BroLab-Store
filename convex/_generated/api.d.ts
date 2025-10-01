@@ -18,6 +18,7 @@ import type * as alerts from "../alerts.js";
 import type * as audit from "../audit.js";
 import type * as auth_roles from "../auth/roles.js";
 import type * as backup from "../backup.js";
+import type * as clerk_webhooks from "../clerk/webhooks.js";
 import type * as consistency from "../consistency.js";
 import type * as dashboard from "../dashboard.js";
 import type * as data from "../data.js";
@@ -60,6 +61,7 @@ import type * as subscriptions_getCurrentSubscription from "../subscriptions/get
 import type * as subscriptions_getSubscription from "../subscriptions/getSubscription.js";
 import type * as subscriptions_invoices from "../subscriptions/invoices.js";
 import type * as subscriptions_updateSubscription from "../subscriptions/updateSubscription.js";
+import type * as sync_internal from "../sync/internal.js";
 import type * as sync_woocommerce from "../sync/woocommerce.js";
 import type * as sync_wordpress from "../sync/wordpress.js";
 import type * as users_clerkSync from "../users/clerkSync.js";
@@ -80,6 +82,7 @@ declare const fullApi: ApiFromModules<{
   audit: typeof audit;
   "auth/roles": typeof auth_roles;
   backup: typeof backup;
+  "clerk/webhooks": typeof clerk_webhooks;
   consistency: typeof consistency;
   dashboard: typeof dashboard;
   data: typeof data;
@@ -122,6 +125,7 @@ declare const fullApi: ApiFromModules<{
   "subscriptions/getSubscription": typeof subscriptions_getSubscription;
   "subscriptions/invoices": typeof subscriptions_invoices;
   "subscriptions/updateSubscription": typeof subscriptions_updateSubscription;
+  "sync/internal": typeof sync_internal;
   "sync/woocommerce": typeof sync_woocommerce;
   "sync/wordpress": typeof sync_wordpress;
   "users/clerkSync": typeof users_clerkSync;

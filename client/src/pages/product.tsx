@@ -1,9 +1,8 @@
-import { BeatSimilarityRecommendations } from "@/components/BeatSimilarityRecommendations";
-import { BeatStemsDelivery } from "@/components/BeatStemsDelivery";
-import { useCartContext } from "@/components/cart-provider";
+import { LazyBeatSimilarityRecommendations } from "@/components/LazyComponents";
 import { LicensePreviewModal } from "@/components/LicensePreviewModal";
 import { OpenGraphMeta } from "@/components/OpenGraphMeta";
 import { SchemaMarkup } from "@/components/SchemaMarkup";
+import { useCartContext } from "@/components/cart-provider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -322,9 +321,7 @@ export default function Product() {
                   <h3 className="text-xl font-bold text-white mb-4">License Options</h3>
                   <RadioGroup
                     value={selectedLicense}
-                    onValueChange={(value: string) =>
-                      setSelectedLicense(value as LicenseTypeEnum)
-                    }
+                    onValueChange={(value: string) => setSelectedLicense(value as LicenseTypeEnum)}
                   >
                     <div className="space-y-3">
                       {licenseOptions.map(option => (
@@ -419,7 +416,7 @@ export default function Product() {
               {/* Beat Stems Delivery section removed per user request */}
 
               {/* Similar Beats */}
-              <BeatSimilarityRecommendations
+              <LazyBeatSimilarityRecommendations
                 currentBeat={{
                   id: Number(product?.id) || 1,
                   title: product?.name || "",
@@ -448,7 +445,7 @@ export default function Product() {
                     tags: similarProduct.tags?.map((tag: any) => tag.name) || [],
                   })) || []
                 }
-                onBeatSelect={beat => {
+                onBeatSelect={(beat: { id: number }) => {
                   console.log("Beat selected:", beat);
                   // Navigate to the selected beat
                   window.location.href = `/product/${beat.id}`;

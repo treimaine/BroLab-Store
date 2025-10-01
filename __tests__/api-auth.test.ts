@@ -1,10 +1,10 @@
 // Provide a supabaseAdmin stub for legacy tests
 const _supabaseAdmin = {
-  from: jest.fn(() => ({ delete: () => ({ like: () => ({}) }), insert: () => ({}) })),
+  from: jest.fn_(() => (_{ delete: () => (_{ like: () => ({}) }), insert: () => ({}) })),
 } as Record<string, unknown>;
 
 // Mock Clerk pour les tests
-jest.mock("@clerk/clerk-sdk-node", () => ({
+jest.mock(_"@clerk/clerk-sdk-node", _() => ({
   clerkClient: {
     users: {
       getUser: jest.fn().mockResolvedValue({
@@ -21,44 +21,44 @@ jest.mock("@clerk/clerk-sdk-node", () => ({
 }));
 
 // Mock Convex pour les tests
-jest.mock("convex/browser", () => ({
-  ConvexHttpClient: jest.fn().mockImplementation(() => ({
+jest.mock(_"convex/browser", _() => ({
+  ConvexHttpClient: jest.fn().mockImplementation_(() => ({
     mutation: jest.fn().mockResolvedValue({ _id: "users:1" }),
     query: jest.fn().mockResolvedValue([]),
   })),
 }));
 
 describe.skip("POST /api/auth/login (legacy Supabase) — skipped: migrated to Clerk", () => {
-  it("should be replaced with Clerk authentication", () => {
+  it(_"should be replaced with Clerk authentication", _() => {
     // TODO: Implement new tests using Clerk authentication
     expect(true).toBe(true);
   });
 });
 
 describe.skip("POST /api/auth/register (legacy Supabase) — skipped: migrated to Clerk", () => {
-  it("should be replaced with Clerk user creation", () => {
+  it(_"should be replaced with Clerk user creation", _() => {
     // TODO: Implement new tests using Clerk user creation
     expect(true).toBe(true);
   });
 });
 
 describe.skip("POST /api/auth/logout (legacy Supabase) — skipped: migrated to Clerk", () => {
-  it("should be replaced with Clerk session management", () => {
+  it(_"should be replaced with Clerk session management", _() => {
     // TODO: Implement new tests using Clerk session management
     expect(true).toBe(true);
   });
 });
 
 describe.skip("GET /api/auth/user (legacy Supabase) — skipped: migrated to Clerk", () => {
-  it("should be replaced with Clerk user retrieval", () => {
+  it(_"should be replaced with Clerk user retrieval", _() => {
     // TODO: Implement new tests using Clerk user retrieval
     expect(true).toBe(true);
   });
 });
 
 // Nouveau test pour Clerk Authentication
-describe("Clerk Authentication Integration", () => {
-  it("should authenticate user with Clerk", async () => {
+describe(_"Clerk Authentication Integration", _() => {
+  it(_"should authenticate user with Clerk", _async () => {
     const mockUser = {
       id: "user_123",
       emailAddresses: [{ emailAddress: "test@example.com" }],
@@ -69,7 +69,7 @@ describe("Clerk Authentication Integration", () => {
     expect(mockUser.emailAddresses[0].emailAddress).toBe("test@example.com");
   });
 
-  it("should create user in Convex after Clerk authentication", async () => {
+  it(_"should create user in Convex after Clerk authentication", _async () => {
     const mockConvexUser = {
       _id: "users:1",
       clerkId: "user_123",
@@ -81,7 +81,7 @@ describe("Clerk Authentication Integration", () => {
     expect(mockConvexUser.email).toBe("test@example.com");
   });
 
-  it("should handle Clerk session management", async () => {
+  it(_"should handle Clerk session management", _async () => {
     const mockSession = {
       id: "sess_123",
       userId: "user_123",

@@ -16,23 +16,98 @@ import { generateICS } from "../utils/calendar";
 
 const router = Router();
 
-// Create a new reservation - AVEC AUTHENTIFICATION ET VALIDATION
-router.post("/", requireAuth, validateBody(CreateReservationSchema), async (req, res): Promise<void> => {
+// Public endpoint - Get available services (no auth required)
+router.get("/services", async (_req, res) => {
   try {
-    console.log("🚀 Creating reservation with authentication");
-    console.log("👤 Authenticated user:", req.user);
-    console.log("📝 Request body:", req.body);
+    const services = [
+      {
+        id: 1,
+        name: "Recording Sessions",
+        description: "Professional recording sessions with state-of-the-art equipment",
+        basePrice: 150,
+        duration: "2-4 hours"
+      },
+      {
+        id: 2,
+        name: "Mixing & Mastering",
+        description: "Professional mixing and mastering services for your tracks",
+        basePrice: 200,
+        duration: "3-5 hours"
+      },
+      {
+        id: 3,
+        name: "Custom Beats",
+        description: "Custom beat production tailored to your style",
+        basePrice: 100,
+        duration: "1-2 hours"
+      },
+      {
+        id: 4,
+        name: "Production Consultation",
+        description: "Expert guidance on music production and arrangement",
+        basePrice: 75,
+        duration: "1 hour"
+      }
+    ];
+    res.json(services);
+  } catch (error) {
+    console.error("Services error:", error);
+    res.status(500).json({ error: "Failed to fetch services" });
+  }
+});
 
-    // Créer la réservation avec l'utilisateur authentifié
-    const reservation = await storage.createReservation({
-      ...req.body,
-      user_id: req.user!.id,
-    });
+// Public endpoint - Get public reservations info (no auth required)
+router.get("/public", async (_req, res) => {
+  try {
+    const publicInfo = {
+      availableServices: 4,
+      totalReservations: 42,
+      availableSlots: 12,
+      nextAvailableDate: "2024-01-20"
+    };
+    res.json(publicInfo);
+  } catch (error) {
+    console.error("Public reservations error:", error);
+    res.status(500).json({ error: "Failed to fetch public reservation info" });
+  }
+});
 
-    console.log("✅ Reservation created successfully:", reservation);
+// Create a new reservation - AVEC AUTHENTIFICATION ET VALIDATION
+router.post(
+  "/",
+  requireAuth,
+  validateBody(CreateReservationSchema),
+  async (req, res): Promise<void> => {
+    try {
+      console.log("🚀 Creating reservation with authentication");
+      console.log("👤 Authenticated user:", req.user);
+      console.log("📝 Request body:", req.body);
 
-    // Envoyer l'email de confirmation
-    const emailContent = `
+      // Transform validated data to storage format
+      const reservationData = {
+        user_id: parseInt(req.user!.id),
+        clerkId: req.user!.clerkId, // Add clerkId for Convex authentication
+        service_type: req.body.serviceType,
+        details: {
+          name: `${req.body.clientInfo.firstName} ${req.body.clientInfo.lastName}`.trim(),
+          email: req.body.clientInfo.email,
+          phone: req.body.clientInfo.phone,
+          requirements: req.body.notes || "",
+          reference_links: [],
+        },
+        preferred_date: req.body.preferredDate,
+        duration_minutes: req.body.preferredDuration,
+        total_price: req.body.budget || 0,
+        notes: req.body.notes || null,
+      };
+
+      // Créer la réservation avec l'utilisateur authentifié
+      const reservation = await storage.createReservation(reservationData);
+
+      console.log("✅ Reservation created successfully:", reservation);
+
+      // Envoyer l'email de confirmation
+      const emailContent = `
       <h2>Confirmation de votre réservation</h2>
       <p>Bonjour ${req.user!.username},</p>
       <p>Nous avons bien reçu votre réservation pour une session ${reservation.service_type}.</p>
@@ -47,31 +122,32 @@ router.post("/", requireAuth, validateBody(CreateReservationSchema), async (req,
       <p>Merci de votre confiance !<br>L'équipe BroLab</p>
     `;
 
-    try {
-      await sendMail({
-        to: req.user!.email,
-        subject: "Confirmation de votre réservation BroLab",
-        html: emailContent,
+      try {
+        await sendMail({
+          to: req.user!.email,
+          subject: "Confirmation de votre réservation BroLab",
+          html: emailContent,
+        });
+        console.log("📧 Confirmation email sent successfully");
+      } catch (emailError) {
+        console.error("⚠️ Failed to send confirmation email:", emailError);
+        // Ne pas faire échouer la réservation si l'email échoue
+      }
+
+      res.status(201).json(reservation);
+    } catch (error: unknown) {
+      console.error("❌ Error creating reservation:", error);
+      const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
+
+      const errorResponse = createApiError("reservation_conflict", "Failed to create reservation", {
+        userMessage: "Unable to create your reservation. Please try again or contact support.",
+        requestId,
       });
-      console.log("📧 Confirmation email sent successfully");
-    } catch (emailError) {
-      console.error("⚠️ Failed to send confirmation email:", emailError);
-      // Ne pas faire échouer la réservation si l'email échoue
+
+      res.status(500).json(errorResponse);
     }
-
-    res.status(201).json(reservation);
-  } catch (error: unknown) {
-    console.error("❌ Error creating reservation:", error);
-    const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
-
-    const errorResponse = createApiError("reservation_conflict", "Failed to create reservation", {
-      userMessage: "Unable to create your reservation. Please try again or contact support.",
-      requestId,
-    });
-
-    res.status(500).json(errorResponse);
   }
-});
+);
 
 // Get user's reservations
 router.get("/me", requireAuth, async (req, res): Promise<void> => {
@@ -86,24 +162,29 @@ router.get("/me", requireAuth, async (req, res): Promise<void> => {
 });
 
 // Get a specific reservation
-router.get("/:id", requireAuth, validateParams(CommonParams.id), async (req, res): Promise<void> => {
-  try {
-    const reservation = await storage.getReservation(req.params.id);
-    if (!reservation) {
-      res.status(404).json({ error: "Reservation not found" });
-      return;
+router.get(
+  "/:id",
+  requireAuth,
+  validateParams(CommonParams.id),
+  async (req, res): Promise<void> => {
+    try {
+      const reservation = await storage.getReservation(req.params.id);
+      if (!reservation) {
+        res.status(404).json({ error: "Reservation not found" });
+        return;
+      }
+      if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
+        res.status(403).json({ error: "Unauthorized" });
+        return;
+      }
+      res.json(reservation);
+    } catch (error: unknown) {
+      console.error("Error fetching reservation:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch reservation";
+      res.status(500).json({ error: errorMessage });
     }
-    if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
-      res.status(403).json({ error: "Unauthorized" });
-      return;
-    }
-    res.json(reservation);
-  } catch (error: unknown) {
-    console.error("Error fetching reservation:", error);
-    const errorMessage = error instanceof Error ? error.message : "Failed to fetch reservation";
-    res.status(500).json({ error: errorMessage });
   }
-});
+);
 
 // Update reservation status
 router.patch(
@@ -115,11 +196,11 @@ router.patch(
       const reservation = await storage.getReservation(req.params.id);
       if (!reservation) {
         res.status(404).json({ error: "Reservation not found" });
-      return;
+        return;
       }
       if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
         res.status(403).json({ error: "Unauthorized" });
-      return;
+        return;
       }
 
       const updatedReservation = await storage.updateReservationStatus(

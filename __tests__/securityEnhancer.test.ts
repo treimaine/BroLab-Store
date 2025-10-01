@@ -7,23 +7,23 @@ import {
 } from "../server/lib/securityEnhancer";
 
 // Mock the audit logger
-jest.mock("../server/lib/audit", () => ({
+jest.mock(_"../server/lib/audit", _() => ({
   auditLogger: {
     logSecurityEvent: jest.fn(),
   },
 }));
 
 // Mock Clerk
-jest.mock("@clerk/express", () => ({
+jest.mock(_"@clerk/express", _() => ({
   getAuth: jest.fn(),
 }));
 
-describe("SecurityEnhancer", () => {
+describe(_"SecurityEnhancer", _() => {
   let securityEnhancer: SecurityEnhancer;
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     securityEnhancer = new SecurityEnhancer();
     mockRequest = {
       headers: {
@@ -41,10 +41,10 @@ describe("SecurityEnhancer", () => {
     jest.clearAllMocks();
   });
 
-  describe("validateClerkToken", () => {
-    const { getAuth } = require("@clerk/express");
+  describe(_"validateClerkToken", _() => {
+    const { _getAuth} = require("@clerk/express");
 
-    it("should return success for valid Clerk token", async () => {
+    it(_"should return success for valid Clerk token", _async () => {
       getAuth.mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
@@ -63,7 +63,7 @@ describe("SecurityEnhancer", () => {
       expect(result.securityEvents).toHaveLength(0);
     });
 
-    it("should return failure for missing user ID", async () => {
+    it(_"should return failure for missing user ID", _async () => {
       getAuth.mockReturnValue({
         userId: null,
         sessionId: null,
@@ -87,7 +87,7 @@ describe("SecurityEnhancer", () => {
       );
     });
 
-    it("should detect expired session claims", async () => {
+    it(_"should detect expired session claims", _async () => {
       getAuth.mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
@@ -106,7 +106,7 @@ describe("SecurityEnhancer", () => {
       expect(result.securityEvents).toContain(SecurityEventType.TOKEN_VALIDATION_FAILURE);
     });
 
-    it("should detect future issued at time", async () => {
+    it(_"should detect future issued at time", _async () => {
       getAuth.mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
@@ -124,7 +124,7 @@ describe("SecurityEnhancer", () => {
       expect(result.securityEvents).toContain(SecurityEventType.TOKEN_VALIDATION_FAILURE);
     });
 
-    it("should detect suspicious user agent", async () => {
+    it(_"should detect suspicious user agent", _async () => {
       mockRequest.headers!["user-agent"] = "curl/7.68.0";
 
       getAuth.mockReturnValue({
@@ -144,8 +144,8 @@ describe("SecurityEnhancer", () => {
       expect(result.riskLevel).toBe(SecurityRiskLevel.MEDIUM);
     });
 
-    it("should handle authentication errors gracefully", async () => {
-      getAuth.mockImplementation(() => {
+    it(_"should handle authentication errors gracefully", _async () => {
+      getAuth.mockImplementation_(() => {
         throw new Error("Clerk service unavailable");
       });
 
@@ -158,8 +158,8 @@ describe("SecurityEnhancer", () => {
     });
   });
 
-  describe("sanitizeInput", () => {
-    it("should sanitize XSS attempts", () => {
+  describe(_"sanitizeInput", _() => {
+    it(_"should sanitize XSS attempts", _() => {
       const maliciousInput = '<script>alert("xss")</script>Hello World';
       const result = securityEnhancer.sanitizeInput(maliciousInput, "test", mockRequest as Request);
 
@@ -168,14 +168,14 @@ describe("SecurityEnhancer", () => {
       expect(result.securityEvents).toContain(SecurityEventType.XSS_ATTEMPT);
     });
 
-    it("should detect SQL injection attempts", () => {
+    it(_"should detect SQL injection attempts", _() => {
       const maliciousInput = "'; DROP TABLE users; --";
       const result = securityEnhancer.sanitizeInput(maliciousInput, "test", mockRequest as Request);
 
       expect(result.securityEvents).toContain(SecurityEventType.SQL_INJECTION_ATTEMPT);
     });
 
-    it("should sanitize nested objects", () => {
+    it(_"should sanitize nested objects", _() => {
       const maliciousInput = {
         name: "John",
         comment: '<script>alert("xss")</script>',
@@ -191,7 +191,7 @@ describe("SecurityEnhancer", () => {
       expect(result.securityEvents).toContain(SecurityEventType.SQL_INJECTION_ATTEMPT);
     });
 
-    it("should handle arrays correctly", () => {
+    it(_"should handle arrays correctly", _() => {
       const maliciousInput = ["normal", '<script>alert("xss")</script>', "also normal"];
       const result = securityEnhancer.sanitizeInput(maliciousInput, "test", mockRequest as Request);
 
@@ -200,7 +200,7 @@ describe("SecurityEnhancer", () => {
       expect(result.securityEvents).toContain(SecurityEventType.XSS_ATTEMPT);
     });
 
-    it("should preserve safe input", () => {
+    it(_"should preserve safe input", _() => {
       const safeInput = "This is a normal string with numbers 123";
       const result = securityEnhancer.sanitizeInput(safeInput, "test", mockRequest as Request);
 
@@ -208,7 +208,7 @@ describe("SecurityEnhancer", () => {
       expect(result.securityEvents).toHaveLength(0);
     });
 
-    it("should truncate very long strings", () => {
+    it(_"should truncate very long strings", _() => {
       const longInput = "a".repeat(20000);
       const result = securityEnhancer.sanitizeInput(longInput, "test", mockRequest as Request);
 
@@ -216,7 +216,7 @@ describe("SecurityEnhancer", () => {
       expect(result.sanitized.length).toBeLessThanOrEqual(10000);
     });
 
-    it("should remove null bytes", () => {
+    it(_"should remove null bytes", _() => {
       const inputWithNulls = "test\x00string\x00with\x00nulls";
       const result = securityEnhancer.sanitizeInput(inputWithNulls, "test", mockRequest as Request);
 
@@ -225,15 +225,15 @@ describe("SecurityEnhancer", () => {
     });
   });
 
-  describe("checkBruteForce", () => {
-    it("should allow requests when no failed attempts", () => {
+  describe(_"checkBruteForce", _() => {
+    it(_"should allow requests when no failed attempts", _() => {
       const result = securityEnhancer.checkBruteForce("192.168.1.1");
 
       expect(result.allowed).toBe(true);
       expect(result.remainingAttempts).toBe(5); // Default max attempts
     });
 
-    it("should track failed attempts", () => {
+    it(_"should track failed attempts", _() => {
       const identifier = "192.168.1.1";
 
       // Record some failed attempts
@@ -246,7 +246,7 @@ describe("SecurityEnhancer", () => {
       expect(result.remainingAttempts).toBe(3); // 5 - 2 = 3
     });
 
-    it("should lock out after max failed attempts", () => {
+    it(_"should lock out after max failed attempts", _() => {
       const identifier = "192.168.1.1";
 
       // Record max failed attempts
@@ -261,7 +261,7 @@ describe("SecurityEnhancer", () => {
       expect(result.lockoutTime).toBeDefined();
     });
 
-    it("should clear failed attempts on successful authentication", () => {
+    it(_"should clear failed attempts on successful authentication", _() => {
       const identifier = "192.168.1.1";
 
       // Record some failed attempts
@@ -278,12 +278,12 @@ describe("SecurityEnhancer", () => {
     });
   });
 
-  describe("createSecurityMiddleware", () => {
+  describe(_"createSecurityMiddleware", _() => {
     let mockNext: jest.Mock;
 
-    beforeEach(() => {
+    beforeEach_(() => {
       mockNext = jest.fn();
-      const { getAuth } = require("@clerk/express");
+      const { _getAuth} = require("@clerk/express");
       getAuth.mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
@@ -295,7 +295,7 @@ describe("SecurityEnhancer", () => {
       });
     });
 
-    it("should add security information to request", async () => {
+    it(_"should add security information to request", _async () => {
       const middleware = securityEnhancer.createSecurityMiddleware();
 
       await middleware(mockRequest as Request, mockResponse as Response, mockNext);
@@ -306,7 +306,7 @@ describe("SecurityEnhancer", () => {
       expect(mockNext).toHaveBeenCalled();
     });
 
-    it("should sanitize request body", async () => {
+    it(_"should sanitize request body", _async () => {
       mockRequest.body = {
         name: "John",
         comment: '<script>alert("xss")</script>',
@@ -321,7 +321,7 @@ describe("SecurityEnhancer", () => {
       expect(mockNext).toHaveBeenCalled();
     });
 
-    it("should sanitize query parameters", async () => {
+    it(_"should sanitize query parameters", _async () => {
       mockRequest.query = {
         search: "'; DROP TABLE users; --",
       };
@@ -336,7 +336,7 @@ describe("SecurityEnhancer", () => {
       expect(mockNext).toHaveBeenCalled();
     });
 
-    it("should block requests when brute force limit exceeded", async () => {
+    it(_"should block requests when brute force limit exceeded", _async () => {
       const identifier = "192.168.1.1";
 
       // Exceed brute force limit
@@ -357,12 +357,12 @@ describe("SecurityEnhancer", () => {
       expect(mockNext).not.toHaveBeenCalled();
     });
 
-    it("should handle middleware errors gracefully", async () => {
+    it(_"should handle middleware errors gracefully", _async () => {
       // Use a different IP to avoid brute force protection from previous tests
       mockRequest.headers!["x-forwarded-for"] = "10.0.0.1";
 
-      const { getAuth } = require("@clerk/express");
-      getAuth.mockImplementation(() => {
+      const { _getAuth} = require("@clerk/express");
+      getAuth.mockImplementation_(() => {
         throw new Error("Clerk service error");
       });
 
@@ -377,8 +377,8 @@ describe("SecurityEnhancer", () => {
     });
   });
 
-  describe("Configuration", () => {
-    it("should use custom configuration", () => {
+  describe(_"Configuration", _() => {
+    it(_"should use custom configuration", _() => {
       const customConfig = {
         maxFailedAttempts: 3,
         lockoutDuration: 30,
@@ -393,14 +393,14 @@ describe("SecurityEnhancer", () => {
       expect(result.remainingAttempts).toBe(3); // Custom max attempts
     });
 
-    it("should disable suspicious activity detection when configured", async () => {
+    it(_"should disable suspicious activity detection when configured", _async () => {
       const customEnhancer = new SecurityEnhancer({
         enableSuspiciousActivityDetection: false,
       });
 
       mockRequest.headers!["user-agent"] = "curl/7.68.0"; // Suspicious agent
 
-      const { getAuth } = require("@clerk/express");
+      const { _getAuth} = require("@clerk/express");
       getAuth.mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
@@ -418,11 +418,11 @@ describe("SecurityEnhancer", () => {
     });
   });
 
-  describe("Edge Cases", () => {
-    it("should handle missing headers gracefully", async () => {
+  describe(_"Edge Cases", _() => {
+    it(_"should handle missing headers gracefully", _async () => {
       mockRequest.headers = {};
 
-      const { getAuth } = require("@clerk/express");
+      const { _getAuth} = require("@clerk/express");
       getAuth.mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
@@ -440,7 +440,7 @@ describe("SecurityEnhancer", () => {
       expect(result.metadata.ipAddress).toBe("192.168.1.1");
     });
 
-    it("should handle null and undefined inputs in sanitization", () => {
+    it(_"should handle null and undefined inputs in sanitization", _() => {
       const inputs = [null, undefined, "", 0, false];
 
       inputs.forEach(input => {
@@ -449,12 +449,12 @@ describe("SecurityEnhancer", () => {
       });
     });
 
-    it("should handle circular references in objects", () => {
+    it(_"should handle circular references in objects", _() => {
       const circularObj: any = { name: "test" };
       circularObj.self = circularObj;
 
       // Should not throw an error
-      expect(() => {
+      expect_(() => {
         securityEnhancer.sanitizeInput(circularObj, "test");
       }).not.toThrow();
     });

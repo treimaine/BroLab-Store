@@ -7,7 +7,7 @@ const mockConvexClient = {
 };
 
 // Mock logger
-jest.mock("../server/lib/logger", () => ({
+jest.mock(_"../server/lib/logger", _() => ({
   logger: {
     info: jest.fn(),
     warn: jest.fn(),
@@ -22,21 +22,21 @@ jest.useFakeTimers();
 const mockSetInterval = jest.fn();
 global.setInterval = mockSetInterval;
 
-describe("RollbackManager", () => {
+describe(_"RollbackManager", _() => {
   let manager: RollbackManager;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     jest.clearAllMocks();
     mockSetInterval.mockClear();
     manager = new RollbackManager(mockConvexClient as any);
   });
 
-  afterEach(() => {
+  afterEach_(() => {
     jest.clearAllTimers();
   });
 
-  describe("createRollbackPoint", () => {
-    it("should create rollback point successfully", async () => {
+  describe(_"createRollbackPoint", _() => {
+    it(_"should create rollback point successfully", _async () => {
       const currentState = { id: "1", name: "Current State", version: 1 };
       const metadata = { userId: "user123", action: "update" };
 
@@ -57,7 +57,7 @@ describe("RollbackManager", () => {
       expect(mockConvexClient.mutation).toHaveBeenCalledWith("rollback:store", expect.any(Object));
     });
 
-    it("should handle errors during rollback point creation", async () => {
+    it(_"should handle errors during rollback point creation", _async () => {
       mockConvexClient.mutation.mockRejectedValue(new Error("Storage error"));
 
       await expect(manager.createRollbackPoint("update_user", "1", {})).rejects.toThrow(
@@ -65,7 +65,7 @@ describe("RollbackManager", () => {
       );
     });
 
-    it("should include metadata in rollback operation", async () => {
+    it(_"should include metadata in rollback operation", _async () => {
       const metadata = { source: "api", requestId: "req123" };
       mockConvexClient.mutation.mockResolvedValue("success");
 
@@ -81,8 +81,8 @@ describe("RollbackManager", () => {
     });
   });
 
-  describe("updateRollbackPoint", () => {
-    it("should update rollback point with new state", async () => {
+  describe(_"updateRollbackPoint", _() => {
+    it(_"should update rollback point with new state", _async () => {
       // First create a rollback point
       mockConvexClient.mutation.mockResolvedValue("success");
       const rollbackId = await manager.createRollbackPoint("update_user", "1", {});
@@ -97,15 +97,15 @@ describe("RollbackManager", () => {
       });
     });
 
-    it("should throw error for non-existent rollback point", async () => {
+    it(_"should throw error for non-existent rollback point", _async () => {
       await expect(manager.updateRollbackPoint("non_existent", {})).rejects.toThrow(
         "Rollback operation not found: non_existent"
       );
     });
   });
 
-  describe("executeRollback", () => {
-    it("should execute rollback successfully", async () => {
+  describe(_"executeRollback", _() => {
+    it(_"should execute rollback successfully", _async () => {
       // Create rollback point
       mockConvexClient.mutation.mockResolvedValue("success");
       const rollbackId = await manager.createRollbackPoint("update_user", "1", {
@@ -128,13 +128,13 @@ describe("RollbackManager", () => {
       });
     });
 
-    it("should throw error for non-existent rollback operation", async () => {
+    it(_"should throw error for non-existent rollback operation", _async () => {
       await expect(manager.executeRollback("non_existent")).rejects.toThrow(
         "Rollback operation not found: non_existent"
       );
     });
 
-    it("should throw error when rollback is not allowed", async () => {
+    it(_"should throw error when rollback is not allowed", _async () => {
       // Create rollback point
       mockConvexClient.mutation.mockResolvedValue("success");
       const rollbackId = await manager.createRollbackPoint("update_user", "1", {});
@@ -150,7 +150,7 @@ describe("RollbackManager", () => {
       );
     });
 
-    it("should throw error for expired rollback operation", async () => {
+    it(_"should throw error for expired rollback operation", _async () => {
       // Create rollback point
       mockConvexClient.mutation.mockResolvedValue("success");
       const rollbackId = await manager.createRollbackPoint("update_user", "1", {});
@@ -167,8 +167,8 @@ describe("RollbackManager", () => {
     });
   });
 
-  describe("createBackup", () => {
-    it("should create backup successfully", async () => {
+  describe(_"createBackup", _() => {
+    it(_"should create backup successfully", _async () => {
       const state = { id: "1", data: "test data" };
       mockConvexClient.mutation.mockResolvedValue("success");
 
@@ -183,15 +183,15 @@ describe("RollbackManager", () => {
       });
     });
 
-    it("should handle errors during backup creation", async () => {
+    it(_"should handle errors during backup creation", _async () => {
       mockConvexClient.mutation.mockRejectedValue(new Error("Backup storage error"));
 
       await expect(manager.createBackup("resource1", {})).rejects.toThrow("Backup storage error");
     });
   });
 
-  describe("validateRollback", () => {
-    it("should validate rollback operation successfully", async () => {
+  describe(_"validateRollback", _() => {
+    it(_"should validate rollback operation successfully", _async () => {
       // Create rollback point
       mockConvexClient.mutation.mockResolvedValue("success");
       const rollbackId = await manager.createRollbackPoint("update_user", "1", {});
@@ -205,14 +205,14 @@ describe("RollbackManager", () => {
       expect(validation.errors).toHaveLength(0);
     });
 
-    it("should return validation errors for invalid rollback", async () => {
+    it(_"should return validation errors for invalid rollback", _async () => {
       const validation = await manager.validateRollback("non_existent");
 
       expect(validation.isValid).toBe(false);
       expect(validation.errors).toContain("Rollback operation not found: non_existent");
     });
 
-    it("should detect expired rollback operations", async () => {
+    it(_"should detect expired rollback operations", _async () => {
       // Create rollback point
       mockConvexClient.mutation.mockResolvedValue("success");
       const rollbackId = await manager.createRollbackPoint("update_user", "1", {});
@@ -229,7 +229,7 @@ describe("RollbackManager", () => {
       expect(validation.errors).toContain("Rollback operation has expired");
     });
 
-    it("should detect missing backup data", async () => {
+    it(_"should detect missing backup data", _async () => {
       // Create rollback point
       mockConvexClient.mutation.mockResolvedValue("success");
       const rollbackId = await manager.createRollbackPoint("update_user", "1", {});
@@ -248,8 +248,8 @@ describe("RollbackManager", () => {
     });
   });
 
-  describe("getRollbackHistory", () => {
-    it("should return all rollback operations when no filter provided", async () => {
+  describe(_"getRollbackHistory", _() => {
+    it(_"should return all rollback operations when no filter provided", _async () => {
       // Create multiple rollback points
       mockConvexClient.mutation.mockResolvedValue("success");
 
@@ -262,7 +262,7 @@ describe("RollbackManager", () => {
       expect(history[0].timestamp).toBeGreaterThanOrEqual(history[1].timestamp); // Sorted by timestamp desc
     });
 
-    it("should filter rollback operations by resourceId", async () => {
+    it(_"should filter rollback operations by resourceId", _async () => {
       mockConvexClient.mutation.mockResolvedValue("success");
 
       await manager.createRollbackPoint("update_user", "1", {});
@@ -275,7 +275,7 @@ describe("RollbackManager", () => {
       expect(history.every(op => op.resourceId === "1")).toBe(true);
     });
 
-    it("should filter rollback operations by operationType", async () => {
+    it(_"should filter rollback operations by operationType", _async () => {
       mockConvexClient.mutation.mockResolvedValue("success");
 
       await manager.createRollbackPoint("update_user", "1", {});
@@ -288,7 +288,7 @@ describe("RollbackManager", () => {
       expect(history.every(op => op.operationType === "update_user")).toBe(true);
     });
 
-    it("should limit results when limit is specified", async () => {
+    it(_"should limit results when limit is specified", _async () => {
       mockConvexClient.mutation.mockResolvedValue("success");
 
       await manager.createRollbackPoint("update_user", "1", {});
@@ -301,8 +301,8 @@ describe("RollbackManager", () => {
     });
   });
 
-  describe("cleanup", () => {
-    it("should clean up expired rollback operations and backups", async () => {
+  describe(_"cleanup", _() => {
+    it(_"should clean up expired rollback operations and backups", _async () => {
       // Create rollback points
       mockConvexClient.mutation.mockResolvedValue("success");
 
@@ -325,15 +325,15 @@ describe("RollbackManager", () => {
       );
     });
 
-    it("should handle cleanup errors gracefully", async () => {
+    it(_"should handle cleanup errors gracefully", _async () => {
       mockConvexClient.mutation.mockRejectedValue(new Error("Cleanup error"));
 
       await expect(manager.cleanup()).rejects.toThrow("Cleanup error");
     });
   });
 
-  describe("getStatistics", () => {
-    it("should return rollback statistics", async () => {
+  describe(_"getStatistics", _() => {
+    it(_"should return rollback statistics", _async () => {
       // Create rollback points
       mockConvexClient.mutation.mockResolvedValue("success");
 
@@ -352,7 +352,7 @@ describe("RollbackManager", () => {
       });
     });
 
-    it("should count expired rollbacks correctly", async () => {
+    it(_"should count expired rollbacks correctly", _async () => {
       mockConvexClient.mutation.mockResolvedValue("success");
 
       const rollbackId = await manager.createRollbackPoint("update_user", "1", {});
@@ -371,8 +371,8 @@ describe("RollbackManager", () => {
     });
   });
 
-  describe("private helper methods", () => {
-    it("should detect expired operations correctly", async () => {
+  describe(_"private helper methods", _() => {
+    it(_"should detect expired operations correctly", _async () => {
       mockConvexClient.mutation.mockResolvedValue("success");
       const rollbackId = await manager.createRollbackPoint("update_user", "1", {});
 
@@ -387,7 +387,7 @@ describe("RollbackManager", () => {
       expect((manager as any).isExpired(operation)).toBe(true);
     });
 
-    it("should validate dependencies correctly", async () => {
+    it(_"should validate dependencies correctly", _async () => {
       mockConvexClient.mutation.mockResolvedValue("success");
 
       const rollbackId1 = await manager.createRollbackPoint("update_user", "1", {});
@@ -413,12 +413,12 @@ describe("RollbackManager", () => {
     });
   });
 
-  describe("cleanup timer", () => {
-    it("should start cleanup timer on initialization", () => {
+  describe(_"cleanup timer", _() => {
+    it(_"should start cleanup timer on initialization", _() => {
       expect(mockSetInterval).toHaveBeenCalledWith(expect.any(Function), 60 * 60 * 1000);
     });
 
-    it("should run cleanup periodically", async () => {
+    it(_"should run cleanup periodically", _async () => {
       const cleanupSpy = jest.spyOn(manager, "cleanup").mockResolvedValue({
         removedRollbacks: 0,
         removedBackups: 0,

@@ -1,9 +1,23 @@
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Bundle analyzer for production builds
+    ...(process.env.ANALYZE
+      ? [
+          visualizer({
+            filename: "dist/bundle-analysis.html",
+            open: true,
+            gzipSize: true,
+            brotliSize: true,
+          }),
+        ]
+      : []),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -12,79 +26,86 @@ export default defineConfig({
       "@convex": path.resolve(import.meta.dirname, "convex"),
     },
   },
+  // Remove console logs in production
+  esbuild: {
+    drop: process.env.NODE_ENV === "production" ? ["console", "debugger"] : [],
+  },
   root: path.resolve(import.meta.dirname, "client"),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
     sourcemap: false, // Disable sourcemaps in production for smaller bundle
     // Performance optimizations
-    target: "esnext",
+    target: "es2020", // Better compatibility and smaller output
     minify: "esbuild",
     cssMinify: true,
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
+    // Additional optimizations
+    reportCompressedSize: false, // Faster builds
+    cssCodeSplit: true, // Split CSS for better caching
+
     rollupOptions: {
-      // Enable tree shaking
+      // Enable aggressive tree shaking
       treeshake: {
         moduleSideEffects: false,
         propertyReadSideEffects: false,
         unknownGlobalSideEffects: false,
+        preset: "smallest",
+      },
+      // Remove unused code
+      external: id => {
+        // Externalize Node.js built-ins that shouldn't be bundled
+        return id.startsWith("node:") || ["fs", "path", "crypto"].includes(id);
       },
       output: {
-        manualChunks: (id: string): string | undefined => {
-          // Vendor chunks for better caching
+        // Enhanced manual chunking for better code splitting
+        manualChunks: id => {
+          // Vendor libraries
           if (id.includes("node_modules")) {
-            // React core
-            if (id.includes("react") || id.includes("react-dom")) {
-              return "react-vendor";
-            }
-            // Radix UI components
-            if (id.includes("@radix-ui")) {
-              return "radix-vendor";
-            }
-            // Clerk authentication
-            if (id.includes("@clerk")) {
-              return "clerk-vendor";
+            // Chart libraries
+            if (id.includes("recharts") || id.includes("d3")) {
+              return "charts";
             }
             // Audio libraries
-            if (id.includes("wavesurfer") || id.includes("framer-motion")) {
-              return "audio-vendor";
+            if (id.includes("wavesurfer") || id.includes("audio")) {
+              return "audio";
             }
-            // Icons and UI utilities
-            if (
-              id.includes("lucide-react") ||
-              id.includes("class-variance-authority") ||
-              id.includes("clsx")
-            ) {
-              return "ui-vendor";
+            // UI libraries
+            if (id.includes("@radix-ui") || id.includes("lucide-react")) {
+              return "ui";
             }
-            // Query and state management
-            if (id.includes("@tanstack/react-query") || id.includes("zustand")) {
-              return "state-vendor";
+            // React ecosystem
+            if (id.includes("react") || id.includes("react-dom")) {
+              return "react";
             }
-            // Payment libraries
-            if (id.includes("stripe") || id.includes("@paypal")) {
-              return "payment-vendor";
+            // Animation libraries
+            if (id.includes("framer-motion")) {
+              return "animation";
             }
             // Other vendor libraries
             return "vendor";
           }
 
+          // Application code splitting
           // Dashboard components
           if (id.includes("/dashboard/") || id.includes("Dashboard")) {
             return "dashboard";
           }
-
           // Audio components
           if (id.includes("Audio") || id.includes("Waveform") || id.includes("Player")) {
-            return "audio";
+            return "audio-components";
+          }
+          // Chart components
+          if (id.includes("Chart") || id.includes("Analytics")) {
+            return "chart-components";
+          }
+          // Page components
+          if (id.includes("/pages/")) {
+            return "pages";
           }
 
-          // Payment components
-          if (id.includes("payment") || id.includes("checkout") || id.includes("cart")) {
-            return "payment";
-          }
-
+          // Default return for other modules
           return undefined;
         },
         chunkFileNames: chunkInfo => {
@@ -98,9 +119,9 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
-    port: 5000,
+    port: 3000,
     hmr: {
-      port: 5000,
+      port: 3000,
     },
     fs: {
       strict: true,
@@ -119,5 +140,7 @@ export default defineConfig({
       "@clerk/clerk-react",
     ],
     exclude: ["@convex-dev/react"],
+    // Force optimization of commonly used packages
+    force: true,
   },
 });

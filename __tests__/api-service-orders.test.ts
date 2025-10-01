@@ -1,24 +1,24 @@
-// __tests__/api-service-orders.test.ts
 import request from "supertest";
 import { app } from "../server/app";
 import * as db from "../server/lib/db";
 import { makeTestUser } from "./factories";
+// __tests__/api-service-orders.test.ts
 
 jest.mock("../server/lib/db");
 
 // Mock Clerk authentication middleware
-jest.mock("../server/middleware/auth", () => ({
-  requireAuth: (req: any, res: any, next: any) => {
+jest.mock(_"../server/middleware/auth", _() => ({
+  requireAuth: (_req: any, _res: any, _next: any) => {
     req.user = { id: "user_123", email: "test@example.com" };
     next();
   },
 }));
 
-describe("/api/service-orders", () => {
+describe(_"/api/service-orders", _() => {
   let agent: any;
   let testUser: ReturnType<typeof makeTestUser>;
 
-  beforeEach(async () => {
+  beforeEach(_async () => {
     jest.clearAllMocks();
     testUser = makeTestUser();
     // Mock upsertUser pour register

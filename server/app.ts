@@ -32,6 +32,8 @@ import uploadsRouter from "./routes/uploads";
 import wishlistRouter from "./routes/wishlist";
 import wooRouter from "./routes/woo";
 import wpRouter from "./routes/wp";
+import reservationsRouter from "./routes/reservations";
+import categoriesRouter from "./routes/categories";
 
 const app = express();
 app.use(express.json());
@@ -54,6 +56,24 @@ app.use((req: Request & { requestId?: string }, _res, next) => {
 setupAuth(app); // Middleware Clerk réactivé
 registerAuthRoutes(app);
 
+// Cache monitoring middleware
+app.use((req, res, next) => {
+  const startTime = Date.now();
+
+  res.on("finish", () => {
+    const responseTime = Date.now() - startTime;
+
+    // Record cache metrics for monitoring
+    if (res.getHeader("X-Cache") === "HIT") {
+      // monitoringUtils.recordHit(req.originalUrl, responseTime);
+    } else if (res.getHeader("X-Cache") === "MISS") {
+      // monitoringUtils.recordMiss(req.originalUrl, responseTime);
+    }
+  });
+
+  next();
+});
+
 // API Routes
 app.use("/api/activity", activityRouter);
 app.use("/api/avatar", avatarRouter);
@@ -67,7 +87,7 @@ app.use("/api/payment/paypal", paypalRouter);
 app.use("/api/payment/stripe", stripeRouter);
 app.use("/api/clerk", clerkRouter);
 app.use("/api/payments", paymentsRouter);
-// Reservations routes handled by routes/index.ts to avoid conflicts
+
 app.use("/api/schema", schemaRouter);
 app.use("/api/security", securityRouter);
 app.use("/api/service-orders", serviceOrdersRouter);
@@ -79,6 +99,8 @@ app.use("/api/wishlist", wishlistRouter);
 app.use("/api/woo", wooRouter);
 app.use("/api/wp", wpRouter);
 app.use("/api/sync", syncRouter);
+app.use("/api/categories", categoriesRouter);
+app.use("/api/reservations", reservationsRouter);
 
 // WordPress and WooCommerce routes
 app.use("/api/products", wooRouter);
@@ -179,6 +201,34 @@ app.get("/api/beats", async (req, res) => {
   } catch (e: any) {
     console.error("/api/beats adapter error:", e);
     return res.status(500).json({ error: "Failed to fetch beats" });
+  }
+});
+
+
+// Featured beats endpoint
+app.get("/api/beats/featured", async (req, res) => {
+  try {
+    const base = `${req.protocol}://${req.get("host")}`;
+    const wooUrl = new URL(base + "/api/woocommerce/products");
+    wooUrl.searchParams.set("featured", "true");
+    wooUrl.searchParams.set("per_page", "10");
+    const r = await fetch(wooUrl.toString());
+    if (!r.ok) return res.status(r.status).send(await r.text());
+    const products = await r.json();
+    const mapped = (products || []).map((p: any) => ({
+      id: p.id,
+      title: p.name,
+      description: p.short_description || p.description || null,
+      genre: (p.categories?.[0]?.name as string) || "",
+      bpm: Number(p.meta_data?.find((m: any) => m.key === "bpm")?.value || 0) || 120,
+      price: Number(p.price || p.prices?.price || 0),
+      image: p.images?.[0]?.src,
+      featured: true,
+    }));
+    return res.json(mapped);
+  } catch (e: any) {
+    console.error("/api/beats/featured adapter error:", e);
+    return res.status(500).json({ error: "Failed to fetch featured beats" });
   }
 });
 
@@ -605,7 +655,7 @@ app.post("/api/cart/item", (req, res): void => {
 });
 
 app.post("/api/cart/items", (req, res): void => {
-  const beatId = Number((req as any).body?.beatId || (req as unknown).body?.beat_id);
+  const beatId = Number((req as any).body?.beatId || (req as any).body?.beat_id);
   if (!beatId) {
     res.status(400).json({ error: "beatId required" });
     return;
@@ -635,5 +685,6 @@ app.get("/api/subscription/plans", (_req, res) => {
     { id: "ultimate", name: "Ultimate", price: 4999 },
   ]);
 });
+
 
 export { app };

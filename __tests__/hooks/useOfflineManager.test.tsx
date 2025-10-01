@@ -1,12 +1,12 @@
+import { renderHook } from "@testing-library/react";
+import { useOfflineManager } from "../../client/src/hooks/useOfflineManager";
 /**
  * Tests for useOfflineManager hook
  */
 
-import { renderHook } from "@testing-library/react";
-import { useOfflineManager } from "../../client/src/hooks/useOfflineManager";
 
 // Mock the network status hook
-jest.mock("../../client/src/hooks/useNetworkStatus", () => ({
+jest.mock(_"../../client/src/hooks/useNetworkStatus", _() => ({
   useNetworkStatus: () => ({
     isOnline: true,
     effectiveType: "4g",
@@ -37,36 +37,36 @@ Object.defineProperty(navigator, "onLine", {
   value: true,
 });
 
-describe("useOfflineManager", () => {
-  beforeEach(() => {
+describe(_"useOfflineManager", _() => {
+  beforeEach_(() => {
     jest.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
     (navigator as any).onLine = true;
   });
 
-  it("should initialize with online status", () => {
-    const { result } = renderHook(() => useOfflineManager());
+  it(_"should initialize with online status", _() => {
+    const { _result} = renderHook_(() => useOfflineManager());
 
     expect(result.current.isOnline).toBe(true);
     expect(result.current.isOfflineMode).toBe(false);
   });
 
-  it("should provide queue operation function", async () => {
-    const { result } = renderHook(() => useOfflineManager());
+  it(_"should provide queue operation function", _async () => {
+    const { _result} = renderHook_(() => useOfflineManager());
 
     expect(typeof result.current.queueOperation).toBe("function");
   });
 
-  it("should provide optimistic update functions", () => {
-    const { result } = renderHook(() => useOfflineManager());
+  it(_"should provide optimistic update functions", _() => {
+    const { _result} = renderHook_(() => useOfflineManager());
 
     expect(typeof result.current.applyOptimisticUpdate).toBe("function");
     expect(typeof result.current.confirmUpdate).toBe("function");
     expect(typeof result.current.rollbackUpdate).toBe("function");
   });
 
-  it("should provide convenience methods", () => {
-    const { result } = renderHook(() => useOfflineManager());
+  it(_"should provide convenience methods", _() => {
+    const { _result} = renderHook_(() => useOfflineManager());
 
     expect(typeof result.current.addToCartOffline).toBe("function");
     expect(typeof result.current.removeFromCartOffline).toBe("function");
@@ -74,15 +74,15 @@ describe("useOfflineManager", () => {
     expect(typeof result.current.startDownloadOffline).toBe("function");
   });
 
-  it("should provide sync control functions", () => {
-    const { result } = renderHook(() => useOfflineManager());
+  it(_"should provide sync control functions", _() => {
+    const { _result} = renderHook_(() => useOfflineManager());
 
     expect(typeof result.current.syncNow).toBe("function");
     expect(typeof result.current.clearCompleted).toBe("function");
   });
 
-  it("should handle offline mode changes", () => {
-    const { result, rerender } = renderHook(() => useOfflineManager());
+  it(_"should handle offline mode changes", _() => {
+    const { _result, _rerender} = renderHook_(() => useOfflineManager());
 
     expect(result.current.isOfflineMode).toBe(false);
 
@@ -97,10 +97,10 @@ describe("useOfflineManager", () => {
     // for a full integration test
   });
 
-  it("should cleanup on unmount", () => {
-    const { unmount } = renderHook(() => useOfflineManager());
+  it(_"should cleanup on unmount", _() => {
+    const { _unmount} = renderHook_(() => useOfflineManager());
 
     // Should not throw on unmount
-    expect(() => unmount()).not.toThrow();
+    expect_(() => unmount()).not.toThrow();
   });
 });

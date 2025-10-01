@@ -93,10 +93,6 @@ export function useEnhancedAnalytics(
         throw new Error("Not authenticated");
       }
 
-      // TODO: Replace with actual Convex query
-      // const result = await convex.query(api.dashboard.getAnalyticsData, { period });
-      // return result;
-
       // Mock implementation for now
       return generateMockAnalyticsData(period);
     },
@@ -122,13 +118,6 @@ export function useEnhancedAnalytics(
       throw err;
     }
   }, [queryRefetch]);
-
-  // Invalidate cache when period changes (currently unused but kept for future use)
-  // const invalidateCache = useCallback(() => {
-  //   queryClient.invalidateQueries({
-  //     queryKey: ["analytics"],
-  //   });
-  // }, [queryClient]);
 
   return {
     data,

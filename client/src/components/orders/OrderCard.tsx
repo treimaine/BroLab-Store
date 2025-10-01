@@ -16,7 +16,6 @@ export function OrderCard({ order, showDetails = true, onOrderClick }: OrderCard
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const downloadInvoice = async () => {
-    // TODO: implement real invoice download when available
     return Promise.resolve();
   };
 

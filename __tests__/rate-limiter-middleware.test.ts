@@ -3,19 +3,19 @@ import { NextFunction, Request, Response } from "express";
 import RateLimiter from "../server/middleware/rateLimiter";
 
 // Mock the rate limiter
-jest.mock("../shared/utils/rate-limiter", () => ({
+jest.mock(_"../shared/utils/rate-limiter", _() => ({
   rateLimiter: {
     checkLimit: jest.fn(),
   },
 }));
 
-describe("RateLimiter Middleware", () => {
+describe(_"RateLimiter Middleware", _() => {
   let mockReq: Partial<Request>;
   let mockRes: Partial<Response>;
   let mockNext: NextFunction;
   let rateLimiter: RateLimiter;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     mockReq = {
       isAuthenticated: jest.fn().mockReturnValue(true),
       user: { id: 123 },
@@ -38,12 +38,12 @@ describe("RateLimiter Middleware", () => {
     });
   });
 
-  describe("middleware creation", () => {
-    it("should create middleware instance", () => {
+  describe(_"middleware creation", _() => {
+    it(_"should create middleware instance", _() => {
       expect(rateLimiter).toBeInstanceOf(RateLimiter);
     });
 
-    it("should have correct configuration", () => {
+    it(_"should have correct configuration", _() => {
       expect(rateLimiter["config"]).toEqual({
         windowMs: 60000,
         maxRequests: 10,
@@ -53,15 +53,15 @@ describe("RateLimiter Middleware", () => {
     });
   });
 
-  describe("static create method", () => {
-    it("should create middleware function", () => {
+  describe(_"static create method", _() => {
+    it(_"should create middleware function", _() => {
       const middleware = RateLimiter.create("test", { windowMs: 60000, maxRequests: 5 });
       expect(typeof middleware).toBe("function");
     });
   });
 
-  describe("predefined rate limiters", () => {
-    it("should export predefined rate limiters", () => {
+  describe(_"predefined rate limiters", _() => {
+    it(_"should export predefined rate limiters", _() => {
       const {
         uploadRateLimit,
         downloadRateLimit,
@@ -76,30 +76,30 @@ describe("RateLimiter Middleware", () => {
     });
   });
 
-  describe("helper methods", () => {
-    it("should check if unauthenticated requests should be checked", () => {
+  describe(_"helper methods", _() => {
+    it(_"should check if unauthenticated requests should be checked", _() => {
       const shouldCheck = rateLimiter["shouldCheckUnauthenticated"](mockReq as Request);
       expect(typeof shouldCheck).toBe("boolean");
     });
 
-    it("should get client IP", () => {
+    it(_"should get client IP", _() => {
       const ip = rateLimiter["getClientIP"](mockReq as Request);
       expect(typeof ip).toBe("string");
     });
 
-    it("should handle decrement counter", async () => {
+    it(_"should handle decrement counter", _async () => {
       // Should not throw
       await expect(rateLimiter["decrementCounter"]("test:key")).resolves.toBeUndefined();
     });
   });
 
-  describe("rate limiter stats methods", () => {
-    it("should get stats", async () => {
+  describe(_"rate limiter stats methods", _() => {
+    it(_"should get stats", _async () => {
       const stats = await rateLimiter.getStats("test:key");
       expect(stats).toBeNull(); // Returns null when Convex is not available
     });
 
-    it("should reset limit", async () => {
+    it(_"should reset limit", _async () => {
       const result = await rateLimiter.resetLimit("test:key");
       expect(result).toBe(false); // Returns false when Convex is not available
     });

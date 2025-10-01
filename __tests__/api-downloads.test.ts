@@ -1,15 +1,15 @@
 // __tests__/api-downloads.test.ts
 
 // Mock Convex pour les tests
-jest.mock("convex/browser", () => ({
-  ConvexHttpClient: jest.fn().mockImplementation(() => ({
+jest.mock(_"convex/browser", _() => ({
+  ConvexHttpClient: jest.fn().mockImplementation_(() => ({
     mutation: jest.fn().mockResolvedValue({ _id: "downloads:1" }),
     query: jest.fn().mockResolvedValue([]),
   })),
 }));
 
 // Mock Clerk pour les tests
-jest.mock("@clerk/clerk-sdk-node", () => ({
+jest.mock(_"@clerk/clerk-sdk-node", _() => ({
   clerkClient: {
     users: {
       getUser: jest.fn().mockResolvedValue({
@@ -21,15 +21,15 @@ jest.mock("@clerk/clerk-sdk-node", () => ({
 }));
 
 describe.skip("/api/downloads (migrated to Clerk + Convex)", () => {
-  it("should be replaced with Clerk + Convex integration tests", () => {
+  it(_"should be replaced with Clerk + Convex integration tests", _() => {
     // TODO: Implement new tests using Clerk authentication and Convex mutations
     expect(true).toBe(true);
   });
 });
 
 // Nouveau test pour l'intégration Clerk + Convex
-describe("Clerk + Convex Downloads Integration", () => {
-  it("should record download with Clerk user and Convex", async () => {
+describe(_"Clerk + Convex Downloads Integration", _() => {
+  it(_"should record download with Clerk user and Convex", _async () => {
     // Mock Clerk authentication
     const mockUser = {
       id: "user_123",

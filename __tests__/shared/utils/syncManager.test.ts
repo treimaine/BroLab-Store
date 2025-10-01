@@ -1,25 +1,25 @@
+import { SyncManager } from "../../../shared/utils/syncManager";
 /**
  * Tests for SyncManager
  */
 
-import { SyncManager } from "../../../shared/utils/syncManager";
 
-describe("SyncManager", () => {
+describe(_"SyncManager", _() => {
   let syncManager: SyncManager;
 
-  beforeEach(() => {
+  beforeEach_(() => {
     syncManager = new SyncManager();
     jest.clearAllTimers();
     jest.useFakeTimers();
   });
 
-  afterEach(() => {
+  afterEach_(() => {
     syncManager.clearAll();
     jest.useRealTimers();
   });
 
-  describe("scheduleSync", () => {
-    it("should schedule a sync operation", async () => {
+  describe(_"scheduleSync", _() => {
+    it(_"should schedule a sync operation", _async () => {
       const operation = {
         type: "user" as const,
         payload: { userId: "123" },
@@ -33,7 +33,7 @@ describe("SyncManager", () => {
       expect(status.pendingOperations).toBe(1);
     });
 
-    it("should debounce operations of the same type and priority", async () => {
+    it(_"should debounce operations of the same type and priority", _async () => {
       const operation1 = {
         type: "user" as const,
         payload: { userId: "123" },
@@ -55,7 +55,7 @@ describe("SyncManager", () => {
       expect(status.pendingOperations).toBe(2);
     });
 
-    it("should handle different priorities correctly", async () => {
+    it(_"should handle different priorities correctly", _async () => {
       const highPriorityOp = {
         type: "user" as const,
         payload: { userId: "123" },
@@ -78,8 +78,8 @@ describe("SyncManager", () => {
     });
   });
 
-  describe("cancelPendingSync", () => {
-    it("should cancel a pending sync operation", async () => {
+  describe(_"cancelPendingSync", _() => {
+    it(_"should cancel a pending sync operation", _async () => {
       const operation = {
         type: "user" as const,
         payload: { userId: "123" },
@@ -96,7 +96,7 @@ describe("SyncManager", () => {
       expect(status2.pendingOperations).toBe(0);
     });
 
-    it("should not affect other operations when canceling", async () => {
+    it(_"should not affect other operations when canceling", _async () => {
       const operation1 = {
         type: "user" as const,
         payload: { userId: "123" },
@@ -122,8 +122,8 @@ describe("SyncManager", () => {
     });
   });
 
-  describe("getSyncStatus", () => {
-    it("should return correct sync status", async () => {
+  describe(_"getSyncStatus", _() => {
+    it(_"should return correct sync status", _async () => {
       const status = await syncManager.getSyncStatus();
 
       expect(status).toHaveProperty("isActive");
@@ -134,8 +134,8 @@ describe("SyncManager", () => {
     });
   });
 
-  describe("clearAll", () => {
-    it("should clear all pending operations and timers", async () => {
+  describe(_"clearAll", _() => {
+    it(_"should clear all pending operations and timers", _async () => {
       const operation = {
         type: "user" as const,
         payload: { userId: "123" },
@@ -154,8 +154,8 @@ describe("SyncManager", () => {
     });
   });
 
-  describe("getPendingOperations", () => {
-    it("should return array of pending operations", async () => {
+  describe(_"getPendingOperations", _() => {
+    it(_"should return array of pending operations", _async () => {
       const operation = {
         type: "user" as const,
         payload: { userId: "123" },

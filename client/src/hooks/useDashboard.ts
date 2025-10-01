@@ -175,7 +175,6 @@ export function useDashboard(options: DashboardOptions = {}): DashboardHookRetur
     if (!isAuthenticated) return undefined;
 
     // Return mock data structure for now
-    // TODO: Replace with actual Convex query: useConvexQuery(api.dashboard.getDashboardData, queryArgs)
     return undefined;
   }, [isAuthenticated, queryArgs]);
 
@@ -355,8 +354,7 @@ export function useDashboardStats(): {
   const queryClient = useQueryClient();
 
   const isAuthenticated = Boolean(clerkUser && isLoaded);
-  // Temporarily use a mock implementation to avoid Convex type instantiation issues
-  // TODO: Replace with actual Convex query: useConvexQuery(api.dashboard.getDashboardStats, isAuthenticated ? {} : "skip")
+  // Mock implementation to avoid Convex type instantiation issues
   const statsData: UserStats | undefined = useMemo(() => {
     if (!isAuthenticated) return undefined;
     return undefined;
