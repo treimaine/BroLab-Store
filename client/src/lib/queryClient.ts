@@ -263,11 +263,11 @@ export const warmCache = async () => {
     // Warm cache with static data that's commonly accessed
     await Promise.all([
       queryClient.prefetchQuery({
-        queryKey: ["subscription", "plans"],
+        queryKey: ["/api/subscription/plans"],
         staleTime: CACHE_CONFIG.STATIC.staleTime,
       }),
       queryClient.prefetchQuery({
-        queryKey: ["beats", "featured"],
+        queryKey: ["/api/beats/featured"],
         staleTime: CACHE_CONFIG.DYNAMIC.staleTime,
       }),
     ]);

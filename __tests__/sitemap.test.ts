@@ -1,9 +1,9 @@
 import request from "supertest";
 import { app } from "../server/app";
 
-describe(_"Sitemap API", _() => {
-  describe(_"GET /sitemap.xml", _() => {
-    it(_"should return valid sitemap XML", _async () => {
+describe("Sitemap API", () => {
+  describe("GET /sitemap.xml", () => {
+    it("should return valid sitemap XML", async () => {
       const response = await request(app).get("/sitemap.xml").expect(200);
 
       expect(response.headers["content-type"]).toContain("application/xml");
@@ -24,7 +24,7 @@ describe(_"Sitemap API", _() => {
       expect(xml).toMatch(/<url>\s*<loc>.*<\/loc>/);
     });
 
-    it(_"should include proper XML structure for each URL", _async () => {
+    it("should include proper XML structure for each URL", async () => {
       const response = await request(app).get("/sitemap.xml").expect(200);
 
       const xml = response.text;
@@ -47,8 +47,8 @@ describe(_"Sitemap API", _() => {
     });
   });
 
-  describe(_"GET /robots.txt", _() => {
-    it(_"should return valid robots.txt", _async () => {
+  describe("GET /robots.txt", () => {
+    it("should return valid robots.txt", async () => {
       const response = await request(app).get("/robots.txt").expect(200);
 
       expect(response.headers["content-type"]).toContain("text/plain");
@@ -69,8 +69,8 @@ describe(_"Sitemap API", _() => {
     });
   });
 
-  describe(_"GET /sitemap-index.xml", _() => {
-    it(_"should return valid sitemap index XML", _async () => {
+  describe("GET /sitemap-index.xml", () => {
+    it("should return valid sitemap index XML", async () => {
       const response = await request(app).get("/sitemap-index.xml").expect(200);
 
       expect(response.headers["content-type"]).toContain("application/xml");
@@ -88,8 +88,8 @@ describe(_"Sitemap API", _() => {
     });
   });
 
-  describe(_"GET /sitemap-beats.xml", _() => {
-    it(_"should return beats-only sitemap XML", _async () => {
+  describe("GET /sitemap-beats.xml", () => {
+    it("should return beats-only sitemap XML", async () => {
       const response = await request(app).get("/sitemap-beats.xml").expect(200);
 
       expect(response.headers["content-type"]).toContain("application/xml");
@@ -106,8 +106,8 @@ describe(_"Sitemap API", _() => {
     });
   });
 
-  describe(_"Sitemap Content Validation", _() => {
-    it(_"should include proper priorities for different page types", _async () => {
+  describe("Sitemap Content Validation", () => {
+    it("should include proper priorities for different page types", async () => {
       const response = await request(app).get("/sitemap.xml").expect(200);
 
       const xml = response.text;
@@ -121,7 +121,7 @@ describe(_"Sitemap API", _() => {
       expect(xml).toContain("<priority>0.3</priority>"); // Terms, Privacy
     });
 
-    it(_"should include proper change frequencies", _async () => {
+    it("should include proper change frequencies", async () => {
       const response = await request(app).get("/sitemap.xml").expect(200);
 
       const xml = response.text;
@@ -132,7 +132,7 @@ describe(_"Sitemap API", _() => {
       expect(xml).toContain("<changefreq>yearly</changefreq>"); // Pages légales (terms, privacy)
     });
 
-    it(_"should include lastmod dates", _async () => {
+    it("should include lastmod dates", async () => {
       const response = await request(app).get("/sitemap.xml").expect(200);
 
       const xml = response.text;
@@ -144,15 +144,15 @@ describe(_"Sitemap API", _() => {
     });
   });
 
-  describe(_"Cache Headers", _() => {
-    it(_"should include appropriate cache headers for sitemap", _async () => {
+  describe("Cache Headers", () => {
+    it("should include appropriate cache headers for sitemap", async () => {
       const response = await request(app).get("/sitemap.xml").expect(200);
 
       expect(response.headers["cache-control"]).toContain("public");
       expect(response.headers["cache-control"]).toContain("max-age=");
     });
 
-    it(_"should include appropriate cache headers for robots.txt", _async () => {
+    it("should include appropriate cache headers for robots.txt", async () => {
       const response = await request(app).get("/robots.txt").expect(200);
 
       expect(response.headers["cache-control"]).toContain("public");

@@ -4,8 +4,23 @@ import session from "express-session";
 import type { User } from "../shared/schema";
 // Imports pour Convex et Clerk - NOUVEAU SDK
 import { clerkMiddleware, getAuth } from "@clerk/express";
+import type { Request } from "express";
+import { ConvexUser, convexUserToUser, userToConvexUserInput } from "../shared/types/ConvexUser";
 import { auditLogger } from "./lib/audit";
 import { getUserByClerkId, upsertUser } from "./lib/convex";
+
+// Type for request with user and security context for compatibility
+interface RequestWithUser extends Request {
+  user?: {
+    id: string;
+    clerkId?: string;
+    username?: string;
+    email: string;
+    name?: string;
+    role?: string;
+  } & Record<string, unknown>;
+  security?: unknown;
+}
 
 // Extend session to include userId
 declare module "express-session" {
@@ -34,11 +49,10 @@ export function setupAuth(app: Express) {
 
   // Ajouter le middleware Clerk à toutes les requêtes - NOUVEAU SDK (noop in tests)
   try {
-    const maybeFn: any = clerkMiddleware as any;
     if (process.env.NODE_ENV === "test") {
       app.use((_req, _res, next) => next());
-    } else if (typeof maybeFn === "function") {
-      app.use(maybeFn());
+    } else if (typeof clerkMiddleware === "function") {
+      app.use(clerkMiddleware());
     } else {
       // Fallback noop to avoid test/runtime crashes if interop issues occur
       app.use((_req, _res, next) => next());
@@ -74,12 +88,10 @@ export function isTokenAccepted(token: string | undefined | null): boolean {
 
 // Middleware to check if user is authenticated
 // Enhanced middleware with security logging and validation
-export const isAuthenticated = async (req: any, res: Response, next: NextFunction) => {
+export const isAuthenticated = async (req: RequestWithUser, res: Response, next: NextFunction) => {
   try {
     // Import security enhancer
-    const { securityEnhancer, SecurityEventType, SecurityRiskLevel } = await import(
-      "./lib/securityEnhancer"
-    );
+    const { securityEnhancer, SecurityEventType } = await import("./lib/securityEnhancer");
 
     const ipAddress =
       (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
@@ -109,7 +121,7 @@ export const isAuthenticated = async (req: any, res: Response, next: NextFunctio
         userAgent
       );
 
-      (req as any).user = {
+      req.user = {
         id: "0",
         username: "testsprite_user",
         email: "testsprite@example.com",
@@ -146,28 +158,34 @@ export const isAuthenticated = async (req: any, res: Response, next: NextFunctio
       });
     }
 
-    const { userId, sessionId, sessionClaims } = authResult.user || {};
+    const { userId, sessionId } = authResult.user || {};
 
     if (userId) {
       // Clear failed attempts on successful authentication
       securityEnhancer.clearFailedAttempts(ipAddress);
 
       // Récupérer l'utilisateur depuis Convex
-      let user = await getUserByClerkId(userId);
+      let convexUser: ConvexUser | null = await getUserByClerkId(userId);
 
-      if (!user) {
+      if (!convexUser) {
         // Créer l'utilisateur dans Convex s'il n'existe pas
-        user = await upsertUser({
+        const newUserInput = userToConvexUserInput({
           clerkId: userId,
           email: "", // Sera mis à jour côté client
           username: `user_${userId.slice(-8)}`,
         });
+        convexUser = await upsertUser(newUserInput);
 
         // Log new user creation
-        await auditLogger.logRegistration(userId, ipAddress, userAgent);
+        if (convexUser) {
+          await auditLogger.logRegistration(userId, ipAddress, userAgent);
+        }
       }
 
-      if (user) {
+      if (convexUser) {
+        // Convert ConvexUser to shared User type
+        const sharedUser = convexUserToUser(convexUser);
+
         // Log successful authentication
         await auditLogger.logLogin(userId, ipAddress, userAgent);
 
@@ -188,16 +206,16 @@ export const isAuthenticated = async (req: any, res: Response, next: NextFunctio
         }
 
         // Définir req.user pour la compatibilité avec les routes existantes
-        (req as any).user = {
-          id: user._id.toString(),
-          clerkId: user.clerkId,
-          username: user.username || `user_${userId.slice(-8)}`,
-          email: user.email || "",
-          role: user.role || "user",
+        req.user = {
+          id: sharedUser.id.toString(),
+          clerkId: convexUser.clerkId,
+          username: sharedUser.username,
+          email: sharedUser.email,
+          role: convexUser.role || "user", // Use role from ConvexUser or default
         };
 
         // Add security context to request
-        (req as any).security = {
+        req.security = {
           riskLevel: authResult.riskLevel,
           securityEvents: authResult.securityEvents,
           sessionId,
@@ -222,7 +240,7 @@ export const isAuthenticated = async (req: any, res: Response, next: NextFunctio
         userAgent
       );
 
-      (req as any).user = {
+      req.user = {
         id: req.session.userId.toString(),
         username: `session_user_${req.session.userId}`,
         email: "",
@@ -259,7 +277,7 @@ export const isAuthenticated = async (req: any, res: Response, next: NextFunctio
 
     await auditLogger.logSecurityEvent(
       "anonymous",
-      "authentication_error" as any,
+      "authentication_error",
       {
         error: error instanceof Error ? error.message : "Unknown error",
         stack: error instanceof Error ? error.stack : undefined,
@@ -275,43 +293,33 @@ export const isAuthenticated = async (req: any, res: Response, next: NextFunctio
 };
 
 // Fonction pour obtenir l'utilisateur actuel (Clerk + Convex)
-export const getCurrentUser = async (req: any): Promise<User | null> => {
+export const getCurrentUser = async (req: RequestWithUser): Promise<User | null> => {
   try {
     // Priorité à l'authentification Clerk - NOUVEAU SDK
-    const { userId, sessionId, sessionClaims } = getAuth(req);
+    const { userId, sessionId } = getAuth(req);
 
     if (userId) {
       const clerkUser = {
         id: userId,
         sessionId: sessionId,
-        sessionClaims: sessionClaims,
       };
 
       // Récupérer l'utilisateur depuis Convex
-      let user = await getUserByClerkId(clerkUser.id);
+      let convexUser: ConvexUser | null = await getUserByClerkId(clerkUser.id);
 
-      if (!user) {
+      if (!convexUser) {
         // Créer l'utilisateur dans Convex s'il n'existe pas
-        user = await upsertUser({
+        const newUserInput = userToConvexUserInput({
           clerkId: clerkUser.id,
           email: "", // Sera mis à jour côté client
           username: `user_${clerkUser.id.slice(-8)}`,
         });
+        convexUser = await upsertUser(newUserInput);
       }
 
-      if (user) {
-        // Convertir le format Convex vers le format User attendu
-        const userId = user._id.toString();
-        return {
-          id: parseInt(userId.slice(-8)) || 0,
-          username: user.username || `user_${clerkUser.id.slice(-8)}`,
-          email: user.email || "",
-          password: "", // Pas de mot de passe avec Clerk
-          created_at: user._creationTime
-            ? new Date(user._creationTime).toISOString()
-            : new Date().toISOString(),
-          avatar: user.imageUrl || user.avatar,
-        };
+      if (convexUser) {
+        // Convert ConvexUser to shared User type using type-safe conversion
+        return convexUserToUser(convexUser);
       }
     }
 
@@ -341,7 +349,7 @@ export function registerAuthRoutes(app: Express) {
           created_at: typedUser.created_at,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Get user error:", error);
       res.status(500).json({ error: "Failed to get user" });
     }

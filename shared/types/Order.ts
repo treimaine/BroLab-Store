@@ -132,6 +132,8 @@ export interface OrderItem {
   unitPrice: number;
   /** Total price for this item (unitPrice * quantity) */
   totalPrice: number;
+  /** Discount amount applied to this item in cents */
+  discountAmount?: number;
   /** License type for beats */
   licenseType: LicenseType;
   /** Additional metadata */

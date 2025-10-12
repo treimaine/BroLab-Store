@@ -1,10 +1,36 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RenderOptions, render } from "@testing-library/react";
 import React, { ReactElement } from "react";
+import { act } from "react-dom/test-utils";
+
 /**
  * Test utilities for React components with providers
+ * Enhanced to handle ES module imports and exports properly
  */
 
+// Mock QueryClient and QueryClientProvider for testing
+class MockQueryClient {
+  constructor(options?: unknown) {
+    this.options = options;
+  }
+
+  private options: unknown;
+
+  invalidateQueries() {
+    return Promise.resolve();
+  }
+
+  setQueryData() {}
+  getQueryData() {}
+  clear() {}
+}
+
+const MockQueryClientProvider = ({ children }: { children: React.ReactNode }) => (
+  <div data-testid="query-client-provider">{children}</div>
+);
+
+// Use mocks instead of real imports to avoid constructor issues
+const QueryClient = MockQueryClient;
+const QueryClientProvider = MockQueryClientProvider;
 
 interface MockConvexClient {
   query: jest.Mock;
@@ -38,7 +64,7 @@ const mockConvexClient: MockConvexClient = {
   action: jest.fn().mockResolvedValue(null),
   subscribe: jest.fn().mockReturnValue({ unsubscribe: jest.fn() }),
   close: jest.fn(),
-  connectionState: jest.fn_(() => ({ isWebSocketConnected: true })),
+  connectionState: jest.fn(() => ({ isWebSocketConnected: true })),
   setAuth: jest.fn(),
   clearAuth: jest.fn(),
 };
@@ -132,6 +158,41 @@ function createWrapper() {
   };
 }
 
+// Enhanced test utilities for ES module compatibility
+export const testUtils = {
+  createQueryClient: () =>
+    new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          gcTime: 0,
+          staleTime: 0,
+        },
+        mutations: {
+          retry: false,
+        },
+      },
+    }),
+
+  mockConvexClient,
+  mockClerk,
+
+  // Helper for creating isolated test environments
+  createIsolatedWrapper: (customQueryClient?: MockQueryClient) => {
+    const queryClient = customQueryClient || testUtils.createQueryClient();
+
+    return function IsolatedWrapper({ children }: { children: React.ReactNode }) {
+      return (
+        <MockClerkProvider publishableKey="pk_test_mock_key" clerk={mockClerk}>
+          <MockConvexProvider client={mockConvexClient}>
+            <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          </MockConvexProvider>
+        </MockClerkProvider>
+      );
+    };
+  },
+};
+
 // Re-export everything
 export * from "@testing-library/react";
 
@@ -139,4 +200,4 @@ export * from "@testing-library/react";
 export { customRender as render };
 
 // Export utilities for tests
-export { createWrapper, mockClerk, mockConvexClient };
+export { act, createWrapper, mockClerk, mockConvexClient, testUtils };

@@ -16,6 +16,11 @@ export interface AuthenticatedRequest extends Omit<Request, "user"> {
     sessionId: string;
     claims: Record<string, unknown>;
   };
+  security?: {
+    riskLevel: string;
+    securityEvents: string[];
+    sessionId?: string;
+  };
   requestId?: string;
 }
 

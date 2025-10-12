@@ -1,5 +1,4 @@
 import {
-import { cacheManager } from "../shared/utils/cache-manager";
   CACHE_KEYS,
   CACHE_TAGS,
   CACHE_TTL,
@@ -12,9 +11,10 @@ import { cacheManager } from "../shared/utils/cache-manager";
   invalidateBeatsCache,
   invalidateUserCache,
 } from "../shared/utils/cache-integration";
+import { cacheManager } from "../shared/utils/cache-manager";
 
 // Mock the cache manager
-jest.mock(_"../shared/utils/cache-manager", _() => ({
+jest.mock("../shared/utils/cache-manager", () => ({
   cacheManager: {
     get: jest.fn(),
     set: jest.fn(),
@@ -27,13 +27,13 @@ jest.mock(_"../shared/utils/cache-manager", _() => ({
 
 const mockCacheManager = cacheManager as jest.Mocked<typeof cacheManager>;
 
-describe(_"Cache Integration", _() => {
-  beforeEach_(() => {
+describe("Cache Integration", () => {
+  beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  describe(_"cacheApiResponse", _() => {
-    test(_"should return cached data when available", _async () => {
+  describe("cacheApiResponse", () => {
+    test("should return cached data when available", async () => {
       const key = "test-api-key";
       const cachedData = { id: 1, name: "Test" };
       const fetcher = jest.fn();
@@ -48,7 +48,7 @@ describe(_"Cache Integration", _() => {
       expect(mockCacheManager.set).not.toHaveBeenCalled();
     });
 
-    test(_"should fetch and cache data when not in cache", _async () => {
+    test("should fetch and cache data when not in cache", async () => {
       const key = "test-api-key";
       const freshData = { id: 2, name: "Fresh" };
       const fetcher = jest.fn().mockResolvedValue(freshData);
@@ -68,7 +68,7 @@ describe(_"Cache Integration", _() => {
       ]);
     });
 
-    test(_"should force refresh when forceRefresh is true", _async () => {
+    test("should force refresh when forceRefresh is true", async () => {
       const key = "test-api-key";
       const cachedData = { id: 1, name: "Cached" };
       const freshData = { id: 1, name: "Fresh" };
@@ -85,7 +85,7 @@ describe(_"Cache Integration", _() => {
       expect(mockCacheManager.set).toHaveBeenCalledWith(key, freshData, CACHE_TTL.MEDIUM, []);
     });
 
-    test(_"should return stale data when fetch fails", _async () => {
+    test("should return stale data when fetch fails", async () => {
       const key = "test-api-key";
       const staleData = { id: 1, name: "Stale" };
       const fetcher = jest.fn().mockRejectedValue(new Error("Fetch failed"));
@@ -101,7 +101,7 @@ describe(_"Cache Integration", _() => {
       expect(mockCacheManager.get).toHaveBeenCalledTimes(2);
     });
 
-    test(_"should throw error when fetch fails and no stale data available", _async () => {
+    test("should throw error when fetch fails and no stale data available", async () => {
       const key = "test-api-key";
       const error = new Error("Fetch failed");
       const fetcher = jest.fn().mockRejectedValue(error);
@@ -114,8 +114,8 @@ describe(_"Cache Integration", _() => {
     });
   });
 
-  describe(_"User Profile Caching", _() => {
-    test(_"should cache user profile data", _async () => {
+  describe("User Profile Caching", () => {
+    test("should cache user profile data", async () => {
       const userId = "user123";
       const profileData = { id: userId, name: "John Doe", email: "john@example.com" };
 
@@ -129,7 +129,7 @@ describe(_"Cache Integration", _() => {
       );
     });
 
-    test(_"should get cached user profile data", _async () => {
+    test("should get cached user profile data", async () => {
       const userId = "user123";
       const profileData = { id: userId, name: "John Doe" };
 
@@ -142,8 +142,8 @@ describe(_"Cache Integration", _() => {
     });
   });
 
-  describe(_"Beats Data Caching", _() => {
-    test(_"should cache beats data with filters", _async () => {
+  describe("Beats Data Caching", () => {
+    test("should cache beats data with filters", async () => {
       const filters = { genre: "hip-hop", bpm: 120 };
       const beatsData = [
         { id: 1, title: "Beat 1" },
@@ -158,7 +158,7 @@ describe(_"Cache Integration", _() => {
       ]);
     });
 
-    test(_"should get cached beats data", _async () => {
+    test("should get cached beats data", async () => {
       const filters = { genre: "hip-hop", bpm: 120 };
       const beatsData = [{ id: 1, title: "Beat 1" }];
 
@@ -172,8 +172,8 @@ describe(_"Cache Integration", _() => {
     });
   });
 
-  describe(_"Cache Invalidation", _() => {
-    test(_"should invalidate user cache", _async () => {
+  describe("Cache Invalidation", () => {
+    test("should invalidate user cache", async () => {
       const userId = "user123";
 
       await invalidateUserCache(userId);
@@ -185,7 +185,7 @@ describe(_"Cache Integration", _() => {
       expect(mockCacheManager.invalidateByTags).toHaveBeenCalledWith([CACHE_TAGS.USER_DATA]);
     });
 
-    test(_"should invalidate beats cache", _async () => {
+    test("should invalidate beats cache", async () => {
       await invalidateBeatsCache();
 
       expect(mockCacheManager.invalidateByTags).toHaveBeenCalledWith([
@@ -195,8 +195,8 @@ describe(_"Cache Integration", _() => {
     });
   });
 
-  describe(_"Cache Health Check", _() => {
-    test(_"should return healthy status when cache is performing well", _async () => {
+  describe("Cache Health Check", () => {
+    test("should return healthy status when cache is performing well", async () => {
       const goodStats = {
         totalEntries: 100,
         totalSize: 1024 * 1024, // 1MB
@@ -211,11 +211,22 @@ describe(_"Cache Integration", _() => {
       const health = await checkCacheHealth();
 
       expect(health.healthy).toBe(true);
-      expect(health.stats).toEqual(goodStats);
+      expect(health.stats).toMatchObject({
+        totalEntries: 100,
+        totalSize: 1024 * 1024,
+        hitRate: 75,
+        missRate: 25,
+        evictionCount: 5,
+        memoryUsage: 1024 * 1024,
+        itemCount: 100, // Added by checkCacheHealth
+        hits: expect.any(Number),
+        misses: expect.any(Number),
+        uptime: expect.any(Number),
+      });
       expect(health.issues).toHaveLength(0);
     });
 
-    test(_"should detect low hit rate issue", _async () => {
+    test("should detect low hit rate issue", async () => {
       const badStats = {
         totalEntries: 100,
         totalSize: 1024 * 1024,
@@ -233,7 +244,7 @@ describe(_"Cache Integration", _() => {
       expect(health.issues).toContain("Low cache hit rate (< 50%)");
     });
 
-    test(_"should detect high memory usage issue", _async () => {
+    test("should detect high memory usage issue", async () => {
       const badStats = {
         totalEntries: 100,
         totalSize: 1024 * 1024,
@@ -251,7 +262,7 @@ describe(_"Cache Integration", _() => {
       expect(health.issues).toContain("High memory usage (> 90% of limit)");
     });
 
-    test(_"should detect high eviction count issue", _async () => {
+    test("should detect high eviction count issue", async () => {
       const badStats = {
         totalEntries: 100,
         totalSize: 1024 * 1024,
@@ -269,7 +280,7 @@ describe(_"Cache Integration", _() => {
       expect(health.issues).toContain("High eviction count - consider increasing cache size");
     });
 
-    test(_"should handle cache health check errors", _async () => {
+    test("should handle cache health check errors", async () => {
       mockCacheManager.getStats.mockRejectedValue(new Error("Cache unavailable"));
 
       const health = await checkCacheHealth();
@@ -280,8 +291,8 @@ describe(_"Cache Integration", _() => {
     });
   });
 
-  describe(_"Cache Keys and Constants", _() => {
-    test(_"should generate correct cache keys", _() => {
+  describe("Cache Keys and Constants", () => {
+    test("should generate correct cache keys", () => {
       const userId = "user123";
       const beatId = "beat456";
       const query = "hip hop beats";
@@ -292,7 +303,7 @@ describe(_"Cache Integration", _() => {
       expect(CACHE_KEYS.SUBSCRIPTION_PLANS).toBe("subscription:plans");
     });
 
-    test(_"should have correct TTL values", _() => {
+    test("should have correct TTL values", () => {
       expect(CACHE_TTL.SHORT).toBe(2 * 60 * 1000); // 2 minutes
       expect(CACHE_TTL.MEDIUM).toBe(5 * 60 * 1000); // 5 minutes
       expect(CACHE_TTL.LONG).toBe(15 * 60 * 1000); // 15 minutes
@@ -300,7 +311,7 @@ describe(_"Cache Integration", _() => {
       expect(CACHE_TTL.PERSISTENT).toBe(24 * 60 * 60 * 1000); // 24 hours
     });
 
-    test(_"should have correct cache tags", _() => {
+    test("should have correct cache tags", () => {
       expect(CACHE_TAGS.USER_DATA).toBe("user-data");
       expect(CACHE_TAGS.BEATS_DATA).toBe("beats-data");
       expect(CACHE_TAGS.SEARCH_DATA).toBe("search-data");

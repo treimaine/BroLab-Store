@@ -1,4 +1,3 @@
-import {
 import { LicenseType } from "../../shared/types/Beat";
 import { Currency } from "../../shared/types/Order";
 import { SubscriptionPlan } from "../../shared/types/User";
@@ -15,6 +14,7 @@ import { SubscriptionPlan } from "../../shared/types/User";
  * - Business rule validation
  */
 
+import {
   applyVolumeDiscount,
   calculateBeatBundlePrice,
   calculateBeatPrice,
@@ -36,22 +36,21 @@ import { SubscriptionPlan } from "../../shared/types/User";
   validateOrderBusinessRules,
 } from "../../shared/utils/business-logic";
 
-
 // ================================
 // BEAT PRICING UTILITIES
 // ================================
 
-describe(_"Beat Pricing Utilities", _() => {
-  describe(_"calculateBeatPrice", _() => {
-    test(_"should calculate correct prices for each license type", _() => {
+describe("Beat Pricing Utilities", () => {
+  describe("calculateBeatPrice", () => {
+    test("should calculate correct prices for each license type", () => {
       expect(calculateBeatPrice(LicenseType.BASIC)).toBe(2999); // $29.99
       expect(calculateBeatPrice(LicenseType.PREMIUM)).toBe(4999); // $49.99
       expect(calculateBeatPrice(LicenseType.UNLIMITED)).toBe(14999); // $149.99
     });
   });
 
-  describe(_"calculateBeatBundlePrice", _() => {
-    test(_"should calculate total price for multiple licenses", _() => {
+  describe("calculateBeatBundlePrice", () => {
+    test("should calculate total price for multiple licenses", () => {
       const licenses = [
         { type: LicenseType.BASIC, quantity: 2 },
         { type: LicenseType.PREMIUM, quantity: 1 },
@@ -61,13 +60,13 @@ describe(_"Beat Pricing Utilities", _() => {
       expect(calculateBeatBundlePrice(licenses)).toBe(expectedTotal);
     });
 
-    test(_"should handle empty license array", _() => {
+    test("should handle empty license array", () => {
       expect(calculateBeatBundlePrice([])).toBe(0);
     });
   });
 
-  describe(_"applyVolumeDiscount", _() => {
-    test(_"should apply correct discount rates based on quantity", _() => {
+  describe("applyVolumeDiscount", () => {
+    test("should apply correct discount rates based on quantity", () => {
       const amount = 10000; // $100.00
 
       // No discount for < 3 items
@@ -92,8 +91,8 @@ describe(_"Beat Pricing Utilities", _() => {
     });
   });
 
-  describe(_"calculateLoyaltyDiscount", _() => {
-    test(_"should apply correct loyalty discounts based on total spent", _() => {
+  describe("calculateLoyaltyDiscount", () => {
+    test("should apply correct loyalty discounts based on total spent", () => {
       const orderAmount = 5000; // $50.00
 
       // No discount for < $200 total spent
@@ -115,9 +114,9 @@ describe(_"Beat Pricing Utilities", _() => {
 // LICENSE VALIDATION UTILITIES
 // ================================
 
-describe(_"License Validation Utilities", _() => {
-  describe(_"canUserPurchaseLicense", _() => {
-    test(_"should allow admin to purchase any license", _() => {
+describe("License Validation Utilities", () => {
+  describe("canUserPurchaseLicense", () => {
+    test("should allow admin to purchase any license", () => {
       expect(canUserPurchaseLicense(LicenseType.BASIC, SubscriptionPlan.FREE, "admin")).toBe(true);
       expect(canUserPurchaseLicense(LicenseType.PREMIUM, SubscriptionPlan.FREE, "admin")).toBe(
         true
@@ -127,7 +126,7 @@ describe(_"License Validation Utilities", _() => {
       );
     });
 
-    test(_"should enforce subscription restrictions for regular users", _() => {
+    test("should enforce subscription restrictions for regular users", () => {
       // Free plan can only purchase basic
       expect(canUserPurchaseLicense(LicenseType.BASIC, SubscriptionPlan.FREE, "customer")).toBe(
         true
@@ -163,8 +162,8 @@ describe(_"License Validation Utilities", _() => {
     });
   });
 
-  describe(_"getLicenseTerms", _() => {
-    test(_"should return correct license terms for each type", _() => {
+  describe("getLicenseTerms", () => {
+    test("should return correct license terms for each type", () => {
       const basicTerms = getLicenseTerms(LicenseType.BASIC);
       expect(basicTerms.copiesSold).toBe(2000);
       expect(basicTerms.exclusive).toBe(false);
@@ -175,8 +174,8 @@ describe(_"License Validation Utilities", _() => {
     });
   });
 
-  describe(_"calculateLicenseUpgradePrice", _() => {
-    test(_"should calculate correct upgrade price", _() => {
+  describe("calculateLicenseUpgradePrice", () => {
+    test("should calculate correct upgrade price", () => {
       const upgradePrice = calculateLicenseUpgradePrice(LicenseType.BASIC, LicenseType.PREMIUM);
       expect(upgradePrice).toBe(2000); // $49.99 - $29.99 = $20.00
 
@@ -190,7 +189,7 @@ describe(_"License Validation Utilities", _() => {
 // ORDER CALCULATION UTILITIES
 // ================================
 
-describe(_"Order Calculation Utilities", _() => {
+describe("Order Calculation Utilities", () => {
   const mockOrderItems = [
     {
       id: 1,
@@ -217,30 +216,30 @@ describe(_"Order Calculation Utilities", _() => {
     },
   ];
 
-  describe(_"calculateOrderSubtotal", _() => {
-    test(_"should calculate correct subtotal from items", _() => {
+  describe("calculateOrderSubtotal", () => {
+    test("should calculate correct subtotal from items", () => {
       const subtotal = calculateOrderSubtotal(mockOrderItems);
       expect(subtotal).toBe(10497); // $59.98 + $49.99 - $5.00 = $104.97
     });
   });
 
-  describe(_"calculateTaxAmount", _() => {
-    test(_"should calculate tax correctly for different rates", _() => {
+  describe("calculateTaxAmount", () => {
+    test("should calculate tax correctly for different rates", () => {
       const subtotal = 10000; // $100.00
 
       expect(calculateTaxAmount(subtotal, 0.08)).toBe(800); // 8% = $8.00
       expect(calculateTaxAmount(subtotal, 0.2)).toBe(2000); // 20% = $20.00
     });
 
-    test(_"should handle JPY currency correctly", _() => {
+    test("should handle JPY currency correctly", () => {
       const subtotal = 10000; // ¥10,000
       const tax = calculateTaxAmount(subtotal, 0.1, Currency.JPY);
       expect(tax).toBe(1000); // ¥1,000 (no decimal places)
     });
   });
 
-  describe(_"calculateProcessingFee", _() => {
-    test(_"should calculate correct fees for different payment methods", _() => {
+  describe("calculateProcessingFee", () => {
+    test("should calculate correct fees for different payment methods", () => {
       const amount = 10000; // $100.00
 
       const stripeFee = calculateProcessingFee(amount, "stripe");
@@ -251,8 +250,8 @@ describe(_"Order Calculation Utilities", _() => {
     });
   });
 
-  describe(_"calculateOrderTotal", _() => {
-    test(_"should calculate complete order total with all fees", _() => {
+  describe("calculateOrderTotal", () => {
+    test("should calculate complete order total with all fees", () => {
       const result = calculateOrderTotal(
         mockOrderItems,
         0.08, // 8% tax
@@ -267,7 +266,7 @@ describe(_"Order Calculation Utilities", _() => {
       expect(result.total).toBe(11196); // Subtotal + tax + processing - discount
     });
 
-    test(_"should ensure total is never negative", _() => {
+    test("should ensure total is never negative", () => {
       const result = calculateOrderTotal(
         mockOrderItems,
         0,
@@ -285,9 +284,9 @@ describe(_"Order Calculation Utilities", _() => {
 // SUBSCRIPTION UTILITIES
 // ================================
 
-describe(_"Subscription Utilities", _() => {
-  describe(_"calculateSubscriptionChange", _() => {
-    test(_"should calculate prorated upgrade correctly", _() => {
+describe("Subscription Utilities", () => {
+  describe("calculateSubscriptionChange", () => {
+    test("should calculate prorated upgrade correctly", () => {
       const result = calculateSubscriptionChange(
         SubscriptionPlan.BASIC,
         SubscriptionPlan.PREMIUM,
@@ -300,7 +299,7 @@ describe(_"Subscription Utilities", _() => {
       expect(result.netAmount).toBe(10); // $15.00 - $5.00 = $10.00
     });
 
-    test(_"should handle annual billing correctly", _() => {
+    test("should handle annual billing correctly", () => {
       const result = calculateSubscriptionChange(
         SubscriptionPlan.BASIC,
         SubscriptionPlan.PREMIUM,
@@ -314,8 +313,8 @@ describe(_"Subscription Utilities", _() => {
     });
   });
 
-  describe(_"checkDownloadQuota", _() => {
-    test(_"should handle unlimited plans correctly", _() => {
+  describe("checkDownloadQuota", () => {
+    test("should handle unlimited plans correctly", () => {
       const result = checkDownloadQuota(SubscriptionPlan.UNLIMITED, 100);
 
       expect(result.hasQuota).toBe(true);
@@ -323,7 +322,7 @@ describe(_"Subscription Utilities", _() => {
       expect(result.isUnlimited).toBe(true);
     });
 
-    test(_"should calculate remaining downloads for limited plans", _() => {
+    test("should calculate remaining downloads for limited plans", () => {
       const result = checkDownloadQuota(SubscriptionPlan.BASIC, 5);
 
       expect(result.hasQuota).toBe(true);
@@ -331,7 +330,7 @@ describe(_"Subscription Utilities", _() => {
       expect(result.isUnlimited).toBe(false);
     });
 
-    test(_"should handle quota exceeded", _() => {
+    test("should handle quota exceeded", () => {
       const result = checkDownloadQuota(SubscriptionPlan.BASIC, 15);
 
       expect(result.hasQuota).toBe(false);
@@ -345,9 +344,9 @@ describe(_"Subscription Utilities", _() => {
 // SERVICE PRICING UTILITIES
 // ================================
 
-describe(_"Service Pricing Utilities", _() => {
-  describe(_"calculateServicePrice", _() => {
-    test(_"should calculate hourly service pricing correctly", _() => {
+describe("Service Pricing Utilities", () => {
+  describe("calculateServicePrice", () => {
+    test("should calculate hourly service pricing correctly", () => {
       const result = calculateServicePrice("mixing", 120); // 2 hours
 
       expect(result.basePrice).toBe(20000); // $200 (2 * $100/hour)
@@ -356,14 +355,14 @@ describe(_"Service Pricing Utilities", _() => {
       expect(result.totalPrice).toBe(20000);
     });
 
-    test(_"should handle flat rate services", _() => {
+    test("should handle flat rate services", () => {
       const result = calculateServicePrice("custom_beat", 60);
 
       expect(result.basePrice).toBe(20000); // $200 flat rate
       expect(result.totalPrice).toBe(20000);
     });
 
-    test(_"should add additional service fees", _() => {
+    test("should add additional service fees", () => {
       const result = calculateServicePrice("mixing", 60, ["rush_delivery", "include_stems"]);
 
       expect(result.basePrice).toBe(10000); // $100 for 1 hour
@@ -371,7 +370,7 @@ describe(_"Service Pricing Utilities", _() => {
       expect(result.totalPrice).toBe(17500);
     });
 
-    test(_"should apply rush order fee", _() => {
+    test("should apply rush order fee", () => {
       const result = calculateServicePrice("mixing", 60, [], true);
 
       expect(result.basePrice).toBe(10000); // $100
@@ -380,8 +379,8 @@ describe(_"Service Pricing Utilities", _() => {
     });
   });
 
-  describe(_"calculateServiceBundleDiscount", _() => {
-    test(_"should apply correct bundle discounts", _() => {
+  describe("calculateServiceBundleDiscount", () => {
+    test("should apply correct bundle discounts", () => {
       const services = [
         { type: "recording", duration: 180 }, // 3 hours * $150 = $450
         { type: "mixing", duration: 120 }, // 2 hours * $100 = $200
@@ -402,27 +401,27 @@ describe(_"Service Pricing Utilities", _() => {
 // CURRENCY UTILITIES
 // ================================
 
-describe(_"Currency Utilities", _() => {
-  describe(_"convertCurrency", _() => {
-    test(_"should return same amount for same currency", _() => {
+describe("Currency Utilities", () => {
+  describe("convertCurrency", () => {
+    test("should return same amount for same currency", () => {
       expect(convertCurrency(1000, Currency.USD, Currency.USD)).toBe(1000);
     });
 
-    test(_"should convert between currencies using exchange rates", _() => {
+    test("should convert between currencies using exchange rates", () => {
       const customRates = { USD_EUR: 0.85 };
       const result = convertCurrency(1000, Currency.USD, Currency.EUR, customRates);
       expect(result).toBe(850); // $10.00 -> €8.50
     });
 
-    test(_"should handle indirect conversion through USD", _() => {
+    test("should handle indirect conversion through USD", () => {
       const customRates = { EUR_USD: 1.18, USD_GBP: 0.73 };
       const result = convertCurrency(1000, Currency.EUR, Currency.GBP, customRates);
       expect(result).toBe(861); // EUR -> USD -> GBP
     });
   });
 
-  describe(_"formatCurrencyAmount", _() => {
-    test(_"should format currencies correctly", _() => {
+  describe("formatCurrencyAmount", () => {
+    test("should format currencies correctly", () => {
       expect(formatCurrencyAmount(1000, Currency.USD)).toBe("$10.00");
       expect(formatCurrencyAmount(1000, Currency.EUR)).toBe("€10.00");
       expect(formatCurrencyAmount(1000, Currency.JPY)).toBe("¥10"); // 1000 cents = ¥10
@@ -434,9 +433,9 @@ describe(_"Currency Utilities", _() => {
 // BUSINESS RULE VALIDATION
 // ================================
 
-describe(_"Business Rule Validation", _() => {
-  describe(_"validateOrderBusinessRules", _() => {
-    test(_"should validate license restrictions", _() => {
+describe("Business Rule Validation", () => {
+  describe("validateOrderBusinessRules", () => {
+    test("should validate license restrictions", () => {
       const items = [
         {
           id: 1,
@@ -458,7 +457,7 @@ describe(_"Business Rule Validation", _() => {
       expect(result.errors[0]).toContain("subscription plan does not allow");
     });
 
-    test(_"should detect duplicate items", _() => {
+    test("should detect duplicate items", () => {
       const items = [
         {
           id: 1,
@@ -489,8 +488,8 @@ describe(_"Business Rule Validation", _() => {
       expect(result.warnings).toContain("Order contains duplicate items");
     });
 
-    test(_"should warn about large orders", _() => {
-      const items = Array.from(_{ length: 60 }, _(_, _i) => ({
+    test("should warn about large orders", () => {
+      const items = Array.from({ length: 60 }, (_, i) => ({
         id: i + 1,
         productId: i + 1,
         productType: "beat" as const,
@@ -510,8 +509,8 @@ describe(_"Business Rule Validation", _() => {
     });
   });
 
-  describe(_"calculateRecommendedBeatPricing", _() => {
-    test(_"should calculate recommended pricing based on market factors", _() => {
+  describe("calculateRecommendedBeatPricing", () => {
+    test("should calculate recommended pricing based on market factors", () => {
       const result = calculateRecommendedBeatPricing("trap", 140, 4.5, "high");
 
       // Should be higher than base pricing due to high demand and good rating
@@ -524,7 +523,7 @@ describe(_"Business Rule Validation", _() => {
       expect(result.premium).toBeLessThan(result.unlimited);
     });
 
-    test(_"should apply genre-specific multipliers", _() => {
+    test("should apply genre-specific multipliers", () => {
       const popResult = calculateRecommendedBeatPricing("pop", 120, 3.0, "medium");
       const rbResult = calculateRecommendedBeatPricing("r&b", 90, 3.0, "medium");
 

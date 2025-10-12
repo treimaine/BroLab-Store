@@ -1,4 +1,67 @@
+import type {
+  Beat,
+  BeatSearchCriteria,
+  BeatSummary,
+  User,
+  UserProfile,
+  WaveformData,
+} from "../types";
+import type { CacheStats } from "../types/system-optimization";
 import { cacheManager } from "./cache-manager";
+
+// ================================
+// CACHE-SPECIFIC INTERFACES
+// ================================
+
+/**
+ * Extended cache health statistics
+ */
+export interface CacheHealthStats extends CacheStats {
+  /** Total number of cache hits */
+  hits?: number;
+  /** Total number of cache misses */
+  misses?: number;
+  /** Number of cached items (alias for totalEntries) */
+  itemCount?: number;
+  /** Cache uptime in milliseconds */
+  uptime?: number;
+}
+
+/**
+ * Express request interface for cache middleware
+ */
+export interface CacheableRequest {
+  /** Request method */
+  method: string;
+  /** Request URL */
+  url: string;
+  /** Request parameters */
+  params: Record<string, string>;
+  /** Query parameters */
+  query: Record<string, string | string[]>;
+  /** Request headers */
+  headers: Record<string, string>;
+  /** User information if authenticated */
+  user?: {
+    id: string;
+    role: string;
+  };
+}
+
+/**
+ * Express response interface for cache middleware
+ */
+export interface CacheableResponse {
+  /** Set response header */
+  setHeader: (name: string, value: string) => void;
+  /** Send JSON response */
+  json: (data: unknown) => CacheableResponse;
+}
+
+/**
+ * Express next function for middleware
+ */
+export type NextFunction = () => void;
 
 /**
  * Cache integration utilities for common use cases
@@ -82,7 +145,10 @@ export async function cacheApiResponse<T>(
 /**
  * Cache user profile data
  */
-export async function cacheUserProfile(userId: string, profileData: any): Promise<void> {
+export async function cacheUserProfile(
+  userId: string,
+  profileData: User | UserProfile
+): Promise<void> {
   const key = CACHE_KEYS.USER_PROFILE(userId);
   await cacheManager.set(key, profileData, CACHE_TTL.LONG, [CACHE_TAGS.USER_DATA]);
 }
@@ -90,7 +156,7 @@ export async function cacheUserProfile(userId: string, profileData: any): Promis
 /**
  * Get cached user profile
  */
-export async function getCachedUserProfile(userId: string): Promise<any | null> {
+export async function getCachedUserProfile(userId: string): Promise<User | UserProfile | null> {
   const key = CACHE_KEYS.USER_PROFILE(userId);
   return await cacheManager.get(key);
 }
@@ -99,8 +165,8 @@ export async function getCachedUserProfile(userId: string): Promise<any | null> 
  * Cache beats list with filters
  */
 export async function cacheBeatsData(
-  filters: Record<string, any>,
-  beatsData: any[]
+  filters: BeatSearchCriteria,
+  beatsData: Beat[] | BeatSummary[]
 ): Promise<void> {
   const filterKey = JSON.stringify(filters);
   const key = CACHE_KEYS.BEATS_LIST(filterKey);
@@ -110,7 +176,9 @@ export async function cacheBeatsData(
 /**
  * Get cached beats data
  */
-export async function getCachedBeatsData(filters: Record<string, any>): Promise<any[] | null> {
+export async function getCachedBeatsData(
+  filters: BeatSearchCriteria
+): Promise<Beat[] | BeatSummary[] | null> {
   const filterKey = JSON.stringify(filters);
   const key = CACHE_KEYS.BEATS_LIST(filterKey);
   return await cacheManager.get(key);
@@ -119,7 +187,10 @@ export async function getCachedBeatsData(filters: Record<string, any>): Promise<
 /**
  * Cache search results
  */
-export async function cacheSearchResults(query: string, results: any[]): Promise<void> {
+export async function cacheSearchResults(
+  query: string,
+  results: Beat[] | BeatSummary[]
+): Promise<void> {
   const key = CACHE_KEYS.SEARCH_RESULTS(query);
   await cacheManager.set(key, results, CACHE_TTL.SHORT, [CACHE_TAGS.SEARCH_DATA]);
 }
@@ -127,7 +198,9 @@ export async function cacheSearchResults(query: string, results: any[]): Promise
 /**
  * Get cached search results
  */
-export async function getCachedSearchResults(query: string): Promise<any[] | null> {
+export async function getCachedSearchResults(
+  query: string
+): Promise<Beat[] | BeatSummary[] | null> {
   const key = CACHE_KEYS.SEARCH_RESULTS(query);
   return await cacheManager.get(key);
 }
@@ -135,7 +208,7 @@ export async function getCachedSearchResults(query: string): Promise<any[] | nul
 /**
  * Cache waveform data for audio player
  */
-export async function cacheWaveformData(beatId: string, waveformData: any): Promise<void> {
+export async function cacheWaveformData(beatId: string, waveformData: WaveformData): Promise<void> {
   const key = CACHE_KEYS.WAVEFORM_DATA(beatId);
   await cacheManager.set(key, waveformData, CACHE_TTL.VERY_LONG, [CACHE_TAGS.AUDIO_DATA]);
 }
@@ -143,7 +216,7 @@ export async function cacheWaveformData(beatId: string, waveformData: any): Prom
 /**
  * Get cached waveform data
  */
-export async function getCachedWaveformData(beatId: string): Promise<any | null> {
+export async function getCachedWaveformData(beatId: string): Promise<WaveformData | null> {
   const key = CACHE_KEYS.WAVEFORM_DATA(beatId);
   return await cacheManager.get(key);
 }
@@ -188,16 +261,16 @@ export async function invalidateCommerceCache(userId?: string): Promise<void> {
  * Cache middleware for Express.js routes
  */
 export function createCacheMiddleware(
-  keyGenerator: (req: any) => string,
+  keyGenerator: (req: CacheableRequest) => string,
   options: {
     ttl?: number;
     tags?: string[];
-    condition?: (req: any) => boolean;
+    condition?: (req: CacheableRequest) => boolean;
   } = {}
 ) {
   const { ttl = CACHE_TTL.MEDIUM, tags = [], condition } = options;
 
-  return async (req: any, res: any, next: any) => {
+  return async (req: CacheableRequest, res: CacheableResponse, next: NextFunction) => {
     // Skip caching if condition is not met
     if (condition && !condition(req)) {
       return next();
@@ -217,7 +290,7 @@ export function createCacheMiddleware(
       const originalJson = res.json;
 
       // Override json method to cache response
-      res.json = function (data: any) {
+      res.json = function (data: unknown) {
         // Cache the response
         cacheManager.set(key, data, ttl, tags).catch(console.error);
 
@@ -252,34 +325,49 @@ export async function preloadCache(): Promise<void> {
 }
 
 /**
+ * Cache health check result
+ */
+export interface CacheHealthResult {
+  /** Whether the cache is healthy */
+  healthy: boolean;
+  /** Cache statistics */
+  stats: CacheHealthStats | null;
+  /** List of issues found */
+  issues: string[];
+}
+
+/**
  * Cache health check
  */
-export async function checkCacheHealth(): Promise<{
-  healthy: boolean;
-  stats: any;
-  issues: string[];
-}> {
+export async function checkCacheHealth(): Promise<CacheHealthResult> {
   try {
     const stats = await cacheManager.getStats();
+    const healthStats: CacheHealthStats = {
+      ...stats,
+      itemCount: stats.totalEntries,
+      hits: Math.round((stats.hitRate / 100) * stats.totalEntries),
+      misses: Math.round((stats.missRate / 100) * stats.totalEntries),
+      uptime: Date.now() - (stats.lastEvictionAt || Date.now()),
+    };
     const issues: string[] = [];
 
     // Check for potential issues
-    if (stats.hitRate < 50) {
+    if (healthStats.hitRate < 50) {
       issues.push("Low cache hit rate (< 50%)");
     }
 
-    if (stats.memoryUsage > 0.9 * 50 * 1024 * 1024) {
+    if (healthStats.memoryUsage > 0.9 * 50 * 1024 * 1024) {
       // 90% of 50MB
       issues.push("High memory usage (> 90% of limit)");
     }
 
-    if (stats.evictionCount > 100) {
+    if (healthStats.evictionCount > 100) {
       issues.push("High eviction count - consider increasing cache size");
     }
 
     return {
       healthy: issues.length === 0,
-      stats,
+      stats: healthStats,
       issues,
     };
   } catch (error) {

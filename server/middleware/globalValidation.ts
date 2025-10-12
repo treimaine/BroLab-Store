@@ -310,11 +310,15 @@ export const globalErrorHandler = (
         ? (error.context as Record<string, unknown>)
         : undefined;
 
-    const errorResponse = createApiError(error.type as unknown, error.message, {
-      userMessage,
-      requestId,
-      context,
-    });
+    const errorResponse = createApiError(
+      error.type as any, // TODO: Improve error type handling
+      error.message,
+      {
+        userMessage,
+        requestId,
+        context,
+      }
+    );
     return res.status(statusCode).json(errorResponse);
   }
 

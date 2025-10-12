@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import express from "express";
 import request from "supertest";
+import { MockConvexClient } from "./types/mocks";
 
 // Mock Convex client
 const mockConvexInstance = {
@@ -9,29 +10,29 @@ const mockConvexInstance = {
   action: jest.fn(),
 };
 
-jest.mock(_"convex/browser", _() => ({
-  ConvexHttpClient: jest.fn_(() => mockConvexInstance),
+jest.mock("convex/browser", () => ({
+  ConvexHttpClient: jest.fn(() => mockConvexInstance),
 }));
 
 // Mock mail service
-jest.mock(_"../server/services/mail", _() => ({ sendMail: jest.fn().mockResolvedValue(undefined) }));
+jest.mock("../server/services/mail", () => ({ sendMail: jest.fn().mockResolvedValue(undefined) }));
 
 // Mock PDF generator
-jest.mock(_"../server/lib/pdf", _() => {
-  const { _Readable} = require("stream");
+jest.mock("../server/lib/pdf", () => {
+  const { Readable } = jest.requireActual("stream");
   return {
-    buildInvoicePdfStream: jest.fn_(() => Readable.from([Buffer.from("PDF")])),
+    buildInvoicePdfStream: jest.fn(() => Readable.from([Buffer.from("PDF")])),
   };
 });
 
 // Under test: Stripe router
-let stripeRouter: any;
+let stripeRouter: unknown;
 
-describe(_"Stripe webhook idempotency and invoice pipeline", _() => {
+describe("Stripe webhook idempotency and invoice pipeline", () => {
   let app: express.Express;
-  let mockConvex: any;
+  let mockConvex: MockConvexClient;
 
-  beforeEach(_async () => {
+  beforeEach(async () => {
     jest.resetModules();
     process.env.NODE_ENV = "test";
     process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_dummy";
@@ -47,37 +48,42 @@ describe(_"Stripe webhook idempotency and invoice pipeline", _() => {
     mockConvexInstance.mutation.mockReset();
     mockConvexInstance.action.mockReset();
 
-    mockConvex = mockConvexInstance;
+    mockConvex = mockConvexInstance as MockConvexClient;
 
     // Set up Express app with router
     app = express();
     app.use(express.json({ limit: "1mb" }));
-    stripeRouter = (await import("../server/routes/stripe")).default;
-    app.use("/api/payment/stripe", stripeRouter);
+    const stripeRouterModule = await import("../server/routes/stripe");
+    stripeRouter = stripeRouterModule.default;
+    app.use("/api/payment/stripe", stripeRouter as express.Router);
 
     // Mock global fetch used for upload
-    global.fetch = jest.fn(_async (url: unknown, _init?: unknown) => {
+    global.fetch = jest.fn(async (url: unknown, _init?: unknown) => {
       if (typeof url === "string" && url.startsWith("http")) {
         return {
           ok: true,
           json: async () => ({ storageId: "file_1" }),
         } as Response;
       }
-      return { ok: true, json: async () => ({}) } as any;
-    }) as any;
+      return { ok: true, json: async () => ({}) } as Response;
+    }) as jest.MockedFunction<typeof fetch>;
   });
 
-  it(_"prevents duplicate processing via idempotency guard", _async () => {
+  it("prevents duplicate processing via idempotency guard", async () => {
     // First call: not processed
-    mockConvex.mutation.mockImplementationOnce(_async (_fn: any, _args: any) => {
-      if (args && args.provider === "stripe") return { alreadyProcessed: false };
-      return {};
-    });
+    mockConvex.mutation.mockImplementationOnce(
+      async (_fn: string, args?: Record<string, unknown>) => {
+        if (args && args.provider === "stripe") return { alreadyProcessed: false };
+        return {};
+      }
+    );
     // Second call: already processed
-    mockConvex.mutation.mockImplementationOnce(_async (_fn: any, _args: any) => {
-      if (args && args.provider === "stripe") return { alreadyProcessed: true };
-      return {};
-    });
+    mockConvex.mutation.mockImplementationOnce(
+      async (_fn: string, args?: Record<string, unknown>) => {
+        if (args && args.provider === "stripe") return { alreadyProcessed: true };
+        return {};
+      }
+    );
 
     const eventBody = {
       id: "evt_test_1",
@@ -99,15 +105,17 @@ describe(_"Stripe webhook idempotency and invoice pipeline", _() => {
     expect(res2.status).toBe(204);
   });
 
-  it(_"generates invoice and sends email on checkout.session.completed", _async () => {
+  it("generates invoice and sends email on checkout.session.completed", async () => {
     // Idempotency first call
-    mockConvex.mutation.mockImplementationOnce(_async (_fn: any, _args: any) => {
-      if (args && args.provider === "stripe") return { alreadyProcessed: false };
-      return {};
-    });
+    mockConvex.mutation.mockImplementationOnce(
+      async (_fn: string, args?: Record<string, unknown>) => {
+        if (args && args.provider === "stripe") return { alreadyProcessed: false };
+        return {};
+      }
+    );
 
     // recordPayment
-    mockConvex.mutation.mockImplementationOnce(_async () => ({ success: true }));
+    mockConvex.mutation.mockImplementationOnce(async () => ({ success: true }));
 
     // getOrderWithRelations
     mockConvex.query.mockResolvedValueOnce({
@@ -136,7 +144,7 @@ describe(_"Stripe webhook idempotency and invoice pipeline", _() => {
     mockConvex.action.mockResolvedValueOnce({ url: "http://upload.local" });
 
     // setInvoiceForOrder
-    mockConvex.mutation.mockImplementationOnce(_async () => ({
+    mockConvex.mutation.mockImplementationOnce(async () => ({
       invoiceId: "inv:1",
       number: "BRL-2025-0001",
       url: "http://cdn/invoice.pdf",

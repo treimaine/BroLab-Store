@@ -16,9 +16,10 @@ export const createReservation = mutation({
 
     if (args.clerkId) {
       // Server-side call with explicit clerkId
+      const clerkId = args.clerkId; // Type narrowing by assigning to local constant
       const user = await ctx.db
         .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", args.clerkId))
+        .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
         .first();
 
       if (!user) {

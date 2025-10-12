@@ -646,7 +646,10 @@ export class SecurityEnhancer {
           req.body = sanitizationResult.sanitized;
 
           if (sanitizationResult.securityEvents.length > 0) {
-            (req as any).security.securityEvents.push(...sanitizationResult.securityEvents);
+            const authReq = req as any;
+            if (authReq.security?.securityEvents) {
+              authReq.security.securityEvents.push(...sanitizationResult.securityEvents);
+            }
           }
         }
 
@@ -659,7 +662,10 @@ export class SecurityEnhancer {
           }
 
           if (sanitizationResult.securityEvents.length > 0) {
-            (req as unknown).security.securityEvents.push(...sanitizationResult.securityEvents);
+            const authReq = req as any;
+            if (authReq.security?.securityEvents) {
+              authReq.security.securityEvents.push(...sanitizationResult.securityEvents);
+            }
           }
         }
 

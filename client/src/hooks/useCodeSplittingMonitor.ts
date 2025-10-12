@@ -4,12 +4,11 @@ import CodeSplittingMonitor, { type CodeSplittingMetrics } from "../utils/codeSp
  * React hook for code splitting monitoring
  */
 
-
 export function useCodeSplittingMonitor() {
-  const [monitor] = useState_(() => CodeSplittingMonitor.getInstance());
+  const [monitor] = useState(() => CodeSplittingMonitor.getInstance());
   const [metrics, setMetrics] = useState<CodeSplittingMetrics | null>(null);
 
-  useEffect_(() => {
+  useEffect(() => {
     // Update metrics every 5 seconds
     const interval = setInterval(() => {
       setMetrics(monitor.getMetrics());

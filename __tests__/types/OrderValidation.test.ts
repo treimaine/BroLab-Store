@@ -21,9 +21,9 @@ import {
   validatePaymentMethodForCurrency,
 } from "../../shared/validation/OrderValidation";
 
-describe(_"Order Validation Tests", _() => {
-  describe(_"OrderStatus Validation", _() => {
-    test(_"should accept valid order statuses", _() => {
+describe("Order Validation Tests", () => {
+  describe("OrderStatus Validation", () => {
+    test("should accept valid order statuses", () => {
       const validStatuses = [
         "pending",
         "processing",
@@ -34,21 +34,21 @@ describe(_"Order Validation Tests", _() => {
       ];
 
       validStatuses.forEach(status => {
-        expect_(() => OrderStatus.parse(status)).not.toThrow();
+        expect(() => OrderStatus.parse(status)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid order statuses", _() => {
+    test("should reject invalid order statuses", () => {
       const invalidStatuses = ["draft", "shipped", "delivered", "", "invalid-status"];
 
       invalidStatuses.forEach(status => {
-        expect_(() => OrderStatus.parse(status)).toThrow();
+        expect(() => OrderStatus.parse(status)).toThrow();
       });
     });
   });
 
-  describe(_"PaymentStatus Validation", _() => {
-    test(_"should accept valid payment statuses", _() => {
+  describe("PaymentStatus Validation", () => {
+    test("should accept valid payment statuses", () => {
       const validStatuses = [
         "pending",
         "processing",
@@ -61,39 +61,39 @@ describe(_"Order Validation Tests", _() => {
       ];
 
       validStatuses.forEach(status => {
-        expect_(() => PaymentStatus.parse(status)).not.toThrow();
+        expect(() => PaymentStatus.parse(status)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid payment statuses", _() => {
+    test("should reject invalid payment statuses", () => {
       const invalidStatuses = ["authorized", "captured", "declined", "", "invalid-status"];
 
       invalidStatuses.forEach(status => {
-        expect_(() => PaymentStatus.parse(status)).toThrow();
+        expect(() => PaymentStatus.parse(status)).toThrow();
       });
     });
   });
 
-  describe(_"PaymentProvider Validation", _() => {
-    test(_"should accept valid payment providers", _() => {
+  describe("PaymentProvider Validation", () => {
+    test("should accept valid payment providers", () => {
       const validProviders = ["stripe", "paypal", "clerk_billing"];
 
       validProviders.forEach(provider => {
-        expect_(() => PaymentProvider.parse(provider)).not.toThrow();
+        expect(() => PaymentProvider.parse(provider)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid payment providers", _() => {
+    test("should reject invalid payment providers", () => {
       const invalidProviders = ["square", "braintree", "apple_pay", "", "invalid-provider"];
 
       invalidProviders.forEach(provider => {
-        expect_(() => PaymentProvider.parse(provider)).toThrow();
+        expect(() => PaymentProvider.parse(provider)).toThrow();
       });
     });
   });
 
-  describe(_"Currency Validation", _() => {
-    test(_"should accept valid ISO 4217 currency codes", _() => {
+  describe("Currency Validation", () => {
+    test("should accept valid ISO 4217 currency codes", () => {
       const validCurrencies = [
         "USD",
         "EUR",
@@ -108,21 +108,21 @@ describe(_"Order Validation Tests", _() => {
       ];
 
       validCurrencies.forEach(currency => {
-        expect_(() => Currency.parse(currency)).not.toThrow();
+        expect(() => Currency.parse(currency)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid currency codes", _() => {
+    test("should reject invalid currency codes", () => {
       const invalidCurrencies = ["usd", "INVALID", "XYZ", "", "123"];
 
       invalidCurrencies.forEach(currency => {
-        expect_(() => Currency.parse(currency)).toThrow();
+        expect(() => Currency.parse(currency)).toThrow();
       });
     });
   });
 
-  describe(_"OrderItem Schema Validation", _() => {
-    test(_"should accept valid order item", _() => {
+  describe("OrderItem Schema Validation", () => {
+    test("should accept valid order item", () => {
       const validOrderItem = {
         id: "item-123",
         productId: 456,
@@ -140,10 +140,10 @@ describe(_"Order Validation Tests", _() => {
         maxDownloads: 3,
       };
 
-      expect_(() => OrderItemSchema.parse(validOrderItem)).not.toThrow();
+      expect(() => OrderItemSchema.parse(validOrderItem)).not.toThrow();
     });
 
-    test(_"should reject order item with negative prices", _() => {
+    test("should reject order item with negative prices", () => {
       const invalidOrderItem = {
         productId: 456,
         productType: "beat" as const,
@@ -153,12 +153,12 @@ describe(_"Order Validation Tests", _() => {
         totalPrice: -100,
       };
 
-      expect_(() => OrderItemSchema.parse(invalidOrderItem)).toThrow(
+      expect(() => OrderItemSchema.parse(invalidOrderItem)).toThrow(
         "Unit price cannot be negative"
       );
     });
 
-    test(_"should apply default values", _() => {
+    test("should apply default values", () => {
       const minimalOrderItem = {
         productId: 456,
         productType: "beat" as const,
@@ -174,8 +174,8 @@ describe(_"Order Validation Tests", _() => {
     });
   });
 
-  describe(_"BillingAddress Schema Validation", _() => {
-    test(_"should accept valid billing address", _() => {
+  describe("BillingAddress Schema Validation", () => {
+    test("should accept valid billing address", () => {
       const validAddress = {
         firstName: "John",
         lastName: "Doe",
@@ -189,10 +189,10 @@ describe(_"Order Validation Tests", _() => {
         phone: "+1-555-123-4567",
       };
 
-      expect_(() => BillingAddressSchema.parse(validAddress)).not.toThrow();
+      expect(() => BillingAddressSchema.parse(validAddress)).not.toThrow();
     });
 
-    test(_"should reject address with missing required fields", _() => {
+    test("should reject address with missing required fields", () => {
       const invalidAddress = {
         firstName: "",
         lastName: "",
@@ -202,10 +202,10 @@ describe(_"Order Validation Tests", _() => {
         country: "USA", // Should be 2-letter code
       };
 
-      expect_(() => BillingAddressSchema.parse(invalidAddress)).toThrow();
+      expect(() => BillingAddressSchema.parse(invalidAddress)).toThrow();
     });
 
-    test(_"should accept address without optional fields", _() => {
+    test("should accept address without optional fields", () => {
       const minimalAddress = {
         firstName: "John",
         lastName: "Doe",
@@ -215,12 +215,12 @@ describe(_"Order Validation Tests", _() => {
         country: "US",
       };
 
-      expect_(() => BillingAddressSchema.parse(minimalAddress)).not.toThrow();
+      expect(() => BillingAddressSchema.parse(minimalAddress)).not.toThrow();
     });
   });
 
-  describe(_"TaxInfo Schema Validation", _() => {
-    test(_"should accept valid tax information", _() => {
+  describe("TaxInfo Schema Validation", () => {
+    test("should accept valid tax information", () => {
       const validTaxInfo = {
         taxRate: 0.08, // 8%
         taxAmount: 240, // $2.40
@@ -229,32 +229,32 @@ describe(_"Order Validation Tests", _() => {
         exemptionReason: "Non-profit organization",
       };
 
-      expect_(() => TaxInfoSchema.parse(validTaxInfo)).not.toThrow();
+      expect(() => TaxInfoSchema.parse(validTaxInfo)).not.toThrow();
     });
 
-    test(_"should reject invalid tax rates", _() => {
+    test("should reject invalid tax rates", () => {
       const invalidTaxInfo = {
         taxRate: 1.5, // 150% - invalid
         taxAmount: 240,
         taxType: "vat" as const,
       };
 
-      expect_(() => TaxInfoSchema.parse(invalidTaxInfo)).toThrow();
+      expect(() => TaxInfoSchema.parse(invalidTaxInfo)).toThrow();
     });
 
-    test(_"should reject negative tax amounts", _() => {
+    test("should reject negative tax amounts", () => {
       const invalidTaxInfo = {
         taxRate: 0.08,
         taxAmount: -100, // Negative amount
         taxType: "gst" as const,
       };
 
-      expect_(() => TaxInfoSchema.parse(invalidTaxInfo)).toThrow();
+      expect(() => TaxInfoSchema.parse(invalidTaxInfo)).toThrow();
     });
   });
 
-  describe(_"PaymentInfo Schema Validation", _() => {
-    test(_"should accept valid payment information", _() => {
+  describe("PaymentInfo Schema Validation", () => {
+    test("should accept valid payment information", () => {
       const validPaymentInfo = {
         provider: "stripe" as const,
         paymentIntentId: "pi_1234567890",
@@ -269,20 +269,20 @@ describe(_"Order Validation Tests", _() => {
         capturedAt: new Date().toISOString(),
       };
 
-      expect_(() => PaymentInfoSchema.parse(validPaymentInfo)).not.toThrow();
+      expect(() => PaymentInfoSchema.parse(validPaymentInfo)).not.toThrow();
     });
 
-    test(_"should reject payment info with invalid last4", _() => {
+    test("should reject payment info with invalid last4", () => {
       const invalidPaymentInfo = {
         provider: "stripe" as const,
         last4: "42424", // Should be exactly 4 digits
         netAmount: 4999,
       };
 
-      expect_(() => PaymentInfoSchema.parse(invalidPaymentInfo)).toThrow();
+      expect(() => PaymentInfoSchema.parse(invalidPaymentInfo)).toThrow();
     });
 
-    test(_"should apply default processing fee", _() => {
+    test("should apply default processing fee", () => {
       const minimalPaymentInfo = {
         provider: "paypal" as const,
         netAmount: 4999,
@@ -293,8 +293,8 @@ describe(_"Order Validation Tests", _() => {
     });
   });
 
-  describe(_"InvoiceInfo Schema Validation", _() => {
-    test(_"should accept valid invoice information", _() => {
+  describe("InvoiceInfo Schema Validation", () => {
+    test("should accept valid invoice information", () => {
       const validInvoiceInfo = {
         invoiceNumber: "INV-2025-001",
         invoiceDate: new Date().toISOString(),
@@ -306,24 +306,24 @@ describe(_"Order Validation Tests", _() => {
         terms: "Payment due within 30 days.",
       };
 
-      expect_(() => InvoiceInfoSchema.parse(validInvoiceInfo)).not.toThrow();
+      expect(() => InvoiceInfoSchema.parse(validInvoiceInfo)).not.toThrow();
     });
 
-    test(_"should reject invoice with empty invoice number", _() => {
+    test("should reject invoice with empty invoice number", () => {
       const invalidInvoiceInfo = {
         invoiceNumber: "",
         invoiceDate: new Date().toISOString(),
         status: "draft" as const,
       };
 
-      expect_(() => InvoiceInfoSchema.parse(invalidInvoiceInfo)).toThrow(
+      expect(() => InvoiceInfoSchema.parse(invalidInvoiceInfo)).toThrow(
         "Invoice number is required"
       );
     });
   });
 
-  describe(_"Complete Order Schema Validation", _() => {
-    test(_"should accept valid complete order", _() => {
+  describe("Complete Order Schema Validation", () => {
+    test("should accept valid complete order", () => {
       const validOrder = {
         id: "order_1234567890",
         orderNumber: "ORD-2025-001",
@@ -362,10 +362,10 @@ describe(_"Order Validation Tests", _() => {
         updatedAt: new Date().toISOString(),
       };
 
-      expect_(() => OrderSchema.parse(validOrder)).not.toThrow();
+      expect(() => OrderSchema.parse(validOrder)).not.toThrow();
     });
 
-    test(_"should reject order with empty items array", _() => {
+    test("should reject order with empty items array", () => {
       const invalidOrder = {
         orderNumber: "ORD-2025-001",
         email: "customer@example.com",
@@ -377,10 +377,10 @@ describe(_"Order Validation Tests", _() => {
         paymentStatus: "pending" as const,
       };
 
-      expect_(() => OrderSchema.parse(invalidOrder)).toThrow("Order must contain at least one item");
+      expect(() => OrderSchema.parse(invalidOrder)).toThrow("Order must contain at least one item");
     });
 
-    test(_"should reject order with invalid email", _() => {
+    test("should reject order with invalid email", () => {
       const invalidOrder = {
         orderNumber: "ORD-2025-001",
         email: "invalid-email",
@@ -400,12 +400,12 @@ describe(_"Order Validation Tests", _() => {
         paymentStatus: "pending" as const,
       };
 
-      expect_(() => OrderSchema.parse(invalidOrder)).toThrow("Valid email is required");
+      expect(() => OrderSchema.parse(invalidOrder)).toThrow("Valid email is required");
     });
   });
 
-  describe(_"CreateOrder Schema Validation", _() => {
-    test(_"should accept valid order creation data", _() => {
+  describe("CreateOrder Schema Validation", () => {
+    test("should accept valid order creation data", () => {
       const validCreateOrder = {
         items: [
           {
@@ -432,10 +432,10 @@ describe(_"Order Validation Tests", _() => {
         idempotencyKey: "idem_1234567890",
       };
 
-      expect_(() => CreateOrderSchema.parse(validCreateOrder)).not.toThrow();
+      expect(() => CreateOrderSchema.parse(validCreateOrder)).not.toThrow();
     });
 
-    test(_"should apply default currency", _() => {
+    test("should apply default currency", () => {
       const createOrderWithoutCurrency = {
         items: [
           {
@@ -453,8 +453,8 @@ describe(_"Order Validation Tests", _() => {
     });
   });
 
-  describe(_"UpdateOrder Schema Validation", _() => {
-    test(_"should accept valid order update data", _() => {
+  describe("UpdateOrder Schema Validation", () => {
+    test("should accept valid order update data", () => {
       const validUpdateOrder = {
         id: "order_1234567890",
         status: "processing" as const,
@@ -464,21 +464,21 @@ describe(_"Order Validation Tests", _() => {
         metadata: { updated_by: "admin" },
       };
 
-      expect_(() => UpdateOrderSchema.parse(validUpdateOrder)).not.toThrow();
+      expect(() => UpdateOrderSchema.parse(validUpdateOrder)).not.toThrow();
     });
 
-    test(_"should require ID for updates", _() => {
+    test("should require ID for updates", () => {
       const updateWithoutId = {
         status: "processing" as const,
         notes: "Updated notes",
       };
 
-      expect_(() => UpdateOrderSchema.parse(updateWithoutId)).toThrow();
+      expect(() => UpdateOrderSchema.parse(updateWithoutId)).toThrow();
     });
   });
 
-  describe(_"OrderFilter Schema Validation", _() => {
-    test(_"should accept valid filter parameters", _() => {
+  describe("OrderFilter Schema Validation", () => {
+    test("should accept valid filter parameters", () => {
       const validFilters = {
         userId: "user_1234567890",
         email: "customer@example.com",
@@ -496,10 +496,10 @@ describe(_"Order Validation Tests", _() => {
         sortOrder: "asc" as const,
       };
 
-      expect_(() => OrderFilterSchema.parse(validFilters)).not.toThrow();
+      expect(() => OrderFilterSchema.parse(validFilters)).not.toThrow();
     });
 
-    test(_"should apply default values", _() => {
+    test("should apply default values", () => {
       const minimalFilters = {};
       const result = OrderFilterSchema.parse(minimalFilters);
 
@@ -510,8 +510,8 @@ describe(_"Order Validation Tests", _() => {
     });
   });
 
-  describe(_"CreatePaymentIntent Schema Validation", _() => {
-    test(_"should accept valid payment intent creation data", _() => {
+  describe("CreatePaymentIntent Schema Validation", () => {
+    test("should accept valid payment intent creation data", () => {
       const validPaymentIntent = {
         orderId: "order_1234567890",
         amount: 4999, // $49.99
@@ -523,22 +523,22 @@ describe(_"Order Validation Tests", _() => {
         metadata: { order_type: "beat_purchase" },
       };
 
-      expect_(() => CreatePaymentIntentSchema.parse(validPaymentIntent)).not.toThrow();
+      expect(() => CreatePaymentIntentSchema.parse(validPaymentIntent)).not.toThrow();
     });
 
-    test(_"should reject payment intent with amount below minimum", _() => {
+    test("should reject payment intent with amount below minimum", () => {
       const invalidPaymentIntent = {
         orderId: "order_1234567890",
         amount: 25, // Below $0.50 minimum
         currency: "USD" as const,
       };
 
-      expect_(() => CreatePaymentIntentSchema.parse(invalidPaymentIntent)).toThrow(
+      expect(() => CreatePaymentIntentSchema.parse(invalidPaymentIntent)).toThrow(
         "Minimum amount is $0.50"
       );
     });
 
-    test(_"should apply default values", _() => {
+    test("should apply default values", () => {
       const minimalPaymentIntent = {
         orderId: "order_1234567890",
         amount: 4999,
@@ -550,8 +550,8 @@ describe(_"Order Validation Tests", _() => {
     });
   });
 
-  describe(_"RefundRequest Schema Validation", _() => {
-    test(_"should accept valid refund request", _() => {
+  describe("RefundRequest Schema Validation", () => {
+    test("should accept valid refund request", () => {
       const validRefundRequest = {
         orderId: "order_1234567890",
         amount: 2500, // Partial refund
@@ -560,10 +560,10 @@ describe(_"Order Validation Tests", _() => {
         notifyCustomer: true,
       };
 
-      expect_(() => RefundRequestSchema.parse(validRefundRequest)).not.toThrow();
+      expect(() => RefundRequestSchema.parse(validRefundRequest)).not.toThrow();
     });
 
-    test(_"should apply default notification setting", _() => {
+    test("should apply default notification setting", () => {
       const refundWithoutNotification = {
         orderId: "order_1234567890",
         reason: "duplicate" as const,
@@ -573,19 +573,19 @@ describe(_"Order Validation Tests", _() => {
       expect(result.notifyCustomer).toBe(true);
     });
 
-    test(_"should reject refund request without order ID", _() => {
+    test("should reject refund request without order ID", () => {
       const invalidRefundRequest = {
         amount: 2500,
         reason: "fraudulent" as const,
       };
 
-      expect_(() => RefundRequestSchema.parse(invalidRefundRequest)).toThrow();
+      expect(() => RefundRequestSchema.parse(invalidRefundRequest)).toThrow();
     });
   });
 
-  describe(_"Validation Utilities", _() => {
-    describe(_"validateOrderTotal", _() => {
-      test(_"should validate correct order total calculation", _() => {
+  describe("Validation Utilities", () => {
+    describe("validateOrderTotal", () => {
+      test("should validate correct order total calculation", () => {
         const validOrder = {
           subtotal: 4999,
           taxAmount: 400,
@@ -597,7 +597,7 @@ describe(_"Order Validation Tests", _() => {
         expect(validateOrderTotal(validOrder)).toBe(true);
       });
 
-      test(_"should reject incorrect order total calculation", _() => {
+      test("should reject incorrect order total calculation", () => {
         const invalidOrder = {
           subtotal: 4999,
           taxAmount: 400,
@@ -609,7 +609,7 @@ describe(_"Order Validation Tests", _() => {
         expect(validateOrderTotal(invalidOrder)).toBe(false);
       });
 
-      test(_"should allow small rounding differences", _() => {
+      test("should allow small rounding differences", () => {
         const orderWithRounding = {
           subtotal: 4999,
           taxAmount: 400,
@@ -622,8 +622,8 @@ describe(_"Order Validation Tests", _() => {
       });
     });
 
-    describe(_"validateOrderItemsTotal", _() => {
-      test(_"should validate correct items total", _() => {
+    describe("validateOrderItemsTotal", () => {
+      test("should validate correct items total", () => {
         const items = [
           { unitPrice: 2999, quantity: 1, discountAmount: 0 },
           { unitPrice: 4999, quantity: 2, discountAmount: 500 },
@@ -633,7 +633,7 @@ describe(_"Order Validation Tests", _() => {
         expect(validateOrderItemsTotal(items, subtotal)).toBe(true);
       });
 
-      test(_"should reject incorrect items total", _() => {
+      test("should reject incorrect items total", () => {
         const items = [
           { unitPrice: 2999, quantity: 1, discountAmount: 0 },
           { unitPrice: 4999, quantity: 2, discountAmount: 500 },
@@ -644,8 +644,8 @@ describe(_"Order Validation Tests", _() => {
       });
     });
 
-    describe(_"validateCurrencyAmount", _() => {
-      test(_"should validate minimum amounts for different currencies", _() => {
+    describe("validateCurrencyAmount", () => {
+      test("should validate minimum amounts for different currencies", () => {
         expect(validateCurrencyAmount(50, "USD")).toBe(true); // $0.50
         expect(validateCurrencyAmount(49, "USD")).toBe(false); // Below minimum
 
@@ -656,32 +656,32 @@ describe(_"Order Validation Tests", _() => {
         expect(validateCurrencyAmount(49, "JPY")).toBe(false); // Below minimum
       });
 
-      test(_"should use default minimum for unknown currencies", _() => {
+      test("should use default minimum for unknown currencies", () => {
         expect(validateCurrencyAmount(50, "XYZ")).toBe(true);
         expect(validateCurrencyAmount(49, "XYZ")).toBe(false);
       });
     });
 
-    describe(_"validatePaymentMethodForCurrency", _() => {
-      test(_"should validate payment methods for USD", _() => {
+    describe("validatePaymentMethodForCurrency", () => {
+      test("should validate payment methods for USD", () => {
         expect(validatePaymentMethodForCurrency("card", "USD")).toBe(true);
         expect(validatePaymentMethodForCurrency("paypal", "USD")).toBe(true);
         expect(validatePaymentMethodForCurrency("bank_transfer", "USD")).toBe(true);
       });
 
-      test(_"should validate payment methods for EUR", _() => {
+      test("should validate payment methods for EUR", () => {
         expect(validatePaymentMethodForCurrency("card", "EUR")).toBe(true);
         expect(validatePaymentMethodForCurrency("paypal", "EUR")).toBe(true);
         expect(validatePaymentMethodForCurrency("bank_transfer", "EUR")).toBe(true);
       });
 
-      test(_"should validate payment methods for JPY", _() => {
+      test("should validate payment methods for JPY", () => {
         expect(validatePaymentMethodForCurrency("card", "JPY")).toBe(true);
         expect(validatePaymentMethodForCurrency("paypal", "JPY")).toBe(false);
         expect(validatePaymentMethodForCurrency("bank_transfer", "JPY")).toBe(false);
       });
 
-      test(_"should handle unknown currencies", _() => {
+      test("should handle unknown currencies", () => {
         expect(validatePaymentMethodForCurrency("card", "XYZ")).toBe(false);
       });
     });

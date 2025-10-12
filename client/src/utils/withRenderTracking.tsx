@@ -4,7 +4,6 @@ import { useCodeSplittingMonitor } from "../hooks/useCodeSplittingMonitor";
  * Higher-order component to track component render performance
  */
 
-
 export function withRenderTracking<P extends object>(
   WrappedComponent: React.ComponentType<P>,
   componentName: string,
@@ -13,7 +12,7 @@ export function withRenderTracking<P extends object>(
   return function TrackedComponent(props: P) {
     const { trackComponentRender } = useCodeSplittingMonitor();
 
-    useEffect_(() => {
+    useEffect(() => {
       const startTime = performance.now();
 
       return () => {

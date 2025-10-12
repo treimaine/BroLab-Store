@@ -1,6 +1,3 @@
-import {
-import {
-import {
 import { DEFAULT_LICENSE_TERMS, LICENSE_PRICING } from "../../shared/types/Beat";
 import { SUBSCRIPTION_FEATURES, SubscriptionPlan } from "../../shared/types/User";
 /**
@@ -16,30 +13,32 @@ import { SUBSCRIPTION_FEATURES, SubscriptionPlan } from "../../shared/types/User
  * - Discount applications
  */
 
+import {
   validateAudioFormatForLicense,
   validateBeatPricing,
   validateBpmForGenre,
 } from "../../shared/validation/BeatValidation";
 
+import {
   validateCurrencyAmount,
   validateOrderItemsTotal,
   validateOrderTotal,
   validatePaymentMethodForCurrency,
 } from "../../shared/validation/OrderValidation";
 
+import {
   validateRoomForService,
   validateServicePricing,
   validateTimeSlot,
 } from "../../shared/validation/ReservationValidation";
 
-
 // ================================
 // BEAT PRICING CALCULATIONS
 // ================================
 
-describe(_"Beat Pricing Calculations", _() => {
-  describe(_"validateBeatPricing", _() => {
-    test(_"should validate correct pricing hierarchy", _() => {
+describe("Beat Pricing Calculations", () => {
+  describe("validateBeatPricing", () => {
+    test("should validate correct pricing hierarchy", () => {
       const validPricing = {
         basic: 2999, // $29.99
         premium: 4999, // $49.99
@@ -50,7 +49,7 @@ describe(_"Beat Pricing Calculations", _() => {
       expect(validateBeatPricing(validPricing)).toBe(true);
     });
 
-    test(_"should reject incorrect pricing hierarchy", _() => {
+    test("should reject incorrect pricing hierarchy", () => {
       const invalidPricing1 = {
         basic: 4999,
         premium: 2999, // Premium should be higher than basic
@@ -77,7 +76,7 @@ describe(_"Beat Pricing Calculations", _() => {
       expect(validateBeatPricing(invalidPricing3)).toBe(false);
     });
 
-    test(_"should handle edge cases", _() => {
+    test("should handle edge cases", () => {
       // Minimum valid pricing
       const minPricing = {
         basic: 100, // $1.00
@@ -98,19 +97,19 @@ describe(_"Beat Pricing Calculations", _() => {
     });
   });
 
-  describe(_"License Pricing Constants", _() => {
-    test(_"should have correct default license pricing", _() => {
+  describe("License Pricing Constants", () => {
+    test("should have correct default license pricing", () => {
       expect(LICENSE_PRICING.basic).toBe(29.99);
       expect(LICENSE_PRICING.premium).toBe(49.99);
       expect(LICENSE_PRICING.unlimited).toBe(149.99);
     });
 
-    test(_"should maintain pricing hierarchy in constants", _() => {
+    test("should maintain pricing hierarchy in constants", () => {
       expect(LICENSE_PRICING.basic).toBeLessThan(LICENSE_PRICING.premium);
       expect(LICENSE_PRICING.premium).toBeLessThan(LICENSE_PRICING.unlimited);
     });
 
-    test(_"should have valid license terms", _() => {
+    test("should have valid license terms", () => {
       expect(DEFAULT_LICENSE_TERMS.basic.copiesSold).toBe(2000);
       expect(DEFAULT_LICENSE_TERMS.premium.copiesSold).toBe(10000);
       expect(DEFAULT_LICENSE_TERMS.unlimited.copiesSold).toBe(-1); // Unlimited
@@ -121,42 +120,42 @@ describe(_"Beat Pricing Calculations", _() => {
     });
   });
 
-  describe(_"Genre-BPM Validation", _() => {
-    test(_"should validate correct BPM ranges for genres", _() => {
+  describe("Genre-BPM Validation", () => {
+    test("should validate correct BPM ranges for genres", () => {
       expect(validateBpmForGenre(120, "hip-hop")).toBe(true);
       expect(validateBpmForGenre(140, "trap")).toBe(true);
       expect(validateBpmForGenre(90, "r&b")).toBe(true);
       expect(validateBpmForGenre(120, "pop")).toBe(true);
     });
 
-    test(_"should reject BPM outside genre ranges", _() => {
+    test("should reject BPM outside genre ranges", () => {
       expect(validateBpmForGenre(200, "hip-hop")).toBe(false); // Too high
       expect(validateBpmForGenre(50, "trap")).toBe(false); // Too low
       expect(validateBpmForGenre(150, "r&b")).toBe(false); // Too high
       expect(validateBpmForGenre(80, "pop")).toBe(false); // Too low
     });
 
-    test(_"should allow unknown genres", _() => {
+    test("should allow unknown genres", () => {
       expect(validateBpmForGenre(120, "unknown-genre")).toBe(true);
       expect(validateBpmForGenre(180, "experimental")).toBe(true);
     });
   });
 
-  describe(_"Audio Format License Validation", _() => {
-    test(_"should validate correct formats for license types", _() => {
+  describe("Audio Format License Validation", () => {
+    test("should validate correct formats for license types", () => {
       expect(validateAudioFormatForLicense("mp3", "basic")).toBe(true);
       expect(validateAudioFormatForLicense("wav", "premium")).toBe(true);
       expect(validateAudioFormatForLicense("aiff", "unlimited")).toBe(true);
       expect(validateAudioFormatForLicense("flac", "exclusive")).toBe(true);
     });
 
-    test(_"should reject incorrect formats for license types", _() => {
+    test("should reject incorrect formats for license types", () => {
       expect(validateAudioFormatForLicense("wav", "basic")).toBe(false);
       expect(validateAudioFormatForLicense("flac", "basic")).toBe(false);
       expect(validateAudioFormatForLicense("mp3", "exclusive")).toBe(false);
     });
 
-    test(_"should handle case insensitivity", _() => {
+    test("should handle case insensitivity", () => {
       expect(validateAudioFormatForLicense("MP3", "basic")).toBe(true);
       expect(validateAudioFormatForLicense("WAV", "premium")).toBe(true);
     });
@@ -167,9 +166,9 @@ describe(_"Beat Pricing Calculations", _() => {
 // ORDER CALCULATIONS
 // ================================
 
-describe(_"Order Calculations", _() => {
-  describe(_"validateOrderTotal", _() => {
-    test(_"should validate correct order total calculation", _() => {
+describe("Order Calculations", () => {
+  describe("validateOrderTotal", () => {
+    test("should validate correct order total calculation", () => {
       const order = {
         subtotal: 10000, // $100.00
         taxAmount: 800, // $8.00 (8% tax)
@@ -181,7 +180,7 @@ describe(_"Order Calculations", _() => {
       expect(validateOrderTotal(order)).toBe(true);
     });
 
-    test(_"should reject incorrect order total calculation", _() => {
+    test("should reject incorrect order total calculation", () => {
       const order = {
         subtotal: 10000,
         taxAmount: 800,
@@ -193,7 +192,7 @@ describe(_"Order Calculations", _() => {
       expect(validateOrderTotal(order)).toBe(false);
     });
 
-    test(_"should handle orders without optional fields", _() => {
+    test("should handle orders without optional fields", () => {
       const order = {
         subtotal: 10000,
         total: 10000, // No tax, shipping, or discounts
@@ -202,7 +201,7 @@ describe(_"Order Calculations", _() => {
       expect(validateOrderTotal(order)).toBe(true);
     });
 
-    test(_"should allow small rounding differences", _() => {
+    test("should allow small rounding differences", () => {
       const order = {
         subtotal: 10000,
         taxAmount: 833, // Results in rounding
@@ -213,8 +212,8 @@ describe(_"Order Calculations", _() => {
     });
   });
 
-  describe(_"validateOrderItemsTotal", _() => {
-    test(_"should validate correct items total", _() => {
+  describe("validateOrderItemsTotal", () => {
+    test("should validate correct items total", () => {
       const items = [
         { unitPrice: 2999, quantity: 2, discountAmount: 500 }, // $59.98 - $5.00 = $54.98
         { unitPrice: 4999, quantity: 1, discountAmount: 0 }, // $49.99
@@ -225,7 +224,7 @@ describe(_"Order Calculations", _() => {
       expect(validateOrderItemsTotal(items, subtotal)).toBe(true);
     });
 
-    test(_"should reject incorrect items total", _() => {
+    test("should reject incorrect items total", () => {
       const items = [
         { unitPrice: 2999, quantity: 2 },
         { unitPrice: 4999, quantity: 1 },
@@ -235,7 +234,7 @@ describe(_"Order Calculations", _() => {
       expect(validateOrderItemsTotal(items, subtotal)).toBe(false);
     });
 
-    test(_"should handle items without discounts", _() => {
+    test("should handle items without discounts", () => {
       const items = [
         { unitPrice: 2999, quantity: 1 },
         { unitPrice: 4999, quantity: 1 },
@@ -246,40 +245,40 @@ describe(_"Order Calculations", _() => {
     });
   });
 
-  describe(_"Currency and Amount Validation", _() => {
-    test(_"should validate minimum amounts for currencies", _() => {
+  describe("Currency and Amount Validation", () => {
+    test("should validate minimum amounts for currencies", () => {
       expect(validateCurrencyAmount(50, "USD")).toBe(true); // $0.50
       expect(validateCurrencyAmount(50, "EUR")).toBe(true); // €0.50
       expect(validateCurrencyAmount(30, "GBP")).toBe(true); // £0.30
       expect(validateCurrencyAmount(50, "JPY")).toBe(true); // ¥50
     });
 
-    test(_"should reject amounts below minimum", _() => {
+    test("should reject amounts below minimum", () => {
       expect(validateCurrencyAmount(25, "USD")).toBe(false); // Below $0.50
       expect(validateCurrencyAmount(25, "EUR")).toBe(false); // Below €0.50
       expect(validateCurrencyAmount(20, "GBP")).toBe(false); // Below £0.30
       expect(validateCurrencyAmount(25, "JPY")).toBe(false); // Below ¥50
     });
 
-    test(_"should handle unknown currencies with default minimum", _() => {
+    test("should handle unknown currencies with default minimum", () => {
       expect(validateCurrencyAmount(50, "XYZ")).toBe(true);
       expect(validateCurrencyAmount(25, "XYZ")).toBe(false);
     });
   });
 
-  describe(_"Payment Method Currency Validation", _() => {
-    test(_"should validate supported payment methods for currencies", _() => {
+  describe("Payment Method Currency Validation", () => {
+    test("should validate supported payment methods for currencies", () => {
       expect(validatePaymentMethodForCurrency("card", "USD")).toBe(true);
       expect(validatePaymentMethodForCurrency("paypal", "USD")).toBe(true);
       expect(validatePaymentMethodForCurrency("bank_transfer", "EUR")).toBe(true);
     });
 
-    test(_"should reject unsupported payment methods", _() => {
+    test("should reject unsupported payment methods", () => {
       expect(validatePaymentMethodForCurrency("paypal", "JPY")).toBe(false);
       expect(validatePaymentMethodForCurrency("bank_transfer", "GBP")).toBe(false);
     });
 
-    test(_"should handle unknown currencies", _() => {
+    test("should handle unknown currencies", () => {
       expect(validatePaymentMethodForCurrency("card", "XYZ")).toBe(false);
     });
   });
@@ -289,8 +288,8 @@ describe(_"Order Calculations", _() => {
 // SUBSCRIPTION PRICING
 // ================================
 
-describe(_"Subscription Pricing", _() => {
-  test(_"should have correct subscription features and pricing", _() => {
+describe("Subscription Pricing", () => {
+  test("should have correct subscription features and pricing", () => {
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.FREE].price).toBe(0);
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.BASIC].price).toBe(9.99);
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.PREMIUM].price).toBe(29.99);
@@ -298,7 +297,7 @@ describe(_"Subscription Pricing", _() => {
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.PRODUCER].price).toBe(199.99);
   });
 
-  test(_"should have correct download limits", _() => {
+  test("should have correct download limits", () => {
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.FREE].monthlyDownloads).toBe(3);
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.BASIC].monthlyDownloads).toBe(10);
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.PREMIUM].monthlyDownloads).toBe(50);
@@ -306,7 +305,7 @@ describe(_"Subscription Pricing", _() => {
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.PRODUCER].monthlyDownloads).toBe(-1); // Unlimited
   });
 
-  test(_"should maintain pricing hierarchy", _() => {
+  test("should maintain pricing hierarchy", () => {
     const plans = [
       SUBSCRIPTION_FEATURES[SubscriptionPlan.FREE].price,
       SUBSCRIPTION_FEATURES[SubscriptionPlan.BASIC].price,
@@ -320,7 +319,7 @@ describe(_"Subscription Pricing", _() => {
     }
   });
 
-  test(_"should have appropriate features for each plan", _() => {
+  test("should have appropriate features for each plan", () => {
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.FREE].features).toContain(
       "3 downloads per month"
     );
@@ -337,9 +336,9 @@ describe(_"Subscription Pricing", _() => {
 // SERVICE PRICING CALCULATIONS
 // ================================
 
-describe(_"Service Pricing Calculations", _() => {
-  describe(_"validateServicePricing", _() => {
-    test(_"should calculate correct pricing for hourly services", _() => {
+describe("Service Pricing Calculations", () => {
+  describe("validateServicePricing", () => {
+    test("should calculate correct pricing for hourly services", () => {
       const mixingPrice = validateServicePricing("mixing", 120); // 2 hours
       expect(mixingPrice).toBe(20000); // $200 (2 hours * $100/hour)
 
@@ -350,7 +349,7 @@ describe(_"Service Pricing Calculations", _() => {
       expect(masteringPrice).toBe(8000); // $80 (1 hour * $80/hour)
     });
 
-    test(_"should calculate correct pricing for flat rate services", _() => {
+    test("should calculate correct pricing for flat rate services", () => {
       const customBeatPrice = validateServicePricing("custom_beat", 60);
       expect(customBeatPrice).toBe(20000); // $200 for 1 hour (flat rate in the pricing table)
 
@@ -358,14 +357,14 @@ describe(_"Service Pricing Calculations", _() => {
       expect(beatRemakePrice).toBe(30000); // $300 for 2 hours (2 * $150/hour)
     });
 
-    test(_"should add additional service fees", _() => {
+    test("should add additional service fees", () => {
       const basePrice = validateServicePricing("mixing", 60); // 1 hour mixing
       const priceWithRush = validateServicePricing("mixing", 60, ["rush_delivery"]);
 
       expect(priceWithRush).toBe(basePrice + 5000); // Base price + $50 rush fee
     });
 
-    test(_"should handle multiple additional services", _() => {
+    test("should handle multiple additional services", () => {
       const priceWithMultiple = validateServicePricing("mixing", 60, [
         "rush_delivery",
         "include_stems",
@@ -375,12 +374,12 @@ describe(_"Service Pricing Calculations", _() => {
       expect(priceWithMultiple).toBe(basePrice + 5000 + 2500); // Rush + stems
     });
 
-    test(_"should use default pricing for unknown services", _() => {
+    test("should use default pricing for unknown services", () => {
       const unknownServicePrice = validateServicePricing("unknown_service", 60);
       expect(unknownServicePrice).toBe(10000); // Default $100/hour
     });
 
-    test(_"should handle fractional hours correctly", _() => {
+    test("should handle fractional hours correctly", () => {
       const halfHourPrice = validateServicePricing("mixing", 30); // 0.5 hours
       expect(halfHourPrice).toBe(5000); // $50 (0.5 hours * $100/hour)
 
@@ -389,8 +388,8 @@ describe(_"Service Pricing Calculations", _() => {
     });
   });
 
-  describe(_"validateTimeSlot", _() => {
-    test(_"should validate correct time slots", _() => {
+  describe("validateTimeSlot", () => {
+    test("should validate correct time slots", () => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(14, 0, 0, 0); // 2 PM tomorrow
@@ -400,7 +399,7 @@ describe(_"Service Pricing Calculations", _() => {
       expect(result.errors).toHaveLength(0);
     });
 
-    test(_"should reject past time slots", _() => {
+    test("should reject past time slots", () => {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
@@ -409,7 +408,7 @@ describe(_"Service Pricing Calculations", _() => {
       expect(result.errors).toContain("Reservation must be scheduled for a future time");
     });
 
-    test(_"should reject time slots outside business hours", _() => {
+    test("should reject time slots outside business hours", () => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(8, 0, 0, 0); // 8 AM (before 9 AM)
@@ -419,7 +418,7 @@ describe(_"Service Pricing Calculations", _() => {
       expect(result.errors).toContain("Reservations must start between 9 AM and 10 PM");
     });
 
-    test(_"should validate service-specific duration limits", _() => {
+    test("should validate service-specific duration limits", () => {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(14, 0, 0, 0);
@@ -436,21 +435,21 @@ describe(_"Service Pricing Calculations", _() => {
     });
   });
 
-  describe(_"validateRoomForService", _() => {
-    test(_"should validate correct room-service combinations", _() => {
+  describe("validateRoomForService", () => {
+    test("should validate correct room-service combinations", () => {
       expect(validateRoomForService("recording", "studio_a")).toBe(true);
       expect(validateRoomForService("mixing", "mixing_room")).toBe(true);
       expect(validateRoomForService("mastering", "mastering_suite")).toBe(true);
       expect(validateRoomForService("consultation", "remote")).toBe(true);
     });
 
-    test(_"should reject incorrect room-service combinations", _() => {
+    test("should reject incorrect room-service combinations", () => {
       expect(validateRoomForService("mastering", "vocal_booth_1")).toBe(false);
       expect(validateRoomForService("recording", "mastering_suite")).toBe(false);
       expect(validateRoomForService("mixing", "vocal_booth_2")).toBe(false);
     });
 
-    test(_"should handle unknown rooms", _() => {
+    test("should handle unknown rooms", () => {
       expect(validateRoomForService("mixing", "unknown_room")).toBe(false);
     });
   });
@@ -460,8 +459,8 @@ describe(_"Service Pricing Calculations", _() => {
 // COMPLEX BUSINESS SCENARIOS
 // ================================
 
-describe(_"Complex Business Scenarios", _() => {
-  test(_"should calculate complete beat purchase with multiple licenses", _() => {
+describe("Complex Business Scenarios", () => {
+  test("should calculate complete beat purchase with multiple licenses", () => {
     const beatPrices = {
       basic: 2999,
       premium: 4999,
@@ -482,7 +481,7 @@ describe(_"Complex Business Scenarios", _() => {
     expect(validateOrderTotal({ subtotal, taxAmount, total })).toBe(true);
   });
 
-  test(_"should validate subscription upgrade pricing", _() => {
+  test("should validate subscription upgrade pricing", () => {
     const currentPlan = SUBSCRIPTION_FEATURES[SubscriptionPlan.BASIC];
     const newPlan = SUBSCRIPTION_FEATURES[SubscriptionPlan.PREMIUM];
 
@@ -496,7 +495,7 @@ describe(_"Complex Business Scenarios", _() => {
     expect(upgradeAmount).toBeLessThan(newPlan.price);
   });
 
-  test(_"should calculate service bundle pricing", _() => {
+  test("should calculate service bundle pricing", () => {
     // Bundle: Recording + Mixing + Mastering
     const recordingPrice = validateServicePricing("recording", 180); // 3 hours
     const mixingPrice = validateServicePricing("mixing", 120); // 2 hours
@@ -511,7 +510,7 @@ describe(_"Complex Business Scenarios", _() => {
     expect(finalPrice).toBe(65700); // $657
   });
 
-  test(_"should validate multi-currency order calculations", _() => {
+  test("should validate multi-currency order calculations", () => {
     // USD order
     const usdOrder = {
       subtotal: 10000, // $100.00
@@ -532,7 +531,7 @@ describe(_"Complex Business Scenarios", _() => {
     expect(validateCurrencyAmount(eurOrder.total, "EUR")).toBe(true);
   });
 
-  test(_"should handle complex discount scenarios", _() => {
+  test("should handle complex discount scenarios", () => {
     const items = [
       { unitPrice: 2999, quantity: 2, discountAmount: 500 }, // Beat 1: $59.98 - $5.00
       { unitPrice: 4999, quantity: 1, discountAmount: 1000 }, // Beat 2: $49.99 - $10.00
@@ -558,13 +557,13 @@ describe(_"Complex Business Scenarios", _() => {
 // EDGE CASES AND ERROR HANDLING
 // ================================
 
-describe(_"Edge Cases and Error Handling", _() => {
-  test(_"should handle zero amounts correctly", _() => {
+describe("Edge Cases and Error Handling", () => {
+  test("should handle zero amounts correctly", () => {
     expect(validateCurrencyAmount(0, "USD")).toBe(false);
     expect(validateOrderTotal({ subtotal: 0, total: 0 })).toBe(true);
   });
 
-  test(_"should handle very large amounts", _() => {
+  test("should handle very large amounts", () => {
     const largeAmount = 99999999; // $999,999.99
     expect(validateCurrencyAmount(largeAmount, "USD")).toBe(true);
 
@@ -575,7 +574,7 @@ describe(_"Edge Cases and Error Handling", _() => {
     expect(validateOrderTotal(order)).toBe(true);
   });
 
-  test(_"should handle rounding edge cases", _() => {
+  test("should handle rounding edge cases", () => {
     // Test rounding with 1 cent difference (should pass)
     const order1 = {
       subtotal: 10000,
@@ -593,7 +592,7 @@ describe(_"Edge Cases and Error Handling", _() => {
     expect(validateOrderTotal(order2)).toBe(false);
   });
 
-  test(_"should handle negative values appropriately", _() => {
+  test("should handle negative values appropriately", () => {
     const invalidPricing = {
       basic: -100,
       premium: 4999,
@@ -606,7 +605,7 @@ describe(_"Edge Cases and Error Handling", _() => {
     expect(validateCurrencyAmount(-100, "USD")).toBe(false);
   });
 
-  test(_"should handle empty and null values", _() => {
+  test("should handle empty and null values", () => {
     expect(validateOrderItemsTotal([], 0)).toBe(true);
     expect(validateServicePricing("", 60)).toBe(10000); // Default pricing
   });

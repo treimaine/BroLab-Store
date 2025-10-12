@@ -27,9 +27,9 @@ export function createLazyComponent<T extends ComponentType<any>>(
       return importFn().catch(error => {
         console.warn("Failed to load component, retrying...", error);
         // Retry once after a short delay
-        return new Promise(resolve => {
+        return new Promise<{ default: T }>((resolve, reject) => {
           setTimeout(() => {
-            resolve(importFn());
+            importFn().then(resolve).catch(reject);
           }, 1000);
         });
       });
@@ -145,10 +145,11 @@ export const lazyLoadingMetrics = {
     console.log(`Component ${componentName} loaded in ${loadTime.toFixed(2)}ms`);
 
     // Track in analytics if available
-    if (typeof window !== "undefined" && (window as any).gtag) {
-      (window as any).gtag("event", "component_load", {
-        component_name: componentName,
-        load_time: Math.round(loadTime),
+    if (typeof window !== "undefined" && "gtag" in window && typeof window.gtag === "function") {
+      window.gtag("event", "component_load", {
+        event_category: "performance",
+        event_label: componentName,
+        value: Math.round(loadTime),
       });
     }
   },

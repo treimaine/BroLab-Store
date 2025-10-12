@@ -8,7 +8,6 @@ import { Suspense } from "react";
  * loaded only when needed to improve initial bundle size and loading performance.
  */
 
-
 // Loading fallback for audio components
 const AudioLoadingFallback = ({
   type = "player",
@@ -83,10 +82,49 @@ const EnhancedGlobalAudioPlayer = createLazyComponent(
   { preloadDelay: 2000, retryOnError: true }
 );
 
+// Define proper prop types for audio components
+interface WaveformAudioPlayerProps {
+  src: string;
+  title?: string;
+  artist?: string;
+  className?: string;
+  showControls?: boolean;
+  showWaveform?: boolean;
+  previewOnly?: boolean;
+  autoPlay?: boolean;
+  onPlay?: () => void;
+  onPause?: () => void;
+  onEnded?: () => void;
+}
+
+interface EnhancedWaveformPlayerProps {
+  src: string;
+  title: string;
+  artist: string;
+  duration?: string;
+  bpm?: number;
+  genre?: string;
+  onLike?: () => void;
+  onDownload?: () => void;
+  liked?: boolean;
+}
+
+interface SonaarAudioPlayerProps {
+  src: string;
+  title?: string;
+  artist?: string;
+  className?: string;
+  autoPlay?: boolean;
+  showControls?: boolean;
+  compact?: boolean;
+}
+
+// SimpleAudioPlayer and EnhancedGlobalAudioPlayer don't take props - they use global audio store
+
 /**
  * Wrapper component for lazy-loaded waveform player
  */
-export function LazyWaveformPlayer(props: any) {
+export function LazyWaveformPlayer(props: WaveformAudioPlayerProps) {
   return (
     <Suspense fallback={<AudioLoadingFallback type="waveform" />}>
       <WaveformAudioPlayer {...props} />
@@ -97,7 +135,7 @@ export function LazyWaveformPlayer(props: any) {
 /**
  * Wrapper component for lazy-loaded enhanced waveform player
  */
-export function LazyEnhancedWaveformPlayer(props: any) {
+export function LazyEnhancedWaveformPlayer(props: EnhancedWaveformPlayerProps) {
   return (
     <Suspense fallback={<AudioLoadingFallback type="waveform" />}>
       <EnhancedWaveformPlayer {...props} />
@@ -108,7 +146,7 @@ export function LazyEnhancedWaveformPlayer(props: any) {
 /**
  * Wrapper component for lazy-loaded Sonaar audio player
  */
-export function LazySonaarAudioPlayer(props: any) {
+export function LazySonaarAudioPlayer(props: SonaarAudioPlayerProps) {
   return (
     <Suspense fallback={<AudioLoadingFallback type="player" />}>
       <SonaarAudioPlayer {...props} />
@@ -119,10 +157,10 @@ export function LazySonaarAudioPlayer(props: any) {
 /**
  * Wrapper component for lazy-loaded simple audio player
  */
-export function LazySimpleAudioPlayer(props: any) {
+export function LazySimpleAudioPlayer() {
   return (
     <Suspense fallback={<AudioLoadingFallback type="controls" />}>
-      <SimpleAudioPlayer {...props} />
+      <SimpleAudioPlayer />
     </Suspense>
   );
 }
@@ -130,10 +168,10 @@ export function LazySimpleAudioPlayer(props: any) {
 /**
  * Wrapper component for lazy-loaded global audio player
  */
-export function LazyGlobalAudioPlayer(props: unknown) {
+export function LazyGlobalAudioPlayer() {
   return (
     <Suspense fallback={<AudioLoadingFallback type="player" />}>
-      <EnhancedGlobalAudioPlayer {...props} />
+      <EnhancedGlobalAudioPlayer />
     </Suspense>
   );
 }
@@ -145,15 +183,15 @@ export function useAudioComponentPreloader() {
   // Preload audio components when user interacts with audio-related elements
   const preloadAudioComponents = () => {
     // Preload basic audio player first
-    import("@/components/SimpleAudioPlayer").catch_(() => {});
+    import("@/components/SimpleAudioPlayer").catch(() => {});
 
     // Then preload more complex components after a delay
     setTimeout(() => {
-      import("@/components/WaveformAudioPlayer").catch_(() => {});
+      import("@/components/WaveformAudioPlayer").catch(() => {});
     }, 2000);
 
     setTimeout(() => {
-      import("@/components/EnhancedGlobalAudioPlayer").catch_(() => {});
+      import("@/components/EnhancedGlobalAudioPlayer").catch(() => {});
     }, 4000);
   };
 
@@ -181,7 +219,7 @@ export function useAudioComponentPreloader() {
  */
 export const audioLibraryPreloader = {
   preloadWaveSurfer: () => {
-    return import("wavesurfer.js").catch_(() => {
+    return import("wavesurfer.js").catch(() => {
       console.warn("Failed to preload WaveSurfer.js");
     });
   },

@@ -4,7 +4,6 @@ import { ComponentType, lazy, LazyExoticComponent } from "react";
  * These components contain large charting libraries and should be loaded on-demand
  */
 
-
 /**
  * Chart-specific lazy loading options
  */
@@ -20,14 +19,14 @@ export interface ChartLazyOptions {
 /**
  * Creates a lazy component specifically optimized for chart libraries
  */
-export function createChartLazyComponent<T extends ComponentType<any>>(
+export function createChartLazyComponent<T extends ComponentType<Record<string, unknown>>>(
   importFn: () => Promise<{ default: T }>,
   options: ChartLazyOptions = {}
 ): LazyExoticComponent<T> {
   const { preloadOnHover = true, retryWithBackoff = true } = options;
 
   // Create the lazy component with retry logic
-  const LazyChartComponent = lazy_(() => {
+  const LazyChartComponent = lazy(() => {
     if (retryWithBackoff) {
       return importFn().catch(error => {
         console.warn("Failed to load chart component, retrying with backoff...", error);
@@ -46,7 +45,7 @@ export function createChartLazyComponent<T extends ComponentType<any>>(
             setTimeout(() => {
               importFn()
                 .then(resolve)
-                .catch_(() => {
+                .catch(() => {
                   retryCount++;
                   attemptRetry();
                 });
@@ -63,7 +62,7 @@ export function createChartLazyComponent<T extends ComponentType<any>>(
   // Setup hover preloading for chart components
   if (preloadOnHover && typeof window !== "undefined") {
     const preloadOnChartHover = () => {
-      importFn().catch_(() => {
+      importFn().catch(() => {
         // Silently fail preloading
       });
     };
@@ -90,7 +89,7 @@ export function preloadChartLibraries() {
   // Preload on first user interaction
   const events = ["mousedown", "touchstart", "keydown"];
   const preload = () => {
-    preloadRecharts().catch_(() => {
+    preloadRecharts().catch(() => {
       // Silently handle preload failures
     });
 
@@ -139,10 +138,15 @@ export const chartBundleOptimization = {
     console.log(`Chart ${chartName} rendered in ${renderTime.toFixed(2)}ms`);
 
     // Track in analytics if available
-    if (typeof window !== "undefined" && (window as any).gtag) {
-      (window as any).gtag("event", "chartrender", {
-        chartname: chartName,
-        rendertime: Math.round(renderTime),
+    if (
+      typeof window !== "undefined" &&
+      "gtag" in window &&
+      typeof (window as any).gtag === "function"
+    ) {
+      (window as any).gtag("event", "chart_render", {
+        event_category: "performance",
+        event_label: chartName,
+        value: Math.round(renderTime),
       });
     }
   },

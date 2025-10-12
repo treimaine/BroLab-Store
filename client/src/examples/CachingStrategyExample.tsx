@@ -22,7 +22,32 @@ import {
 } from "../hooks/useCachingStrategy";
 
 // Mock data fetchers (replace with actual API calls)
-const fetchBeats = async (filters: Record<string, any>) => {
+interface Beat {
+  id: number;
+  title: string;
+  artist: string;
+  genre: string;
+  bpm: number;
+  price: number;
+}
+
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  subscription: string;
+  downloadsUsed: number;
+  downloadsLimit: number;
+}
+
+interface WaveformData {
+  beatId: string;
+  peaks: number[];
+  duration: number;
+  sampleRate: number;
+}
+
+const fetchBeats = async (filters: Record<string, string | number>): Promise<Beat[]> => {
   console.log("🎵 Fetching beats from API...", filters);
   await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API delay
 
@@ -30,13 +55,13 @@ const fetchBeats = async (filters: Record<string, any>) => {
     id: i + 1,
     title: `Beat ${i + 1}`,
     artist: "BroLab",
-    genre: filters.genre || "Hip Hop",
+    genre: (filters.genre as string) || "Hip Hop",
     bpm: 120 + i * 5,
     price: 29.99,
   }));
 };
 
-const fetchUserProfile = async (userId: string) => {
+const fetchUserProfile = async (userId: string): Promise<UserProfile> => {
   console.log("👤 Fetching user profile from API...", userId);
   await new Promise(resolve => setTimeout(resolve, 800));
 
@@ -50,7 +75,7 @@ const fetchUserProfile = async (userId: string) => {
   };
 };
 
-const fetchWaveform = async (beatId: string) => {
+const fetchWaveform = async (beatId: string): Promise<WaveformData> => {
   console.log("🌊 Fetching waveform data from API...", beatId);
   await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -62,7 +87,14 @@ const fetchWaveform = async (beatId: string) => {
   };
 };
 
-const fetchSubscriptionPlans = async () => {
+interface SubscriptionPlan {
+  id: number;
+  name: string;
+  price: number;
+  downloads: number;
+}
+
+const fetchSubscriptionPlans = async (): Promise<SubscriptionPlan[]> => {
   console.log("💳 Fetching subscription plans from API...");
   await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -108,10 +140,10 @@ export function CachingStrategyExample() {
       key: `user-${userId}-favorites`,
       dataType: DataType.USER_SPECIFIC,
       updater: (beatId, oldFavorites) => {
-        return oldFavorites ? [...oldFavorites, beatId] : [beatId];
+        return Array.isArray(oldFavorites) ? [...oldFavorites, beatId] : [beatId];
       },
     },
-    onSuccess: (data, beatId) => {
+    onSuccess: (_data, beatId) => {
       console.log(`✅ Successfully added beat ${beatId} to favorites`);
     },
   });
@@ -218,9 +250,9 @@ export function CachingStrategyExample() {
             <div className="text-red-400">Error: {beatsQuery.error.message}</div>
           )}
 
-          {beatsQuery.data && (
+          {beatsQuery.data && Array.isArray(beatsQuery.data) && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {beatsQuery.data.slice(0, 4).map((beat: any) => (
+              {beatsQuery.data.slice(0, 4).map((beat: Beat) => (
                 <div
                   key={beat.id}
                   className="p-3 bg-gray-700 rounded flex justify-between items-center"
@@ -253,20 +285,20 @@ export function CachingStrategyExample() {
         <CardContent>
           {userQuery.isLoading && <div>Loading user profile...</div>}
           {userQuery.error && <div className="text-red-400">Error: {userQuery.error.message}</div>}
-          {userQuery.data && (
+          {userQuery.data && typeof userQuery.data === "object" && "name" in userQuery.data && (
             <div className="space-y-2">
               <div>
-                <strong>Name:</strong> {userQuery.data.name}
+                <strong>Name:</strong> {(userQuery.data as UserProfile).name}
               </div>
               <div>
-                <strong>Email:</strong> {userQuery.data.email}
+                <strong>Email:</strong> {(userQuery.data as UserProfile).email}
               </div>
               <div>
-                <strong>Subscription:</strong> {userQuery.data.subscription}
+                <strong>Subscription:</strong> {(userQuery.data as UserProfile).subscription}
               </div>
               <div>
-                <strong>Downloads:</strong> {userQuery.data.downloadsUsed}/
-                {userQuery.data.downloadsLimit}
+                <strong>Downloads:</strong> {(userQuery.data as UserProfile).downloadsUsed}/
+                {(userQuery.data as UserProfile).downloadsLimit}
               </div>
             </div>
           )}
@@ -296,22 +328,24 @@ export function CachingStrategyExample() {
           {waveformQuery.error && (
             <div className="text-red-400">Error: {waveformQuery.error.message}</div>
           )}
-          {waveformQuery.data && (
-            <div className="space-y-2">
-              <div>
-                <strong>Beat ID:</strong> {waveformQuery.data.beatId}
+          {waveformQuery.data &&
+            typeof waveformQuery.data === "object" &&
+            "beatId" in waveformQuery.data && (
+              <div className="space-y-2">
+                <div>
+                  <strong>Beat ID:</strong> {(waveformQuery.data as WaveformData).beatId}
+                </div>
+                <div>
+                  <strong>Duration:</strong> {(waveformQuery.data as WaveformData).duration}s
+                </div>
+                <div>
+                  <strong>Sample Rate:</strong> {(waveformQuery.data as WaveformData).sampleRate}Hz
+                </div>
+                <div className="h-16 bg-gray-700 rounded flex items-center justify-center">
+                  <div className="text-sm text-gray-400">Waveform visualization would go here</div>
+                </div>
               </div>
-              <div>
-                <strong>Duration:</strong> {waveformQuery.data.duration}s
-              </div>
-              <div>
-                <strong>Sample Rate:</strong> {waveformQuery.data.sampleRate}Hz
-              </div>
-              <div className="h-16 bg-gray-700 rounded flex items-center justify-center">
-                <div className="text-sm text-gray-400">Waveform visualization would go here</div>
-              </div>
-            </div>
-          )}
+            )}
         </CardContent>
       </Card>
 
@@ -325,9 +359,9 @@ export function CachingStrategyExample() {
           {plansQuery.error && (
             <div className="text-red-400">Error: {plansQuery.error.message}</div>
           )}
-          {plansQuery.data && (
+          {plansQuery.data && Array.isArray(plansQuery.data) && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {plansQuery.data.map((plan: unknown) => (
+              {plansQuery.data.map((plan: SubscriptionPlan) => (
                 <div key={plan.id} className="p-4 bg-gray-700 rounded text-center">
                   <div className="font-bold text-lg">{plan.name}</div>
                   <div className="text-2xl font-bold text-purple-400">${plan.price}</div>
@@ -361,7 +395,7 @@ export function CachingStrategyExample() {
           {searchQuery_result.error && (
             <div className="text-red-400">Error: {searchQuery_result.error.message}</div>
           )}
-          {searchQuery_result.data && (
+          {searchQuery_result.data && Array.isArray(searchQuery_result.data) && (
             <div className="text-sm text-gray-400">
               Found {searchQuery_result.data.length} results for "{searchQuery}"
             </div>

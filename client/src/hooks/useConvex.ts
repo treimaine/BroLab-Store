@@ -23,12 +23,7 @@ export function useCurrentUser() {
 
 // Favorites hooks using the actual API structure
 export function useFavorites() {
-  const { convexUser } = useCurrentUser();
-
-  return useQuery(
-    api.favorites.getFavorites,
-    convexUser?.id ? { userId: convexUser.id } : "skip"
-  );
+  return useQuery(api.favorites.getFavorites.getFavorites);
 }
 
 export function useAddToFavorites() {
