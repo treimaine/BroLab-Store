@@ -24,8 +24,8 @@ import { describe, expect, test } from "@jest/globals";
  */
 
 
-describe(_"Type Validation Test Suite", _() => {
-  test(_"should have comprehensive test coverage for all validation schemas", _() => {
+describe("Type Validation Test Suite", () => {
+  test("should have comprehensive test coverage for all validation schemas", () => {
     // This test ensures all validation test files are properly structured
     // and can be imported without errors
 
@@ -43,7 +43,7 @@ describe(_"Type Validation Test Suite", _() => {
     expect(testFiles.every(file => file.endsWith(".test.ts"))).toBe(true);
   });
 
-  test(_"should validate test file naming conventions", _() => {
+  test("should validate test file naming conventions", () => {
     const validationFiles = [
       "BeatValidation",
       "OrderValidation",
@@ -58,7 +58,7 @@ describe(_"Type Validation Test Suite", _() => {
     });
   });
 
-  test(_"should ensure test coverage for all business domains", _() => {
+  test("should ensure test coverage for all business domains", () => {
     const businessDomains = [
       "beats", // Music production and licensing
       "orders", // E-commerce and payments

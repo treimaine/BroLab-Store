@@ -8,28 +8,28 @@ import {
   stubWcApiRequest,
 } from "./woocommerce-stubs";
 
-describe(_"WooCommerce Stubs", _() => {
-  afterEach_(() => {
+describe("WooCommerce Stubs", () => {
+  afterEach(() => {
     cleanupWooCommerceStubs();
   });
 
-  describe(_"mockBeats", _() => {
-    it(_"should contain valid beat data", _() => {
+  describe("mockBeats", () => {
+    it("should contain valid beat data", () => {
       expect(mockBeats[123]).toBeDefined();
       expect(mockBeats[123].title).toBe("Test Beat - Hip Hop");
       expect(mockBeats[123].genre).toBe("Hip Hop");
       expect(mockBeats[123].bpm).toBe(140);
     });
 
-    it(_"should contain multiple beats", _() => {
+    it("should contain multiple beats", () => {
       expect(Object.keys(mockBeats)).toHaveLength(3);
       expect(mockBeats[456]).toBeDefined();
       expect(mockBeats[789]).toBeDefined();
     });
   });
 
-  describe(_"mockBeatsList", _() => {
-    it(_"should contain valid beat list data", _() => {
+  describe("mockBeatsList", () => {
+    it("should contain valid beat list data", () => {
       expect(mockBeatsList).toHaveLength(3);
       expect(mockBeatsList[0].id).toBe(123);
       expect(mockBeatsList[0].name).toBe("Test Beat - Hip Hop");
@@ -37,8 +37,8 @@ describe(_"WooCommerce Stubs", _() => {
     });
   });
 
-  describe(_"stubWcApiRequest", _() => {
-    it(_"should return product data for valid product ID", _async () => {
+  describe("stubWcApiRequest", () => {
+    it("should return product data for valid product ID", async () => {
       const product = await stubWcApiRequest("/products/123");
 
       expect(product).toBeDefined();
@@ -48,7 +48,7 @@ describe(_"WooCommerce Stubs", _() => {
       expect(product.categories[0].name).toBe("Hip Hop");
     });
 
-    it(_"should return products list for products endpoint", _async () => {
+    it("should return products list for products endpoint", async () => {
       const products = await stubWcApiRequest("/products");
 
       expect(products).toBeDefined();
@@ -56,18 +56,18 @@ describe(_"WooCommerce Stubs", _() => {
       expect(products).toHaveLength(3);
     });
 
-    it(_"should throw error for invalid product ID", _async () => {
+    it("should throw error for invalid product ID", async () => {
       await expect(stubWcApiRequest("/products/999999")).rejects.toThrow("404");
     });
 
-    it(_"should return empty object for unknown endpoints", _async () => {
+    it("should return empty object for unknown endpoints", async () => {
       const result = await stubWcApiRequest("/unknown");
       expect(result).toEqual({});
     });
   });
 
-  describe(_"stubFetch", _() => {
-    it(_"should handle WooCommerce API URLs", _async () => {
+  describe("stubFetch", () => {
+    it("should handle WooCommerce API URLs", async () => {
       const response = await stubFetch("https://example.com/wp-json/wc/v3/products/123");
 
       expect(response.ok).toBe(true);
@@ -78,7 +78,7 @@ describe(_"WooCommerce Stubs", _() => {
       expect(data.name).toBe("Test Beat - Hip Hop");
     });
 
-    it(_"should handle non-WooCommerce URLs", _async () => {
+    it("should handle non-WooCommerce URLs", async () => {
       const response = await stubFetch("https://example.com/api/other");
 
       expect(response.ok).toBe(true);
@@ -89,8 +89,8 @@ describe(_"WooCommerce Stubs", _() => {
     });
   });
 
-  describe(_"setupWooCommerceStubs", _() => {
-    it(_"should setup global fetch mock", _() => {
+  describe("setupWooCommerceStubs", () => {
+    it("should setup global fetch mock", () => {
       setupWooCommerceStubs();
 
       expect(global.fetch).toBeDefined();

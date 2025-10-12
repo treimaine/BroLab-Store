@@ -18,27 +18,27 @@ import {
   getUserMessageForErrorType,
 } from "../../shared/validation/ErrorValidation";
 
-describe(_"Error Validation Tests", _() => {
-  describe(_"ErrorSeverity Validation", _() => {
-    test(_"should accept valid error severities", _() => {
+describe("Error Validation Tests", () => {
+  describe("ErrorSeverity Validation", () => {
+    test("should accept valid error severities", () => {
       const validSeverities = ["low", "medium", "high", "critical"];
 
       validSeverities.forEach(severity => {
-        expect_(() => ErrorSeverity.parse(severity)).not.toThrow();
+        expect(() => ErrorSeverity.parse(severity)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid error severities", _() => {
+    test("should reject invalid error severities", () => {
       const invalidSeverities = ["info", "warning", "error", "", "invalid-severity"];
 
       invalidSeverities.forEach(severity => {
-        expect_(() => ErrorSeverity.parse(severity)).toThrow();
+        expect(() => ErrorSeverity.parse(severity)).toThrow();
       });
     });
   });
 
-  describe(_"ErrorCategory Validation", _() => {
-    test(_"should accept valid error categories", _() => {
+  describe("ErrorCategory Validation", () => {
+    test("should accept valid error categories", () => {
       const validCategories = [
         "authentication",
         "authorization",
@@ -57,21 +57,21 @@ describe(_"Error Validation Tests", _() => {
       ];
 
       validCategories.forEach(category => {
-        expect_(() => ErrorCategory.parse(category)).not.toThrow();
+        expect(() => ErrorCategory.parse(category)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid error categories", _() => {
+    test("should reject invalid error categories", () => {
       const invalidCategories = ["ui", "frontend", "backend", "", "invalid-category"];
 
       invalidCategories.forEach(category => {
-        expect_(() => ErrorCategory.parse(category)).toThrow();
+        expect(() => ErrorCategory.parse(category)).toThrow();
       });
     });
   });
 
-  describe(_"ErrorType Validation", _() => {
-    test(_"should accept valid authentication error types", _() => {
+  describe("ErrorType Validation", () => {
+    test("should accept valid authentication error types", () => {
       const authErrors = [
         "invalid_credentials",
         "account_locked",
@@ -80,11 +80,11 @@ describe(_"Error Validation Tests", _() => {
       ];
 
       authErrors.forEach(errorType => {
-        expect_(() => ErrorType.parse(errorType)).not.toThrow();
+        expect(() => ErrorType.parse(errorType)).not.toThrow();
       });
     });
 
-    test(_"should accept valid authorization error types", _() => {
+    test("should accept valid authorization error types", () => {
       const authzErrors = [
         "insufficient_permissions",
         "resource_forbidden",
@@ -93,11 +93,11 @@ describe(_"Error Validation Tests", _() => {
       ];
 
       authzErrors.forEach(errorType => {
-        expect_(() => ErrorType.parse(errorType)).not.toThrow();
+        expect(() => ErrorType.parse(errorType)).not.toThrow();
       });
     });
 
-    test(_"should accept valid payment error types", _() => {
+    test("should accept valid payment error types", () => {
       const paymentErrors = [
         "payment_failed",
         "insufficient_funds",
@@ -107,11 +107,11 @@ describe(_"Error Validation Tests", _() => {
       ];
 
       paymentErrors.forEach(errorType => {
-        expect_(() => ErrorType.parse(errorType)).not.toThrow();
+        expect(() => ErrorType.parse(errorType)).not.toThrow();
       });
     });
 
-    test(_"should accept valid audio processing error types", _() => {
+    test("should accept valid audio processing error types", () => {
       const audioErrors = [
         "audio_format_unsupported",
         "audio_file_corrupted",
@@ -120,11 +120,11 @@ describe(_"Error Validation Tests", _() => {
       ];
 
       audioErrors.forEach(errorType => {
-        expect_(() => ErrorType.parse(errorType)).not.toThrow();
+        expect(() => ErrorType.parse(errorType)).not.toThrow();
       });
     });
 
-    test(_"should accept valid business logic error types", _() => {
+    test("should accept valid business logic error types", () => {
       const businessErrors = [
         "beat_not_available",
         "license_conflict",
@@ -133,21 +133,21 @@ describe(_"Error Validation Tests", _() => {
       ];
 
       businessErrors.forEach(errorType => {
-        expect_(() => ErrorType.parse(errorType)).not.toThrow();
+        expect(() => ErrorType.parse(errorType)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid error types", _() => {
+    test("should reject invalid error types", () => {
       const invalidTypes = ["unknown_error", "custom_error", "", "invalid-type"];
 
       invalidTypes.forEach(errorType => {
-        expect_(() => ErrorType.parse(errorType)).toThrow();
+        expect(() => ErrorType.parse(errorType)).toThrow();
       });
     });
   });
 
-  describe(_"ErrorContext Schema Validation", _() => {
-    test(_"should accept valid error context", _() => {
+  describe("ErrorContext Schema Validation", () => {
+    test("should accept valid error context", () => {
       const validContext = {
         requestId: "req_1234567890",
         userId: "user_1234567890",
@@ -164,41 +164,41 @@ describe(_"Error Validation Tests", _() => {
         metadata: { source: "api", version: "1.0" },
       };
 
-      expect_(() => ErrorContextSchema.parse(validContext)).not.toThrow();
+      expect(() => ErrorContextSchema.parse(validContext)).not.toThrow();
     });
 
-    test(_"should accept empty error context", _() => {
+    test("should accept empty error context", () => {
       const emptyContext = {};
-      expect_(() => ErrorContextSchema.parse(emptyContext)).not.toThrow();
+      expect(() => ErrorContextSchema.parse(emptyContext)).not.toThrow();
     });
 
-    test(_"should reject invalid IP address", _() => {
+    test("should reject invalid IP address", () => {
       const invalidContext = {
         ipAddress: "invalid-ip-address",
       };
 
-      expect_(() => ErrorContextSchema.parse(invalidContext)).toThrow();
+      expect(() => ErrorContextSchema.parse(invalidContext)).toThrow();
     });
 
-    test(_"should reject invalid HTTP method", _() => {
+    test("should reject invalid HTTP method", () => {
       const invalidContext = {
         method: "INVALID",
       };
 
-      expect_(() => ErrorContextSchema.parse(invalidContext)).toThrow();
+      expect(() => ErrorContextSchema.parse(invalidContext)).toThrow();
     });
 
-    test(_"should reject invalid status code", _() => {
+    test("should reject invalid status code", () => {
       const invalidContext = {
         statusCode: 999, // Invalid HTTP status code
       };
 
-      expect_(() => ErrorContextSchema.parse(invalidContext)).toThrow();
+      expect(() => ErrorContextSchema.parse(invalidContext)).toThrow();
     });
   });
 
-  describe(_"ErrorResolution Schema Validation", _() => {
-    test(_"should accept valid error resolution", _() => {
+  describe("ErrorResolution Schema Validation", () => {
+    test("should accept valid error resolution", () => {
       const validResolution = {
         userMessage: "The beat you're looking for is no longer available.",
         userAction: "Browse other beats in this genre",
@@ -210,20 +210,20 @@ describe(_"Error Validation Tests", _() => {
         escalationLevel: "tier1" as const,
       };
 
-      expect_(() => ErrorResolutionSchema.parse(validResolution)).not.toThrow();
+      expect(() => ErrorResolutionSchema.parse(validResolution)).not.toThrow();
     });
 
-    test(_"should require user message", _() => {
+    test("should require user message", () => {
       const invalidResolution = {
         userMessage: "", // Empty message
       };
 
-      expect_(() => ErrorResolutionSchema.parse(invalidResolution)).toThrow(
+      expect(() => ErrorResolutionSchema.parse(invalidResolution)).toThrow(
         "User message is required"
       );
     });
 
-    test(_"should apply default values", _() => {
+    test("should apply default values", () => {
       const minimalResolution = {
         userMessage: "An error occurred",
       };
@@ -234,27 +234,27 @@ describe(_"Error Validation Tests", _() => {
       expect(result.escalationLevel).toBe("none");
     });
 
-    test(_"should reject invalid documentation URL", _() => {
+    test("should reject invalid documentation URL", () => {
       const invalidResolution = {
         userMessage: "An error occurred",
         documentationUrl: "not-a-valid-url",
       };
 
-      expect_(() => ErrorResolutionSchema.parse(invalidResolution)).toThrow();
+      expect(() => ErrorResolutionSchema.parse(invalidResolution)).toThrow();
     });
 
-    test(_"should reject negative retry after", _() => {
+    test("should reject negative retry after", () => {
       const invalidResolution = {
         userMessage: "An error occurred",
         retryAfter: -100, // Negative value
       };
 
-      expect_(() => ErrorResolutionSchema.parse(invalidResolution)).toThrow();
+      expect(() => ErrorResolutionSchema.parse(invalidResolution)).toThrow();
     });
   });
 
-  describe(_"Complete Error Schema Validation", _() => {
-    test(_"should accept valid complete error", _() => {
+  describe("Complete Error Schema Validation", () => {
+    test("should accept valid complete error", () => {
       const validError = {
         id: "err_1234567890",
         type: "beat_not_available" as const,
@@ -283,10 +283,10 @@ describe(_"Error Validation Tests", _() => {
         lastOccurrence: new Date().toISOString(),
       };
 
-      expect_(() => ErrorSchema.parse(validError)).not.toThrow();
+      expect(() => ErrorSchema.parse(validError)).not.toThrow();
     });
 
-    test(_"should apply default values", _() => {
+    test("should apply default values", () => {
       const minimalError = {
         type: "internal_server_error" as const,
         category: "system" as const,
@@ -302,7 +302,7 @@ describe(_"Error Validation Tests", _() => {
       expect(result.count).toBe(1);
     });
 
-    test(_"should reject error without required fields", _() => {
+    test("should reject error without required fields", () => {
       const invalidError = {
         type: "invalid_input" as const,
         category: "validation" as const,
@@ -314,12 +314,12 @@ describe(_"Error Validation Tests", _() => {
         occurredAt: new Date().toISOString(),
       };
 
-      expect_(() => ErrorSchema.parse(invalidError)).toThrow("Error message is required");
+      expect(() => ErrorSchema.parse(invalidError)).toThrow("Error message is required");
     });
   });
 
-  describe(_"ApiErrorResponse Schema Validation", _() => {
-    test(_"should accept valid API error response", _() => {
+  describe("ApiErrorResponse Schema Validation", () => {
+    test("should accept valid API error response", () => {
       const validApiError = {
         error: {
           type: "payment_failed" as const,
@@ -339,10 +339,10 @@ describe(_"Error Validation Tests", _() => {
         },
       };
 
-      expect_(() => ApiErrorResponseSchema.parse(validApiError)).not.toThrow();
+      expect(() => ApiErrorResponseSchema.parse(validApiError)).not.toThrow();
     });
 
-    test(_"should accept API error without debug information", _() => {
+    test("should accept API error without debug information", () => {
       const apiErrorWithoutDebug = {
         error: {
           type: "beat_not_available" as const,
@@ -352,12 +352,12 @@ describe(_"Error Validation Tests", _() => {
         },
       };
 
-      expect_(() => ApiErrorResponseSchema.parse(apiErrorWithoutDebug)).not.toThrow();
+      expect(() => ApiErrorResponseSchema.parse(apiErrorWithoutDebug)).not.toThrow();
     });
   });
 
-  describe(_"ValidationError Schema Validation", _() => {
-    test(_"should accept valid validation error", _() => {
+  describe("ValidationError Schema Validation", () => {
+    test("should accept valid validation error", () => {
       const validValidationError = {
         field: "email",
         value: "invalid-email",
@@ -373,36 +373,36 @@ describe(_"Error Validation Tests", _() => {
         ],
       };
 
-      expect_(() => ValidationErrorSchema.parse(validValidationError)).not.toThrow();
+      expect(() => ValidationErrorSchema.parse(validValidationError)).not.toThrow();
     });
 
-    test(_"should reject validation error without field name", _() => {
+    test("should reject validation error without field name", () => {
       const invalidValidationError = {
         field: "", // Empty field name
         value: "test",
         message: "Field is required",
       };
 
-      expect_(() => ValidationErrorSchema.parse(invalidValidationError)).toThrow(
+      expect(() => ValidationErrorSchema.parse(invalidValidationError)).toThrow(
         "Field name is required"
       );
     });
 
-    test(_"should reject validation error without message", _() => {
+    test("should reject validation error without message", () => {
       const invalidValidationError = {
         field: "username",
         value: "test",
         message: "", // Empty message
       };
 
-      expect_(() => ValidationErrorSchema.parse(invalidValidationError)).toThrow(
+      expect(() => ValidationErrorSchema.parse(invalidValidationError)).toThrow(
         "Validation message is required"
       );
     });
   });
 
-  describe(_"ValidationErrorResponse Schema Validation", _() => {
-    test(_"should accept valid validation error response", _() => {
+  describe("ValidationErrorResponse Schema Validation", () => {
+    test("should accept valid validation error response", () => {
       const validValidationResponse = {
         error: {
           type: "validation_error" as const,
@@ -425,10 +425,10 @@ describe(_"Error Validation Tests", _() => {
         },
       };
 
-      expect_(() => ValidationErrorResponseSchema.parse(validValidationResponse)).not.toThrow();
+      expect(() => ValidationErrorResponseSchema.parse(validValidationResponse)).not.toThrow();
     });
 
-    test(_"should reject validation response without errors", _() => {
+    test("should reject validation response without errors", () => {
       const invalidValidationResponse = {
         error: {
           type: "validation_error" as const,
@@ -439,14 +439,14 @@ describe(_"Error Validation Tests", _() => {
         },
       };
 
-      expect_(() => ValidationErrorResponseSchema.parse(invalidValidationResponse)).toThrow(
+      expect(() => ValidationErrorResponseSchema.parse(invalidValidationResponse)).toThrow(
         "At least one validation error required"
       );
     });
   });
 
-  describe(_"RateLimitError Schema Validation", _() => {
-    test(_"should accept valid rate limit error", _() => {
+  describe("RateLimitError Schema Validation", () => {
+    test("should accept valid rate limit error", () => {
       const validRateLimitError = {
         error: {
           type: "rate_limit_exceeded" as const,
@@ -460,10 +460,10 @@ describe(_"Error Validation Tests", _() => {
         },
       };
 
-      expect_(() => RateLimitErrorSchema.parse(validRateLimitError)).not.toThrow();
+      expect(() => RateLimitErrorSchema.parse(validRateLimitError)).not.toThrow();
     });
 
-    test(_"should apply default message", _() => {
+    test("should apply default message", () => {
       const rateLimitErrorWithoutMessage = {
         error: {
           type: "rate_limit_exceeded" as const,
@@ -480,8 +480,8 @@ describe(_"Error Validation Tests", _() => {
     });
   });
 
-  describe(_"BusinessLogicError Schema Validation", _() => {
-    test(_"should accept valid business logic error", _() => {
+  describe("BusinessLogicError Schema Validation", () => {
+    test("should accept valid business logic error", () => {
       const validBusinessError = {
         error: {
           type: "license_conflict" as const,
@@ -497,10 +497,10 @@ describe(_"Error Validation Tests", _() => {
         },
       };
 
-      expect_(() => BusinessLogicErrorSchema.parse(validBusinessError)).not.toThrow();
+      expect(() => BusinessLogicErrorSchema.parse(validBusinessError)).not.toThrow();
     });
 
-    test(_"should accept business error with minimal fields", _() => {
+    test("should accept business error with minimal fields", () => {
       const minimalBusinessError = {
         error: {
           type: "reservation_conflict" as const,
@@ -510,13 +510,13 @@ describe(_"Error Validation Tests", _() => {
         },
       };
 
-      expect_(() => BusinessLogicErrorSchema.parse(minimalBusinessError)).not.toThrow();
+      expect(() => BusinessLogicErrorSchema.parse(minimalBusinessError)).not.toThrow();
     });
   });
 
-  describe(_"Error Creation Utilities", _() => {
-    describe(_"createApiError", _() => {
-      test(_"should create valid API error", _() => {
+  describe("Error Creation Utilities", () => {
+    describe("createApiError", () => {
+      test("should create valid API error", () => {
         const apiError = createApiError("beat_not_available", "Beat with ID 123 not found", {
           code: "BEAT_NOT_FOUND",
           userMessage: "This beat is no longer available.",
@@ -525,7 +525,7 @@ describe(_"Error Validation Tests", _() => {
           requestId: "req_123",
         });
 
-        expect_(() => ApiErrorResponseSchema.parse(apiError)).not.toThrow();
+        expect(() => ApiErrorResponseSchema.parse(apiError)).not.toThrow();
         expect(apiError.error.type).toBe("beat_not_available");
         expect(apiError.error.message).toBe("Beat with ID 123 not found");
         expect(apiError.error.code).toBe("BEAT_NOT_FOUND");
@@ -533,13 +533,13 @@ describe(_"Error Validation Tests", _() => {
         expect(apiError.error.requestId).toBe("req_123");
       });
 
-      test(_"should use message as userMessage when not provided", _() => {
+      test("should use message as userMessage when not provided", () => {
         const apiError = createApiError("internal_server_error", "Database connection failed");
 
         expect(apiError.error.userMessage).toBe("Database connection failed");
       });
 
-      test(_"should include timestamp", _() => {
+      test("should include timestamp", () => {
         const apiError = createApiError("timeout", "Request timed out");
 
         expect(apiError.error.timestamp).toBeDefined();
@@ -547,8 +547,8 @@ describe(_"Error Validation Tests", _() => {
       });
     });
 
-    describe(_"createValidationError", _() => {
-      test(_"should create valid validation error", _() => {
+    describe("createValidationError", () => {
+      test("should create valid validation error", () => {
         const validationError = createValidationError(
           [
             {
@@ -566,13 +566,13 @@ describe(_"Error Validation Tests", _() => {
           "req_123"
         );
 
-        expect_(() => ValidationErrorResponseSchema.parse(validationError)).not.toThrow();
+        expect(() => ValidationErrorResponseSchema.parse(validationError)).not.toThrow();
         expect(validationError.error.errors).toHaveLength(2);
         expect(validationError.error.errorCount).toBe(2);
         expect(validationError.error.requestId).toBe("req_123");
       });
 
-      test(_"should include timestamp", _() => {
+      test("should include timestamp", () => {
         const validationError = createValidationError([
           {
             field: "username",
@@ -586,8 +586,8 @@ describe(_"Error Validation Tests", _() => {
       });
     });
 
-    describe(_"createBusinessLogicError", _() => {
-      test(_"should create valid business logic error", _() => {
+    describe("createBusinessLogicError", () => {
+      test("should create valid business logic error", () => {
         const businessError = createBusinessLogicError(
           "reservation_conflict",
           "Time slot already booked",
@@ -601,14 +601,14 @@ describe(_"Error Validation Tests", _() => {
           }
         );
 
-        expect_(() => BusinessLogicErrorSchema.parse(businessError)).not.toThrow();
+        expect(() => BusinessLogicErrorSchema.parse(businessError)).not.toThrow();
         expect(businessError.error.type).toBe("reservation_conflict");
         expect(businessError.error.businessRule).toBe("time_slot_uniqueness");
         expect(businessError.error.resourceType).toBe("reservation");
         expect(businessError.error.requestId).toBe("req_123");
       });
 
-      test(_"should include timestamp", _() => {
+      test("should include timestamp", () => {
         const businessError = createBusinessLogicError(
           "quota_exceeded",
           "Download quota exceeded",
@@ -621,51 +621,51 @@ describe(_"Error Validation Tests", _() => {
     });
   });
 
-  describe(_"Error Mapping Utilities", _() => {
-    describe(_"getHttpStatusForErrorType", _() => {
-      test(_"should return correct status codes for authentication errors", _() => {
+  describe("Error Mapping Utilities", () => {
+    describe("getHttpStatusForErrorType", () => {
+      test("should return correct status codes for authentication errors", () => {
         expect(getHttpStatusForErrorType("invalid_credentials")).toBe(401);
         expect(getHttpStatusForErrorType("session_expired")).toBe(401);
         expect(getHttpStatusForErrorType("two_factor_required")).toBe(401);
       });
 
-      test(_"should return correct status codes for authorization errors", _() => {
+      test("should return correct status codes for authorization errors", () => {
         expect(getHttpStatusForErrorType("insufficient_permissions")).toBe(403);
         expect(getHttpStatusForErrorType("resource_forbidden")).toBe(403);
         expect(getHttpStatusForErrorType("account_locked")).toBe(403);
       });
 
-      test(_"should return correct status codes for validation errors", _() => {
+      test("should return correct status codes for validation errors", () => {
         expect(getHttpStatusForErrorType("invalid_input")).toBe(400);
         expect(getHttpStatusForErrorType("missing_required_field")).toBe(400);
         expect(getHttpStatusForErrorType("format_error")).toBe(400);
       });
 
-      test(_"should return correct status codes for payment errors", _() => {
+      test("should return correct status codes for payment errors", () => {
         expect(getHttpStatusForErrorType("subscription_required")).toBe(402);
         expect(getHttpStatusForErrorType("payment_failed")).toBe(422);
         expect(getHttpStatusForErrorType("card_declined")).toBe(422);
       });
 
-      test(_"should return correct status codes for business logic errors", _() => {
+      test("should return correct status codes for business logic errors", () => {
         expect(getHttpStatusForErrorType("beat_not_available")).toBe(404);
         expect(getHttpStatusForErrorType("license_conflict")).toBe(409);
         expect(getHttpStatusForErrorType("reservation_conflict")).toBe(409);
       });
 
-      test(_"should return 500 for unknown error types", _() => {
+      test("should return 500 for unknown error types", () => {
         expect(getHttpStatusForErrorType("unknown_error" as any)).toBe(500);
       });
 
-      test(_"should return correct status codes for system errors", _() => {
+      test("should return correct status codes for system errors", () => {
         expect(getHttpStatusForErrorType("internal_server_error")).toBe(500);
         expect(getHttpStatusForErrorType("service_unavailable")).toBe(503);
         expect(getHttpStatusForErrorType("timeout")).toBe(504);
       });
     });
 
-    describe(_"getUserMessageForErrorType", _() => {
-      test(_"should return user-friendly messages for authentication errors", _() => {
+    describe("getUserMessageForErrorType", () => {
+      test("should return user-friendly messages for authentication errors", () => {
         expect(getUserMessageForErrorType("invalid_credentials")).toBe(
           "Invalid email or password. Please try again."
         );
@@ -674,7 +674,7 @@ describe(_"Error Validation Tests", _() => {
         );
       });
 
-      test(_"should return user-friendly messages for payment errors", _() => {
+      test("should return user-friendly messages for payment errors", () => {
         expect(getUserMessageForErrorType("payment_failed")).toBe(
           "Payment could not be processed. Please check your payment method."
         );
@@ -683,7 +683,7 @@ describe(_"Error Validation Tests", _() => {
         );
       });
 
-      test(_"should return user-friendly messages for business logic errors", _() => {
+      test("should return user-friendly messages for business logic errors", () => {
         expect(getUserMessageForErrorType("beat_not_available")).toBe(
           "This beat is no longer available for purchase."
         );
@@ -692,13 +692,13 @@ describe(_"Error Validation Tests", _() => {
         );
       });
 
-      test(_"should return generic message for unknown error types", _() => {
+      test("should return generic message for unknown error types", () => {
         expect(getUserMessageForErrorType("unknown_error" as any)).toBe(
           "An unexpected error occurred. Please try again."
         );
       });
 
-      test(_"should return user-friendly messages for file upload errors", _() => {
+      test("should return user-friendly messages for file upload errors", () => {
         expect(getUserMessageForErrorType("file_too_large")).toBe(
           "File size exceeds the maximum limit of 50MB."
         );

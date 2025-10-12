@@ -9,9 +9,9 @@ import {
   validateFileUpload,
 } from "../../shared/validation/index";
 
-describe(_"Validation Utilities Tests", _() => {
-  describe(_"combineSchemas", _() => {
-    test(_"should combine two schemas", _() => {
+describe("Validation Utilities Tests", () => {
+  describe("combineSchemas", () => {
+    test("should combine two schemas", () => {
       const schema1 = z.object({ name: z.string() });
       const schema2 = z.object({ age: z.number() });
 
@@ -21,19 +21,19 @@ describe(_"Validation Utilities Tests", _() => {
       expect(result).toEqual({ name: "John", age: 25 });
     });
 
-    test(_"should reject data missing fields from either schema", _() => {
+    test("should reject data missing fields from either schema", () => {
       const schema1 = z.object({ name: z.string() });
       const schema2 = z.object({ age: z.number() });
 
       const combined = combineSchemas(schema1, schema2);
 
-      expect_(() => combined.parse({ name: "John" })).toThrow();
-      expect_(() => combined.parse({ age: 25 })).toThrow();
+      expect(() => combined.parse({ name: "John" })).toThrow();
+      expect(() => combined.parse({ age: 25 })).toThrow();
     });
   });
 
-  describe(_"makeOptional", _() => {
-    test(_"should make schema optional", _() => {
+  describe("makeOptional", () => {
+    test("should make schema optional", () => {
       const schema = z.string().min(1);
       const optional = makeOptional(schema);
 
@@ -42,8 +42,8 @@ describe(_"Validation Utilities Tests", _() => {
     });
   });
 
-  describe(_"makePartial", _() => {
-    test(_"should make all fields in object schema optional", _() => {
+  describe("makePartial", () => {
+    test("should make all fields in object schema optional", () => {
       const schema = z.object({
         name: z.string(),
         age: z.number(),
@@ -58,8 +58,8 @@ describe(_"Validation Utilities Tests", _() => {
     });
   });
 
-  describe(_"validateFileUpload", _() => {
-    test(_"should validate valid file upload", _() => {
+  describe("validateFileUpload", () => {
+    test("should validate valid file upload", () => {
       const mockFile = {
         fieldname: "audio",
         originalname: "beat.mp3",
@@ -69,10 +69,10 @@ describe(_"Validation Utilities Tests", _() => {
         buffer: Buffer.from("mock file content"),
       } as Express.Multer.File;
 
-      expect_(() => validateFileUpload(mockFile)).not.toThrow();
+      expect(() => validateFileUpload(mockFile)).not.toThrow();
     });
 
-    test(_"should reject file exceeding size limit", _() => {
+    test("should reject file exceeding size limit", () => {
       const mockFile = {
         fieldname: "audio",
         originalname: "large-beat.wav",
@@ -82,10 +82,10 @@ describe(_"Validation Utilities Tests", _() => {
         buffer: Buffer.from("mock file content"),
       } as Express.Multer.File;
 
-      expect_(() => validateFileUpload(mockFile)).toThrow("File size exceeds 50MB limit");
+      expect(() => validateFileUpload(mockFile)).toThrow("File size exceeds 50MB limit");
     });
 
-    test(_"should reject file without filename", _() => {
+    test("should reject file without filename", () => {
       const mockFile = {
         fieldname: "audio",
         originalname: "",
@@ -95,12 +95,12 @@ describe(_"Validation Utilities Tests", _() => {
         buffer: Buffer.from("mock file content"),
       } as Express.Multer.File;
 
-      expect_(() => validateFileUpload(mockFile)).toThrow("Filename is required");
+      expect(() => validateFileUpload(mockFile)).toThrow("Filename is required");
     });
   });
 
-  describe(_"isValidationError", _() => {
-    test(_"should identify Zod validation errors", _() => {
+  describe("isValidationError", () => {
+    test("should identify Zod validation errors", () => {
       const schema = z.string().min(5);
 
       try {
@@ -110,12 +110,12 @@ describe(_"Validation Utilities Tests", _() => {
       }
     });
 
-    test(_"should not identify regular errors as validation errors", _() => {
+    test("should not identify regular errors as validation errors", () => {
       const regularError = new Error("Regular error");
       expect(isValidationError(regularError)).toBe(false);
     });
 
-    test(_"should not identify non-error values as validation errors", _() => {
+    test("should not identify non-error values as validation errors", () => {
       expect(isValidationError("string")).toBe(false);
       expect(isValidationError(null)).toBe(false);
       expect(isValidationError(undefined)).toBe(false);
@@ -123,8 +123,8 @@ describe(_"Validation Utilities Tests", _() => {
     });
   });
 
-  describe(_"extractValidationErrors", _() => {
-    test(_"should extract validation errors in standardized format", _() => {
+  describe("extractValidationErrors", () => {
+    test("should extract validation errors in standardized format", () => {
       const schema = z.object({
         name: z.string().min(1),
         email: z.string().email(),
@@ -165,7 +165,7 @@ describe(_"Validation Utilities Tests", _() => {
       }
     });
 
-    test(_"should handle nested field paths", _() => {
+    test("should handle nested field paths", () => {
       const schema = z.object({
         user: z.object({
           profile: z.object({
@@ -192,7 +192,7 @@ describe(_"Validation Utilities Tests", _() => {
       }
     });
 
-    test(_"should handle array field paths", _() => {
+    test("should handle array field paths", () => {
       const schema = z.object({
         items: z.array(
           z.object({
@@ -217,15 +217,15 @@ describe(_"Validation Utilities Tests", _() => {
     });
   });
 
-  describe(_"Type transformation tests", _() => {
-    test(_"should transform string to number", _() => {
+  describe("Type transformation tests", () => {
+    test("should transform string to number", () => {
       const schema = z.string().transform(val => parseInt(val, 10));
       const result = schema.parse("123");
       expect(result).toBe(123);
       expect(typeof result).toBe("number");
     });
 
-    test(_"should transform and validate email", _() => {
+    test("should transform and validate email", () => {
       const schema = z
         .string()
         .email()
@@ -234,13 +234,13 @@ describe(_"Validation Utilities Tests", _() => {
       expect(result).toBe("user@example.com");
     });
 
-    test(_"should transform array of strings to numbers", _() => {
+    test("should transform array of strings to numbers", () => {
       const schema = z.array(z.string().transform(val => parseInt(val, 10)));
       const result = schema.parse(["1", "2", "3"]);
       expect(result).toEqual([1, 2, 3]);
     });
 
-    test(_"should transform nested object properties", _() => {
+    test("should transform nested object properties", () => {
       const schema = z.object({
         user: z.object({
           name: z.string().transform(val => val.trim().toLowerCase()),
@@ -263,7 +263,7 @@ describe(_"Validation Utilities Tests", _() => {
       });
     });
 
-    test(_"should handle optional transformations", _() => {
+    test("should handle optional transformations", () => {
       const schema = z.object({
         name: z.string(),
         age: z
@@ -279,7 +279,7 @@ describe(_"Validation Utilities Tests", _() => {
       expect(result2).toEqual({ name: "John" });
     });
 
-    test(_"should validate transformed values", _() => {
+    test("should validate transformed values", () => {
       const schema = z
         .string()
         .transform(val => parseInt(val, 10))
@@ -288,11 +288,11 @@ describe(_"Validation Utilities Tests", _() => {
         });
 
       expect(schema.parse("5")).toBe(5);
-      expect_(() => schema.parse("-5")).toThrow("Must be positive");
-      expect_(() => schema.parse("0")).toThrow("Must be positive");
+      expect(() => schema.parse("-5")).toThrow("Must be positive");
+      expect(() => schema.parse("0")).toThrow("Must be positive");
     });
 
-    test(_"should handle complex business logic transformations", _() => {
+    test("should handle complex business logic transformations", () => {
       const priceSchema = z.object({
         amount: z.string().transform(val => Math.round(parseFloat(val) * 100)), // Convert dollars to cents
         currency: z.string().default("USD"),
@@ -305,7 +305,7 @@ describe(_"Validation Utilities Tests", _() => {
       });
     });
 
-    test(_"should validate BroLab-specific transformations", _() => {
+    test("should validate BroLab-specific transformations", () => {
       const beatSchema = z.object({
         title: z.string().transform(val => val.trim()),
         slug: z.string().transform(val => val.toLowerCase().replace(/\s+/g, "-")),

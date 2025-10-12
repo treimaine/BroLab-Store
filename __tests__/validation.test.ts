@@ -12,9 +12,9 @@ import {
   validateUUID,
 } from "../shared/validation";
 
-describe(_"Validation System Tests", _() => {
-  describe(_"File Upload Validation", _() => {
-    test(_"should validate correct file upload", _() => {
+describe("Validation System Tests", () => {
+  describe("File Upload Validation", () => {
+    test("should validate correct file upload", () => {
       const mockFile = {
         originalname: "test.pdf",
         mimetype: "application/pdf",
@@ -26,7 +26,7 @@ describe(_"Validation System Tests", _() => {
       expect(result.errors).toHaveLength(0);
     });
 
-    test(_"should reject file too large", _() => {
+    test("should reject file too large", () => {
       const mockFile = {
         originalname: "large.pdf",
         mimetype: "application/pdf",
@@ -38,7 +38,7 @@ describe(_"Validation System Tests", _() => {
       expect(result.errors).toContain("File size exceeds 50MB limit");
     });
 
-    test(_"should reject invalid MIME type", _() => {
+    test("should reject invalid MIME type", () => {
       const mockFile = {
         originalname: "test.txt",
         mimetype: "text/plain",
@@ -50,7 +50,7 @@ describe(_"Validation System Tests", _() => {
       expect(result.errors).toContain("File type not allowed");
     });
 
-    test(_"should reject executable files", _() => {
+    test("should reject executable files", () => {
       const mockFile = {
         originalname: "malware.exe",
         mimetype: "application/octet-stream",
@@ -62,7 +62,7 @@ describe(_"Validation System Tests", _() => {
       expect(result.errors).toContain("Executable files are not allowed");
     });
 
-    test(_"should reject invalid file paths", _() => {
+    test("should reject invalid file paths", () => {
       const mockFile = {
         originalname: "../../../etc/passwd",
         mimetype: "application/pdf",
@@ -75,56 +75,56 @@ describe(_"Validation System Tests", _() => {
     });
   });
 
-  describe(_"File Path Validation", _() => {
-    test(_"should accept valid file paths", _() => {
+  describe("File Path Validation", () => {
+    test("should accept valid file paths", () => {
       expect(validateFilePath("folder/file.pdf")).toBe(true);
       expect(validateFilePath("user_123/document.docx")).toBe(true);
       expect(validateFilePath("uploads/2025/file-name.mp3")).toBe(true);
     });
 
-    test(_"should reject directory traversal attempts", _() => {
+    test("should reject directory traversal attempts", () => {
       expect(validateFilePath("../etc/passwd")).toBe(false);
       expect(validateFilePath("folder/../../../secret")).toBe(false);
       expect(validateFilePath("/absolute/path")).toBe(false);
       expect(validateFilePath("folder//double-slash")).toBe(false);
     });
 
-    test(_"should reject invalid characters", _() => {
+    test("should reject invalid characters", () => {
       expect(validateFilePath("file<script>.pdf")).toBe(false);
       expect(validateFilePath("file|pipe.pdf")).toBe(false);
       expect(validateFilePath("file?query.pdf")).toBe(false);
     });
   });
 
-  describe(_"MIME Type Validation", _() => {
-    test(_"should accept standard allowed types", _() => {
+  describe("MIME Type Validation", () => {
+    test("should accept standard allowed types", () => {
       expect(validateMimeType("application/pdf")).toBe(true);
       expect(validateMimeType("audio/mpeg")).toBe(true);
       expect(validateMimeType("image/jpeg")).toBe(true);
       expect(validateMimeType("application/zip")).toBe(true);
     });
 
-    test(_"should reject non-allowed types", _() => {
+    test("should reject non-allowed types", () => {
       expect(validateMimeType("text/plain")).toBe(false);
       expect(validateMimeType("application/octet-stream")).toBe(false);
       expect(validateMimeType("video/mp4")).toBe(false);
     });
 
-    test(_"should use custom allowed types", _() => {
+    test("should use custom allowed types", () => {
       const customTypes = ["text/plain", "application/json"];
       expect(validateMimeType("text/plain", customTypes)).toBe(true);
       expect(validateMimeType("application/pdf", customTypes)).toBe(false);
     });
   });
 
-  describe(_"UUID Validation", _() => {
-    test(_"should accept valid UUIDs", _() => {
+  describe("UUID Validation", () => {
+    test("should accept valid UUIDs", () => {
       expect(validateUUID("550e8400-e29b-41d4-a716-446655440000")).toBe(true);
       expect(validateUUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")).toBe(true);
       expect(validateUUID("f47ac10b-58cc-4372-a567-0e02b2c3d479")).toBe(true);
     });
 
-    test(_"should reject invalid UUIDs", _() => {
+    test("should reject invalid UUIDs", () => {
       expect(validateUUID("not-a-uuid")).toBe(false);
       expect(validateUUID("550e8400-e29b-41d4-a716")).toBe(false);
       expect(validateUUID("550e8400-e29b-41d4-a716-446655440000-extra")).toBe(false);
@@ -132,14 +132,14 @@ describe(_"Validation System Tests", _() => {
     });
   });
 
-  describe(_"Email Validation", _() => {
-    test(_"should accept valid emails", _() => {
+  describe("Email Validation", () => {
+    test("should accept valid emails", () => {
       expect(validateEmail("user@example.com")).toBe(true);
       expect(validateEmail("test.email+tag@domain.co.uk")).toBe(true);
       expect(validateEmail("user123@test-domain.org")).toBe(true);
     });
 
-    test(_"should reject invalid emails", _() => {
+    test("should reject invalid emails", () => {
       expect(validateEmail("invalid.email")).toBe(false);
       expect(validateEmail("@domain.com")).toBe(false);
       expect(validateEmail("user@")).toBe(false);
@@ -147,21 +147,21 @@ describe(_"Validation System Tests", _() => {
       expect(validateEmail("")).toBe(false);
     });
 
-    test(_"should reject emails that are too long", _() => {
+    test("should reject emails that are too long", () => {
       const longEmail = "a".repeat(250) + "@domain.com";
       expect(validateEmail(longEmail)).toBe(false);
     });
   });
 
-  describe(_"Phone Number Validation", _() => {
-    test(_"should accept valid phone numbers", _() => {
+  describe("Phone Number Validation", () => {
+    test("should accept valid phone numbers", () => {
       expect(validatePhoneNumber("+1234567890")).toBe(true);
       expect(validatePhoneNumber("(123) 456-7890")).toBe(true);
       expect(validatePhoneNumber("+33 1 23 45 67 89")).toBe(true);
       expect(validatePhoneNumber("123-456-7890")).toBe(true);
     });
 
-    test(_"should reject invalid phone numbers", _() => {
+    test("should reject invalid phone numbers", () => {
       expect(validatePhoneNumber("123")).toBe(false);
       expect(validatePhoneNumber("abcdefghij")).toBe(false);
       expect(validatePhoneNumber("")).toBe(false);
@@ -169,22 +169,22 @@ describe(_"Validation System Tests", _() => {
     });
   });
 
-  describe(_"Input Sanitization", _() => {
-    test(_"should remove dangerous characters", _() => {
+  describe("Input Sanitization", () => {
+    test("should remove dangerous characters", () => {
       expect(sanitizeUserInput('<script>alert("xss")</script>')).toBe("scriptalert(xss)/script");
       expect(sanitizeUserInput('Hello "World"')).toBe("Hello World");
       expect(sanitizeUserInput("It's a test & more")).toBe("Its a test  more");
     });
 
-    test(_"should trim whitespace and limit length", _() => {
+    test("should trim whitespace and limit length", () => {
       expect(sanitizeUserInput("  hello world  ")).toBe("hello world");
       const longString = "a".repeat(1500);
       expect(sanitizeUserInput(longString)).toHaveLength(1000);
     });
   });
 
-  describe(_"Schema Validation", _() => {
-    test(_"should validate file upload schema", _() => {
+  describe("Schema Validation", () => {
+    test("should validate file upload schema", () => {
       const validData = {
         name: "file.pdf",
         size: 1024,
@@ -192,10 +192,10 @@ describe(_"Validation System Tests", _() => {
         lastModified: Date.now(),
       };
 
-      expect_(() => fileUploadValidation.parse(validData)).not.toThrow();
+      expect(() => fileUploadValidation.parse(validData)).not.toThrow();
     });
 
-    test(_"should reject invalid file upload schema", _() => {
+    test("should reject invalid file upload schema", () => {
       const invalidData = {
         user_id: 1,
         filename: "",
@@ -206,10 +206,10 @@ describe(_"Validation System Tests", _() => {
         role: "invalid_role",
       };
 
-      expect_(() => fileUploadValidation.parse(invalidData)).toThrow();
+      expect(() => fileUploadValidation.parse(invalidData)).toThrow();
     });
 
-    test(_"should validate file filter schema", _() => {
+    test("should validate file filter schema", () => {
       const validFilters = {
         role: "upload" as const,
         reservation_id: "550e8400-e29b-41d4-a716-446655440000",
@@ -217,10 +217,10 @@ describe(_"Validation System Tests", _() => {
         owner_id: 1,
       };
 
-      expect_(() => fileFilterValidation.parse(validFilters)).not.toThrow();
+      expect(() => fileFilterValidation.parse(validFilters)).not.toThrow();
     });
 
-    test(_"should validate service order schema", _() => {
+    test("should validate service order schema", () => {
       const validOrder = {
         service_type: "mixing" as const,
         details: "Please enhance the bass and improve the overall mix quality",
@@ -230,10 +230,10 @@ describe(_"Validation System Tests", _() => {
         contact_phone: "+1234567890",
       };
 
-      expect_(() => serviceOrderValidation.parse(validOrder)).not.toThrow();
+      expect(() => serviceOrderValidation.parse(validOrder)).not.toThrow();
     });
 
-    test(_"should reject invalid service order schema", _() => {
+    test("should reject invalid service order schema", () => {
       const invalidOrder = {
         user_id: 1,
         service_type: "invalid_service",
@@ -241,7 +241,7 @@ describe(_"Validation System Tests", _() => {
         status: "invalid_status",
       };
 
-      expect_(() => serviceOrderValidation.parse(invalidOrder)).toThrow();
+      expect(() => serviceOrderValidation.parse(invalidOrder)).toThrow();
     });
   });
 });

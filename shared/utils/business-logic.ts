@@ -576,35 +576,4 @@ export const calculateRecommendedBeatPricing = (
   };
 };
 
-// ================================
-// EXPORTS
-// ================================
-
-export {
-  applyVolumeDiscount,
-  calculateBeatBundlePrice,
-  // Pricing
-  calculateBeatPrice,
-  calculateLicenseUpgradePrice,
-  calculateLoyaltyDiscount,
-  // Orders
-  calculateOrderSubtotal,
-  calculateOrderTotal,
-  calculateProcessingFee,
-  calculateRecommendedBeatPricing,
-  calculateServiceBundleDiscount,
-  // Services
-  calculateServicePrice,
-  // Subscriptions
-  calculateSubscriptionChange,
-  calculateTaxAmount,
-  // Licensing
-  canUserPurchaseLicense,
-  checkDownloadQuota,
-  // Currency
-  convertCurrency,
-  formatCurrencyAmount,
-  getLicenseTerms,
-  // Validation
-  validateOrderBusinessRules,
-};
+// All functions are already exported individually above with 'export const' declarations

@@ -8,12 +8,12 @@ const mockConvexClient = {
   query: jest.fn(),
 };
 
-jest.mock(_"convex/browser", _() => ({
-  ConvexHttpClient: jest.fn().mockImplementation_(() => mockConvexClient),
+jest.mock("convex/browser", () => ({
+  ConvexHttpClient: jest.fn().mockImplementation(() => mockConvexClient),
 }));
 
 // Mock performance monitor
-jest.mock(_"../shared/utils/system-manager", _() => ({
+jest.mock("../shared/utils/system-manager", () => ({
   performanceMonitor: {
     startTimer: jest.fn().mockReturnValue({
       stop: jest.fn().mockReturnValue(100),
@@ -27,11 +27,11 @@ interface MockConvexClient {
   mutation: jest.Mock;
 }
 
-describe(_"ConvexRateLimiterImpl", _() => {
+describe("ConvexRateLimiterImpl", () => {
   let rateLimiter: ConvexRateLimiterImpl;
   let mockConvex: MockConvexClient;
 
-  beforeEach_(() => {
+  beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
     mockConvexClient.mutation.mockReset();
@@ -41,8 +41,8 @@ describe(_"ConvexRateLimiterImpl", _() => {
     rateLimiter = new ConvexRateLimiterImpl(mockConvexClient as any);
   });
 
-  describe(_"checkLimit", _() => {
-    it(_"should allow requests within limit", _async () => {
+  describe("checkLimit", () => {
+    it("should allow requests within limit", async () => {
       const mockResult = {
         allowed: true,
         remaining: 9,
@@ -73,7 +73,7 @@ describe(_"ConvexRateLimiterImpl", _() => {
       );
     });
 
-    it(_"should block requests when limit exceeded", _async () => {
+    it("should block requests when limit exceeded", async () => {
       const mockResult = {
         allowed: false,
         remaining: 0,
@@ -97,7 +97,7 @@ describe(_"ConvexRateLimiterImpl", _() => {
       expect(onLimitReached).toHaveBeenCalledWith("user:123:api");
     });
 
-    it(_"should fail open when Convex call fails", _async () => {
+    it("should fail open when Convex call fails", async () => {
       mockConvexClient.mutation.mockRejectedValue(new Error("Network error"));
 
       const limit: RateLimit = {
@@ -112,8 +112,8 @@ describe(_"ConvexRateLimiterImpl", _() => {
     });
   });
 
-  describe(_"resetLimit", _() => {
-    it(_"should reset rate limit successfully", _async () => {
+  describe("resetLimit", () => {
+    it("should reset rate limit successfully", async () => {
       mockConvexClient.mutation.mockResolvedValue(true);
 
       await rateLimiter.resetLimit("user:123:api");
@@ -123,7 +123,7 @@ describe(_"ConvexRateLimiterImpl", _() => {
       });
     });
 
-    it(_"should handle reset errors gracefully", _async () => {
+    it("should handle reset errors gracefully", async () => {
       mockConvexClient.mutation.mockRejectedValue(new Error("Database error"));
 
       // Should not throw
@@ -131,8 +131,8 @@ describe(_"ConvexRateLimiterImpl", _() => {
     });
   });
 
-  describe(_"getStats", _() => {
-    it(_"should return rate limit stats", _async () => {
+  describe("getStats", () => {
+    it("should return rate limit stats", async () => {
       const mockStats = {
         key: "user:123:api",
         requests: 5,
@@ -152,7 +152,7 @@ describe(_"ConvexRateLimiterImpl", _() => {
       });
     });
 
-    it(_"should return default stats when key not found", _async () => {
+    it("should return default stats when key not found", async () => {
       mockConvexClient.query.mockResolvedValue(null);
 
       const result = await rateLimiter.getStats("user:123:api");
@@ -164,8 +164,8 @@ describe(_"ConvexRateLimiterImpl", _() => {
     });
   });
 
-  describe(_"incrementCounter", _() => {
-    it(_"should increment counter and return new count", _async () => {
+  describe("incrementCounter", () => {
+    it("should increment counter and return new count", async () => {
       mockConvexClient.mutation.mockResolvedValue(5);
 
       const result = await rateLimiter.incrementCounter("user:123:api");
@@ -185,8 +185,8 @@ describe(_"ConvexRateLimiterImpl", _() => {
     });
   });
 
-  describe(_"getGlobalStats", _() => {
-    it(_"should return global rate limit stats", _async () => {
+  describe("getGlobalStats", () => {
+    it("should return global rate limit stats", async () => {
       const mockGlobalStats = {
         "user:123:api": {
           key: "user:123:api",
@@ -215,8 +215,8 @@ describe(_"ConvexRateLimiterImpl", _() => {
     });
   });
 
-  describe(_"getUserStats", _() => {
-    it(_"should return user-specific rate limit stats", _async () => {
+  describe("getUserStats", () => {
+    it("should return user-specific rate limit stats", async () => {
       const mockUserStats = {
         "user:123:api": {
           key: "user:123:api",
@@ -240,9 +240,9 @@ describe(_"ConvexRateLimiterImpl", _() => {
     });
   });
 
-  describe(_"getMetrics", _() => {
-    it(_"should return rate limit metrics", _async () => {
-      const mockMetrics = {
+  describe("getMetrics", () => {
+    it("should return rate limit metrics", async () => {
+      const mockConvexResponse = {
         totalKeys: 10,
         totalRequests: 150,
         totalBlocked: 5,
@@ -253,17 +253,28 @@ describe(_"ConvexRateLimiterImpl", _() => {
         },
       };
 
-      mockConvexClient.query.mockResolvedValue(mockMetrics);
+      const expectedMetrics = {
+        totalKeys: 10,
+        totalRequests: 150,
+        totalBlocked: 5,
+        activeWindows: 8,
+        byAction: {
+          api: 100,
+          upload: 50,
+        },
+      };
+
+      mockConvexClient.query.mockResolvedValue(mockConvexResponse);
 
       const result = await rateLimiter.getMetrics();
 
-      expect(result).toEqual(mockMetrics);
+      expect(result).toEqual(expectedMetrics);
       expect(mockConvexClient.query).toHaveBeenCalledWith("rateLimits:getRateLimitMetrics", {
         timeRange: undefined,
       });
     });
 
-    it(_"should accept time range parameter", _async () => {
+    it("should accept time range parameter", async () => {
       const timeRange = {
         start: Date.now() - 60000,
         end: Date.now(),
@@ -285,8 +296,8 @@ describe(_"ConvexRateLimiterImpl", _() => {
     });
   });
 
-  describe(_"cleanupExpired", _() => {
-    it(_"should cleanup expired rate limits", _async () => {
+  describe("cleanupExpired", () => {
+    it("should cleanup expired rate limits", async () => {
       const mockResult = { deletedCount: 5, cutoff: Date.now() - 86400000 };
       mockConvexClient.mutation.mockResolvedValue(mockResult);
 
@@ -302,13 +313,13 @@ describe(_"ConvexRateLimiterImpl", _() => {
     });
   });
 
-  describe(_"static helper methods", _() => {
-    it(_"should generate correct rate limit keys", _() => {
+  describe("static helper methods", () => {
+    it("should generate correct rate limit keys", () => {
       const key = ConvexRateLimiterImpl.generateKey("user:123", "api_request");
       expect(key).toBe("user:123:api_request");
     });
 
-    it(_"should create rate limit config with defaults", _() => {
+    it("should create rate limit config with defaults", () => {
       const config = ConvexRateLimiterImpl.createConfig(60000, 100);
 
       expect(config).toEqual({
@@ -319,7 +330,7 @@ describe(_"ConvexRateLimiterImpl", _() => {
       });
     });
 
-    it(_"should create rate limit config with custom options", _() => {
+    it("should create rate limit config with custom options", () => {
       const config = ConvexRateLimiterImpl.createConfig(60000, 100, {
         skipSuccessfulRequests: true,
         message: "Custom message",
@@ -335,8 +346,8 @@ describe(_"ConvexRateLimiterImpl", _() => {
     });
   });
 
-  describe(_"RateLimitConfigs", _() => {
-    it(_"should provide predefined configurations", _() => {
+  describe("RateLimitConfigs", () => {
+    it("should provide predefined configurations", () => {
       expect(RateLimitConfigs.API_STRICT).toEqual({
         windowMs: 15 * 60 * 1000,
         maxRequests: 100,

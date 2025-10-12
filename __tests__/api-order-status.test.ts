@@ -2,18 +2,18 @@ import { describe, expect, it, jest } from "@jest/globals";
 // __tests__/api-order-status.test.ts
 
 // Legacy supabase stub for this test file
-const _supabaseAdmin = { from: jest.fn() } as Record<string, unknown>;
+const _supabaseAdmin = { from: jest.fn() };
 
 describe.skip("Order Status Tests (migrated to Convex)", () => {
-  it(_"should be replaced with Convex order management", _() => {
+  it("should be replaced with Convex order management", () => {
     // TODO: Implement new tests using Convex order management
     expect(true).toBe(true);
   });
 });
 
 // Nouveau test pour Convex Order Management
-describe(_"Convex Order Management", _() => {
-  it(_"should create order with Convex", _async () => {
+describe("Convex Order Management", () => {
+  it("should create order with Convex", async () => {
     const mockOrder = {
       _id: "orders:1",
       userId: "user_123",
@@ -33,7 +33,7 @@ describe(_"Convex Order Management", _() => {
     expect(mockOrder.status).toBe("pending");
   });
 
-  it(_"should update order status in Convex", _async () => {
+  it("should update order status in Convex", async () => {
     const mockOrderUpdate = {
       _id: "orders:1",
       status: "completed",
@@ -43,7 +43,7 @@ describe(_"Convex Order Management", _() => {
     expect(mockOrderUpdate.status).toBe("completed");
   });
 
-  it(_"should query user orders from Convex", _async () => {
+  it("should query user orders from Convex", async () => {
     const mockOrders = [
       {
         _id: "orders:1",

@@ -1,13 +1,21 @@
 import request from "supertest";
 import { cleanupWooCommerceStubs, setupWooCommerceStubs } from "./stubs/woocommerce-stubs";
-import { app } from "../server/app";
+
+// Mock the openGraph generator library
+jest.mock("../server/lib/openGraphGenerator", () => ({
+  generateBeatOpenGraph: jest.fn(),
+  generateShopOpenGraph: jest.fn(),
+  generateHomeOpenGraph: jest.fn(),
+  generateStaticPageOpenGraph: jest.fn(),
+  generateOpenGraphHTML: jest.fn(),
+}));
 
 // Mock des modules avant l'import de l'app
-jest.mock(_"../server/routes/openGraph", _() => {
+jest.mock("../server/routes/openGraph", () => {
   const express = require("express");
   const router = express.Router();
 
-  router.get(_"/beat/:id", _(req: express.Request, _res: express.Response) => {
+  router.get("/beat/:id", (req: express.Request, res: express.Response) => {
     const beatId = req.params.id;
     if (beatId === "999999") {
       return res.status(404).json({ error: "Beat not found" });
@@ -29,7 +37,7 @@ jest.mock(_"../server/routes/openGraph", _() => {
     `);
   });
 
-  router.get(_"/shop", _(req: express.Request, _res: express.Response) => {
+  router.get("/shop", (req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(`
@@ -46,7 +54,7 @@ jest.mock(_"../server/routes/openGraph", _() => {
     `);
   });
 
-  router.get(_"/home", _(req: express.Request, _res: express.Response) => {
+  router.get("/home", (req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(`
@@ -63,7 +71,7 @@ jest.mock(_"../server/routes/openGraph", _() => {
     `);
   });
 
-  router.get(_"/page/:pageName", _(req: express.Request, _res: express.Response) => {
+  router.get("/page/:pageName", (req: express.Request, res: express.Response) => {
     const pageName = req.params.pageName;
     const validPages = ["about", "contact", "terms", "privacy", "license"];
 
@@ -91,11 +99,11 @@ jest.mock(_"../server/routes/openGraph", _() => {
 });
 
 // Mock des modules schema
-jest.mock(_"../server/routes/schema", _() => {
+jest.mock("../server/routes/schema", () => {
   const express = require("express");
   const router = express.Router();
 
-  router.get(_"/beat/:id", _(req: express.Request, _res: express.Response) => {
+  router.get("/beat/:id", (req: express.Request, _res: express.Response) => {
     const beatId = req.params.id;
     if (beatId === "999999") {
       return res.status(404).json({ error: "Beat not found" });
@@ -129,7 +137,7 @@ jest.mock(_"../server/routes/schema", _() => {
     });
   });
 
-  router.get(_"/beats-list", _(req: express.Request, _res: express.Response) => {
+  router.get("/beats-list", (req: express.Request, _res: express.Response) => {
     res.setHeader("Content-Type", "application/ld+json");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.json({
@@ -157,7 +165,7 @@ jest.mock(_"../server/routes/schema", _() => {
     });
   });
 
-  router.get(_"/organization", _(req: express.Request, _res: express.Response) => {
+  router.get("/organization", (req: express.Request, _res: express.Response) => {
     res.setHeader("Content-Type", "application/ld+json");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.json({
@@ -174,17 +182,19 @@ jest.mock(_"../server/routes/schema", _() => {
 });
 
 // Import de l'app après les mocks
+import express from "express";
+import { app } from "../server/app";
 
-describe(_"Open Graph API", _() => {
-  beforeAll_(() => {
+describe("Open Graph API", () => {
+  beforeAll(() => {
     setupWooCommerceStubs();
   });
 
-  afterAll_(() => {
+  afterAll(() => {
     cleanupWooCommerceStubs();
   });
-  describe(_"GET /api/opengraph/beat/:id", _() => {
-    it(_"should return Open Graph meta tags for valid beat ID", _async () => {
+  describe("GET /api/opengraph/beat/:id", () => {
+    it("should return Open Graph meta tags for valid beat ID", async () => {
       // First, get a list of products to find a valid ID
       const listResponse = await request(app).get("/sitemap.xml").expect(200);
 
@@ -222,15 +232,15 @@ describe(_"Open Graph API", _() => {
       }
     });
 
-    it(_"should return 404 for invalid beat ID", _async () => {
+    it("should return 404 for invalid beat ID", async () => {
       const response = await request(app).get("/api/opengraph/beat/999999").expect(404);
 
       expect(response.body.error).toBe("Beat not found");
     });
   });
 
-  describe(_"GET /api/opengraph/shop", _() => {
-    it(_"should return Open Graph meta tags for shop page", _async () => {
+  describe("GET /api/opengraph/shop", () => {
+    it("should return Open Graph meta tags for shop page", async () => {
       const response = await request(app).get("/api/opengraph/shop").expect(200);
 
       expect(response.headers["content-type"]).toContain("text/html");
@@ -254,8 +264,8 @@ describe(_"Open Graph API", _() => {
     });
   });
 
-  describe(_"GET /api/opengraph/home", _() => {
-    it(_"should return Open Graph meta tags for home page", _async () => {
+  describe("GET /api/opengraph/home", () => {
+    it("should return Open Graph meta tags for home page", async () => {
       const response = await request(app).get("/api/opengraph/home").expect(200);
 
       expect(response.headers["content-type"]).toContain("text/html");
@@ -276,8 +286,8 @@ describe(_"Open Graph API", _() => {
     });
   });
 
-  describe(_"GET /api/opengraph/page/:pageName", _() => {
-    it(_"should return Open Graph meta tags for valid static pages", _async () => {
+  describe("GET /api/opengraph/page/:pageName", () => {
+    it("should return Open Graph meta tags for valid static pages", async () => {
       const validPages = ["about", "contact", "terms", "privacy", "license"];
 
       for (const pageName of validPages) {
@@ -301,15 +311,15 @@ describe(_"Open Graph API", _() => {
       }
     });
 
-    it(_"should return 400 for invalid page name", _async () => {
+    it("should return 400 for invalid page name", async () => {
       const response = await request(app).get("/api/opengraph/page/invalid-page").expect(400);
 
       expect(response.body.error).toBe("Invalid page name");
     });
   });
 
-  describe(_"Open Graph Content Validation", _() => {
-    it(_"should include proper Twitter Card type for beats", _async () => {
+  describe("Open Graph Content Validation", () => {
+    it("should include proper Twitter Card type for beats", async () => {
       // First, get a list of products to find a valid ID
       const listResponse = await request(app).get("/sitemap.xml").expect(200);
 
@@ -333,7 +343,7 @@ describe(_"Open Graph API", _() => {
       }
     });
 
-    it(_"should include proper Twitter Card type for pages", _async () => {
+    it("should include proper Twitter Card type for pages", async () => {
       const response = await request(app).get("/api/opengraph/shop").expect(200);
 
       const html = response.text;
@@ -345,7 +355,7 @@ describe(_"Open Graph API", _() => {
       expect(html).toContain('content="website"');
     });
 
-    it(_"should include proper site name", _async () => {
+    it("should include proper site name", async () => {
       const response = await request(app).get("/api/opengraph/home").expect(200);
 
       const html = response.text;
@@ -355,8 +365,8 @@ describe(_"Open Graph API", _() => {
     });
   });
 
-  describe(_"HTML Escaping", _() => {
-    it(_"should properly escape HTML characters in meta tags", _async () => {
+  describe("HTML Escaping", () => {
+    it("should properly escape HTML characters in meta tags", async () => {
       const response = await request(app).get("/api/opengraph/shop").expect(200);
 
       const html = response.text;
@@ -376,8 +386,8 @@ describe(_"Open Graph API", _() => {
     });
   });
 
-  describe(_"Cache Headers", _() => {
-    it(_"should include appropriate cache headers for Open Graph", _async () => {
+  describe("Cache Headers", () => {
+    it("should include appropriate cache headers for Open Graph", async () => {
       const response = await request(app).get("/api/opengraph/shop").expect(200);
 
       expect(response.headers["cache-control"]).toContain("public");

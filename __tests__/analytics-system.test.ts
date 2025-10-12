@@ -1,12 +1,6 @@
-import {
+import { AnalyticsConfig, InteractionType, PrivacySettings } from "../shared/types/analytics";
+import { TimeRange } from "../shared/types/core";
 import { analyticsManager } from "../shared/utils/analytics-manager";
-// Analytics System Tests
-
-  AnalyticsConfig,
-  InteractionType,
-  PrivacySettings,
-  TimeRange,
-} from "../shared/types/analytics";
 
 // Mock localStorage
 const localStorageMock = {
@@ -60,8 +54,8 @@ const mockLocation = {
   },
 };
 
-describe(_"Analytics Manager", _() => {
-  beforeEach_(() => {
+describe("Analytics Manager", () => {
+  beforeEach(() => {
     jest.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
 
@@ -87,8 +81,8 @@ describe(_"Analytics Manager", _() => {
     });
   });
 
-  describe(_"Configuration", _() => {
-    it(_"should configure analytics with default settings", _() => {
+  describe("Configuration", () => {
+    it("should configure analytics with default settings", () => {
       const config = analyticsManager.getConfig();
 
       expect(config.enabled).toBe(true);
@@ -96,7 +90,7 @@ describe(_"Analytics Manager", _() => {
       expect(config.privacy.anonymizeIPs).toBe(true);
     });
 
-    it(_"should update configuration", _() => {
+    it("should update configuration", () => {
       const newConfig: Partial<AnalyticsConfig> = {
         sampling: {
           enabled: true,
@@ -111,9 +105,9 @@ describe(_"Analytics Manager", _() => {
       expect(config.sampling.rate).toBe(0.5);
     });
 
-    it(_"should respect Do Not Track setting", _async () => {
+    it("should respect Do Not Track setting", async () => {
       // Mock Do Not Track enabled
-      (global as any).window.navigator.doNotTrack = "1";
+      (global as unknown).window.navigator.doNotTrack = "1";
 
       const config: Partial<AnalyticsConfig> = {
         privacy: {
@@ -128,8 +122,8 @@ describe(_"Analytics Manager", _() => {
     });
   });
 
-  describe(_"Privacy Settings", _() => {
-    it(_"should get privacy settings", _async () => {
+  describe("Privacy Settings", () => {
+    it("should get privacy settings", async () => {
       const settings = await analyticsManager.getPrivacySettings();
 
       expect(settings).toHaveProperty("trackingEnabled");
@@ -137,7 +131,7 @@ describe(_"Analytics Manager", _() => {
       expect(settings.gdprCompliant).toBe(true);
     });
 
-    it(_"should update privacy settings", _async () => {
+    it("should update privacy settings", async () => {
       const newSettings: Partial<PrivacySettings> = {
         trackingEnabled: false,
         dataRetentionDays: 30,
@@ -150,28 +144,28 @@ describe(_"Analytics Manager", _() => {
       expect(settings.dataRetentionDays).toBe(30);
     });
 
-    it(_"should disable tracking when privacy settings disable it", _async () => {
+    it("should disable tracking when privacy settings disable it", async () => {
       await analyticsManager.setPrivacySettings({ trackingEnabled: false });
 
       expect(analyticsManager.isTrackingAllowed()).toBe(false);
     });
   });
 
-  describe(_"Session Management", _() => {
-    it(_"should start a new session", _async () => {
+  describe("Session Management", () => {
+    it("should start a new session", async () => {
       const sessionId = await analyticsManager.startSession("user123");
 
       expect(sessionId).toBeDefined();
       expect(sessionId).toMatch(/^session_/);
     });
 
-    it(_"should end a session", _async () => {
+    it("should end a session", async () => {
       const sessionId = await analyticsManager.startSession("user123");
 
       await expect(analyticsManager.endSession(sessionId)).resolves.not.toThrow();
     });
 
-    it(_"should update session data", _async () => {
+    it("should update session data", async () => {
       const sessionId = await analyticsManager.startSession("user123");
 
       await expect(
@@ -180,8 +174,8 @@ describe(_"Analytics Manager", _() => {
     });
   });
 
-  describe(_"Interaction Tracking", _() => {
-    it(_"should track user interactions", _async () => {
+  describe("Interaction Tracking", () => {
+    it("should track user interactions", async () => {
       const interaction = {
         sessionId: "test-session",
         type: "click" as InteractionType,
@@ -194,19 +188,19 @@ describe(_"Analytics Manager", _() => {
       await expect(analyticsManager.trackInteraction(interaction)).resolves.not.toThrow();
     });
 
-    it(_"should track page views", _async () => {
+    it("should track page views", async () => {
       await expect(
         analyticsManager.trackPageView("/test-page", { title: "Test Page" })
       ).resolves.not.toThrow();
     });
 
-    it(_"should track conversions", _async () => {
+    it("should track conversions", async () => {
       await expect(
         analyticsManager.trackConversion("funnel1", "step1", 100)
       ).resolves.not.toThrow();
     });
 
-    it(_"should not track when tracking is disabled", _async () => {
+    it("should not track when tracking is disabled", async () => {
       await analyticsManager.setPrivacySettings({ trackingEnabled: false });
 
       const interaction = {
@@ -222,7 +216,7 @@ describe(_"Analytics Manager", _() => {
       await expect(analyticsManager.trackInteraction(interaction)).resolves.not.toThrow();
     });
 
-    it(_"should store interactions locally when enabled", _async () => {
+    it("should store interactions locally when enabled", async () => {
       localStorageMock.getItem.mockReturnValue("[]");
 
       // Ensure local storage is enabled and tracking is allowed
@@ -243,10 +237,17 @@ describe(_"Analytics Manager", _() => {
           shareWithThirdParties: false,
           gdprCompliant: true,
         },
+        sampling: {
+          enabled: false, // Disable sampling to ensure tracking happens
+          rate: 1.0,
+        },
       });
 
       // Explicitly set privacy settings to ensure tracking is enabled
       await analyticsManager.setPrivacySettings({ trackingEnabled: true });
+
+      // Verify tracking is allowed
+      expect(analyticsManager.isTrackingAllowed()).toBe(true);
 
       const interaction = {
         sessionId: "test-session",
@@ -266,8 +267,8 @@ describe(_"Analytics Manager", _() => {
     });
   });
 
-  describe(_"Funnel Management", _() => {
-    it(_"should create a conversion funnel", _async () => {
+  describe("Funnel Management", () => {
+    it("should create a conversion funnel", async () => {
       const funnel = {
         name: "Test Funnel",
         isActive: true,
@@ -289,7 +290,7 @@ describe(_"Analytics Manager", _() => {
       expect(funnelId).toMatch(/^funnel_/);
     });
 
-    it(_"should get all funnels", _async () => {
+    it("should get all funnels", async () => {
       const funnel = {
         name: "Test Funnel",
         isActive: true,
@@ -303,7 +304,7 @@ describe(_"Analytics Manager", _() => {
       expect(funnels[0].name).toBe("Test Funnel");
     });
 
-    it(_"should update a funnel", _async () => {
+    it("should update a funnel", async () => {
       const funnel = {
         name: "Test Funnel",
         isActive: true,
@@ -319,7 +320,7 @@ describe(_"Analytics Manager", _() => {
       expect(updatedFunnel?.name).toBe("Updated Funnel");
     });
 
-    it(_"should delete a funnel", _async () => {
+    it("should delete a funnel", async () => {
       const funnel = {
         name: "Test Funnel",
         isActive: true,
@@ -334,13 +335,13 @@ describe(_"Analytics Manager", _() => {
     });
   });
 
-  describe(_"Analytics Data", _() => {
+  describe("Analytics Data", () => {
     const timeRange: TimeRange = {
       start: Date.now() - 24 * 60 * 60 * 1000, // 24 hours ago
       end: Date.now(),
     };
 
-    it(_"should get dashboard data", _async () => {
+    it("should get dashboard data", async () => {
       const dashboardData = await analyticsManager.getDashboardData(timeRange);
 
       expect(dashboardData).toHaveProperty("overview");
@@ -350,7 +351,7 @@ describe(_"Analytics Manager", _() => {
       expect(dashboardData).toHaveProperty("realTimeMetrics");
     });
 
-    it(_"should get real-time metrics", _async () => {
+    it("should get real-time metrics", async () => {
       const metrics = await analyticsManager.getRealTimeMetrics();
 
       expect(metrics).toHaveProperty("activeUsers");
@@ -361,21 +362,21 @@ describe(_"Analytics Manager", _() => {
       expect(metrics).toHaveProperty("errorRate");
     });
 
-    it(_"should get user behavior insights", _async () => {
+    it("should get user behavior insights", async () => {
       const insights = await analyticsManager.getUserBehaviorInsights(timeRange);
 
       expect(Array.isArray(insights)).toBe(true);
     });
 
-    it(_"should generate insights", _async () => {
+    it("should generate insights", async () => {
       const insights = await analyticsManager.generateInsights(timeRange);
 
       expect(Array.isArray(insights)).toBe(true);
     });
   });
 
-  describe(_"Data Privacy Compliance", _() => {
-    it(_"should anonymize user data", _async () => {
+  describe("Data Privacy Compliance", () => {
+    it("should anonymize user data", async () => {
       // Track some interactions with user ID
       await analyticsManager.trackInteraction({
         sessionId: "test-session",
@@ -393,7 +394,7 @@ describe(_"Analytics Manager", _() => {
       await expect(analyticsManager.anonymizeUser("user123")).resolves.not.toThrow();
     });
 
-    it(_"should export user data", _async () => {
+    it("should export user data", async () => {
       await analyticsManager.trackInteraction({
         sessionId: "test-session",
         type: "click",
@@ -409,7 +410,7 @@ describe(_"Analytics Manager", _() => {
       expect(Array.isArray(userData)).toBe(true);
     });
 
-    it(_"should delete user data", _async () => {
+    it("should delete user data", async () => {
       await analyticsManager.trackInteraction({
         sessionId: "test-session",
         type: "click",
@@ -427,8 +428,8 @@ describe(_"Analytics Manager", _() => {
     });
   });
 
-  describe(_"Sampling", _() => {
-    it(_"should respect sampling configuration", _() => {
+  describe("Sampling", () => {
+    it("should respect sampling configuration", () => {
       analyticsManager.configure({
         sampling: {
           enabled: true,
@@ -440,7 +441,7 @@ describe(_"Analytics Manager", _() => {
       expect(typeof analyticsManager.shouldSample()).toBe("boolean");
     });
 
-    it(_"should always sample when sampling is disabled", _() => {
+    it("should always sample when sampling is disabled", () => {
       analyticsManager.configure({
         sampling: {
           enabled: false,
@@ -452,8 +453,8 @@ describe(_"Analytics Manager", _() => {
     });
   });
 
-  describe(_"Error Handling", _() => {
-    it(_"should handle invalid funnel ID gracefully", _async () => {
+  describe("Error Handling", () => {
+    it("should handle invalid funnel ID gracefully", async () => {
       const timeRange: TimeRange = {
         start: Date.now() - 1000,
         end: Date.now(),
@@ -464,9 +465,9 @@ describe(_"Analytics Manager", _() => {
       );
     });
 
-    it(_"should handle localStorage errors gracefully", _async () => {
+    it("should handle localStorage errors gracefully", async () => {
       // Mock localStorage to throw an error
-      localStorageMock.setItem.mockImplementation_(() => {
+      localStorageMock.setItem.mockImplementation(() => {
         throw new Error("Storage quota exceeded");
       });
 
@@ -485,9 +486,9 @@ describe(_"Analytics Manager", _() => {
   });
 });
 
-describe(_"Analytics Integration", _() => {
-  it(_"should work with multiple concurrent interactions", _async () => {
-    const interactions = Array.from(_{ length: 10 }, _(_, _i) => ({
+describe("Analytics Integration", () => {
+  it("should work with multiple concurrent interactions", async () => {
+    const interactions = Array.from({ length: 10 }, (_, i) => ({
       sessionId: "test-session",
       type: "click" as InteractionType,
       component: "button",
@@ -503,7 +504,7 @@ describe(_"Analytics Integration", _() => {
     await expect(Promise.all(promises)).resolves.not.toThrow();
   });
 
-  it(_"should maintain data consistency across operations", _async () => {
+  it("should maintain data consistency across operations", async () => {
     const sessionId = await analyticsManager.startSession("user123");
 
     await analyticsManager.trackInteraction({

@@ -78,6 +78,9 @@ export function useComponentLoadTime(componentName: string) {
   useEffect(() => {
     performance.mark(`${componentName}-load-start`);
   }, [componentName]);
+
+  // Return void explicitly to satisfy TypeScript noImplicitReturns
+  return;
 }
 
 /**
@@ -114,6 +117,8 @@ export function BundleSizeAnalyzer() {
         resourceObserver.disconnect();
       };
     }
+    // Return undefined when not in development mode
+    return undefined;
   }, []);
 
   return null;

@@ -1,10 +1,25 @@
 import { NextFunction, Request, Response } from "express";
 import { rateLimiter } from "../../shared/utils/rate-limiter";
 
+// Type for accessing socket properties safely
+interface SocketConnection {
+  remoteAddress?: string;
+  socket?: {
+    remoteAddress?: string;
+  };
+}
+
+// Extended request type for IP extraction
+type ExtendedRequest = Request & {
+  socket?: {
+    remoteAddress?: string;
+  };
+};
+
 interface RateLimitConfig {
   windowMs: number; // Time window in milliseconds
   maxRequests: number; // Maximum requests per window
-  keyGenerator?: (req: Request) => string; // Custom key generator
+  keyGenerator?: (req: ExtendedRequest) => string; // Custom key generator
   skipSuccessfulRequests?: boolean;
   skipFailedRequests?: boolean;
   message?: string; // Custom error message
@@ -21,7 +36,6 @@ interface RateLimitResult {
 export class RateLimiter {
   private config: RateLimitConfig;
   private action: string;
-
   constructor(action: string, config: RateLimitConfig) {
     this.action = action;
     const defaults = {
@@ -33,7 +47,7 @@ export class RateLimiter {
     this.config = { ...defaults, ...config };
   }
 
-  async middleware(req: Request, res: Response, next: NextFunction) {
+  async middleware(req: ExtendedRequest, res: Response, next: NextFunction) {
     try {
       // Allow unauthenticated requests to pass through for some actions
       if (!req.isAuthenticated() && !this.shouldCheckUnauthenticated(req)) {
@@ -83,26 +97,44 @@ export class RateLimiter {
       });
 
       // Store original end function to track success/failure for conditional counting
-      const originalEnd = res.end;
+      const originalEnd = res.end.bind(res);
       let requestCompleted = false;
+      const config = this.config;
+      const decrementCounter = this.decrementCounter.bind(this);
 
-      res.end = (chunk?: any, encoding?: any) => {
+      // Override res.end to track request completion
+      res.end = ((chunk?: unknown, encoding?: BufferEncoding | (() => void), cb?: () => void) => {
         if (!requestCompleted) {
           requestCompleted = true;
 
           const shouldCount = !(
-            (res.statusCode >= 200 && res.statusCode < 300 && this.config.skipSuccessfulRequests) ||
-            (res.statusCode >= 400 && this.config.skipFailedRequests)
+            (res.statusCode >= 200 && res.statusCode < 300 && config.skipSuccessfulRequests) ||
+            (res.statusCode >= 400 && config.skipFailedRequests)
           );
 
           // If we should skip this request, we need to decrement the counter
           if (!shouldCount) {
-            this.decrementCounter(key).catch(console.error);
+            decrementCounter(key).catch(console.error);
           }
         }
 
-        return originalEnd.call(res, chunk, encoding);
-      };
+        // Handle different overloads of res.end properly
+        if (typeof chunk === "undefined") {
+          return originalEnd();
+        } else if (typeof encoding === "function") {
+          // encoding is actually a callback
+          return originalEnd(chunk, encoding);
+        } else if (typeof encoding === "string" && typeof cb === "function") {
+          // encoding is BufferEncoding, cb is callback
+          return originalEnd(chunk, encoding, cb);
+        } else if (typeof encoding === "string") {
+          // encoding is BufferEncoding, no callback
+          return originalEnd(chunk, encoding);
+        } else {
+          // chunk only, no encoding or callback
+          return originalEnd(chunk);
+        }
+      }) as Response["end"];
 
       next();
     } catch (error) {
@@ -113,20 +145,23 @@ export class RateLimiter {
     }
   }
 
-  private shouldCheckUnauthenticated(req: Request): boolean {
+  private shouldCheckUnauthenticated(_req: ExtendedRequest): boolean {
     // Check unauthenticated requests for certain actions like API calls
     const checkUnauthenticatedActions = ["api_request", "file_download"];
     return checkUnauthenticatedActions.includes(this.action);
   }
 
-  private getClientIP(req: Request): string {
-    return (
-      req.ip ||
-      req.connection.remoteAddress ||
-      req.socket.remoteAddress ||
-      (req.connection as any)?.socket?.remoteAddress ||
-      "unknown"
-    );
+  private getClientIP(req: ExtendedRequest): string {
+    // Get client IP from various sources
+    if (req.ip) return req.ip;
+    if (req.socket?.remoteAddress) return req.socket.remoteAddress;
+
+    // Handle deprecated connection property safely
+    const connection = req.connection as unknown as SocketConnection | undefined;
+    if (connection?.remoteAddress) return connection.remoteAddress;
+    if (connection?.socket?.remoteAddress) return connection.socket.remoteAddress;
+
+    return "unknown";
   }
 
   private async decrementCounter(key: string): Promise<void> {
@@ -149,7 +184,21 @@ export class RateLimiter {
   // Method to get rate limit stats
   async getStats(key: string) {
     try {
-      return await rateLimiter.getStats(key);
+      // Ensure the method exists and is callable
+      if (rateLimiter && typeof rateLimiter.getStats === "function") {
+        return await rateLimiter.getStats(key);
+      } else {
+        console.warn("getStats method not available on rate limiter instance");
+        // Return a default stats object
+        return {
+          key,
+          requests: 0,
+          remaining: 0,
+          resetTime: Date.now(),
+          windowStart: Date.now(),
+          blocked: 0,
+        };
+      }
     } catch (error) {
       console.error("Failed to get rate limit stats:", error);
       return null;
@@ -159,8 +208,14 @@ export class RateLimiter {
   // Method to reset rate limit
   async resetLimit(key: string): Promise<boolean> {
     try {
-      await rateLimiter.resetLimit(key);
-      return true;
+      // Ensure the method exists and is callable
+      if (rateLimiter && typeof rateLimiter.resetLimit === "function") {
+        await rateLimiter.resetLimit(key);
+        return true;
+      } else {
+        console.warn("resetLimit method not available on rate limiter instance");
+        return false;
+      }
     } catch (error) {
       console.error("Failed to reset rate limit:", error);
       return false;

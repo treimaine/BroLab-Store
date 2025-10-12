@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import { RateLimitConfigs, RateLimiterImpl } from "../shared/utils/rate-limiter";
 
-describe(_"RateLimiter Integration Tests", _() => {
-  describe(_"RateLimitConfigs", _() => {
-    it(_"should provide API rate limit configurations", _() => {
+describe("RateLimiter Integration Tests", () => {
+  describe("RateLimitConfigs", () => {
+    it("should provide API rate limit configurations", () => {
       expect(RateLimitConfigs.API_STRICT).toEqual({
         windowMs: 15 * 60 * 1000, // 15 minutes
         maxRequests: 100,
@@ -26,7 +26,7 @@ describe(_"RateLimiter Integration Tests", _() => {
       });
     });
 
-    it(_"should provide file operation rate limit configurations", _() => {
+    it("should provide file operation rate limit configurations", () => {
       expect(RateLimitConfigs.FILE_UPLOAD).toEqual({
         windowMs: 60 * 60 * 1000, // 1 hour
         maxRequests: 20,
@@ -42,7 +42,7 @@ describe(_"RateLimiter Integration Tests", _() => {
       });
     });
 
-    it(_"should provide authentication rate limit configurations", _() => {
+    it("should provide authentication rate limit configurations", () => {
       expect(RateLimitConfigs.LOGIN_ATTEMPTS).toEqual({
         windowMs: 15 * 60 * 1000, // 15 minutes
         maxRequests: 5,
@@ -58,7 +58,7 @@ describe(_"RateLimiter Integration Tests", _() => {
       });
     });
 
-    it(_"should provide email operation rate limit configurations", _() => {
+    it("should provide email operation rate limit configurations", () => {
       expect(RateLimitConfigs.EMAIL_SEND).toEqual({
         windowMs: 24 * 60 * 60 * 1000, // 24 hours
         maxRequests: 10,
@@ -74,7 +74,7 @@ describe(_"RateLimiter Integration Tests", _() => {
       });
     });
 
-    it(_"should provide search and query rate limit configurations", _() => {
+    it("should provide search and query rate limit configurations", () => {
       expect(RateLimitConfigs.SEARCH_QUERIES).toEqual({
         windowMs: 60 * 1000, // 1 minute
         maxRequests: 30,
@@ -91,8 +91,8 @@ describe(_"RateLimiter Integration Tests", _() => {
     });
   });
 
-  describe(_"RateLimiterImpl static methods", _() => {
-    it(_"should generate correct rate limit keys", _() => {
+  describe("RateLimiterImpl static methods", () => {
+    it("should generate correct rate limit keys", () => {
       expect(RateLimiterImpl.generateKey("user:123", "api_request")).toBe("user:123:api_request");
       expect(RateLimiterImpl.generateKey("192.168.1.1", "file_upload")).toBe(
         "192.168.1.1:file_upload"
@@ -100,7 +100,7 @@ describe(_"RateLimiter Integration Tests", _() => {
       expect(RateLimiterImpl.generateKey("session:abc123", "search")).toBe("session:abc123:search");
     });
 
-    it(_"should create rate limit config with defaults", _() => {
+    it("should create rate limit config with defaults", () => {
       const config = RateLimiterImpl.createConfig(60000, 100);
 
       expect(config).toEqual({
@@ -111,7 +111,7 @@ describe(_"RateLimiter Integration Tests", _() => {
       });
     });
 
-    it(_"should create rate limit config with custom options", _() => {
+    it("should create rate limit config with custom options", () => {
       const onLimitReached = jest.fn();
       const keyGenerator = (_id: string) => `custom:${id}`;
 
@@ -135,12 +135,12 @@ describe(_"RateLimiter Integration Tests", _() => {
     });
   });
 
-  describe(_"RateLimiterImpl instance", _() => {
-    it(_"should create instance without errors", _() => {
-      expect_(() => new RateLimiterImpl()).not.toThrow();
+  describe("RateLimiterImpl instance", () => {
+    it("should create instance without errors", () => {
+      expect(() => new RateLimiterImpl()).not.toThrow();
     });
 
-    it(_"should have all required methods", _() => {
+    it("should have all required methods", () => {
       const rateLimiter = new RateLimiterImpl();
 
       expect(typeof rateLimiter.checkLimit).toBe("function");
@@ -154,8 +154,8 @@ describe(_"RateLimiter Integration Tests", _() => {
     });
   });
 
-  describe(_"Rate limit configurations validation", _() => {
-    it(_"should have reasonable time windows", _() => {
+  describe("Rate limit configurations validation", () => {
+    it("should have reasonable time windows", () => {
       // Short-term limits (seconds to minutes)
       expect(RateLimitConfigs.SEARCH_QUERIES.windowMs).toBe(60 * 1000); // 1 minute
       expect(RateLimitConfigs.DATABASE_QUERIES.windowMs).toBe(60 * 1000); // 1 minute
@@ -172,7 +172,7 @@ describe(_"RateLimiter Integration Tests", _() => {
       expect(RateLimitConfigs.EMAIL_SEND.windowMs).toBe(24 * 60 * 60 * 1000); // 24 hours
     });
 
-    it(_"should have appropriate request limits", _() => {
+    it("should have appropriate request limits", () => {
       // Strict limits for security-sensitive operations
       expect(RateLimitConfigs.LOGIN_ATTEMPTS.maxRequests).toBe(5);
       expect(RateLimitConfigs.PASSWORD_RESET.maxRequests).toBe(3);
@@ -193,7 +193,7 @@ describe(_"RateLimiter Integration Tests", _() => {
       expect(RateLimitConfigs.API_LENIENT.maxRequests).toBe(1000);
     });
 
-    it(_"should have consistent default options", _() => {
+    it("should have consistent default options", () => {
       const configs = Object.values(RateLimitConfigs);
 
       configs.forEach(config => {

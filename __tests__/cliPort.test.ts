@@ -7,12 +7,12 @@ describe('Port CLI logic (prompt & flags)', () => {
   let originalIsTTY: boolean | undefined;
   let exitSpy: jest.SpyInstance;
 
-  beforeEach_(() => {
+  beforeEach(() => {
     originalArgv = process.argv;
     originalIsTTY = process.stdin.isTTY;
-    exitSpy = jest.spyOn(process, 'exit').mockImplementation(_((code?: number) => { throw new Error(`process.exit: ${code}`); }) as any);
+    exitSpy = jest.spyOn(process, 'exit').mockImplementation(((code?: number) => { throw new Error(`process.exit: ${code}`); }) as any);
   });
-  afterEach_(() => {
+  afterEach(() => {
     process.argv = originalArgv;
     (process.stdin as any).isTTY = originalIsTTY;
     jest.restoreAllMocks();
@@ -111,7 +111,7 @@ describe('Port CLI logic (prompt & flags)', () => {
     process.argv = ['node', 'server/index.ts'];
     (process.stdin as any).isTTY = true;
     const findFreePortMock = jest.spyOn(portUtils, 'findFreePort').mockRejectedValue(new Error('EADDRINUSE'));
-    const promptMock = jest.spyOn(portUtils, 'promptForPort').mockImplementation_(() => {
+    const promptMock = jest.spyOn(portUtils, 'promptForPort').mockImplementation(() => {
       process.exit(0); // mocké pour throw
       return Promise.reject(new Error('process.exit: 0')); // unreachable, mais pour Jest
     });

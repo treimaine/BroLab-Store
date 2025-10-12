@@ -2,13 +2,13 @@ import { useAuth, useUser } from "@clerk/clerk-react";
 import { describe, expect, it, jest } from "@jest/globals";
 
 // Mock Clerk
-jest.mock(_"@clerk/clerk-react", _() => ({
+jest.mock("@clerk/clerk-react", () => ({
   useUser: jest.fn(),
   useAuth: jest.fn(),
 }));
 
-describe(_"Clerk Authentication", _() => {
-  it(_"should authenticate user with Clerk", _() => {
+describe("Clerk Authentication", () => {
+  it("should authenticate user with Clerk", () => {
     const mockUser = {
       id: "user_123",
       emailAddresses: [{ emailAddress: "test@example.com" }],
@@ -30,7 +30,7 @@ describe(_"Clerk Authentication", _() => {
     expect(mockUser.emailAddresses[0].emailAddress).toBe("test@example.com");
   });
 
-  it(_"should check subscription status with Clerk", _() => {
+  it("should check subscription status with Clerk", () => {
     const mockHas = jest
       .fn()
       .mockReturnValueOnce(true) // basic plan
@@ -41,14 +41,14 @@ describe(_"Clerk Authentication", _() => {
       has: mockHas,
     });
 
-    const { _has} = useAuth();
+    const { has } = useAuth();
 
     expect(has!({ plan: "basic" })).toBe(true);
     expect(has!({ plan: "artist" })).toBe(false);
     expect(has!({ plan: "ultimate" })).toBe(false);
   });
 
-  it(_"should check feature access with Clerk", _() => {
+  it("should check feature access with Clerk", () => {
     const mockHas = jest
       .fn()
       .mockReturnValueOnce(true) // unlimited_downloads
@@ -59,14 +59,14 @@ describe(_"Clerk Authentication", _() => {
       has: mockHas,
     });
 
-    const { _has} = useAuth();
+    const { has } = useAuth();
 
     expect(has!({ feature: "unlimited_downloads" })).toBe(true);
     expect(has!({ feature: "premium_support" })).toBe(false);
     expect(has!({ feature: "custom_licenses" })).toBe(true);
   });
 
-  it(_"should handle unauthenticated user", _() => {
+  it("should handle unauthenticated user", () => {
     (useUser as jest.Mock).mockReturnValue({
       user: null,
       isSignedIn: false,
@@ -77,22 +77,22 @@ describe(_"Clerk Authentication", _() => {
       has: jest.fn().mockReturnValue(false),
     });
 
-    const { _user, _isSignedIn} = useUser();
-    const { _has} = useAuth();
+    const { user, isSignedIn } = useUser();
+    const { has } = useAuth();
 
     expect(user).toBeNull();
     expect(isSignedIn).toBe(false);
     expect(has!({ plan: "basic" })).toBe(false);
   });
 
-  it(_"should handle loading state", _() => {
+  it("should handle loading state", () => {
     (useUser as jest.Mock).mockReturnValue({
       user: null,
       isSignedIn: false,
       isLoaded: false,
     });
 
-    const { _isLoaded} = useUser();
+    const { isLoaded } = useUser();
 
     expect(isLoaded).toBe(false);
   });

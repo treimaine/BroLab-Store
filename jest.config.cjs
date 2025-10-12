@@ -22,7 +22,9 @@ module.exports = {
       "ts-jest",
       {
         tsconfig: "tsconfig.jest.json",
-        diagnostics: false,
+        diagnostics: {
+          warnOnly: true,
+        },
         useESM: false,
       },
     ],
@@ -40,16 +42,24 @@ module.exports = {
     "^.*/lib/openGraphGenerator$": "<rootDir>/__tests__/mocks/openGraph-generator.mock.js",
     "^../lib/schemaMarkup$": "<rootDir>/__tests__/mocks/schema-markup.mock.js",
   },
-  // Handle import.meta.env for Vite environment variables (mocked in jest.setup.ts)
-  globals: {
-    "ts-jest": {
-      tsconfig: "tsconfig.jest.json",
-      diagnostics: false,
-      useESM: false,
-    },
+  // Enhanced jsdom configuration for client-side testing
+  testEnvironmentOptions: {
+    url: "http://localhost:3000",
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    resources: "usable",
+    runScripts: "dangerously",
   },
+  // Improved error handling and timeout settings
+  testTimeout: 30000,
+  setupFilesAfterEnv: ["<rootDir>/__tests__/jest.setup.ts"],
+  // Better handling of async operations
+  maxWorkers: 1,
   // Force exit after tests complete to avoid hanging
   forceExit: true,
   // Detect open handles to help identify async operations
   detectOpenHandles: true,
+  // Verbose error reporting
+  verbose: false,
+  // Fail fast on first error for debugging
+  bail: false,
 };

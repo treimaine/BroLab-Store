@@ -7,12 +7,11 @@ import React, { ComponentType, Suspense, useEffect, useRef, useState } from "rea
  * only when they're about to become visible, improving initial page load performance.
  */
 
-
-interface IntersectionLazyLoaderProps {
+interface IntersectionLazyLoaderProps<T = Record<string, any>> {
   /** The component to lazy load */
-  component: () => Promise<{ default: ComponentType<any> }>;
+  component: () => Promise<{ default: ComponentType<T> }>;
   /** Props to pass to the lazy loaded component */
-  componentProps?: Record<string, any>;
+  componentProps?: T;
   /** Loading fallback component */
   fallback?: React.ReactNode;
   /** Root margin for intersection observer (default: "100px") */
@@ -58,9 +57,9 @@ const DefaultPlaceholder = ({ minHeight }: { minHeight: string }) => (
   </div>
 );
 
-export function IntersectionLazyLoader({
+export function IntersectionLazyLoader<T = Record<string, any>>({
   component,
-  componentProps = {},
+  componentProps,
   fallback,
   rootMargin = "100px",
   threshold = 0.1,
@@ -70,15 +69,15 @@ export function IntersectionLazyLoader({
   onLoadStart,
   onLoadComplete,
   onLoadError,
-}: IntersectionLazyLoaderProps) {
+}: IntersectionLazyLoaderProps<T>) {
   const [shouldLoad, setShouldLoad] = useState(loadImmediately);
-  const [LazyComponent, setLazyComponent] = useState<ComponentType<any> | null>(null);
+  const [LazyComponent, setLazyComponent] = useState<ComponentType<T> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Setup intersection observer
-  useEffect_(() => {
+  useEffect(() => {
     if (shouldLoad || !containerRef.current) return;
 
     const observer = new IntersectionObserver(
@@ -104,7 +103,7 @@ export function IntersectionLazyLoader({
   }, [shouldLoad, rootMargin, threshold]);
 
   // Load component when shouldLoad becomes true
-  useEffect_(() => {
+  useEffect(() => {
     if (!shouldLoad || LazyComponent || isLoading) return;
 
     setIsLoading(true);
@@ -113,7 +112,7 @@ export function IntersectionLazyLoader({
 
     component()
       .then(module => {
-        setLazyComponent_(() => module.default);
+        setLazyComponent(() => module.default);
         onLoadComplete?.();
       })
       .catch(err => {
@@ -121,7 +120,7 @@ export function IntersectionLazyLoader({
         setError(error);
         onLoadError?.(error);
       })
-      .finally_(() => {
+      .finally(() => {
         setIsLoading(false);
       });
   }, [shouldLoad, LazyComponent, isLoading, component, onLoadStart, onLoadComplete, onLoadError]);
@@ -154,7 +153,7 @@ export function IntersectionLazyLoader({
   if (LazyComponent) {
     return (
       <Suspense fallback={fallback || <DefaultFallback minHeight={minHeight} />}>
-        <LazyComponent {...componentProps} />
+        <LazyComponent {...(componentProps as any)} />
       </Suspense>
     );
   }
@@ -173,75 +172,52 @@ export function IntersectionLazyLoader({
 /**
  * Hook for creating intersection-based lazy loaders
  */
-export function useIntersectionLazyLoader<T extends ComponentType<any>>(
-  component: () => Promise<{ default: T }>,
-  options: Omit<IntersectionLazyLoaderProps, "component"> = {}
+export function useIntersectionLazyLoader<T = Record<string, any>>(
+  component: () => Promise<{ default: ComponentType<T> }>,
+  options: Omit<IntersectionLazyLoaderProps<T>, "component"> = {}
 ) {
-  return (props: React.ComponentProps<T>) => (
-    <IntersectionLazyLoader component={component} componentProps={props} {...options} />
+  return (props: T) => (
+    <IntersectionLazyLoader<T> component={component} componentProps={props} {...options} />
   );
 }
 
 /**
  * Higher-order component for intersection-based lazy loading
  */
-export function withIntersectionLazyLoading<T extends ComponentType<unknown>>(
-  component: () => Promise<{ default: T }>,
-  options: Omit<IntersectionLazyLoaderProps, "component" | "componentProps"> = {}
+export function withIntersectionLazyLoading<T = Record<string, any>>(
+  component: () => Promise<{ default: ComponentType<T> }>,
+  options: Omit<IntersectionLazyLoaderProps<T>, "component" | "componentProps"> = {}
 ) {
-  return (props: React.ComponentProps<T>) => (
-    <IntersectionLazyLoader component={component} componentProps={props} {...options} />
+  return (props: T) => (
+    <IntersectionLazyLoader<T> component={component} componentProps={props} {...options} />
   );
 }
 
 /**
- * Prebuilt lazy loaders for common heavy components
+ * Type-safe lazy loading utilities for specific component types
  */
-export const LazyLoaders = {
-  // Dashboard components
-  BroLabTrendCharts: withIntersectionLazyLoading(
-    () =>
-      import("@/components/dashboard/BroLabTrendCharts").then(module => ({
-        default: module.BroLabTrendCharts,
-      })),
-    { minHeight: "400px", rootMargin: "50px" }
-  ),
 
-  EnhancedAnalytics: withIntersectionLazyLoading(
-    () => import("@/components/dashboard/EnhancedAnalytics"),
-    { minHeight: "600px", rootMargin: "100px" }
-  ),
+// Helper function to create type-safe lazy loaders
+export function createLazyLoader<T>(
+  importFn: () => Promise<{ default: ComponentType<T> }>,
+  options: Omit<IntersectionLazyLoaderProps<T>, "component" | "componentProps"> = {}
+) {
+  return (props: T) => (
+    <IntersectionLazyLoader<T> component={importFn} componentProps={props} {...options} />
+  );
+}
 
-  AnalyticsCharts: withIntersectionLazyLoading_(() => import("@/components/AnalyticsCharts"), {
-    minHeight: "500px",
-    rootMargin: "75px",
-  }),
-
-  // Audio components
-  WaveformAudioPlayer: withIntersectionLazyLoading(
-    () =>
-      import("@/components/WaveformAudioPlayer").then(module => ({
-        default: module.WaveformAudioPlayer,
-      })),
-    { minHeight: "120px", rootMargin: "200px" }
-  ),
-
-  EnhancedWaveformPlayer: withIntersectionLazyLoading(
-    () =>
-      import("@/components/EnhancedWaveformPlayer").then(module => ({
-        default: module.EnhancedWaveformPlayer,
-      })),
-    { minHeight: "150px", rootMargin: "200px" }
-  ),
-
-  // Table components
-  DownloadsTable: withIntersectionLazyLoading_(() => import("@/components/DownloadsTable"), {
-    minHeight: "300px",
-    rootMargin: "100px",
-  }),
-
-  OrdersTable: withIntersectionLazyLoading_(() => import("@/components/OrdersTable"), {
-    minHeight: "300px",
-    rootMargin: "100px",
-  }),
-};
+// Helper function for named exports
+export function createNamedLazyLoader<T>(
+  importFn: () => Promise<any>,
+  exportName: string,
+  options: Omit<IntersectionLazyLoaderProps<T>, "component" | "componentProps"> = {}
+) {
+  return (props: T) => (
+    <IntersectionLazyLoader<T>
+      component={() => importFn().then(m => ({ default: m[exportName] }))}
+      componentProps={props}
+      {...options}
+    />
+  );
+}

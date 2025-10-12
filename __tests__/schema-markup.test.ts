@@ -1,13 +1,19 @@
 import request from "supertest";
 import { cleanupWooCommerceStubs, setupWooCommerceStubs } from "./stubs/woocommerce-stubs";
-import { app } from "../server/app";
+
+// Mock the schema markup library
+jest.mock("../server/lib/schemaMarkup", () => ({
+  generateBeatSchemaMarkup: jest.fn(),
+  generateBeatsListSchemaMarkup: jest.fn(),
+  generateOrganizationSchemaMarkup: jest.fn(),
+}));
 
 // Mock des modules avant l'import de l'app
-jest.mock(_"../server/routes/openGraph", _() => {
+jest.mock("../server/routes/openGraph", () => {
   const express = require("express");
   const router = express.Router();
 
-  router.get(_"/beat/:id", _(req: express.Request, _res: express.Response) => {
+  router.get("/beat/:id", (req: express.Request, _res: express.Response) => {
     const beatId = req.params.id;
     if (beatId === "999999") {
       return res.status(404).json({ error: "Beat not found" });
@@ -29,7 +35,7 @@ jest.mock(_"../server/routes/openGraph", _() => {
     `);
   });
 
-  router.get(_"/shop", _(req: express.Request, _res: express.Response) => {
+  router.get("/shop", (req: express.Request, _res: express.Response) => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(`
@@ -46,7 +52,7 @@ jest.mock(_"../server/routes/openGraph", _() => {
     `);
   });
 
-  router.get(_"/home", _(req: express.Request, _res: express.Response) => {
+  router.get("/home", (req: express.Request, _res: express.Response) => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(`
@@ -63,7 +69,7 @@ jest.mock(_"../server/routes/openGraph", _() => {
     `);
   });
 
-  router.get(_"/page/:pageName", _(req: express.Request, _res: express.Response) => {
+  router.get("/page/:pageName", (req: express.Request, _res: express.Response) => {
     const pageName = req.params.pageName;
     const validPages = ["about", "contact", "terms", "privacy", "license"];
 
@@ -91,11 +97,11 @@ jest.mock(_"../server/routes/openGraph", _() => {
 });
 
 // Mock des modules schema
-jest.mock(_"../server/routes/schema", _() => {
+jest.mock("../server/routes/schema", () => {
   const express = require("express");
   const router = express.Router();
 
-  router.get(_"/beat/:id", _(req: express.Request, _res: express.Response) => {
+  router.get("/beat/:id", (req: express.Request, res: express.Response) => {
     const beatId = req.params.id;
     if (beatId === "999999") {
       return res.status(404).json({ error: "Beat not found" });
@@ -129,7 +135,7 @@ jest.mock(_"../server/routes/schema", _() => {
     });
   });
 
-  router.get(_"/beats-list", _(req: express.Request, _res: express.Response) => {
+  router.get("/beats-list", (req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "application/ld+json");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.json({
@@ -157,7 +163,7 @@ jest.mock(_"../server/routes/schema", _() => {
     });
   });
 
-  router.get(_"/organization", _(req: express.Request, _res: express.Response) => {
+  router.get("/organization", (req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "application/ld+json");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.json({
@@ -174,17 +180,19 @@ jest.mock(_"../server/routes/schema", _() => {
 });
 
 // Import de l'app après les mocks
+import express from "express";
+import { app } from "../server/app";
 
-describe(_"Schema Markup API", _() => {
-  beforeAll_(() => {
+describe("Schema Markup API", () => {
+  beforeAll(() => {
     setupWooCommerceStubs();
   });
 
-  afterAll_(() => {
+  afterAll(() => {
     cleanupWooCommerceStubs();
   });
-  describe(_"GET /api/schema/organization", _() => {
-    it(_"should return organization schema markup", _async () => {
+  describe("GET /api/schema/organization", () => {
+    it("should return organization schema markup", async () => {
       const response = await request(app).get("/api/schema/organization").expect(200);
 
       expect(response.headers["content-type"]).toContain("application/ld+json");
@@ -197,8 +205,8 @@ describe(_"Schema Markup API", _() => {
     });
   });
 
-  describe(_"GET /api/schema/beats-list", _() => {
-    it(_"should return beats list schema markup", _async () => {
+  describe("GET /api/schema/beats-list", () => {
+    it("should return beats list schema markup", async () => {
       const response = await request(app).get("/api/schema/beats-list").expect(200);
 
       expect(response.headers["content-type"]).toContain("application/ld+json");
@@ -212,8 +220,8 @@ describe(_"Schema Markup API", _() => {
     });
   });
 
-  describe(_"GET /api/schema/beat/:id", _() => {
-    it(_"should return beat schema markup for valid ID", _async () => {
+  describe("GET /api/schema/beat/:id", () => {
+    it("should return beat schema markup for valid ID", async () => {
       // First, get a list of products to find a valid ID
       const listResponse = await request(app).get("/api/schema/beats-list").expect(200);
 
@@ -238,15 +246,15 @@ describe(_"Schema Markup API", _() => {
       }
     });
 
-    it(_"should return 404 for invalid beat ID", _async () => {
+    it("should return 404 for invalid beat ID", async () => {
       const response = await request(app).get("/api/schema/beat/999999").expect(404);
 
       expect(response.body.error).toBe("Beat not found");
     });
   });
 
-  describe(_"Schema Markup Structure", _() => {
-    it(_"should include required MusicRecording properties", _async () => {
+  describe("Schema Markup Structure", () => {
+    it("should include required MusicRecording properties", async () => {
       // First, get a list of products to find a valid ID
       const listResponse = await request(app).get("/api/schema/beats-list").expect(200);
 
@@ -274,7 +282,9 @@ describe(_"Schema Markup API", _() => {
         expect(Array.isArray(schema.additionalProperty)).toBe(true);
 
         // Check for BPM property
-        const bpmProperty = schema.additionalProperty.find(_(prop: any) => prop.name === "BPM");
+        const bpmProperty = schema.additionalProperty.find(
+          (prop: { name: string; "@type": string }) => prop.name === "BPM"
+        );
         expect(bpmProperty).toBeDefined();
         expect(bpmProperty["@type"]).toBe("PropertyValue");
       } else {
@@ -283,7 +293,7 @@ describe(_"Schema Markup API", _() => {
       }
     });
 
-    it(_"should include offers when available", _async () => {
+    it("should include offers when available", async () => {
       // First, get a list of products to find a valid ID
       const listResponse = await request(app).get("/api/schema/beats-list").expect(200);
 
@@ -309,8 +319,8 @@ describe(_"Schema Markup API", _() => {
     });
   });
 
-  describe(_"Cache Headers", _() => {
-    it(_"should include appropriate cache headers", _async () => {
+  describe("Cache Headers", () => {
+    it("should include appropriate cache headers", async () => {
       const response = await request(app).get("/api/schema/organization").expect(200);
 
       expect(response.headers["cache-control"]).toContain("public");

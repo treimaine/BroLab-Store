@@ -22,9 +22,9 @@ import {
   validateBpmForGenre,
 } from "../../shared/validation/BeatValidation";
 
-describe(_"Beat Validation Tests", _() => {
-  describe(_"BeatGenre Validation", _() => {
-    test(_"should accept valid genres", _() => {
+describe("Beat Validation Tests", () => {
+  describe("BeatGenre Validation", () => {
+    test("should accept valid genres", () => {
       const validGenres = [
         "hip-hop",
         "trap",
@@ -41,21 +41,21 @@ describe(_"Beat Validation Tests", _() => {
       ];
 
       validGenres.forEach(genre => {
-        expect_(() => BeatGenre.parse(genre)).not.toThrow();
+        expect(() => BeatGenre.parse(genre)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid genres", _() => {
+    test("should reject invalid genres", () => {
       const invalidGenres = ["rock", "jazz", "classical", "", "invalid-genre"];
 
       invalidGenres.forEach(genre => {
-        expect_(() => BeatGenre.parse(genre)).toThrow();
+        expect(() => BeatGenre.parse(genre)).toThrow();
       });
     });
   });
 
-  describe(_"BeatMood Validation", _() => {
-    test(_"should accept valid moods", _() => {
+  describe("BeatMood Validation", () => {
+    test("should accept valid moods", () => {
       const validMoods = [
         "aggressive",
         "chill",
@@ -70,21 +70,21 @@ describe(_"Beat Validation Tests", _() => {
       ];
 
       validMoods.forEach(mood => {
-        expect_(() => BeatMood.parse(mood)).not.toThrow();
+        expect(() => BeatMood.parse(mood)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid moods", _() => {
+    test("should reject invalid moods", () => {
       const invalidMoods = ["sad", "angry", "peaceful", "", "invalid-mood"];
 
       invalidMoods.forEach(mood => {
-        expect_(() => BeatMood.parse(mood)).toThrow();
+        expect(() => BeatMood.parse(mood)).toThrow();
       });
     });
   });
 
-  describe(_"MusicalKey Validation", _() => {
-    test(_"should accept valid major keys", _() => {
+  describe("MusicalKey Validation", () => {
+    test("should accept valid major keys", () => {
       const majorKeys = [
         "C",
         "C#",
@@ -106,11 +106,11 @@ describe(_"Beat Validation Tests", _() => {
       ];
 
       majorKeys.forEach(key => {
-        expect_(() => MusicalKey.parse(key)).not.toThrow();
+        expect(() => MusicalKey.parse(key)).not.toThrow();
       });
     });
 
-    test(_"should accept valid minor keys", _() => {
+    test("should accept valid minor keys", () => {
       const minorKeys = [
         "Cm",
         "C#m",
@@ -132,39 +132,39 @@ describe(_"Beat Validation Tests", _() => {
       ];
 
       minorKeys.forEach(key => {
-        expect_(() => MusicalKey.parse(key)).not.toThrow();
+        expect(() => MusicalKey.parse(key)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid keys", _() => {
+    test("should reject invalid keys", () => {
       const invalidKeys = ["H", "Zm", "C##", "", "invalid-key"];
 
       invalidKeys.forEach(key => {
-        expect_(() => MusicalKey.parse(key)).toThrow();
+        expect(() => MusicalKey.parse(key)).toThrow();
       });
     });
   });
 
-  describe(_"LicenseType Validation", _() => {
-    test(_"should accept valid license types", _() => {
+  describe("LicenseType Validation", () => {
+    test("should accept valid license types", () => {
       const validTypes = ["basic", "premium", "unlimited", "exclusive"];
 
       validTypes.forEach(type => {
-        expect_(() => LicenseType.parse(type)).not.toThrow();
+        expect(() => LicenseType.parse(type)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid license types", _() => {
+    test("should reject invalid license types", () => {
       const invalidTypes = ["free", "standard", "pro", "", "invalid-license"];
 
       invalidTypes.forEach(type => {
-        expect_(() => LicenseType.parse(type)).toThrow();
+        expect(() => LicenseType.parse(type)).toThrow();
       });
     });
   });
 
-  describe(_"BeatStatus Validation", _() => {
-    test(_"should accept valid statuses", _() => {
+  describe("BeatStatus Validation", () => {
+    test("should accept valid statuses", () => {
       const validStatuses = [
         "active",
         "inactive",
@@ -174,72 +174,72 @@ describe(_"Beat Validation Tests", _() => {
       ];
 
       validStatuses.forEach(status => {
-        expect_(() => BeatStatus.parse(status)).not.toThrow();
+        expect(() => BeatStatus.parse(status)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid statuses", _() => {
+    test("should reject invalid statuses", () => {
       const invalidStatuses = ["published", "draft", "archived", "", "invalid-status"];
 
       invalidStatuses.forEach(status => {
-        expect_(() => BeatStatus.parse(status)).toThrow();
+        expect(() => BeatStatus.parse(status)).toThrow();
       });
     });
   });
 
-  describe(_"BPM Schema Validation", _() => {
-    test(_"should accept valid BPM values", _() => {
+  describe("BPM Schema Validation", () => {
+    test("should accept valid BPM values", () => {
       const validBpms = [60, 80, 120, 140, 180, 200];
 
       validBpms.forEach(bpm => {
-        expect_(() => BpmSchema.parse(bpm)).not.toThrow();
+        expect(() => BpmSchema.parse(bpm)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid BPM values", _() => {
-      expect_(() => BpmSchema.parse(59)).toThrow("BPM must be at least 60");
-      expect_(() => BpmSchema.parse(201)).toThrow("BPM cannot exceed 200");
-      expect_(() => BpmSchema.parse(120.5)).toThrow("BPM must be a whole number");
-      expect_(() => BpmSchema.parse(-10)).toThrow();
+    test("should reject invalid BPM values", () => {
+      expect(() => BpmSchema.parse(59)).toThrow("BPM must be at least 60");
+      expect(() => BpmSchema.parse(201)).toThrow("BPM cannot exceed 200");
+      expect(() => BpmSchema.parse(120.5)).toThrow("BPM must be a whole number");
+      expect(() => BpmSchema.parse(-10)).toThrow();
     });
   });
 
-  describe(_"Beat Price Schema Validation", _() => {
-    test(_"should accept valid prices", _() => {
+  describe("Beat Price Schema Validation", () => {
+    test("should accept valid prices", () => {
       const validPrices = [100, 2999, 4999, 14999, 99999999]; // $1.00 to $999,999.99
 
       validPrices.forEach(price => {
-        expect_(() => BeatPriceSchema.parse(price)).not.toThrow();
+        expect(() => BeatPriceSchema.parse(price)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid prices", _() => {
-      expect_(() => BeatPriceSchema.parse(99)).toThrow("Price must be at least $1.00");
-      expect_(() => BeatPriceSchema.parse(100000000)).toThrow("Price cannot exceed $999,999.99");
-      expect_(() => BeatPriceSchema.parse(29.99)).toThrow("Price must be in cents");
-      expect_(() => BeatPriceSchema.parse(-100)).toThrow();
+    test("should reject invalid prices", () => {
+      expect(() => BeatPriceSchema.parse(99)).toThrow("Price must be at least $1.00");
+      expect(() => BeatPriceSchema.parse(100000000)).toThrow("Price cannot exceed $999,999.99");
+      expect(() => BeatPriceSchema.parse(29.99)).toThrow("Price must be in cents");
+      expect(() => BeatPriceSchema.parse(-100)).toThrow();
     });
   });
 
-  describe(_"Beat Duration Schema Validation", _() => {
-    test(_"should accept valid durations", _() => {
+  describe("Beat Duration Schema Validation", () => {
+    test("should accept valid durations", () => {
       const validDurations = [30, 60, 120, 180, 300, 600]; // 30 seconds to 10 minutes
 
       validDurations.forEach(duration => {
-        expect_(() => BeatDurationSchema.parse(duration)).not.toThrow();
+        expect(() => BeatDurationSchema.parse(duration)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid durations", _() => {
-      expect_(() => BeatDurationSchema.parse(29)).toThrow("Beat must be at least 30 seconds");
-      expect_(() => BeatDurationSchema.parse(601)).toThrow("Beat cannot exceed 10 minutes");
-      expect_(() => BeatDurationSchema.parse(-30)).toThrow("Duration must be positive");
-      expect_(() => BeatDurationSchema.parse(0)).toThrow();
+    test("should reject invalid durations", () => {
+      expect(() => BeatDurationSchema.parse(29)).toThrow("Beat must be at least 30 seconds");
+      expect(() => BeatDurationSchema.parse(601)).toThrow("Beat cannot exceed 10 minutes");
+      expect(() => BeatDurationSchema.parse(-30)).toThrow("Duration must be positive");
+      expect(() => BeatDurationSchema.parse(0)).toThrow();
     });
   });
 
-  describe(_"Beat Tags Schema Validation", _() => {
-    test(_"should accept valid tags", _() => {
+  describe("Beat Tags Schema Validation", () => {
+    test("should accept valid tags", () => {
       const validTagArrays = [
         ["trap", "dark", "aggressive"],
         ["chill", "lo-fi", "relaxing", "study"],
@@ -248,24 +248,24 @@ describe(_"Beat Validation Tests", _() => {
       ];
 
       validTagArrays.forEach(tags => {
-        expect_(() => BeatTagsSchema.parse(tags)).not.toThrow();
+        expect(() => BeatTagsSchema.parse(tags)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid tags", _() => {
+    test("should reject invalid tags", () => {
       const tooManyTags = Array(11).fill("tag"); // More than 10 tags
-      expect_(() => BeatTagsSchema.parse(tooManyTags)).toThrow("Maximum 10 tags allowed");
+      expect(() => BeatTagsSchema.parse(tooManyTags)).toThrow("Maximum 10 tags allowed");
 
       const tooLongTag = "a".repeat(21); // More than 20 characters
-      expect_(() => BeatTagsSchema.parse([tooLongTag])).toThrow();
+      expect(() => BeatTagsSchema.parse([tooLongTag])).toThrow();
 
       const emptyTag = [""];
-      expect_(() => BeatTagsSchema.parse(emptyTag)).toThrow();
+      expect(() => BeatTagsSchema.parse(emptyTag)).toThrow();
     });
   });
 
-  describe(_"Audio File Schema Validation", _() => {
-    test(_"should accept valid audio file", _() => {
+  describe("Audio File Schema Validation", () => {
+    test("should accept valid audio file", () => {
       const validAudioFile = {
         url: "https://example.com/audio.mp3",
         format: "mp3" as const,
@@ -275,10 +275,10 @@ describe(_"Beat Validation Tests", _() => {
         waveformData: [0.1, 0.2, 0.3, 0.4, 0.5],
       };
 
-      expect_(() => AudioFileSchema.parse(validAudioFile)).not.toThrow();
+      expect(() => AudioFileSchema.parse(validAudioFile)).not.toThrow();
     });
 
-    test(_"should reject invalid audio file", _() => {
+    test("should reject invalid audio file", () => {
       const invalidAudioFile = {
         url: "not-a-url",
         format: "invalid-format",
@@ -287,10 +287,10 @@ describe(_"Beat Validation Tests", _() => {
         fileSize: -1000,
       };
 
-      expect_(() => AudioFileSchema.parse(invalidAudioFile)).toThrow();
+      expect(() => AudioFileSchema.parse(invalidAudioFile)).toThrow();
     });
 
-    test(_"should accept audio file without optional waveform data", _() => {
+    test("should accept audio file without optional waveform data", () => {
       const audioFileWithoutWaveform = {
         url: "https://example.com/audio.wav",
         format: "wav" as const,
@@ -299,12 +299,12 @@ describe(_"Beat Validation Tests", _() => {
         fileSize: 10485760, // 10MB
       };
 
-      expect_(() => AudioFileSchema.parse(audioFileWithoutWaveform)).not.toThrow();
+      expect(() => AudioFileSchema.parse(audioFileWithoutWaveform)).not.toThrow();
     });
   });
 
-  describe(_"Beat Metadata Schema Validation", _() => {
-    test(_"should accept valid metadata", _() => {
+  describe("Beat Metadata Schema Validation", () => {
+    test("should accept valid metadata", () => {
       const validMetadata = {
         producer: "BroLab Producer",
         credits: "Produced by BroLab Entertainment",
@@ -313,10 +313,10 @@ describe(_"Beat Validation Tests", _() => {
         collaborators: ["Producer A", "Producer B"],
       };
 
-      expect_(() => BeatMetadataSchema.parse(validMetadata)).not.toThrow();
+      expect(() => BeatMetadataSchema.parse(validMetadata)).not.toThrow();
     });
 
-    test(_"should reject invalid metadata", _() => {
+    test("should reject invalid metadata", () => {
       const invalidMetadata = {
         producer: "", // Required field cannot be empty
         credits: "a".repeat(501), // Too long
@@ -325,20 +325,20 @@ describe(_"Beat Validation Tests", _() => {
         collaborators: Array(6).fill("Producer"), // Too many collaborators
       };
 
-      expect_(() => BeatMetadataSchema.parse(invalidMetadata)).toThrow();
+      expect(() => BeatMetadataSchema.parse(invalidMetadata)).toThrow();
     });
 
-    test(_"should accept metadata with only required fields", _() => {
+    test("should accept metadata with only required fields", () => {
       const minimalMetadata = {
         producer: "BroLab Producer",
       };
 
-      expect_(() => BeatMetadataSchema.parse(minimalMetadata)).not.toThrow();
+      expect(() => BeatMetadataSchema.parse(minimalMetadata)).not.toThrow();
     });
   });
 
-  describe(_"Complete Beat Schema Validation", _() => {
-    test(_"should accept valid complete beat", _() => {
+  describe("Complete Beat Schema Validation", () => {
+    test("should accept valid complete beat", () => {
       const validBeat = {
         id: 1,
         title: "Dark Trap Beat",
@@ -366,10 +366,10 @@ describe(_"Beat Validation Tests", _() => {
         updatedAt: new Date().toISOString(),
       };
 
-      expect_(() => BeatSchema.parse(validBeat)).not.toThrow();
+      expect(() => BeatSchema.parse(validBeat)).not.toThrow();
     });
 
-    test(_"should reject beat with invalid title characters", _() => {
+    test("should reject beat with invalid title characters", () => {
       const beatWithInvalidTitle = {
         title: "Beat with <script> tags",
         slug: "beat-with-script-tags",
@@ -389,12 +389,12 @@ describe(_"Beat Validation Tests", _() => {
         producerName: "BroLab Producer",
       };
 
-      expect_(() => BeatSchema.parse(beatWithInvalidTitle)).toThrow(
+      expect(() => BeatSchema.parse(beatWithInvalidTitle)).toThrow(
         "Beat title contains invalid characters"
       );
     });
 
-    test(_"should reject beat with invalid slug format", _() => {
+    test("should reject beat with invalid slug format", () => {
       const beatWithInvalidSlug = {
         title: "Valid Beat Title",
         slug: "Invalid_Slug_With_Underscores",
@@ -414,14 +414,14 @@ describe(_"Beat Validation Tests", _() => {
         producerName: "BroLab Producer",
       };
 
-      expect_(() => BeatSchema.parse(beatWithInvalidSlug)).toThrow(
+      expect(() => BeatSchema.parse(beatWithInvalidSlug)).toThrow(
         "Slug must be lowercase with hyphens only"
       );
     });
   });
 
-  describe(_"Create Beat Schema Validation", _() => {
-    test(_"should accept valid beat creation data", _() => {
+  describe("Create Beat Schema Validation", () => {
+    test("should accept valid beat creation data", () => {
       const validCreateBeat = {
         title: "New Trap Beat",
         slug: "new-trap-beat-2025",
@@ -441,10 +441,10 @@ describe(_"Beat Validation Tests", _() => {
         producerName: "BroLab Producer",
       };
 
-      expect_(() => CreateBeatSchema.parse(validCreateBeat)).not.toThrow();
+      expect(() => CreateBeatSchema.parse(validCreateBeat)).not.toThrow();
     });
 
-    test(_"should reject creation data with auto-generated fields", _() => {
+    test("should reject creation data with auto-generated fields", () => {
       const createBeatWithId = {
         id: 1, // Should not be included in creation
         title: "New Trap Beat",
@@ -471,29 +471,29 @@ describe(_"Beat Validation Tests", _() => {
     });
   });
 
-  describe(_"Update Beat Schema Validation", _() => {
-    test(_"should accept valid beat update data", _() => {
+  describe("Update Beat Schema Validation", () => {
+    test("should accept valid beat update data", () => {
       const validUpdateBeat = {
         id: 1,
         title: "Updated Beat Title",
         bpm: 150,
       };
 
-      expect_(() => UpdateBeatSchema.parse(validUpdateBeat)).not.toThrow();
+      expect(() => UpdateBeatSchema.parse(validUpdateBeat)).not.toThrow();
     });
 
-    test(_"should require ID for updates", _() => {
+    test("should require ID for updates", () => {
       const updateWithoutId = {
         title: "Updated Beat Title",
         bpm: 150,
       };
 
-      expect_(() => UpdateBeatSchema.parse(updateWithoutId)).toThrow();
+      expect(() => UpdateBeatSchema.parse(updateWithoutId)).toThrow();
     });
   });
 
-  describe(_"Beat Filter Schema Validation", _() => {
-    test(_"should accept valid filter parameters", _() => {
+  describe("Beat Filter Schema Validation", () => {
+    test("should accept valid filter parameters", () => {
       const validFilters = {
         genre: "trap" as const,
         mood: "dark" as const,
@@ -508,10 +508,10 @@ describe(_"Beat Validation Tests", _() => {
         limit: 20,
       };
 
-      expect_(() => BeatFilterSchema.parse(validFilters)).not.toThrow();
+      expect(() => BeatFilterSchema.parse(validFilters)).not.toThrow();
     });
 
-    test(_"should apply default values", _() => {
+    test("should apply default values", () => {
       const minimalFilters = {};
       const result = BeatFilterSchema.parse(minimalFilters);
 
@@ -520,18 +520,18 @@ describe(_"Beat Validation Tests", _() => {
       expect(result.limit).toBe(20);
     });
 
-    test(_"should reject invalid BPM ranges", _() => {
+    test("should reject invalid BPM ranges", () => {
       const invalidBpmFilters = {
         bpmMin: 50, // Below minimum
         bpmMax: 250, // Above maximum
       };
 
-      expect_(() => BeatFilterSchema.parse(invalidBpmFilters)).toThrow();
+      expect(() => BeatFilterSchema.parse(invalidBpmFilters)).toThrow();
     });
   });
 
-  describe(_"Beat Purchase Schema Validation", _() => {
-    test(_"should accept valid purchase data", _() => {
+  describe("Beat Purchase Schema Validation", () => {
+    test("should accept valid purchase data", () => {
       const validPurchase = {
         beatId: 123,
         licenseType: "premium" as const,
@@ -539,10 +539,10 @@ describe(_"Beat Validation Tests", _() => {
         customLicenseTerms: "Custom terms for this purchase",
       };
 
-      expect_(() => BeatPurchaseSchema.parse(validPurchase)).not.toThrow();
+      expect(() => BeatPurchaseSchema.parse(validPurchase)).not.toThrow();
     });
 
-    test(_"should apply default quantity", _() => {
+    test("should apply default quantity", () => {
       const purchaseWithoutQuantity = {
         beatId: 123,
         licenseType: "basic" as const,
@@ -553,8 +553,8 @@ describe(_"Beat Validation Tests", _() => {
     });
   });
 
-  describe(_"Beat Interaction Schema Validation", _() => {
-    test(_"should accept valid interaction data", _() => {
+  describe("Beat Interaction Schema Validation", () => {
+    test("should accept valid interaction data", () => {
       const validInteractions = [
         { beatId: 123, action: "like" as const },
         { beatId: 456, action: "unlike" as const },
@@ -563,42 +563,42 @@ describe(_"Beat Validation Tests", _() => {
       ];
 
       validInteractions.forEach(interaction => {
-        expect_(() => BeatInteractionSchema.parse(interaction)).not.toThrow();
+        expect(() => BeatInteractionSchema.parse(interaction)).not.toThrow();
       });
     });
 
-    test(_"should reject invalid actions", _() => {
+    test("should reject invalid actions", () => {
       const invalidInteraction = {
         beatId: 123,
         action: "invalid-action",
       };
 
-      expect_(() => BeatInteractionSchema.parse(invalidInteraction)).toThrow();
+      expect(() => BeatInteractionSchema.parse(invalidInteraction)).toThrow();
     });
   });
 
-  describe(_"Validation Utilities", _() => {
-    describe(_"validateBpmForGenre", _() => {
-      test(_"should validate BPM for hip-hop genre", _() => {
+  describe("Validation Utilities", () => {
+    describe("validateBpmForGenre", () => {
+      test("should validate BPM for hip-hop genre", () => {
         expect(validateBpmForGenre(100, "hip-hop")).toBe(true);
         expect(validateBpmForGenre(50, "hip-hop")).toBe(false);
         expect(validateBpmForGenre(150, "hip-hop")).toBe(false);
       });
 
-      test(_"should validate BPM for trap genre", _() => {
+      test("should validate BPM for trap genre", () => {
         expect(validateBpmForGenre(140, "trap")).toBe(true);
         expect(validateBpmForGenre(120, "trap")).toBe(false);
         expect(validateBpmForGenre(180, "trap")).toBe(false);
       });
 
-      test(_"should allow any BPM for unknown genres", _() => {
+      test("should allow any BPM for unknown genres", () => {
         expect(validateBpmForGenre(80, "unknown-genre")).toBe(true);
         expect(validateBpmForGenre(200, "unknown-genre")).toBe(true);
       });
     });
 
-    describe(_"validateBeatPricing", _() => {
-      test(_"should validate correct pricing hierarchy", _() => {
+    describe("validateBeatPricing", () => {
+      test("should validate correct pricing hierarchy", () => {
         const validPricing = {
           basic: 2999,
           premium: 4999,
@@ -609,7 +609,7 @@ describe(_"Beat Validation Tests", _() => {
         expect(validateBeatPricing(validPricing)).toBe(true);
       });
 
-      test(_"should reject incorrect pricing hierarchy", _() => {
+      test("should reject incorrect pricing hierarchy", () => {
         const invalidPricing1 = {
           basic: 4999,
           premium: 2999, // Premium should be higher than basic
@@ -629,33 +629,33 @@ describe(_"Beat Validation Tests", _() => {
       });
     });
 
-    describe(_"validateAudioFormatForLicense", _() => {
-      test(_"should validate format for basic license", _() => {
+    describe("validateAudioFormatForLicense", () => {
+      test("should validate format for basic license", () => {
         expect(validateAudioFormatForLicense("mp3", "basic")).toBe(true);
         expect(validateAudioFormatForLicense("wav", "basic")).toBe(false);
       });
 
-      test(_"should validate format for premium license", _() => {
+      test("should validate format for premium license", () => {
         expect(validateAudioFormatForLicense("mp3", "premium")).toBe(true);
         expect(validateAudioFormatForLicense("wav", "premium")).toBe(true);
         expect(validateAudioFormatForLicense("flac", "premium")).toBe(false);
       });
 
-      test(_"should validate format for unlimited license", _() => {
+      test("should validate format for unlimited license", () => {
         expect(validateAudioFormatForLicense("mp3", "unlimited")).toBe(true);
         expect(validateAudioFormatForLicense("wav", "unlimited")).toBe(true);
         expect(validateAudioFormatForLicense("aiff", "unlimited")).toBe(true);
         expect(validateAudioFormatForLicense("flac", "unlimited")).toBe(false);
       });
 
-      test(_"should validate format for exclusive license", _() => {
+      test("should validate format for exclusive license", () => {
         expect(validateAudioFormatForLicense("wav", "exclusive")).toBe(true);
         expect(validateAudioFormatForLicense("aiff", "exclusive")).toBe(true);
         expect(validateAudioFormatForLicense("flac", "exclusive")).toBe(true);
         expect(validateAudioFormatForLicense("mp3", "exclusive")).toBe(false);
       });
 
-      test(_"should handle unknown license types", _() => {
+      test("should handle unknown license types", () => {
         expect(validateAudioFormatForLicense("mp3", "unknown")).toBe(false);
       });
     });

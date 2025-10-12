@@ -14,6 +14,11 @@ import type {
   User,
 } from "../../shared/schema";
 import {
+  convexUserToUser,
+  createConvexUserId,
+  userToConvexUserInput,
+} from "../../shared/types/ConvexUser";
+import {
   createOrder as convexCreateOrder,
   createReservation as convexCreateReservation,
   getUserByClerkId as convexGetUserByClerkId,
@@ -39,14 +44,28 @@ export async function getUserByUsername(username: string): Promise<User | null> 
 
 // Get user by Clerk ID
 export async function getUserByClerkId(clerkId: string): Promise<User | null> {
-  return await convexGetUserByClerkId(clerkId);
+  const convexUser = await convexGetUserByClerkId(clerkId);
+  if (!convexUser) return null;
+
+  // Convert Convex User to shared schema User using type-safe conversion
+  return convexUserToUser(convexUser);
 }
 
 // Upsert user
-export async function upsertUser(user: Partial<User>): Promise<User> {
-  const result = await convexUpsertUser(user);
+export async function upsertUser(user: {
+  clerkId: string;
+  email: string;
+  username?: string;
+  fullName?: string;
+  avatarUrl?: string;
+}): Promise<User | null> {
+  // Convert input to ConvexUserInput format
+  const convexUserInput = userToConvexUserInput(user);
+  const result = await convexUpsertUser(convexUserInput);
   if (!result) throw new Error("Failed to upsert user");
-  return result as User;
+
+  // Convert Convex User to shared schema User using type-safe conversion
+  return convexUserToUser(result);
 }
 
 // Log a download event (idempotent: increments count if already exists)
@@ -63,14 +82,14 @@ export async function logDownload({
 
   try {
     const result = await convexLogDownload({
-      userId: String(userId),
+      userId: createConvexUserId(userId),
       beatId: productId,
       licenseType: license,
     });
 
     // Map to expected format
     return {
-      id: (result as any)?.toString() || "0",
+      id: result?.toString() || "0",
       user_id: userId,
       product_id: productId,
       license: license,
@@ -115,25 +134,26 @@ export async function upsertSubscription({
   stripeSubId,
   userId,
   plan,
-  status,
-  current_period_end,
+  _status,
+  _current_period_end,
 }: {
   stripeSubId: string;
   userId: number;
   plan: string;
-  status: string;
-  current_period_end: string;
-}): Promise<any> {
+  _status: string;
+  _current_period_end: string;
+}): Promise<string | null> {
+  // Convert the user ID to proper Convex ID format using type-safe conversion
+  const convexUserId = createConvexUserId(userId);
+
   return await convexUpsertSubscription({
-    userId: String(userId),
-    stripeSubscriptionId: stripeSubId,
+    userId: convexUserId,
+    stripeCustomerId: stripeSubId, // Use stripeCustomerId instead of stripeSubscriptionId
     plan,
-    status,
-    currentPeriodEnd: current_period_end,
   });
 }
 
-export async function getSubscription(userId: number): Promise<any> {
+export async function getSubscription(userId: number): Promise<unknown> {
   // TODO: Implement with Convex
   console.log("Getting subscription for user:", userId);
   return null;
@@ -177,13 +197,26 @@ export async function deleteFileRecord(fileId: string): Promise<void> {
 }
 
 export async function logActivity(activity: Omit<ActivityLog, "id">): Promise<ActivityLog> {
+  // Convert user_id to proper Convex ID format using type-safe conversion
+  const convexUserId = activity.user_id
+    ? createConvexUserId(activity.user_id)
+    : createConvexUserId(0);
+
   const result = await convexLogActivity({
-    userId: String(activity.user_id || 0),
+    userId: convexUserId,
     action: activity.action,
     details: activity.details,
   });
   if (!result) throw new Error("Failed to log activity");
-  return result as ActivityLog;
+
+  // Convert Convex result to ActivityLog format
+  return {
+    id: parseInt(result.toString().slice(-8)) || 0,
+    user_id: activity.user_id,
+    action: activity.action,
+    details: activity.details,
+    timestamp: new Date().toISOString(),
+  } as ActivityLog;
 }
 
 // Sauvegarde l'URL de la facture PDF dans la commande
@@ -210,9 +243,48 @@ export async function getOrderInvoiceData(
 
 // Crée une nouvelle commande
 export async function createOrder(order: InsertOrder): Promise<Order> {
-  const result = await convexCreateOrder(order);
+  // Transform InsertOrder to match Convex OrderData interface
+  const convexOrderData = {
+    items: order.items.map(item => ({
+      productId: item.productId || 0,
+      title: item.title,
+      name: item.title, // Use title as name for compatibility
+      price: item.price || 0,
+      license: item.license || "basic",
+      quantity: item.quantity || 1,
+    })),
+    total: order.total,
+    email: order.email,
+    status: order.status,
+    currency: "USD", // Default currency
+    paymentId: order.stripe_payment_intent_id || undefined,
+    paymentStatus: order.status === "paid" ? "succeeded" : "pending",
+  };
+
+  const result = await convexCreateOrder(convexOrderData);
   if (!result) throw new Error("Failed to create order");
-  return result as Order;
+
+  // Convert Convex result to Order format
+  return {
+    id: parseInt(result.orderId?.toString().slice(-8)) || 0,
+    user_id: order.user_id,
+    session_id: order.session_id,
+    email: order.email,
+    total: order.total,
+    status: order.status,
+    stripe_payment_intent_id: order.stripe_payment_intent_id,
+    items: order.items.map(item => ({
+      id: 0,
+      beat_id: item.productId || 0,
+      license_type: item.license || "basic",
+      price: item.price || 0,
+      quantity: item.quantity || 1,
+      session_id: order.session_id,
+      user_id: order.user_id,
+      created_at: new Date().toISOString(),
+    })),
+    created_at: new Date().toISOString(),
+  } as Order;
 }
 
 // Liste les commandes d'un utilisateur
@@ -231,9 +303,34 @@ export async function listOrderItems(orderId: number): Promise<CartItem[]> {
 
 // Reservation helpers
 export async function createReservation(reservation: InsertReservation): Promise<Reservation> {
-  const result = await convexCreateReservation(reservation);
+  // Transform InsertReservation to match Convex ReservationData interface
+  const convexReservationData = {
+    serviceType: reservation.service_type,
+    details: reservation.details as Record<string, unknown>, // Keep as object for Convex
+    preferredDate: reservation.preferred_date,
+    durationMinutes: reservation.duration_minutes,
+    totalPrice: reservation.total_price,
+    notes: reservation.notes || undefined,
+    clerkId: `user_${reservation.user_id}`, // Convert user_id to clerkId pattern
+  };
+
+  const result = await convexCreateReservation(convexReservationData);
   if (!result) throw new Error("Failed to create reservation");
-  return result as Reservation;
+
+  // Convert Convex result to Reservation format
+  return {
+    id: result?.toString() || "",
+    user_id: reservation.user_id,
+    service_type: reservation.service_type,
+    status: "pending",
+    details: reservation.details,
+    preferred_date: reservation.preferred_date,
+    duration_minutes: reservation.duration_minutes,
+    total_price: reservation.total_price,
+    notes: reservation.notes,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  } as Reservation;
 }
 
 export async function getReservationById(id: string): Promise<Reservation | null> {

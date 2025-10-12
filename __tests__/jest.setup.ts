@@ -1,18 +1,48 @@
 import "@jest/globals";
 import "@testing-library/jest-dom";
+import express from "express";
 import { TextDecoder, TextEncoder } from "util";
-// __tests__/jest.setup.ts
 
 // Polyfills for Node test environment
-// @ts-ignore
-global.TextEncoder = TextEncoder as any;
-// @ts-ignore
-global.TextDecoder = TextDecoder as any;
+// @ts-expect-error - Global polyfill for Node.js compatibility
+global.TextEncoder = TextEncoder;
+// @ts-expect-error - Global polyfill for Node.js compatibility
+global.TextDecoder = TextDecoder;
 
 // Add setImmediate polyfill for Node.js compatibility
-// @ts-ignore
+// @ts-expect-error - Global polyfill for Node.js compatibility
 global.setImmediate =
-  global.setImmediate || (_(fn: Function, _...args: any[]) => setTimeout(fn, 0, ...args));
+  global.setImmediate ||
+  ((fn: (...args: unknown[]) => void, ...args: unknown[]) => setTimeout(fn, 0, ...args));
+
+// Enhanced jsdom environment setup
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: jest.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(), // deprecated
+    removeListener: jest.fn(), // deprecated
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+});
+
+// Mock ResizeObserver for client-side components
+global.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
+
+// Mock IntersectionObserver for lazy loading components
+global.IntersectionObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
 
 // Mock import.meta for Vite environment variables
 Object.defineProperty(globalThis, "import", {
@@ -44,12 +74,19 @@ Object.defineProperty(globalThis, "import", {
   writable: true,
 });
 
-// Lightweight fetch stub for tests (avoid ESM node-fetch)
-// @ts-ignore
-global.fetch = jest.fn(_async () => (_{ ok: true, _json: async () => ({}) }));
+// Enhanced fetch mock for better test compatibility
+// @ts-expect-error - Global fetch mock for testing
+global.fetch = jest.fn(async () => ({
+  ok: true,
+  status: 200,
+  json: async () => ({}),
+  text: async () => "",
+  blob: async () => new Blob(),
+  headers: new Headers(),
+}));
 
 // Mock WooCommerce API calls to avoid real HTTP requests
-jest.mock(_"../server/routes/openGraph", _() => {
+jest.mock("../server/routes/openGraph", () => {
   const originalModule = jest.requireActual("../server/routes/openGraph");
   return {
     ...originalModule,
@@ -58,41 +95,41 @@ jest.mock(_"../server/routes/openGraph", _() => {
   };
 });
 
-jest.mock(_"../server/routes/schema", _() => {
-  const { _Router} = require("express");
-  const router = Router();
+jest.mock("../server/routes/schema", () => {
+  const express = jest.requireActual("express");
+  const router = express.Router();
 
-  router.get(_"/beat/:id", _(req, _res) => {
+  router.get("/beat/:id", (req: express.Request, res: express.Response) => {
     res.json({ schema: "mock beat schema" });
   });
 
-  router.get(_"/shop", _(req, _res) => {
+  router.get("/shop", (req: express.Request, res: express.Response) => {
     res.json({ schema: "mock shop schema" });
   });
 
   return router;
 });
 
-jest.mock(_"../server/routes/openGraph", _() => {
-  const { _Router} = require("express");
-  const router = Router();
+jest.mock("../server/routes/openGraph", () => {
+  const express = jest.requireActual("express");
+  const router = express.Router();
 
-  router.get(_"/beat/:id", _(req, _res) => {
+  router.get("/beat/:id", (req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "text/html");
     res.send("<html><head><title>Mock Beat</title></head><body>Mock Beat Page</body></html>");
   });
 
-  router.get(_"/shop", _(req, _res) => {
+  router.get("/shop", (req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "text/html");
     res.send("<html><head><title>Mock Shop</title></head><body>Mock Shop Page</body></html>");
   });
 
-  router.get(_"/home", _(req, _res) => {
+  router.get("/home", (req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "text/html");
     res.send("<html><head><title>Mock Home</title></head><body>Mock Home Page</body></html>");
   });
 
-  router.get(_"/page/:pageName", _(req, _res) => {
+  router.get("/page/:pageName", (req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "text/html");
     res.send(
       `<html><head><title>Mock ${req.params.pageName}</title></head><body>Mock ${req.params.pageName} Page</body></html>`
@@ -103,12 +140,12 @@ jest.mock(_"../server/routes/openGraph", _() => {
 });
 
 // Clean up async operations and timers
-beforeEach_(() => {
+beforeEach(() => {
   jest.clearAllMocks();
   jest.clearAllTimers();
 });
 
-afterEach_(() => {
+afterEach(() => {
   // Clear any remaining timers only if fake timers are enabled
   if (jest.isMockFunction(setTimeout)) {
     jest.clearAllTimers();

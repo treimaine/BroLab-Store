@@ -3,7 +3,7 @@
  * This test focuses on the core functionality without complex mocking
  */
 
-describe(_"DataSynchronizationManager Integration", _() => {
+describe("DataSynchronizationManager Integration", () => {
   // Mock ConvexHttpClient
   const mockConvexClient = {
     query: jest.fn(),
@@ -11,7 +11,7 @@ describe(_"DataSynchronizationManager Integration", _() => {
   };
 
   // Mock logger
-  jest.mock(_"../server/lib/logger", _() => ({
+  jest.mock("../server/lib/logger", () => ({
     logger: {
       info: jest.fn(),
       warn: jest.fn(),
@@ -19,13 +19,13 @@ describe(_"DataSynchronizationManager Integration", _() => {
     },
   }));
 
-  it(_"should be able to create an instance", _() => {
+  it("should be able to create an instance", () => {
     // This test just verifies that the class can be instantiated
     // without throwing errors during construction
-    expect_(() => {
+    expect(() => {
       // We'll use a try-catch to handle any dependency issues
       try {
-        const { _DataSynchronizationManager} = require("../server/lib/dataSynchronizationManager");
+        const { DataSynchronizationManager } = require("../server/lib/dataSynchronizationManager");
         new DataSynchronizationManager(mockConvexClient);
       } catch (error) {
         // If there are dependency issues, we'll just pass the test
@@ -35,9 +35,9 @@ describe(_"DataSynchronizationManager Integration", _() => {
     }).not.toThrow();
   });
 
-  it(_"should have all required methods", _() => {
+  it("should have all required methods", () => {
     try {
-      const { _DataSynchronizationManager} = require("../server/lib/dataSynchronizationManager");
+      const { DataSynchronizationManager } = require("../server/lib/dataSynchronizationManager");
       const manager = new DataSynchronizationManager(mockConvexClient);
 
       // Check that all required methods exist
@@ -55,8 +55,8 @@ describe(_"DataSynchronizationManager Integration", _() => {
     }
   });
 
-  it(_"should export the singleton getter function", _() => {
-    const { _getDataSynchronizationManager} = require("../server/lib/dataSynchronizationManager");
+  it("should export the singleton getter function", () => {
+    const { getDataSynchronizationManager } = require("../server/lib/dataSynchronizationManager");
     expect(typeof getDataSynchronizationManager).toBe("function");
   });
 });

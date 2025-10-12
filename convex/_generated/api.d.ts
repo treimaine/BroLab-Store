@@ -14,6 +14,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as activity_getRecent from "../activity/getRecent.js";
+import type * as activity_logActivity from "../activity/logActivity.js";
 import type * as alerts from "../alerts.js";
 import type * as audit from "../audit.js";
 import type * as auth_roles from "../auth/roles.js";
@@ -78,6 +79,7 @@ import type * as users from "../users.js";
  */
 declare const fullApi: ApiFromModules<{
   "activity/getRecent": typeof activity_getRecent;
+  "activity/logActivity": typeof activity_logActivity;
   alerts: typeof alerts;
   audit: typeof audit;
   "auth/roles": typeof auth_roles;

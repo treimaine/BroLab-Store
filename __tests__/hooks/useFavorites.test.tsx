@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import * as clerkReact from "@clerk/clerk-react";
+import { describe, expect, it, jest } from "@jest/globals";
+import * as tanstackQuery from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
+import * as convexReact from "convex/react";
 import { useFavorites } from "../../client/src/hooks/useFavorites";
 import { createWrapper } from "../test-utils";
 
 // Mock the Convex API
-jest.mock(_"@convex/_generated/api", _() => ({
+jest.mock("../../client/src/lib/convex-api", () => ({
   api: {
     favorites: {
       getFavorites: {
@@ -22,36 +25,37 @@ jest.mock(_"@convex/_generated/api", _() => ({
 }));
 
 // Mock Clerk
-jest.mock(_"@clerk/clerk-react", _() => ({
-  useUser: jest.fn_(() => ({
-    user: { id: "user_test123" },
-    isLoaded: true,
-    isSignedIn: true,
-  })),
+jest.mock("@clerk/clerk-react", () => ({
+  useUser: jest.fn(),
 }));
 
 // Mock Convex React hooks
-jest.mock(_"convex/react", _() => ({
+jest.mock("convex/react", () => ({
   useQuery: jest.fn(),
   useMutation: jest.fn(),
 }));
 
 // Mock TanStack Query
-jest.mock(_"@tanstack/react-query", _() => ({
-  ...jest.requireActual("@tanstack/react-query"),
+jest.mock("@tanstack/react-query", () => ({
   useMutation: jest.fn(),
-  useQueryClient: jest.fn_(() => ({
-    invalidateQueries: jest.fn(),
-  })),
+  useQueryClient: jest.fn(),
 }));
 
-describe(_"useFavorites", _() => {
-  const mockUseQuery = jest.mocked(require("convex/react").useQuery);
-  const mockUseMutation = jest.mocked(require("convex/react").useMutation);
-  const mockUseUser = jest.mocked(require("@clerk/clerk-react").useUser);
-  const mockTanStackMutation = jest.mocked(require("@tanstack/react-query").useMutation);
+describe("useFavorites", () => {
+  const mockUseQuery = jest.mocked(convexReact.useQuery);
+  const mockUseMutation = jest.mocked(convexReact.useMutation);
+  const mockUseUser = jest.mocked(clerkReact.useUser);
+  const mockTanStackMutation = jest.mocked(tanstackQuery.useMutation);
+  const mockUseQueryClient = jest.mocked(tanstackQuery.useQueryClient);
 
-  beforeEach_(() => {
+  beforeAll(() => {
+    // Setup default mock implementations
+    mockUseQueryClient.mockReturnValue({
+      invalidateQueries: jest.fn(),
+    } as unknown);
+  });
+
+  beforeEach(() => {
     jest.clearAllMocks();
 
     // Reset Clerk mock
@@ -67,10 +71,24 @@ describe(_"useFavorites", _() => {
     mockTanStackMutation.mockReturnValue({
       mutate: jest.fn(),
       isPending: false,
-    } as unknown);
+      mutateAsync: jest.fn(),
+      reset: jest.fn(),
+      isError: false,
+      isIdle: true,
+      isSuccess: false,
+      data: undefined,
+      error: null,
+      failureCount: 0,
+      failureReason: null,
+      isLoading: false,
+      isPaused: false,
+      status: "idle" as const,
+      variables: undefined,
+      submittedAt: 0,
+    });
   });
 
-  it(_"returns favorites array", _async () => {
+  it("returns favorites array", async () => {
     const mockFavorites = [
       { _id: "fav1", beatId: 1, userId: "user_test123" },
       { _id: "fav2", beatId: 2, userId: "user_test123" },
@@ -79,15 +97,15 @@ describe(_"useFavorites", _() => {
     mockUseQuery.mockReturnValue(mockFavorites);
 
     const wrapper = createWrapper();
-    const { _result} = renderHook_(() => useFavorites(), { wrapper });
+    const { result } = renderHook(() => useFavorites(), { wrapper });
 
-    await waitFor_(() => {
+    await waitFor(() => {
       expect(Array.isArray(result.current.favorites)).toBe(true);
       expect(result.current.favorites).toEqual(mockFavorites);
     });
   });
 
-  it(_"supports add/remove operations", _async () => {
+  it("supports add/remove operations", async () => {
     const mockAddMutation = jest.fn().mockResolvedValue(undefined);
     const mockRemoveMutation = jest.fn().mockResolvedValue(undefined);
 
@@ -95,7 +113,7 @@ describe(_"useFavorites", _() => {
     mockUseMutation.mockReturnValueOnce(mockAddMutation).mockReturnValueOnce(mockRemoveMutation);
 
     const wrapper = createWrapper();
-    const { _result} = renderHook_(() => useFavorites(), { wrapper });
+    const { result } = renderHook(() => useFavorites(), { wrapper });
 
     expect(typeof result.current.addToFavorites).toBe("function");
     expect(typeof result.current.removeFromFavorites).toBe("function");
@@ -103,7 +121,7 @@ describe(_"useFavorites", _() => {
     expect(typeof result.current.isRemoving).toBe("boolean");
   });
 
-  it(_"checks if beat is favorite", _async () => {
+  it("checks if beat is favorite", async () => {
     const mockFavorites = [
       { _id: "fav1", beatId: 1, userId: "user_test123" },
       { _id: "fav2", beatId: 2, userId: "user_test123" },
@@ -112,9 +130,9 @@ describe(_"useFavorites", _() => {
     mockUseQuery.mockReturnValue(mockFavorites);
 
     const wrapper = createWrapper();
-    const { _result} = renderHook_(() => useFavorites(), { wrapper });
+    const { result } = renderHook(() => useFavorites(), { wrapper });
 
-    await waitFor_(() => {
+    await waitFor(() => {
       expect(result.current.isFavorite(1)).toBe(true);
       expect(result.current.isFavorite(3)).toBe(false);
     });

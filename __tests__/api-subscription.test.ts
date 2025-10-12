@@ -4,39 +4,39 @@
 const supabaseAdmin = { from: jest.fn() } as any;
 
 describe.skip("GET /api/subscription/status (legacy Stripe/Supabase) — skipped: migrated to Clerk Billing", () => {
-  it(_"should be replaced with Clerk Billing subscription status", _() => {
+  it("should be replaced with Clerk Billing subscription status", () => {
     // TODO: Implement new tests using Clerk Billing
     expect(true).toBe(true);
   });
 });
 
 describe.skip("POST /api/subscription/webhook (Stripe) — skipped: migrated to Clerk Billing", () => {
-  it.skip(_"traite checkout.session.completed, _upsert la subscription et retourne 200", _async () => {
+  it.skip("traite checkout.session.completed, upsert la subscription et retourne 200", async () => {
     // TODO: Replace with Clerk webhook tests
     expect(true).toBe(true);
   });
 });
 
 describe.skip("POST /api/subscription/webhook (Stripe) - cas avancés — skipped", () => {
-  it.skip(_"retourne 400 et error: invalid_signature si signature Stripe invalide", _async () => {
+  it.skip("retourne 400 et error: invalid_signature si signature Stripe invalide", async () => {
     // TODO: Replace with Clerk webhook validation tests
     expect(true).toBe(true);
   });
 
-  it.skip(_"retourne 400 et error: unsupported_event_type si type d'événement non supporté", _async () => {
+  it.skip("retourne 400 et error: unsupported_event_type si type d'événement non supporté", async () => {
     // TODO: Replace with Clerk webhook event type tests
     expect(true).toBe(true);
   });
 
-  it.skip(_"retourne 500 et error: database_error si erreur Supabase", _async () => {
+  it.skip("retourne 500 et error: database_error si erreur Supabase", async () => {
     // TODO: Replace with Convex error handling tests
     expect(true).toBe(true);
   });
 });
 
 // Nouveau test pour Clerk Billing
-describe(_"Clerk Billing Subscription Tests", _() => {
-  it(_"should get subscription status from Clerk", _async () => {
+describe("Clerk Billing Subscription Tests", () => {
+  it("should get subscription status from Clerk", async () => {
     const mockSubscription = {
       id: "sub_123",
       status: "active",
@@ -48,7 +48,7 @@ describe(_"Clerk Billing Subscription Tests", _() => {
     expect(mockSubscription.planId).toBe("basic_plan");
   });
 
-  it(_"should handle Clerk webhook events", _async () => {
+  it("should handle Clerk webhook events", async () => {
     const mockWebhookEvent = {
       type: "subscription.created",
       data: {
@@ -63,7 +63,7 @@ describe(_"Clerk Billing Subscription Tests", _() => {
     expect(mockWebhookEvent.data.status).toBe("active");
   });
 
-  it(_"should sync subscription data with Convex", _async () => {
+  it("should sync subscription data with Convex", async () => {
     const mockConvexSync = {
       userId: "user_123",
       subscriptionId: "sub_123",

@@ -5,9 +5,9 @@ import { describe, expect, it } from "@jest/globals";
  */
 
 
-describe(_"Dashboard Configuration System", _() => {
-  describe(_"Currency Utilities", _() => {
-    it(_"should format currency correctly with basic implementation", _() => {
+describe("Dashboard Configuration System", () => {
+  describe("Currency Utilities", () => {
+    it("should format currency correctly with basic implementation", () => {
       // Test basic currency formatting without importing the full module
       function formatCurrencyUSD(valueInCents: number | null | undefined): string {
         const cents = typeof valueInCents === "number" ? valueInCents : 0;
@@ -25,7 +25,7 @@ describe(_"Dashboard Configuration System", _() => {
       expect(formatCurrencyUSD(undefined)).toMatch(/\$0\.00/);
     });
 
-    it(_"should handle edge cases", _() => {
+    it("should handle edge cases", () => {
       function formatCurrencyUSD(valueInCents: number | null | undefined): string {
         const cents = typeof valueInCents === "number" ? valueInCents : 0;
         const dollars = cents / 100;
@@ -47,8 +47,8 @@ describe(_"Dashboard Configuration System", _() => {
     });
   });
 
-  describe(_"Configuration Constants", _() => {
-    it(_"should have valid configuration structure", _() => {
+  describe("Configuration Constants", () => {
+    it("should have valid configuration structure", () => {
       // Test basic configuration structure without environment dependencies
       const basicConfig = {
         ui: {
@@ -79,7 +79,7 @@ describe(_"Dashboard Configuration System", _() => {
       expect(typeof basicConfig.features.realtimeUpdates).toBe("boolean");
     });
 
-    it(_"should have valid currency configuration", _() => {
+    it("should have valid currency configuration", () => {
       const currencyConfig = {
         baseCurrency: "USD",
         formatting: {
@@ -101,10 +101,10 @@ describe(_"Dashboard Configuration System", _() => {
     });
   });
 
-  describe(_"Type Definitions", _() => {
-    it(_"should have dashboard types available", _() => {
+  describe("Type Definitions", () => {
+    it("should have dashboard types available", () => {
       // Test that shared types can be imported
-      expect_(() => {
+      expect(() => {
         require("@shared/types/dashboard");
       }).not.toThrow();
     });

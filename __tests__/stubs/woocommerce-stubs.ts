@@ -172,12 +172,12 @@ export const setupWooCommerceStubs = () => {
 
   // Mock des modules spécifiques
   try {
-    jest.doMock(_"../../server/routes/openGraph", _() => ({
+    jest.doMock("../../server/routes/openGraph", () => ({
       ...jest.requireActual("../../server/routes/openGraph"),
       wcApiRequest: stubWcApiRequest,
     }));
 
-    jest.doMock(_"../../server/routes/schema", _() => ({
+    jest.doMock("../../server/routes/schema", () => ({
       ...jest.requireActual("../../server/routes/schema"),
       wcApiRequest: stubWcApiRequest,
     }));

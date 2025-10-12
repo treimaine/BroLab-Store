@@ -10,7 +10,7 @@ import {
   webhookSecurityHeaders,
 } from "../server/middleware/webhookSecurity";
 
-describe(_"Webhook Security Middleware", _() => {
+describe("Webhook Security Middleware", () => {
   let app: express.Application;
   const testSecret = "test_webhook_secret_123";
   const testPayload = JSON.stringify({
@@ -24,7 +24,7 @@ describe(_"Webhook Security Middleware", _() => {
     request: { id: null, idempotency_key: null },
   });
 
-  beforeEach_(() => {
+  beforeEach(() => {
     app = express();
     app.use(express.json());
     app.use(express.raw({ type: "application/json" }));
@@ -33,15 +33,15 @@ describe(_"Webhook Security Middleware", _() => {
     webhookValidator.registerProvider("test", testSecret);
   });
 
-  afterEach_(() => {
+  afterEach(() => {
     webhookValidator.removeProvider("test");
   });
 
-  describe(_"webhookSecurity middleware", _() => {
-    it(_"should validate correct webhook signature", _async () => {
+  describe("webhookSecurity middleware", () => {
+    it("should validate correct webhook signature", async () => {
       const signature = webhookValidator.generateSignature(testPayload, testSecret);
 
-      app.post("/webhook", webhookSecurity({ provider: "test" }), (_req, _res) => {
+      app.post("/webhook", webhookSecurity({ provider: "test" }), (req, res) => {
         expect(req.webhookValidation?.isValid).toBe(true);
         expect(req.webhookValidation?.payload).toBeDefined();
         res.json({ success: true });
@@ -55,10 +55,10 @@ describe(_"Webhook Security Middleware", _() => {
         .expect(200);
     });
 
-    it(_"should reject invalid webhook signature", _async () => {
+    it("should reject invalid webhook signature", async () => {
       const invalidSignature = "invalid_signature_123";
 
-      app.post("/webhook", webhookSecurity({ provider: "test", skipInTest: false }), (_req, _res) => {
+      app.post("/webhook", webhookSecurity({ provider: "test", skipInTest: false }), (req, res) => {
         res.json({ success: true });
       });
 
@@ -74,7 +74,7 @@ describe(_"Webhook Security Middleware", _() => {
         });
     });
 
-    it(_"should skip validation in test environment when configured", _async () => {
+    it("should skip validation in test environment when configured", async () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = "test";
 
@@ -84,7 +84,7 @@ describe(_"Webhook Security Middleware", _() => {
           provider: "test",
           skipInTest: true,
         }),
-        (_req, _res) => {
+        (req, res) => {
           expect(req.webhookValidation?.isValid).toBe(true);
           res.json({ success: true });
         }
@@ -99,14 +99,14 @@ describe(_"Webhook Security Middleware", _() => {
       process.env.NODE_ENV = originalEnv;
     });
 
-    it(_"should handle missing signature when not required", _async () => {
+    it("should handle missing signature when not required", async () => {
       app.post(
         "/webhook",
         webhookSecurity({
           provider: "test",
           required: false,
         }),
-        (_req, _res) => {
+        (req, res) => {
           expect(req.webhookValidation?.isValid).toBe(true);
           res.json({ success: true });
         }
@@ -119,7 +119,7 @@ describe(_"Webhook Security Middleware", _() => {
         .expect(200);
     });
 
-    it(_"should run custom validation when provided", _async () => {
+    it("should run custom validation when provided", async () => {
       const signature = webhookValidator.generateSignature(testPayload, testSecret);
       const customValidation = jest.fn().mockResolvedValue({
         valid: false,
@@ -133,7 +133,7 @@ describe(_"Webhook Security Middleware", _() => {
           skipInTest: false,
           customValidation,
         }),
-        (_req, _res) => {
+        (req, res) => {
           res.json({ success: true });
         }
       );
@@ -151,11 +151,11 @@ describe(_"Webhook Security Middleware", _() => {
       expect(customValidation).toHaveBeenCalled();
     });
 
-    it(_"should handle provider configuration not found", _async () => {
+    it("should handle provider configuration not found", async () => {
       app.post(
         "/webhook",
         webhookSecurity({ provider: "nonexistent", skipInTest: false }),
-        (_req, _res) => {
+        (req, res) => {
           res.json({ success: true });
         }
       );
@@ -171,11 +171,11 @@ describe(_"Webhook Security Middleware", _() => {
     });
   });
 
-  describe(_"requireWebhookValidation middleware", _() => {
-    it(_"should pass when webhook validation is present and valid", _async () => {
+  describe("requireWebhookValidation middleware", () => {
+    it("should pass when webhook validation is present and valid", async () => {
       app.post(
         "/webhook",
-        (_req, _res, _next) => {
+        (req, _res, next) => {
           req.webhookValidation = {
             provider: "test",
             payload: JSON.parse(testPayload),
@@ -185,7 +185,7 @@ describe(_"Webhook Security Middleware", _() => {
           next();
         },
         requireWebhookValidation,
-        (_req, _res) => {
+        (req, res) => {
           res.json({ success: true });
         }
       );
@@ -193,8 +193,8 @@ describe(_"Webhook Security Middleware", _() => {
       await request(app).post("/webhook").send(testPayload).expect(200);
     });
 
-    it(_"should fail when webhook validation is not present", _async () => {
-      app.post(_"/webhook", _requireWebhookValidation, _(req, _res) => {
+    it("should fail when webhook validation is not present", async () => {
+      app.post("/webhook", requireWebhookValidation, (req, res) => {
         res.json({ success: true });
       });
 
@@ -207,10 +207,10 @@ describe(_"Webhook Security Middleware", _() => {
         });
     });
 
-    it(_"should fail when webhook validation is invalid", _async () => {
+    it("should fail when webhook validation is invalid", async () => {
       app.post(
         "/webhook",
-        (_req, _res, _next) => {
+        (req, _res, next) => {
           req.webhookValidation = {
             provider: "test",
             payload: JSON.parse(testPayload),
@@ -220,7 +220,7 @@ describe(_"Webhook Security Middleware", _() => {
           next();
         },
         requireWebhookValidation,
-        (_req, _res) => {
+        (req, res) => {
           res.json({ success: true });
         }
       );
@@ -236,9 +236,9 @@ describe(_"Webhook Security Middleware", _() => {
     });
   });
 
-  describe(_"webhookRateLimit middleware", _() => {
-    it(_"should allow requests within rate limit", _async () => {
-      app.post("/webhook", webhookRateLimit({ maxRequests: 5, windowMs: 1000 }), (_req, _res) => {
+  describe("webhookRateLimit middleware", () => {
+    it("should allow requests within rate limit", async () => {
+      app.post("/webhook", webhookRateLimit({ maxRequests: 5, windowMs: 1000 }), (req, res) => {
         res.json({ success: true });
       });
 
@@ -248,8 +248,8 @@ describe(_"Webhook Security Middleware", _() => {
       }
     });
 
-    it(_"should block requests exceeding rate limit", _async () => {
-      app.post("/webhook", webhookRateLimit({ maxRequests: 2, windowMs: 1000 }), (_req, _res) => {
+    it("should block requests exceeding rate limit", async () => {
+      app.post("/webhook", webhookRateLimit({ maxRequests: 2, windowMs: 1000 }), (req, res) => {
         res.json({ success: true });
       });
 
@@ -268,8 +268,8 @@ describe(_"Webhook Security Middleware", _() => {
         });
     });
 
-    it(_"should set rate limit headers", _async () => {
-      app.post("/webhook", webhookRateLimit({ maxRequests: 5, windowMs: 1000 }), (_req, _res) => {
+    it("should set rate limit headers", async () => {
+      app.post("/webhook", webhookRateLimit({ maxRequests: 5, windowMs: 1000 }), (req, res) => {
         res.json({ success: true });
       });
 
@@ -284,7 +284,7 @@ describe(_"Webhook Security Middleware", _() => {
         });
     });
 
-    it(_"should use custom key generator", _async () => {
+    it("should use custom key generator", async () => {
       const keyGenerator = jest.fn().mockReturnValue("custom-key");
 
       app.post(
@@ -294,7 +294,7 @@ describe(_"Webhook Security Middleware", _() => {
           windowMs: 1000,
           keyGenerator,
         }),
-        (_req, _res) => {
+        (req, res) => {
           res.json({ success: true });
         }
       );
@@ -306,11 +306,11 @@ describe(_"Webhook Security Middleware", _() => {
     });
   });
 
-  describe(_"webhookIdempotency middleware", _() => {
-    it(_"should allow first request and cache response", _async () => {
+  describe("webhookIdempotency middleware", () => {
+    it("should allow first request and cache response", async () => {
       const keyExtractor = jest.fn().mockReturnValue("test-key-123");
 
-      app.post("/webhook", webhookIdempotency({ keyExtractor }), (_req, _res) => {
+      app.post("/webhook", webhookIdempotency({ keyExtractor }), (req, res) => {
         res.json({ success: true, timestamp: Date.now() });
       });
 
@@ -320,11 +320,11 @@ describe(_"Webhook Security Middleware", _() => {
       expect(response1.body.success).toBe(true);
     });
 
-    it(_"should return cached response for duplicate requests", _async () => {
+    it("should return cached response for duplicate requests", async () => {
       const keyExtractor = jest.fn().mockReturnValue("test-key-456");
       let callCount = 0;
 
-      app.post("/webhook", webhookIdempotency({ keyExtractor }), (_req, _res) => {
+      app.post("/webhook", webhookIdempotency({ keyExtractor }), (req, res) => {
         callCount++;
         res.json({ success: true, callCount });
       });
@@ -340,11 +340,11 @@ describe(_"Webhook Security Middleware", _() => {
       expect(callCount).toBe(1); // Handler only called once
     });
 
-    it(_"should skip idempotency when no key is provided", _async () => {
+    it("should skip idempotency when no key is provided", async () => {
       const keyExtractor = jest.fn().mockReturnValue(null);
       let callCount = 0;
 
-      app.post("/webhook", webhookIdempotency({ keyExtractor }), (_req, _res) => {
+      app.post("/webhook", webhookIdempotency({ keyExtractor }), (req, res) => {
         callCount++;
         res.json({ success: true, callCount });
       });
@@ -356,9 +356,9 @@ describe(_"Webhook Security Middleware", _() => {
     });
   });
 
-  describe(_"webhookSecurityHeaders middleware", _() => {
-    it(_"should set security headers", _async () => {
-      app.post(_"/webhook", _webhookSecurityHeaders, _(req, _res) => {
+  describe("webhookSecurityHeaders middleware", () => {
+    it("should set security headers", async () => {
+      app.post("/webhook", webhookSecurityHeaders, (req, res) => {
         res.json({ success: true });
       });
 
@@ -378,8 +378,8 @@ describe(_"Webhook Security Middleware", _() => {
     });
   });
 
-  describe(_"createWebhookSecurityStack", _() => {
-    it(_"should create comprehensive security middleware stack", _async () => {
+  describe("createWebhookSecurityStack", () => {
+    it("should create comprehensive security middleware stack", async () => {
       const signature = webhookValidator.generateSignature(testPayload, testSecret);
       const middlewares = createWebhookSecurityStack("test", {
         required: true,
@@ -387,7 +387,7 @@ describe(_"Webhook Security Middleware", _() => {
         idempotencyKeyExtractor: req => (req.headers["idempotency-key"] as string) || null,
       });
 
-      app.post(_"/webhook", _...middlewares, _(req, _res) => {
+      app.post("/webhook", ...middlewares, (req, res) => {
         expect(req.webhookValidation?.isValid).toBe(true);
         res.json({ success: true });
       });
@@ -407,7 +407,7 @@ describe(_"Webhook Security Middleware", _() => {
         });
     });
 
-    it(_"should handle custom validation in security stack", _async () => {
+    it("should handle custom validation in security stack", async () => {
       const signature = webhookValidator.generateSignature(testPayload, testSecret);
       const customValidation = jest.fn().mockResolvedValue({
         valid: true,
@@ -419,7 +419,7 @@ describe(_"Webhook Security Middleware", _() => {
         customValidation,
       });
 
-      app.post(_"/webhook", _...middlewares, _(req, _res) => {
+      app.post("/webhook", ...middlewares, (req, res) => {
         res.json({ success: true });
       });
 
@@ -434,8 +434,8 @@ describe(_"Webhook Security Middleware", _() => {
     });
   });
 
-  describe(_"Integration with real webhook scenarios", _() => {
-    it(_"should handle Stripe webhook format", _async () => {
+  describe("Integration with real webhook scenarios", () => {
+    it("should handle Stripe webhook format", async () => {
       const stripeSecret = "whsec_test_stripe_secret";
       webhookValidator.registerProvider("stripe", stripeSecret);
 
@@ -450,7 +450,7 @@ describe(_"Webhook Security Middleware", _() => {
       app.post(
         "/stripe-webhook",
         webhookSecurity({ provider: "stripe", skipInTest: false }),
-        (_req, _res) => {
+        (req, res) => {
           expect(req.webhookValidation?.isValid).toBe(true);
           expect(req.webhookValidation?.timestamp).toBe(timestamp);
           res.json({ received: true });
@@ -467,18 +467,18 @@ describe(_"Webhook Security Middleware", _() => {
       webhookValidator.removeProvider("stripe");
     });
 
-    it(_"should handle concurrent webhook requests safely", _async () => {
+    it("should handle concurrent webhook requests safely", async () => {
       const signature = webhookValidator.generateSignature(testPayload, testSecret);
       let processedCount = 0;
 
-      app.post("/webhook", webhookSecurity({ provider: "test" }), (_req, _res) => {
+      app.post("/webhook", webhookSecurity({ provider: "test" }), (req, res) => {
         processedCount++;
         // Use immediate response instead of setTimeout to avoid async cleanup issues
         res.json({ success: true, count: processedCount });
       });
 
       // Send multiple concurrent requests
-      const promises = Array.from(_{ length: 5 }, _() =>
+      const promises = Array.from({ length: 5 }, () =>
         request(app)
           .post("/webhook")
           .set("test-signature", signature)

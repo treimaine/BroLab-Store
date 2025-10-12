@@ -1,6 +1,7 @@
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { ConvexHttpClient } from "convex/browser";
+import { createMockConvexClient } from "../types/mocks";
 
 // Mock Convex API
 const api = {
@@ -21,28 +22,31 @@ const api = {
 };
 
 // Mock Convex
-jest.mock(_"convex/browser", _() => ({
+jest.mock("convex/browser", () => ({
   ConvexHttpClient: jest.fn(),
 }));
 
 // Mock Clerk
-jest.mock(_"@clerk/clerk-react", _() => ({
+jest.mock("@clerk/clerk-react", () => ({
   useUser: jest.fn(),
   useAuth: jest.fn(),
 }));
 
-describe(_"Convex + Clerk Integration", _() => {
-  let mockConvex: any;
+import { MockConvexClient } from "../types/mocks";
 
-  beforeEach_(() => {
+describe("Convex + Clerk Integration", () => {
+  let mockConvex: MockConvexClient;
+
+  beforeEach(() => {
+    mockConvex = createMockConvexClient();
     mockConvex = {
       query: jest.fn(),
       mutation: jest.fn(),
     };
-    (ConvexHttpClient as jest.Mock).mockImplementation_(() => mockConvex);
+    (ConvexHttpClient as jest.Mock).mockImplementation(() => mockConvex);
   });
 
-  it(_"should sync user data between Clerk and Convex", _async () => {
+  it("should sync user data between Clerk and Convex", async () => {
     const mockClerkUser = {
       id: "clerk_123",
       emailAddresses: [{ emailAddress: "test@example.com" }],
@@ -72,7 +76,7 @@ describe(_"Convex + Clerk Integration", _() => {
     expect(convexUser.email).toBe(mockClerkUser.emailAddresses[0].emailAddress);
   });
 
-  it(_"should handle subscription status with Clerk features", _async () => {
+  it("should handle subscription status with Clerk features", async () => {
     const mockHas = jest
       .fn()
       .mockReturnValueOnce(true) // basic plan
@@ -82,7 +86,7 @@ describe(_"Convex + Clerk Integration", _() => {
       has: mockHas,
     });
 
-    const { _has} = useAuth();
+    const { has } = useAuth();
 
     // Test plan access
     expect(has!({ plan: "basic" })).toBe(true);
@@ -91,7 +95,7 @@ describe(_"Convex + Clerk Integration", _() => {
     expect(has!({ feature: "unlimited_downloads" })).toBe(true);
   });
 
-  it(_"should create user in Convex when Clerk user signs up", _async () => {
+  it("should create user in Convex when Clerk user signs up", async () => {
     const mockClerkUser = {
       id: "clerk_new_user",
       emailAddresses: [{ emailAddress: "newuser@example.com" }],
@@ -123,7 +127,7 @@ describe(_"Convex + Clerk Integration", _() => {
     expect(newUser.email).toBe(mockClerkUser.emailAddresses[0].emailAddress);
   });
 
-  it(_"should handle favorites with authenticated user", _async () => {
+  it("should handle favorites with authenticated user", async () => {
     const mockClerkUser = {
       id: "clerk_123",
       emailAddresses: [{ emailAddress: "test@example.com" }],
@@ -163,7 +167,7 @@ describe(_"Convex + Clerk Integration", _() => {
     expect(favorite.beatId).toBe(456);
   });
 
-  it(_"should handle downloads with subscription check", _async () => {
+  it("should handle downloads with subscription check", async () => {
     const mockClerkUser = {
       id: "clerk_123",
       emailAddresses: [{ emailAddress: "test@example.com" }],
@@ -195,7 +199,7 @@ describe(_"Convex + Clerk Integration", _() => {
     mockConvex.query.mockResolvedValue(mockConvexUser);
     mockConvex.mutation.mockResolvedValue(mockDownload);
 
-    const { _has} = useAuth();
+    const { has } = useAuth();
     const canDownload = has!({ plan: "basic" });
 
     if (canDownload) {
@@ -211,7 +215,7 @@ describe(_"Convex + Clerk Integration", _() => {
     expect(canDownload).toBe(true);
   });
 
-  it(_"should handle unauthenticated user gracefully", _async () => {
+  it("should handle unauthenticated user gracefully", async () => {
     (useUser as jest.Mock).mockReturnValue({
       user: null,
       isSignedIn: false,
@@ -221,8 +225,8 @@ describe(_"Convex + Clerk Integration", _() => {
       has: jest.fn().mockReturnValue(false),
     });
 
-    const { _user, _isSignedIn} = useUser();
-    const { _has} = useAuth();
+    const { user, isSignedIn } = useUser();
+    const { has } = useAuth();
 
     expect(user).toBeNull();
     expect(isSignedIn).toBe(false);
@@ -233,7 +237,7 @@ describe(_"Convex + Clerk Integration", _() => {
     expect(mockConvex.mutation).not.toHaveBeenCalled();
   });
 
-  it(_"should handle subscription upgrades", _async () => {
+  it("should handle subscription upgrades", async () => {
     const mockClerkUser = {
       id: "clerk_123",
       emailAddresses: [{ emailAddress: "test@example.com" }],
@@ -262,7 +266,7 @@ describe(_"Convex + Clerk Integration", _() => {
     mockConvex.query.mockResolvedValue(mockConvexUser);
     mockConvex.mutation.mockResolvedValue(mockConvexUser);
 
-    const { _has} = useAuth();
+    const { has } = useAuth();
 
     // Check subscription status
     const hasBasic = has!({ plan: "basic" });
