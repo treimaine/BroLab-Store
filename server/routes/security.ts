@@ -3,6 +3,7 @@
 // Purpose: Security management and RLS administration routes
 
 import { Router } from "express";
+import { handleRouteError } from "../types/routes";
 // RLS Security removed - using Convex for security
 
 const router = Router();
@@ -14,11 +15,8 @@ router.post("/admin/rls/initialize", async (req, res) => {
       success: true,
       message: "Security handled by Convex",
     });
-  } catch (error: any) {
-    res.status(500).json({
-      error: "Security error",
-      message: error.message,
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Security initialization failed");
   }
 });
 
@@ -29,11 +27,8 @@ router.post("/admin/rls/apply-policies", async (req, res) => {
       success: true,
       message: "Security handled by Convex",
     });
-  } catch (error: any) {
-    res.status(500).json({
-      error: "Security error",
-      message: error.message,
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Security policy application failed");
   }
 });
 
@@ -44,11 +39,8 @@ router.get("/admin/rls/verify", async (req, res) => {
       success: true,
       message: "Security handled by Convex",
     });
-  } catch (error: any) {
-    res.status(500).json({
-      error: "Security error",
-      message: error.message,
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Security verification failed");
   }
 });
 

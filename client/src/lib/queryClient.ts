@@ -38,6 +38,99 @@ export async function apiRequest(
   return res;
 }
 
+// Enhanced API request with retry mechanism and better error handling
+export interface ApiRequestOptions {
+  retries?: number;
+  retryDelay?: number;
+  timeout?: number;
+  onRetry?: (attempt: number, error: Error) => void;
+  headers?: Record<string, string>;
+}
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public statusText: string,
+    public response?: Response,
+    public data?: unknown
+  ) {
+    super(`${status}: ${statusText}`);
+    this.name = "ApiError";
+  }
+}
+
+export async function enhancedApiRequest(
+  method: string,
+  url: string,
+  data?: unknown,
+  options: ApiRequestOptions = {}
+): Promise<Response> {
+  const { retries = 3, retryDelay = 1000, timeout = 30000, onRetry, headers: customHeaders } = options;
+
+  let lastError: Error;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      const res = await fetch(url, {
+        method,
+        headers: { ...(data ? { "Content-Type": "application/json" } : {}), ...(customHeaders || {}) },
+        body: data ? JSON.stringify(data) : undefined,
+        credentials: "include",
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Don't retry on client errors (4xx) except for specific cases
+      if (res.status >= 400 && res.status < 500 && ![408, 429].includes(res.status)) {
+        const errorText = await res.text().catch(() => res.statusText);
+        let errorData: unknown;
+
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = errorText;
+        }
+
+        throw new ApiError(res.status, res.statusText, res, errorData);
+      }
+
+      // Check if response is ok
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => res.statusText);
+        throw new ApiError(res.status, res.statusText, res, errorText);
+      }
+
+      return res;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry on the last attempt or on client errors
+      if (
+        attempt === retries ||
+        (error instanceof ApiError && error.status >= 400 && error.status < 500)
+      ) {
+        throw lastError;
+      }
+
+      // Call retry callback if provided
+      if (onRetry) {
+        onRetry(attempt + 1, lastError);
+      }
+
+      // Wait before retrying with exponential backoff
+      const delay = retryDelay * Math.pow(2, attempt);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError!;
+}
+
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>

@@ -74,6 +74,7 @@ describe("Mail Service", () => {
         to: "test@example.com",
         subject: "Test Subject",
         from: "BroLab <contact@brolabentertainment.com>",
+        attempt: 1,
       });
 
       expect(mockTransporter.sendMail).not.toHaveBeenCalled();

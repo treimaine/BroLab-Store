@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getCurrentUser, isAuthenticated } from "../auth";
+import { handleRouteError } from "../types/routes";
 // import { supabaseAdmin } from '../lib/supabaseAdmin'; // Removed - using Convex for data
 
 const router = Router();
@@ -23,14 +24,13 @@ router.get("/", isAuthenticated, async (req, res): Promise<void> => {
     // if (error) {
     //   console.error('Error fetching wishlist:', error);
     //   res.status(500).json({ error: 'Failed to fetch wishlist' });
-      return;
+    return;
     // }
 
     // res.json(data || []);
     res.json([]);
-  } catch (error) {
-    console.error("Wishlist fetch error:", error);
-    res.status(500).json({ error: "Internal server error" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to fetch wishlist");
   }
 });
 
@@ -60,7 +60,7 @@ router.post("/", isAuthenticated, async (req, res): Promise<void> => {
     // if (beatError || !beatData) {
     //   console.error('Beat not found in database:', beatError);
     //   res.status(404).json({ error: 'Beat not found in database' });
-      return;
+    return;
     // }
 
     // const { error } = await supabaseAdmin
@@ -73,17 +73,16 @@ router.post("/", isAuthenticated, async (req, res): Promise<void> => {
     // if (error) {
     //   if (error.code === '23505') { // Unique constraint violation
     //     res.status(409).json({ error: 'Beat is already in your wishlist' });
-      return;
+    return;
     //   }
     //   console.error('Error adding to wishlist:', error);
     //   res.status(500).json({ error: 'Failed to add to wishlist' });
-      return;
+    return;
     // }
 
     res.status(201).json({ message: "Added to wishlist successfully" });
-  } catch (error) {
-    console.error("Wishlist add error:", error);
-    res.status(500).json({ error: "Internal server error" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to add to wishlist");
   }
 });
 
@@ -113,13 +112,12 @@ router.delete("/:beatId", isAuthenticated, async (req, res): Promise<void> => {
     // if (error) {
     //   console.error('Error removing from wishlist:', error);
     //   res.status(500).json({ error: 'Failed to remove from wishlist' });
-      return;
+    return;
     // }
 
     res.json({ message: "Removed from wishlist successfully" });
-  } catch (error) {
-    console.error("Wishlist remove error:", error);
-    res.status(500).json({ error: "Internal server error" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to remove from wishlist");
   }
 });
 
@@ -141,13 +139,12 @@ router.delete("/", isAuthenticated, async (req, res): Promise<void> => {
     // if (error) {
     //   console.error('Error clearing wishlist:', error);
     //   res.status(500).json({ error: 'Failed to clear wishlist' });
-      return;
+    return;
     // }
 
     res.json({ message: "Wishlist cleared successfully" });
-  } catch (error) {
-    console.error("Wishlist clear error:", error);
-    res.status(500).json({ error: "Internal server error" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to clear wishlist");
   }
 });
 

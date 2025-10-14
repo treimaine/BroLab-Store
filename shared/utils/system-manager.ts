@@ -6,6 +6,8 @@ import {
   HealthCheck,
   HealthMonitor,
   MetricTrend,
+  OfflineManager,
+  OptimisticUpdateManager,
   PerformanceMetric,
   PerformanceMonitor,
   RetryManager,
@@ -15,9 +17,22 @@ import {
   WebVitals,
 } from "../types/system-optimization";
 import { ErrorBoundaryManagerImpl, setupGlobalErrorHandlers } from "./error-handler";
+import { OfflineManagerImpl } from "./offline-manager";
+import { OptimisticUpdateManagerImpl } from "./optimistic-update-manager";
 import { RateLimiterImpl } from "./rate-limiter";
 import { RetryManagerImpl } from "./retry-manager";
-import { SyncManager } from "./syncManager";
+import { SyncManager, SyncStatus } from "./syncManager";
+
+// Browser Performance API with memory extension (non-standard)
+interface PerformanceMemory {
+  usedJSHeapSize: number;
+  totalJSHeapSize: number;
+  jsHeapSizeLimit: number;
+}
+
+interface PerformanceWithMemory extends Performance {
+  memory: PerformanceMemory;
+}
 
 // ================================
 // PERFORMANCE MONITOR IMPLEMENTATION
@@ -317,8 +332,8 @@ export class SystemManager {
   public readonly performanceMonitor: PerformanceMonitor;
   public readonly healthMonitor: HealthMonitor;
   public readonly rateLimiter: RateLimiter;
-  public readonly offlineManager: any; // OfflineManagerImpl;
-  public readonly optimisticUpdateManager: any; // OptimisticUpdateManagerImpl;
+  public readonly offlineManager: OfflineManager;
+  public readonly optimisticUpdateManager: OptimisticUpdateManager;
 
   private initialized = false;
 
@@ -333,9 +348,9 @@ export class SystemManager {
     // Integrate error boundary manager with performance monitor for comprehensive reporting
     this.errorBoundaryManager.setPerformanceMonitor(this.performanceMonitor);
 
-    // Initialize offline manager and optimistic update manager lazily
-    this.offlineManager = null;
-    this.optimisticUpdateManager = null;
+    // Initialize offline manager and optimistic update manager
+    this.offlineManager = new OfflineManagerImpl(this.syncManager);
+    this.optimisticUpdateManager = new OptimisticUpdateManagerImpl();
   }
 
   public static getInstance(): SystemManager {
@@ -373,7 +388,7 @@ export class SystemManager {
   }
 
   public async getSystemStatus(): Promise<{
-    sync: any;
+    sync: SyncStatus;
     health: SystemHealth;
     performance: {
       averageResponseTime: number;
@@ -577,7 +592,7 @@ export class SystemManager {
 
     // Browser memory estimation (not accurate)
     if (typeof performance !== "undefined" && "memory" in performance) {
-      const memory = (performance as any).memory;
+      const memory = (performance as PerformanceWithMemory).memory;
       return memory.usedJSHeapSize / memory.jsHeapSizeLimit;
     }
 

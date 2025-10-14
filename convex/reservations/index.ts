@@ -1,4 +1,5 @@
 // Export all reservation functions
 export { createReservation } from "./createReservation";
-export { getUserReservations } from "./listReservations";
+export { getReservation, getUserReservations } from "./listReservations";
+export { sendReservationStatusUpdateEmail } from "./sendStatusUpdateEmail";
 export { updateReservationStatus } from "./updateReservationStatus";

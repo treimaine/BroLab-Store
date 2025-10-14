@@ -302,7 +302,14 @@ export async function listOrderItems(orderId: number): Promise<CartItem[]> {
 }
 
 // Reservation helpers
-export async function createReservation(reservation: InsertReservation): Promise<Reservation> {
+export async function createReservation(
+  reservation: InsertReservation & { clerkId?: string }
+): Promise<Reservation> {
+  // Validate required clerkId
+  if (!reservation.clerkId) {
+    throw new Error("Authentication error: clerkId is required for reservation creation");
+  }
+
   // Transform InsertReservation to match Convex ReservationData interface
   const convexReservationData = {
     serviceType: reservation.service_type,
@@ -311,26 +318,62 @@ export async function createReservation(reservation: InsertReservation): Promise
     durationMinutes: reservation.duration_minutes,
     totalPrice: reservation.total_price,
     notes: reservation.notes || undefined,
-    clerkId: `user_${reservation.user_id}`, // Convert user_id to clerkId pattern
+    clerkId: reservation.clerkId, // Use actual clerkId when available
   };
 
-  const result = await convexCreateReservation(convexReservationData);
-  if (!result) throw new Error("Failed to create reservation");
+  console.log("🚀 DB Layer: Creating reservation with Convex data:", {
+    serviceType: convexReservationData.serviceType,
+    preferredDate: convexReservationData.preferredDate,
+    durationMinutes: convexReservationData.durationMinutes,
+    totalPrice: convexReservationData.totalPrice,
+    clerkId: convexReservationData.clerkId
+      ? `${convexReservationData.clerkId.substring(0, 8)}...`
+      : "undefined",
+  });
 
-  // Convert Convex result to Reservation format
-  return {
-    id: result?.toString() || "",
-    user_id: reservation.user_id,
-    service_type: reservation.service_type,
-    status: "pending",
-    details: reservation.details,
-    preferred_date: reservation.preferred_date,
-    duration_minutes: reservation.duration_minutes,
-    total_price: reservation.total_price,
-    notes: reservation.notes,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  } as Reservation;
+  try {
+    const result = await convexCreateReservation(convexReservationData);
+    if (!result) {
+      throw new Error("Convex reservation creation returned null result");
+    }
+
+    console.log("✅ DB Layer: Reservation created with ID:", result.toString());
+
+    // Convert Convex result to Reservation format
+    return {
+      id: result.toString(),
+      user_id: reservation.user_id,
+      service_type: reservation.service_type,
+      status: "pending",
+      details: reservation.details,
+      preferred_date: reservation.preferred_date,
+      duration_minutes: reservation.duration_minutes,
+      total_price: reservation.total_price,
+      notes: reservation.notes,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Reservation;
+  } catch (error) {
+    console.error("❌ DB Layer: Failed to create reservation:", error);
+
+    // Re-throw with more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes("User not found")) {
+        throw new Error(
+          "Authentication failed: User account not found. Please ensure you are properly authenticated."
+        );
+      }
+      if (error.message.includes("Authentication")) {
+        throw new Error(
+          "Authentication failed: Unable to verify user identity. Please log out and log back in."
+        );
+      }
+    }
+
+    throw new Error(
+      `Failed to create reservation: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
 }
 
 export async function getReservationById(id: string): Promise<Reservation | null> {

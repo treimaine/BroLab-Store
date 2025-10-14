@@ -1,5 +1,6 @@
 import express from "express";
 import { isAuthenticated } from "../auth";
+import { handleRouteError } from "../types/routes";
 
 const router = express.Router();
 
@@ -35,9 +36,8 @@ router.get("/dashboard", isAuthenticated, async (req, res) => {
     };
 
     res.json(analytics);
-  } catch (error) {
-    console.error("Analytics error:", error);
-    res.status(500).json({ error: "Failed to fetch analytics" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to fetch analytics");
   }
 });
 
@@ -77,9 +77,8 @@ router.get("/beats/:beatId", isAuthenticated, async (req, res) => {
     };
 
     res.json(beatAnalytics);
-  } catch (error) {
-    console.error("Beat analytics error:", error);
-    res.status(500).json({ error: "Failed to fetch beat analytics" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to fetch beat analytics");
   }
 });
 

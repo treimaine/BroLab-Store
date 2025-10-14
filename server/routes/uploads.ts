@@ -1,10 +1,11 @@
 import { Router } from "express";
 import multer from "multer";
-import { createApiError, getUserMessageForErrorType } from "../../shared/validation/index";
+import { createApiError } from "../../shared/validation/index";
 import { isAuthenticated } from "../auth";
 import { scanFile, uploadToSupabase, validateFile } from "../lib/upload";
 import { uploadRateLimit } from "../middleware/rateLimiter";
 import { validateFileUpload } from "../middleware/validation";
+import { handleRouteError } from "../types/routes";
 
 const router = Router();
 
@@ -45,7 +46,7 @@ router.post(
           requestId,
         });
         res.status(400).json(errorResponse);
-      return;
+        return;
       }
 
       // Validation du fichier
@@ -58,7 +59,7 @@ router.post(
           error: "Validation du fichier échouée",
           details: validation.errors,
         });
-      return;
+        return;
       }
 
       // Scan antivirus
@@ -67,7 +68,7 @@ router.post(
         res.status(400).json({
           error: "Le fichier n'a pas passé le scan de sécurité",
         });
-      return;
+        return;
       }
 
       // Génération du chemin de stockage
@@ -90,15 +91,7 @@ router.post(
         },
       });
     } catch (error: unknown) {
-      console.error("Erreur upload:", error);
-      const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
-
-      const errorResponse = createApiError("upload_failed", "File upload failed", {
-        userMessage: getUserMessageForErrorType("upload_failed"),
-        requestId,
-      });
-
-      res.status(500).json(errorResponse);
+      handleRouteError(error, res, "File upload failed");
     }
   }
 );

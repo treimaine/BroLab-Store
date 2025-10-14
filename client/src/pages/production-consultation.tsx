@@ -128,9 +128,9 @@ Additional Message: ${formData.message}`,
       console.log("🚀 Sending consultation reservation data:", reservationData);
       const response = await fetch("/api/reservations", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${await getToken()}`
+          Authorization: `Bearer ${await getToken()}`,
         },
         body: JSON.stringify(reservationData),
       });

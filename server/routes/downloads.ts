@@ -5,6 +5,22 @@ import { insertDownloadSchema } from "../../shared/schema";
 import { getCurrentUser, isAuthenticated } from "../auth";
 import { createValidationMiddleware } from "../lib/validation";
 import { getCurrentClerkUser } from "../middleware/clerkAuth";
+import { handleRouteError } from "../types/routes";
+
+// Download object interface - matches Convex schema
+interface DownloadRecord {
+  _id: string;
+  beatId: number;
+  licenseType: string;
+  timestamp: number; // Changed from downloadedAt to timestamp to match Convex schema
+  userId: string;
+  downloadUrl?: string;
+  fileSize?: number;
+  downloadCount?: number;
+  expiresAt?: number;
+  ipAddress?: string;
+  userAgent?: string;
+}
 
 // Configuration Convex
 const convexUrl = process.env.VITE_CONVEX_URL || "https://agile-boar-163.convex.cloud";
@@ -22,14 +38,14 @@ router.post(
       const user = await getCurrentUser(req);
       if (!user) {
         res.status(401).json({ error: "Authentication required" });
-      return;
+        return;
       }
 
       // Get Clerk user for Clerk ID
       const clerkUser = getCurrentClerkUser(req);
       if (!clerkUser) {
         res.status(401).json({ error: "Clerk authentication required" });
-      return;
+        return;
       }
 
       const { productId, license, price, productName } = req.body;
@@ -65,9 +81,8 @@ router.post(
       } else {
         res.status(500).json({ error: "Failed to log download" });
       }
-    } catch (error) {
-      console.error("🚨 Download error:", error);
-      res.status(500).json({ error: "Internal server error" });
+    } catch (error: unknown) {
+      handleRouteError(error, res, "Download failed");
     }
   }
 );
@@ -92,17 +107,16 @@ router.get("/", isAuthenticated, async (req, res): Promise<void> => {
     const downloads = await (convex as any).query("downloads:getUserDownloads", {});
 
     res.json({
-      downloads: downloads.map((download: any) => ({
+      downloads: downloads.map((download: DownloadRecord) => ({
         id: download._id,
         product_id: download.beatId,
         license: download.licenseType,
-        downloaded_at: download.timestamp,
-        download_count: 1, // Convex ne stocke pas le nombre de téléchargements
+        downloaded_at: new Date(download.timestamp).toISOString(), // Convert timestamp to ISO string
+        download_count: download.downloadCount || 1,
       })),
     });
-  } catch (error: any) {
-    console.error("List downloads error:", error);
-    res.status(500).json({ error: "Internal server error" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to list downloads");
   }
 });
 
@@ -126,11 +140,11 @@ router.get("/export", isAuthenticated, async (req, res): Promise<void> => {
     const downloads = await (convex as any).query("downloads:getUserDownloads", {});
 
     // Prepare CSV data
-    const csvData = downloads.map((download: any) => ({
+    const csvData = downloads.map((download: DownloadRecord) => ({
       product_id: download.beatId,
       license: download.licenseType,
-      downloaded_at: download.timestamp,
-      download_count: 1,
+      downloaded_at: new Date(download.timestamp).toISOString(), // Convert timestamp to ISO string
+      download_count: download.downloadCount || 1,
     }));
 
     // Generate CSV
@@ -146,9 +160,8 @@ router.get("/export", isAuthenticated, async (req, res): Promise<void> => {
     res.setHeader("Content-Disposition", 'attachment; filename="downloads.csv"');
 
     res.send(csv);
-  } catch (error: any) {
-    console.error("Export downloads error:", error);
-    res.status(500).json({ error: "Internal server error" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to export downloads");
   }
 });
 
@@ -168,9 +181,6 @@ router.get("/quota", isAuthenticated, async (req, res): Promise<void> => {
       return;
     }
 
-    // Get download quota from Convex
-    const quotaData = await (convex as any).query("downloads:getUserDownloadQuota", {});
-
     // For now, return a basic quota response since checkDownloadQuota returns unlimited
     const downloads = await (convex as any).query("downloads:getUserDownloads", {});
 
@@ -188,9 +198,8 @@ router.get("/quota", isAuthenticated, async (req, res): Promise<void> => {
       progress,
       licenseType: "basic",
     });
-  } catch (error) {
-    console.error("Error fetching download quota:", error);
-    res.status(500).json({ error: "Failed to fetch download quota" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to fetch download quota");
   }
 });
 
@@ -226,9 +235,8 @@ router.get("/quota/test", async (req, res): Promise<void> => {
       test: true,
       message: "Test endpoint - authentication required for actual data",
     });
-  } catch (error) {
-    console.error("Error fetching test download quota:", error);
-    res.status(500).json({ error: "Failed to fetch test download quota", details: error });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to fetch test download quota");
   }
 });
 
@@ -247,9 +255,8 @@ router.get("/file/:productId/:type", async (req, res): Promise<void> => {
       downloadUrl: `/api/placeholder/audio.mp3`, // Placeholder URL
       note: "This is a placeholder. In production, this would serve the actual file.",
     });
-  } catch (error: any) {
-    console.error("File download error:", error);
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "File download failed");
   }
 });
 

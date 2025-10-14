@@ -14,6 +14,7 @@ import {
   ErrorLog,
   ErrorStats,
   ErrorTrend,
+  PerformanceMonitor,
   RecoveryOption,
   TimeRange,
 } from "../types/system-optimization";
@@ -309,7 +310,7 @@ export class ErrorBoundaryManagerImpl implements ErrorBoundaryManager {
   private errorHandler: ErrorHandler;
   private errorPatterns: Map<string, ErrorPattern> = new Map();
   private errorNotificationCallbacks: Array<(error: ErrorLog, trend: ErrorTrend) => void> = [];
-  private performanceMonitor?: any; // Will be injected to avoid circular dependency
+  private performanceMonitor?: PerformanceMonitor; // Will be injected to avoid circular dependency
 
   constructor() {
     this.errorHandler = ErrorHandler.getInstance();
@@ -317,7 +318,7 @@ export class ErrorBoundaryManagerImpl implements ErrorBoundaryManager {
   }
 
   // Inject performance monitor to avoid circular dependency
-  setPerformanceMonitor(monitor: any): void {
+  setPerformanceMonitor(monitor: PerformanceMonitor): void {
     this.performanceMonitor = monitor;
   }
 

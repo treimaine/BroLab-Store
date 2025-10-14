@@ -3,16 +3,112 @@ import { getDataConsistencyManager } from "./dataConsistencyManager";
 import { logger } from "./logger";
 import { getRollbackManager } from "./rollbackManager";
 
+// Helper functions for typed Convex operations
+function typedQuery<T = unknown>(
+  client: ConvexHttpClient,
+  name: string,
+  args?: Record<string, unknown>
+): Promise<T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return client.query(name as any, args) as Promise<T>;
+}
+
+function typedMutation<T = unknown>(
+  client: ConvexHttpClient,
+  name: string,
+  args?: Record<string, unknown>
+): Promise<T> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return client.mutation(name as any, args) as Promise<T>;
+}
+
+// Resource data types
+interface ResourceData {
+  _id?: string;
+  id?: string;
+  [key: string]: unknown;
+}
+
+// User resource data
+interface UserResourceData extends ResourceData {
+  userId?: string;
+  email?: string;
+  clerkId?: string;
+  name?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+// Order resource data
+interface OrderResourceData extends ResourceData {
+  orderId?: string;
+  userId: string;
+  items: OrderItem[];
+  total: number;
+  status: string;
+  createdAt: number;
+  updatedAt?: number;
+}
+
+// Product resource data
+interface ProductResourceData extends ResourceData {
+  productId?: string;
+  name: string;
+  price: number;
+  description?: string;
+  category?: string;
+  isActive: boolean;
+  createdAt: number;
+  updatedAt?: number;
+}
+
+// Order item interface
+interface OrderItem {
+  productId: string;
+  quantity: number;
+  price: number;
+  name: string;
+}
+
+// Sync mutation result
+interface SyncMutationResult {
+  success: boolean;
+  newState: ResourceData;
+  timestamp: number;
+}
+
+// Consistency metrics data from Convex
+interface ConsistencyMetricsData {
+  totalChecks: number;
+  passedChecks: number;
+  failedChecks: number;
+  passRate: number;
+  totalViolations: number;
+  resolvedViolations: number;
+  pendingViolations: number;
+  alertsTriggered: number;
+  alertsResolved: number;
+}
+
+// Alert details interface
+interface AlertDetails {
+  currentRate?: number;
+  threshold?: number;
+  errorCount?: number;
+  violationCount?: number;
+  message: string;
+}
+
 /**
  * DataSynchronizationManager ensures data consistency across all sync operations,
  * implements data integrity validation and repair mechanisms, and provides
  * consistency monitoring and alerting.
  */
 export class DataSynchronizationManager {
-  private convexClient: ConvexHttpClient;
-  private consistencyChecks: Map<string, ConsistencyCheck> = new Map();
-  private syncOperations: Map<string, SyncOperation> = new Map();
-  private integrityRules: Map<string, IntegrityRule[]> = new Map();
+  private readonly convexClient: ConvexHttpClient;
+  private readonly consistencyChecks: Map<string, ConsistencyCheck> = new Map();
+  private readonly syncOperations: Map<string, SyncOperation> = new Map();
+  private readonly integrityRules: Map<string, IntegrityRule[]> = new Map();
   private monitoringEnabled: boolean = true;
   private alertThresholds: AlertThresholds;
 
@@ -130,8 +226,13 @@ export class DataSynchronizationManager {
 
       // Get resources to validate
       const resources = resourceId
-        ? [await this.convexClient.query("data:get" as any, { resourceType, resourceId })]
-        : await this.convexClient.query("data:list" as any, { resourceType });
+        ? [
+            await typedQuery<ResourceData | null>(this.convexClient, "data:get", {
+              resourceType,
+              resourceId,
+            }),
+          ]
+        : await typedQuery<ResourceData[]>(this.convexClient, "data:list", { resourceType });
 
       for (const resource of resources) {
         if (!resource) continue;
@@ -141,7 +242,7 @@ export class DataSynchronizationManager {
             const isValid = await rule.validator(resource);
             if (!isValid) {
               violations.push({
-                resourceId: resource._id || resource.id,
+                resourceId: resource._id ?? resource.id ?? "unknown",
                 resourceType,
                 rule: rule.name,
                 description: rule.description,
@@ -157,7 +258,7 @@ export class DataSynchronizationManager {
               resourceId: resource._id,
             });
             violations.push({
-              resourceId: resource._id || resource.id,
+              resourceId: resource._id ?? resource.id ?? "unknown",
               resourceType,
               rule: rule.name,
               description: `Validation error: ${error}`,
@@ -179,7 +280,11 @@ export class DataSynchronizationManager {
       };
 
       // Store validation result
-      await this.convexClient.mutation("integrity:storeValidationResult" as any, result);
+      await typedMutation<void>(
+        this.convexClient,
+        "integrity:storeValidationResult",
+        result as unknown as Record<string, unknown>
+      );
 
       logger.info("Data integrity validation completed", {
         resourceType,
@@ -256,9 +361,13 @@ export class DataSynchronizationManager {
       const failedOperations = syncOps.filter(op => op.status === "failed").length;
 
       // Get consistency check results
-      const consistencyResults = await this.convexClient.query("consistency:getMetrics" as any, {
-        timeRange: range,
-      });
+      const consistencyResults = await typedQuery<ConsistencyMetricsData | null>(
+        this.convexClient,
+        "consistency:getMetrics",
+        {
+          timeRange: range,
+        }
+      );
 
       // Calculate metrics
       const metrics: ConsistencyMetrics = {
@@ -347,7 +456,7 @@ export class DataSynchronizationManager {
       const checks: ConsistencyCheck[] = [];
 
       // Check if resource exists
-      const resource = await this.convexClient.query("data:get" as any, {
+      const resource = await typedQuery<ResourceData | null>(this.convexClient, "data:get", {
         resourceType: operation.type,
         resourceId: operation.resourceId,
       });
@@ -409,7 +518,7 @@ export class DataSynchronizationManager {
 
   private async performPostSyncCheck(
     operation: SyncOperationRequest,
-    result: any
+    result: SyncMutationResult
   ): Promise<ConsistencyCheckResult> {
     try {
       const checks: ConsistencyCheck[] = [];
@@ -456,9 +565,9 @@ export class DataSynchronizationManager {
     }
   }
 
-  private async executeSyncOperation(operation: SyncOperationRequest): Promise<any> {
+  private async executeSyncOperation(operation: SyncOperationRequest): Promise<SyncMutationResult> {
     // Execute the actual sync operation using Convex
-    return await this.convexClient.mutation("data:sync" as any, {
+    return await typedMutation<SyncMutationResult>(this.convexClient, "data:sync", {
       type: operation.type,
       resourceId: operation.resourceId,
       newState: operation.newState,
@@ -472,7 +581,7 @@ export class DataSynchronizationManager {
       const rules = this.integrityRules.get(violation.resourceType) || [];
       const rule = rules.find(r => r.name === violation.rule);
 
-      if (!rule || !rule.repair) {
+      if (!rule?.repair) {
         return {
           violationId: violation.resourceId,
           success: false,
@@ -485,7 +594,7 @@ export class DataSynchronizationManager {
       const repairedData = await rule.repair(violation.data);
 
       // Update the resource with repaired data
-      await this.convexClient.mutation("data:update" as any, {
+      await typedMutation<ResourceData>(this.convexClient, "data:update", {
         resourceType: violation.resourceType,
         resourceId: violation.resourceId,
         data: repairedData,
@@ -513,17 +622,19 @@ export class DataSynchronizationManager {
       name: "required_fields",
       description: "User must have required fields",
       severity: "high",
-      validator: (data: any) => {
-        return !!(data.userId || data.id) && !!data.email;
+      validator: (data: ResourceData) => {
+        const userData = data as UserResourceData;
+        return !!(userData.userId ?? userData.id) && !!userData.email;
       },
-      repair: (data: any) => {
-        if (!data.userId && !data.id) {
-          data.userId = `user_${Date.now()}`;
+      repair: (data: ResourceData) => {
+        const userData = { ...data } as UserResourceData;
+        if (!userData.userId && !userData.id) {
+          userData.userId = `user_${Date.now()}`;
         }
-        if (!data.email) {
-          data.email = `${data.userId}@example.com`;
+        if (!userData.email) {
+          userData.email = `${userData.userId ?? "user"}@example.com`;
         }
-        return data;
+        return userData;
       },
     });
 
@@ -532,14 +643,16 @@ export class DataSynchronizationManager {
       name: "order_items_valid",
       description: "Order must have valid items array",
       severity: "high",
-      validator: (data: any) => {
-        return Array.isArray(data.items) && data.items.length > 0;
+      validator: (data: ResourceData) => {
+        const orderData = data as OrderResourceData;
+        return Array.isArray(orderData.items) && orderData.items.length > 0;
       },
-      repair: (data: any) => {
-        if (!Array.isArray(data.items)) {
-          data.items = [];
+      repair: (data: ResourceData) => {
+        const orderData = { ...data } as OrderResourceData;
+        if (!Array.isArray(orderData.items)) {
+          orderData.items = [];
         }
-        return data;
+        return orderData;
       },
     });
 
@@ -548,14 +661,16 @@ export class DataSynchronizationManager {
       name: "product_name_required",
       description: "Product must have a name",
       severity: "medium",
-      validator: (data: any) => {
-        return !!data.name && data.name.trim().length > 0;
+      validator: (data: ResourceData) => {
+        const productData = data as ProductResourceData;
+        return !!productData.name && productData.name.trim().length > 0;
       },
-      repair: (data: any) => {
-        if (!data.name || data.name.trim().length === 0) {
-          data.name = `Product ${data.id || Date.now()}`;
+      repair: (data: ResourceData) => {
+        const productData = { ...data } as ProductResourceData;
+        if (!productData.name || productData.name.trim().length === 0) {
+          productData.name = `Product ${productData.id || Date.now()}`;
         }
-        return data;
+        return productData;
       },
     });
   }
@@ -605,7 +720,7 @@ export class DataSynchronizationManager {
     }
   }
 
-  private async triggerAlert(type: string, details: any): Promise<void> {
+  private async triggerAlert(type: string, details: AlertDetails): Promise<void> {
     try {
       const alert = {
         type,
@@ -616,7 +731,11 @@ export class DataSynchronizationManager {
       };
 
       // Store alert
-      await this.convexClient.mutation("alerts:create" as any, alert);
+      await typedMutation<void>(
+        this.convexClient,
+        "alerts:create",
+        alert as Record<string, unknown>
+      );
 
       // Log alert
       logger.warn("Consistency alert triggered", alert);
@@ -648,9 +767,9 @@ export class DataSynchronizationManager {
 interface SyncOperationRequest {
   type: string;
   resourceId: string;
-  currentState: any;
-  newState: any;
-  metadata?: Record<string, any>;
+  currentState: ResourceData;
+  newState: ResourceData;
+  metadata?: Record<string, unknown>;
 }
 
 interface SyncOperation {
@@ -661,15 +780,15 @@ interface SyncOperation {
   startTime: number;
   endTime?: number;
   rollbackId: string;
-  result?: any;
+  result?: SyncMutationResult;
   error?: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 interface SyncResult {
   success: boolean;
   operationId: string;
-  result?: any;
+  result?: SyncMutationResult;
   consistencyChecks: {
     preSync: ConsistencyCheckResult;
     postSync: ConsistencyCheckResult;
@@ -694,8 +813,8 @@ interface IntegrityRule {
   name: string;
   description: string;
   severity: "low" | "medium" | "high";
-  validator: (data: any) => boolean | Promise<boolean>;
-  repair?: (data: any) => any | Promise<any>;
+  validator: (data: ResourceData) => boolean | Promise<boolean>;
+  repair?: (data: ResourceData) => ResourceData | Promise<ResourceData>;
 }
 
 interface IntegrityViolation {
@@ -705,7 +824,7 @@ interface IntegrityViolation {
   description: string;
   severity: "low" | "medium" | "high";
   timestamp: number;
-  data: any;
+  data: ResourceData;
 }
 
 interface IntegrityValidationResult {
@@ -720,7 +839,7 @@ interface IntegrityValidationResult {
 interface RepairAttempt {
   violationId: string;
   success: boolean;
-  repairedData?: any;
+  repairedData?: ResourceData;
   error?: string;
   timestamp: number;
 }

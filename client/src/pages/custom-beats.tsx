@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { CheckCircle, Clock, Music, Star } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, CheckCircle, Clock, Loader2, Music, Star } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
 interface BeatRequest {
@@ -26,27 +26,77 @@ interface BeatRequest {
 }
 
 export default function CustomBeats() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedRequests, setSubmittedRequests] = useState<BeatRequest[]>([]);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { getToken } = useAuth();
-  const { user, isSignedIn } = useUser();
+  const { user: clerkUser, isSignedIn, isLoaded: clerkLoaded } = useUser();
+
+  // Form submission state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+
+  // Authentication state management
+  const [authState, setAuthState] = useState({
+    isLoading: !clerkLoaded,
+    hasError: false,
+    errorMessage: null as string | null,
+    isAuthenticated: false,
+  });
+
+  // Update auth state when Clerk loads
+  useEffect(() => {
+    if (clerkLoaded) {
+      const newAuthState = {
+        isLoading: false,
+        isAuthenticated: !!isSignedIn && !!clerkUser,
+        hasError: false,
+        errorMessage: null,
+      };
+      setAuthState(newAuthState);
+    }
+  }, [clerkLoaded, isSignedIn, clerkUser]);
 
   const handleSubmitRequest = async (request: BeatRequest) => {
     setIsSubmitting(true);
+    setSubmissionError(null);
 
     try {
-      // Convert custom beat request to reservation format using new schema
+      // Enhanced authentication validation (like mixing-mastering service)
+      if (!clerkLoaded) {
+        toast({
+          title: "Please Wait",
+          description: "Authentication is still loading. Please try again in a moment.",
+          variant: "default",
+        });
+        return;
+      }
+
+      if (!isSignedIn || !clerkUser) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to make a reservation.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Calculate total price with priority fees
+      const baseBudget = request.budget;
+      const priorityFee =
+        request.priority === "express" ? 100 : request.priority === "priority" ? 50 : 0;
+      const totalPrice = baseBudget + priorityFee;
+
+      // Convert custom beat request to reservation format using REAL user data
       const reservationData = {
         serviceType: "custom_beat" as const,
         clientInfo: {
-          firstName: "Custom Beat", // TODO: Get from user form
-          lastName: "Request",
-          email: "user@example.com", // TODO: Get from user form
-          phone: "0000000000", // Default phone number
+          firstName: clerkUser.firstName || clerkUser.fullName?.split(" ")[0] || "User",
+          lastName: clerkUser.lastName || clerkUser.fullName?.split(" ").slice(1).join(" ") || "",
+          email: clerkUser.emailAddresses[0]?.emailAddress || "",
+          phone: clerkUser.phoneNumbers?.[0]?.phoneNumber || "0000000000",
         },
-        preferredDate: new Date().toISOString(), // Will be set by user
+        preferredDate: new Date(request.deadline).toISOString(),
         preferredDuration: 480, // 8 hours for custom beat production
         serviceDetails: {
           genre: request.genre,
@@ -69,57 +119,70 @@ Additional Notes: ${request.additionalNotes || "None"}
 Uploaded Files: ${request.uploadedFiles?.length ? `${request.uploadedFiles.length} file(s) uploaded` : "None"}
 
 Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadline}`,
-        budget:
-          (request.budget +
-            (request.priority === "express" ? 100 : request.priority === "priority" ? 50 : 0)) *
-          100, // Convert to cents
+        budget: totalPrice * 100, // Convert to cents
+        acceptTerms: true, // Required by schema
       };
 
+      console.log("🎵 Creating Custom Beat reservation with authenticated user:", {
+        userId: clerkUser.id,
+        userName: clerkUser.fullName,
+        serviceType: reservationData.serviceType,
+        totalPrice,
+      });
+
+      console.log("🚀 Sending custom beat reservation data:", reservationData);
       const response = await fetch("/api/reservations", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${await getToken()}`
+          Authorization: `Bearer ${await getToken()}`,
         },
         body: JSON.stringify(reservationData),
       });
 
+      console.log("📡 Custom Beat response status:", response.status);
+
       if (response.ok) {
         const reservation = await response.json();
-        setSubmittedRequests(prev => [...prev, request]);
 
-        // Create pending payment for checkout
+        // Create pending payment for checkout (simple format like Production Consultation)
         const pendingPayment = {
           service: "custom_beat",
           serviceName: "Custom Beat Production",
           serviceDetails: `${request.genre} beat - ${request.priority} priority (${request.duration}s)`,
           reservationId: reservation.id,
-          price: reservationData.budget / 100, // Convert cents to dollars
+          price: totalPrice, // Price in dollars (not cents)
           quantity: 1,
         };
 
-        // Add to existing services array
+        // Add to existing services array (simple format like Production Consultation)
         const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
         const updatedServices = [...existingServices, pendingPayment];
         sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
 
-        toast({
-          title: "Custom Beat Request Reserved!",
-          description: `Your custom beat request has been submitted. We'll get back to you within ${
-            request.priority === "express"
-              ? "24 hours"
-              : request.priority === "priority"
-                ? "2-3 days"
-                : "5-7 days"
-          }.`,
+        console.log("✅ Custom Beat reservation created successfully:", {
+          reservationId: reservation.id,
+          userId: clerkUser.id,
         });
-
-        // Redirect to checkout
-        setLocation("/checkout");
       } else {
-        throw new Error("Failed to submit request");
+        throw new Error("Failed to create custom beat reservation");
       }
+
+      // Update submitted requests for UI
+      setSubmittedRequests(prev => [...prev, request]);
+
+      toast({
+        title: "Custom Beat Request Added!",
+        description: `Your custom beat request has been added to checkout. Priority: ${request.priority}`,
+      });
+
+      console.log("🛒 Navigating to checkout for Custom Beat service");
+      setLocation("/checkout");
     } catch (error) {
+      console.error("❌ Custom Beat submission failed:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+      setSubmissionError(errorMessage);
+
       toast({
         title: "Submission Failed",
         description: "There was an error submitting your request. Please try again.",
@@ -138,6 +201,45 @@ Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadlin
       />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Enhanced Authentication Loading State */}
+        {authState.isLoading && (
+          <div className="mb-8 p-4 bg-gradient-to-r from-blue-900/20 to-purple-900/20 border border-blue-500/30 rounded-lg">
+            <div className="flex items-center justify-center text-blue-300">
+              <Loader2 className="animate-spin h-5 w-5 mr-3" />
+              <div className="text-center">
+                <p className="font-medium">Loading authentication...</p>
+                <p className="text-xs text-blue-400 mt-1">Preparing your personalized experience</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Authentication Error State */}
+        {authState.hasError && (
+          <div className="mb-8 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+            <div className="flex items-center text-red-300">
+              <AlertTriangle className="w-5 h-5 mr-2" />
+              <div>
+                <p className="font-medium">Authentication Issue</p>
+                <p className="text-sm mt-1">{authState.errorMessage}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Submission Error State */}
+        {submissionError && (
+          <div className="mb-8 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+            <div className="flex items-center text-red-300">
+              <AlertTriangle className="w-5 h-5 mr-2" />
+              <div>
+                <p className="font-medium">Submission Error</p>
+                <p className="text-sm mt-1">{submissionError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Process Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <Card className="card-dark text-center">

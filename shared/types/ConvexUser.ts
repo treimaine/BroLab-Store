@@ -72,7 +72,7 @@ export interface ConvexUser {
 /**
  * Input type for creating/updating users in Convex
  */
-export interface ConvexUserInput {
+export interface ConvexUserInput extends Record<string, unknown> {
   clerkId: string;
   email: string;
   username?: string;
@@ -126,7 +126,7 @@ export function userToConvexUserInput(user: Partial<User> & { clerkId: string })
 /**
  * Extract numeric ID from Convex ID for compatibility with legacy systems
  */
-function extractNumericId(convexId: Id<"users">): number {
+export function extractNumericId(convexId: Id<"users">): number {
   // Extract the last 8 characters and convert to number
   const idString = convexId.toString();
   const numericPart = idString.slice(-8);
@@ -175,7 +175,7 @@ export function isSharedUser(obj: unknown): obj is User {
 /**
  * Safe conversion that handles both ConvexUser and User types
  */
-export function ensureSharedUser(user: ConvexUser | User | unknown): User | null {
+export function ensureSharedUser(user: ConvexUser | User): User | null {
   if (isConvexUser(user)) {
     return convexUserToUser(user);
   }

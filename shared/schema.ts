@@ -528,7 +528,7 @@ export type Reservation = {
     email: string;
     phone: string;
     requirements?: string;
-    reference_links?: string[];
+    referenceLinks?: string[];
   };
   preferred_date: string; // ISO date string
   duration_minutes: number;
@@ -546,7 +546,7 @@ export const insertReservationSchema = z.object({
     email: z.string().email("Invalid email format"),
     phone: z.string().min(10, "Invalid phone number"),
     requirements: z.string().optional(),
-    reference_links: z.array(z.string().url()).optional(),
+    referenceLinks: z.array(z.string().url()).optional(),
   }),
   preferred_date: z.string().datetime(),
   duration_minutes: z.number().min(30).max(480),

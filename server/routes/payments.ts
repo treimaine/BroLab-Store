@@ -7,6 +7,7 @@ import type {
 import { CreatePaymentIntentSchema, validateBody } from "../../shared/validation/index";
 import { urls } from "../config/urls";
 import type { CreatePaymentSessionHandler } from "../types/ApiTypes";
+import { handleRouteError } from "../types/routes";
 
 const router = Router();
 
@@ -41,14 +42,7 @@ const createPaymentSession: CreatePaymentSessionHandler = async (req, res) => {
 
     res.json(response);
   } catch (error: unknown) {
-    console.error("Error creating payment session:", error);
-    const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
-
-    res.status(500).json({
-      error: "Failed to create payment session",
-      message: "Unable to create payment session. Please try again.",
-      requestId,
-    });
+    handleRouteError(error, res, "Failed to create payment session");
   }
 };
 
@@ -201,8 +195,7 @@ const paymentWebhook = async (req: Request, res: Response) => {
       res.status(500).json({ received: true, synced: false, error: errorMessage });
     }
   } catch (error: unknown) {
-    console.error("Error processing payment webhook:", error);
-    res.status(500).json({ error: "Failed to process webhook" });
+    handleRouteError(error, res, "Failed to process payment webhook");
   }
 };
 

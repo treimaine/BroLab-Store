@@ -4,6 +4,7 @@ import {
   generateSitemapIndex,
   generateSitemapXML,
 } from "../lib/sitemapGenerator";
+import { ProcessedBeatData, WooCommerceApiProduct, handleRouteError } from "../types/routes";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
   if (!WC_CONSUMER_KEY || !WC_CONSUMER_SECRET) {
     // In tests/dev, return sample data to keep endpoints working
     if (process.env.NODE_ENV === "test") {
-      return [] as any;
+      return [] as WooCommerceApiProduct[];
     }
     throw new Error("WooCommerce API credentials not configured");
   }
@@ -28,7 +29,12 @@ async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
 
   const response =
     process.env.NODE_ENV === "test"
-      ? ({ ok: true, status: 200, statusText: "OK", json: async () => [] } as any)
+      ? ({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          json: async () => [] as WooCommerceApiProduct[],
+        } as Response)
       : await fetch(url.toString(), {
           ...options,
           headers: {
@@ -53,7 +59,7 @@ const BASE_URL = process.env.FRONTEND_URL || "https://brolabentertainment.com";
  * GET /sitemap.xml
  * Génère le sitemap XML principal avec tous les beats et pages
  */
-router.get("/sitemap.xml", async (req, res) => {
+router.get("/sitemap.xml", async (_req, res) => {
   try {
     // Récupérer tous les produits et catégories depuis WooCommerce
     const [products, categories] = await Promise.all([
@@ -62,23 +68,45 @@ router.get("/sitemap.xml", async (req, res) => {
     ]);
 
     // Transformer les données WooCommerce
-    const beats = products.map((product: any) => ({
-      id: product.id,
-      title: product.name,
-      description: product.description,
-      genre: product.categories?.[0]?.name || "Unknown",
-      bpm: product.bpm || product.meta_data?.find((meta: any) => meta.key === "bpm")?.value || null,
-      key: product.key || product.meta_data?.find((meta: any) => meta.key === "key")?.value || null,
-      mood:
-        product.mood || product.meta_data?.find((meta: any) => meta.key === "mood")?.value || null,
-      price: parseFloat(product.price) || 0,
-      image_url: product.images?.[0]?.src,
-      audio_url: product.audio_url,
-      tags: product.tags?.map((tag: any) => tag.name) || [],
-      duration: product.duration || null,
-      downloads: product.downloads || 0,
-      updated_at: product.date_modified || product.date_created,
-    }));
+    const beats: ProcessedBeatData[] = products.map((product: WooCommerceApiProduct) => {
+      // Extract BPM from product or meta_data
+      let bpm: number | undefined;
+      if (product.bpm) {
+        bpm = parseInt(product.bpm.toString());
+      } else {
+        const bpmMeta = product.meta_data?.find(meta => meta.key === "bpm");
+        if (bpmMeta?.value) {
+          bpm = parseInt(bpmMeta.value.toString());
+        }
+      }
+
+      return {
+        id: product.id,
+        title: product.name,
+        name: product.name, // Alias for compatibility
+        description: product.description,
+        genre: product.categories?.[0]?.name || "Unknown",
+        bpm,
+        key:
+          product.key ||
+          product.meta_data?.find(meta => meta.key === "key")?.value?.toString() ||
+          null,
+        mood:
+          product.mood ||
+          product.meta_data?.find(meta => meta.key === "mood")?.value?.toString() ||
+          null,
+        price: parseFloat(product.price) || 0,
+        image_url: product.images?.[0]?.src,
+        image: product.images?.[0]?.src, // Alias for compatibility
+        images: product.images,
+        audio_url: product.audio_url,
+        tags: product.tags?.map(tag => tag.name) || [],
+        categories: product.categories,
+        meta_data: product.meta_data,
+        duration: product.duration ? parseFloat(product.duration.toString()) : undefined,
+        downloads: product.downloads || 0,
+      };
+    });
 
     // Générer le sitemap XML
     const sitemapXML = generateSitemapXML(beats, categories, {
@@ -92,9 +120,8 @@ router.get("/sitemap.xml", async (req, res) => {
     res.setHeader("Content-Type", "application/xml");
     res.setHeader("Cache-Control", "public, max-age=3600"); // Cache 1 heure
     res.send(sitemapXML);
-  } catch (error: any) {
-    console.error("Error generating sitemap:", error);
-    res.status(500).json({ error: "Failed to generate sitemap" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate sitemap");
   }
 });
 
@@ -102,7 +129,7 @@ router.get("/sitemap.xml", async (req, res) => {
  * GET /sitemap-index.xml
  * Génère un sitemap index pour les gros sites
  */
-router.get("/sitemap-index.xml", async (req, res) => {
+router.get("/sitemap-index.xml", async (_req, res) => {
   try {
     const sitemaps = ["/sitemap.xml", "/sitemap-beats.xml", "/sitemap-categories.xml"];
 
@@ -111,9 +138,8 @@ router.get("/sitemap-index.xml", async (req, res) => {
     res.setHeader("Content-Type", "application/xml");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(sitemapIndexXML);
-  } catch (error: any) {
-    console.error("Error generating sitemap index:", error);
-    res.status(500).json({ error: "Failed to generate sitemap index" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate sitemap index");
   }
 });
 
@@ -121,16 +147,15 @@ router.get("/sitemap-index.xml", async (req, res) => {
  * GET /robots.txt
  * Génère le fichier robots.txt
  */
-router.get("/robots.txt", async (req, res) => {
+router.get("/robots.txt", async (_req, res) => {
   try {
     const robotsTxt = generateRobotsTxt(BASE_URL);
 
     res.setHeader("Content-Type", "text/plain");
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache 24 heures
     res.send(robotsTxt);
-  } catch (error: any) {
-    console.error("Error generating robots.txt:", error);
-    res.status(500).json({ error: "Failed to generate robots.txt" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate robots.txt");
   }
 });
 
@@ -138,27 +163,49 @@ router.get("/robots.txt", async (req, res) => {
  * GET /sitemap-beats.xml
  * Sitemap spécifique pour les beats uniquement
  */
-router.get("/sitemap-beats.xml", async (req, res) => {
+router.get("/sitemap-beats.xml", async (_req, res) => {
   try {
     const products = await wcApiRequest("/products?per_page=100");
 
-    const beats = products.map((product: any) => ({
-      id: product.id,
-      title: product.name,
-      description: product.description,
-      genre: product.categories?.[0]?.name || "Unknown",
-      bpm: product.bpm || product.meta_data?.find((meta: any) => meta.key === "bpm")?.value || null,
-      key: product.key || product.meta_data?.find((meta: any) => meta.key === "key")?.value || null,
-      mood:
-        product.mood || product.meta_data?.find((meta: any) => meta.key === "mood")?.value || null,
-      price: parseFloat(product.price) || 0,
-      image_url: product.images?.[0]?.src,
-      audio_url: product.audio_url,
-      tags: product.tags?.map((tag: any) => tag.name) || [],
-      duration: product.duration || null,
-      downloads: product.downloads || 0,
-      updated_at: product.date_modified || product.date_created,
-    }));
+    const beats: ProcessedBeatData[] = products.map((product: WooCommerceApiProduct) => {
+      // Extract BPM from product or meta_data
+      let bpm: number | undefined;
+      if (product.bpm) {
+        bpm = parseInt(product.bpm.toString());
+      } else {
+        const bpmMeta = product.meta_data?.find(meta => meta.key === "bpm");
+        if (bpmMeta?.value) {
+          bpm = parseInt(bpmMeta.value.toString());
+        }
+      }
+
+      return {
+        id: product.id,
+        title: product.name,
+        name: product.name, // Alias for compatibility
+        description: product.description,
+        genre: product.categories?.[0]?.name || "Unknown",
+        bpm,
+        key:
+          product.key ||
+          product.meta_data?.find(meta => meta.key === "key")?.value?.toString() ||
+          null,
+        mood:
+          product.mood ||
+          product.meta_data?.find(meta => meta.key === "mood")?.value?.toString() ||
+          null,
+        price: parseFloat(product.price) || 0,
+        image_url: product.images?.[0]?.src,
+        image: product.images?.[0]?.src, // Alias for compatibility
+        images: product.images,
+        audio_url: product.audio_url,
+        tags: product.tags?.map(tag => tag.name) || [],
+        categories: product.categories,
+        meta_data: product.meta_data,
+        duration: product.duration ? parseFloat(product.duration.toString()) : undefined,
+        downloads: product.downloads || 0,
+      };
+    });
 
     const sitemapXML = generateSitemapXML(beats, [], {
       baseUrl: BASE_URL,
@@ -170,9 +217,8 @@ router.get("/sitemap-beats.xml", async (req, res) => {
     res.setHeader("Content-Type", "application/xml");
     res.setHeader("Cache-Control", "public, max-age=1800"); // Cache 30 minutes
     res.send(sitemapXML);
-  } catch (error: any) {
-    console.error("Error generating beats sitemap:", error);
-    res.status(500).json({ error: "Failed to generate beats sitemap" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate beats sitemap");
   }
 });
 

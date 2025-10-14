@@ -1,3 +1,5 @@
+import type { NextFunction, Request, Response } from "express";
+
 // import { supabaseAdmin } from './supabaseAdmin'; // Removed - using Convex for data
 
 // System health monitoring
@@ -18,8 +20,35 @@ export interface SystemMetrics {
   lastCheck: string;
 }
 
+// Interface for system event logging
+export interface SystemEvent {
+  type: "error" | "warning" | "info";
+  service: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+// Interface for performance metrics data
+export interface PerformanceMetricsResult {
+  metrics: SystemMetrics;
+  healthChecks: HealthCheck[];
+}
+
+// Type for metric values stored in the metrics map
+export type MetricValue = string | number | boolean | object;
+
+// Extended Express interfaces for middleware
+interface ExtendedRequest extends Request {
+  path: string;
+}
+
+interface ExtendedResponse extends Response {
+  statusCode: number;
+  end: (...args: unknown[]) => this;
+}
+
 class MonitoringService {
-  private metrics: Map<string, any> = new Map();
+  private metrics: Map<string, MetricValue> = new Map();
   private healthChecks: HealthCheck[] = [];
   private requestCounts: Map<string, number> = new Map();
   private errorCounts: Map<string, number> = new Map();
@@ -56,13 +85,14 @@ class MonitoringService {
         responseTime,
         timestamp: new Date().toISOString(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown database error";
       return {
         service: "database",
         status: "down",
         responseTime: Date.now() - startTime,
         timestamp: new Date().toISOString(),
-        error: error.message,
+        error: errorMessage,
       };
     }
   }
@@ -97,13 +127,14 @@ class MonitoringService {
         responseTime,
         timestamp: new Date().toISOString(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown storage error";
       return {
         service: "storage",
         status: "down",
         responseTime: Date.now() - startTime,
         timestamp: new Date().toISOString(),
-        error: error.message,
+        error: errorMessage,
       };
     }
   }
@@ -131,13 +162,14 @@ class MonitoringService {
         responseTime,
         timestamp: new Date().toISOString(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown WooCommerce API error";
       return {
         service: "woocommerce",
         status: "down",
         responseTime: Date.now() - startTime,
         timestamp: new Date().toISOString(),
-        error: error.message,
+        error: errorMessage,
       };
     }
   }
@@ -198,7 +230,7 @@ class MonitoringService {
     return {
       uptime: process.uptime(),
       memoryUsage: process.memoryUsage(),
-      activeConnections: this.metrics.get("activeConnections") || 0,
+      activeConnections: (this.metrics.get("activeConnections") as number) || 0,
       requestsPerMinute,
       errorRate,
       lastCheck: new Date().toISOString(),
@@ -206,12 +238,7 @@ class MonitoringService {
   }
 
   // Log system events
-  async logSystemEvent(event: {
-    type: "error" | "warning" | "info";
-    service: string;
-    message: string;
-    details?: any;
-  }) {
+  async logSystemEvent(event: SystemEvent) {
     try {
       // TODO: Implement with Convex
       // await supabaseAdmin
@@ -237,7 +264,7 @@ class MonitoringService {
   }
 
   // Performance metrics collection
-  async collectPerformanceMetrics() {
+  async collectPerformanceMetrics(): Promise<PerformanceMetricsResult> {
     const metrics = this.getSystemMetrics();
     const healthChecks = await this.performHealthCheck();
 
@@ -276,31 +303,31 @@ class MonitoringService {
 
   // Express middleware for request tracking
   trackingMiddleware() {
-    return (req: any, res: any, next: any) => {
+    return (req: Request, res: Response, next: NextFunction) => {
       const startTime = Date.now();
       const originalEnd = res.end;
 
-      res.end = (...args: any[]) => {
+      res.end = (...args: unknown[]) => {
         const responseTime = Date.now() - startTime;
         const success = res.statusCode < 400;
 
-        this.trackRequest(req.path, success);
+        this.trackRequest((req as ExtendedRequest).path || req.url, success);
 
         // Log slow requests
         if (responseTime > 5000) {
           this.logSystemEvent({
             type: "warning",
             service: "api",
-            message: `Slow request detected: ${req.method} ${req.path}`,
+            message: `Slow request detected: ${req.method} ${(req as ExtendedRequest).path || req.url}`,
             details: {
               responseTime,
-              statusCode: res.statusCode,
-              userAgent: req.get("User-Agent"),
+              statusCode: (res as ExtendedResponse).statusCode,
+              userAgent: req.get ? req.get("User-Agent") : undefined,
             },
           }).catch(console.error);
         }
 
-        return originalEnd.apply(res, args);
+        return originalEnd.apply(res, args as Parameters<typeof originalEnd>);
       };
 
       next();

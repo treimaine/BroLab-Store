@@ -110,7 +110,7 @@ function fromDbOrder(row: {
 
 export interface IStorage {
   // Reservation management
-  createReservation(reservation: InsertReservation): Promise<Reservation>;
+  createReservation(reservation: InsertReservation & { clerkId?: string }): Promise<Reservation>;
   getReservation(id: string): Promise<Reservation | undefined>;
   getUserReservations(userId: string | number): Promise<Reservation[]>;
   updateReservationStatus(id: string, status: ReservationStatusEnum): Promise<Reservation>;
@@ -513,7 +513,9 @@ export class MemStorage implements IStorage {
   }
 
   // Reservation methods
-  async createReservation(reservation: InsertReservation): Promise<Reservation> {
+  async createReservation(
+    reservation: InsertReservation & { clerkId?: string }
+  ): Promise<Reservation> {
     const id = crypto.randomUUID();
     const newReservation: Reservation = {
       ...reservation,
@@ -565,7 +567,18 @@ export class MemStorage implements IStorage {
 
 export class DatabaseStorage implements IStorage {
   // Reservation methods
-  async createReservation(reservation: InsertReservation): Promise<Reservation> {
+  async createReservation(
+    reservation: InsertReservation & { clerkId?: string }
+  ): Promise<Reservation> {
+    console.log(
+      "🔄 DatabaseStorage: Creating reservation with clerkId:",
+      reservation.clerkId ? `${reservation.clerkId.substring(0, 8)}...` : "undefined"
+    );
+
+    if (!reservation.clerkId) {
+      throw new Error("Authentication error: clerkId is required for reservation creation");
+    }
+
     return await createReservation(reservation);
   }
 

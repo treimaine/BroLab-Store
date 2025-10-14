@@ -1,6 +1,7 @@
 // server/routes/woo.ts
 import { Request, Response, Router } from "express";
 import { fetchWooCategories, fetchWooProduct, fetchWooProducts } from "../services/woo";
+import { handleRouteError } from "../types/routes";
 import { WooCommerceMetaData, WooCommerceProduct } from "../types/woocommerce";
 
 const router = Router();
@@ -248,9 +249,8 @@ router.get("/products", async (req: Request, res: Response) => {
     });
 
     res.json(beats);
-  } catch (e) {
-    console.error("Error fetching products:", e);
-    res.status(500).json({ error: "Failed to fetch products" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to fetch products");
   }
 });
 
@@ -419,9 +419,8 @@ router.get("/products/:id", async (req, res, next): Promise<void> => {
     };
 
     res.json(beat);
-  } catch (e) {
-    console.error("Error fetching product:", e);
-    res.status(500).json({ error: "Failed to fetch product" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to fetch product");
   }
 });
 
@@ -449,9 +448,8 @@ router.get("/categories", async (_req, res, next) => {
 
     const cats = await fetchWooCategories();
     res.json({ categories: cats });
-  } catch (e) {
-    console.error("Error fetching categories:", e);
-    res.status(500).json({ error: "Failed to fetch categories" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to fetch categories");
   }
 });
 

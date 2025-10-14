@@ -2,6 +2,7 @@ import { Router } from "express";
 import { ErrorMessages } from "../../shared/constants/ErrorMessages";
 import monitoring from "../lib/monitoring";
 import { apiRateLimit } from "../middleware/rateLimiter";
+import { handleRouteError } from "../types/routes";
 
 const router = Router();
 
@@ -17,13 +18,7 @@ router.get("/health", apiRateLimit, async (req, res): Promise<void> => {
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    res.status(500).json({
-      status: "error",
-      message: "Health check failed",
-      error: errorMessage,
-      timestamp: new Date().toISOString(),
-    });
+    handleRouteError(error, res, "Health check failed");
   }
 });
 
@@ -52,12 +47,7 @@ router.get("/metrics", apiRateLimit, async (req, res): Promise<void> => {
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    res.status(500).json({
-      error: "Failed to collect metrics",
-      message: errorMessage,
-      timestamp: new Date().toISOString(),
-    });
+    handleRouteError(error, res, "Failed to collect metrics");
   }
 });
 
@@ -78,11 +68,7 @@ router.get("/status", async (req, res): Promise<void> => {
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
-    res.status(500).json({
-      status: "error",
-      message: error instanceof Error ? error.message : "Unknown error",
-      timestamp: new Date().toISOString(),
-    });
+    handleRouteError(error, res, "Failed to get system status");
   }
 });
 
@@ -120,12 +106,7 @@ router.post("/health/check", apiRateLimit, async (req, res): Promise<void> => {
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    res.status(500).json({
-      error: "Health check failed",
-      message: errorMessage,
-      timestamp: new Date().toISOString(),
-    });
+    handleRouteError(error, res, "Manual health check failed");
   }
 });
 

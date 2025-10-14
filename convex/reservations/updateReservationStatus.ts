@@ -6,6 +6,7 @@ export const updateReservationStatus = mutation({
     reservationId: v.id("reservations"),
     status: v.string(),
     notes: v.optional(v.string()),
+    skipEmailNotification: v.optional(v.boolean()), // For webhook updates to avoid duplicate emails
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -19,6 +20,9 @@ export const updateReservationStatus = mutation({
     if (!reservation) {
       throw new Error("Reservation not found");
     }
+
+    // Store old status for email notification
+    const oldStatus = reservation.status;
 
     // Vérifier que l'utilisateur est propriétaire de la réservation ou admin
     const userId = await ctx.db
@@ -41,6 +45,31 @@ export const updateReservationStatus = mutation({
       updatedAt: Date.now(),
     });
 
-    return { success: true };
+    // Send email notification if status changed and not skipped
+    if (!args.skipEmailNotification && oldStatus !== args.status) {
+      try {
+        // Schedule the email to be sent via action (non-blocking)
+        await ctx.scheduler.runAfter(
+          0,
+          "reservations/sendStatusUpdateEmail:sendReservationStatusUpdateEmail" as any,
+          {
+            reservationId: args.reservationId,
+            oldStatus,
+            newStatus: args.status,
+          }
+        );
+        console.log(
+          `📧 Status update email scheduled for reservation ${args.reservationId}: ${oldStatus} -> ${args.status}`
+        );
+      } catch (emailError) {
+        console.error(
+          `⚠️ Failed to schedule status update email for reservation ${args.reservationId}:`,
+          emailError
+        );
+        // Don't fail the status update if email scheduling fails
+      }
+    }
+
+    return { success: true, oldStatus, newStatus: args.status };
   },
 });

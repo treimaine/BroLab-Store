@@ -10,10 +10,15 @@ interface CheckoutSuccessData {
   sessionId?: string;
   amount?: number;
   metadata?: Record<string, string>;
+  services?: Array<{
+    serviceName: string;
+    reservationId: string;
+    price: number;
+  }>;
 }
 
 export default function CheckoutSuccess() {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [checkoutData, setCheckoutData] = useState<CheckoutSuccessData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -140,6 +145,41 @@ export default function CheckoutSuccess() {
                         </Badge>
                       </div>
                     )}
+                    {checkoutData.metadata.reservationIds && (
+                      <div className="col-span-full">
+                        <span className="text-gray-300">Reservation IDs:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {checkoutData.metadata.reservationIds.split(",").map((id, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {id.slice(-8)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Services Details */}
+              {checkoutData.services && checkoutData.services.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-400">Services Purchased</label>
+                  <div className="space-y-2">
+                    {checkoutData.services.map((service, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center p-3 bg-gray-800 rounded-lg"
+                      >
+                        <div>
+                          <p className="text-white font-medium">{service.serviceName}</p>
+                          <p className="text-gray-400 text-sm">
+                            ID: {service.reservationId.slice(-8)}
+                          </p>
+                        </div>
+                        <p className="text-green-400 font-bold">${service.price.toFixed(2)}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -154,25 +194,29 @@ export default function CheckoutSuccess() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Download className="w-6 h-6 text-blue-400" />
+              {checkoutData?.metadata?.cart_count && (
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Download className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <h3 className="text-white font-medium mb-2">Download Your Beats</h3>
+                  <p className="text-gray-400 text-sm">
+                    Access your purchased beats from your dashboard
+                  </p>
                 </div>
-                <h3 className="text-white font-medium mb-2">Download Your Beats</h3>
-                <p className="text-gray-400 text-sm">
-                  Access your purchased beats from your dashboard
-                </p>
-              </div>
+              )}
 
-              <div className="text-center">
-                <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Music className="w-6 h-6 text-purple-400" />
+              {checkoutData?.metadata?.services_count && (
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Music className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <h3 className="text-white font-medium mb-2">Service Confirmation</h3>
+                  <p className="text-gray-400 text-sm">
+                    We&apos;ll contact you within 24 hours to confirm your service booking
+                  </p>
                 </div>
-                <h3 className="text-white font-medium mb-2">Start Creating</h3>
-                <p className="text-gray-400 text-sm">
-                  Use your beats in your music production projects
-                </p>
-              </div>
+              )}
 
               <div className="text-center">
                 <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">

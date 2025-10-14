@@ -109,6 +109,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.warn("Schema router not available:", error);
   }
 
+  // Register internal API routes (for Convex actions and webhooks)
+  try {
+    const internalRouter = await import("./routes/internal");
+    app.use("/api/internal", internalRouter.default);
+    console.log("✅ Internal API routes registered successfully");
+  } catch (error) {
+    console.warn("Internal router not available:", error);
+  }
+
+  // Register reservations routes
+  try {
+    const reservationsRouter = await import("./routes/reservations");
+    app.use("/api/reservations", reservationsRouter.default);
+    console.log("✅ Reservations routes registered successfully");
+  } catch (error) {
+    console.warn("Reservations router not available:", error);
+  }
+
   // Payment endpoints now handled by Clerk/Convex
 
   // Subscription endpoints now handled by Clerk/Convex
