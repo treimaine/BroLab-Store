@@ -14,6 +14,102 @@ interface Order {
   status: string;
 }
 
+// Auth token options interface for Clerk integration
+interface ClerkTokenOptions {
+  template?: string;
+  leewayInSeconds?: number;
+  skipCache?: boolean;
+}
+
+// Clerk user interface for sync operations
+interface ClerkUserForSync {
+  id: string;
+  sessionId?: string;
+  getToken?: (options?: ClerkTokenOptions) => Promise<string | null>;
+  [key: string]: unknown;
+}
+
+// Sync statistics interface
+interface SyncStats {
+  products: {
+    total: number;
+    active: number;
+    featured: number;
+  };
+  orders: {
+    total: number;
+    byStatus: Record<string, number>;
+  };
+}
+
+// Convex sync result interfaces
+interface ConvexSyncResult {
+  length: number;
+  action?: string;
+  [key: string]: unknown;
+}
+
+interface ConvexProductsQueryResult {
+  page: Product[];
+  [key: string]: unknown;
+}
+
+interface ConvexOrdersQueryResult {
+  page: Order[];
+  [key: string]: unknown;
+}
+
+// Convex function names for server-side usage
+const CONVEX_FUNCTIONS = {
+  SYNC_WORDPRESS_PRODUCTS: "sync/wordpress:syncWordPressProducts",
+  SYNC_WOOCOMMERCE_ORDERS: "sync/woocommerce:syncWooCommerceOrders",
+  SYNC_CLERK_USER: "users/clerkSync:syncClerkUser",
+  GET_SYNCED_PRODUCTS: "sync/wordpress:getSyncedProducts",
+  GET_SYNCED_ORDERS: "sync/woocommerce:getSyncedOrders",
+} as const;
+
+// Server-side Convex client interface for string-based function calls
+interface ServerConvexClient {
+  mutation: (functionName: string, args: Record<string, unknown>) => Promise<unknown>;
+  query: (functionName: string, args: Record<string, unknown>) => Promise<unknown>;
+}
+
+// Type-safe wrapper for Convex mutations using string-based function names
+async function callConvexMutation<T>(
+  client: ConvexHttpClient,
+  functionName: string,
+  args: Record<string, unknown>
+): Promise<T> {
+  try {
+    // Server-side Convex calls require explicit typing due to generated API limitations
+    // This is the recommended approach for server-side integration
+    const serverClient = client as unknown as ServerConvexClient;
+    const result = await serverClient.mutation(functionName, args);
+    return result as T;
+  } catch (error) {
+    console.error(`Convex mutation ${functionName} failed:`, error);
+    throw error;
+  }
+}
+
+// Type-safe wrapper for Convex queries using string-based function names
+async function callConvexQuery<T>(
+  client: ConvexHttpClient,
+  functionName: string,
+  args: Record<string, unknown>
+): Promise<T> {
+  try {
+    // Server-side Convex calls require explicit typing due to generated API limitations
+    // This is the recommended approach for server-side integration
+    const serverClient = client as unknown as ServerConvexClient;
+    const result = await serverClient.query(functionName, args);
+    return result as T;
+  } catch (error) {
+    console.error(`Convex query ${functionName} failed:`, error);
+    throw error;
+  }
+}
+
 // Configuration Convex
 const convexUrl = process.env.VITE_CONVEX_URL || "https://agile-boar-163.convex.cloud";
 const convex = new ConvexHttpClient(convexUrl);
@@ -70,9 +166,13 @@ export async function syncWordPressToConvex(): Promise<SyncResult> {
     );
 
     // Synchroniser avec Convex
-    const result = await convex.mutation("sync:wordpress:syncWordPressProducts" as any, {
-      products: productsForConvex,
-    });
+    const result = await callConvexMutation<ConvexSyncResult>(
+      convex,
+      CONVEX_FUNCTIONS.SYNC_WORDPRESS_PRODUCTS,
+      {
+        products: productsForConvex,
+      }
+    );
 
     console.log(`✅ WordPress sync completed: ${result.length} products processed`);
 
@@ -127,9 +227,13 @@ export async function syncWooCommerceToConvex(): Promise<SyncResult> {
     }));
 
     // Synchroniser avec Convex
-    const result = await convex.mutation("sync:woocommerce:syncWooCommerceOrders" as any, {
-      orders: ordersForConvex,
-    });
+    const result = await callConvexMutation<ConvexSyncResult>(
+      convex,
+      CONVEX_FUNCTIONS.SYNC_WOOCOMMERCE_ORDERS,
+      {
+        orders: ordersForConvex,
+      }
+    );
 
     console.log(`✅ WooCommerce sync completed: ${result.length} orders processed`);
 
@@ -149,23 +253,22 @@ export async function syncWooCommerceToConvex(): Promise<SyncResult> {
 }
 
 // Synchroniser un utilisateur Clerk avec Convex
-export async function syncClerkUserToConvex(clerkUser: {
-  id: string;
-  sessionId?: string;
-  getToken?: (options?: any) => Promise<string | null>;
-  [key: string]: unknown;
-}): Promise<SyncResult> {
+export async function syncClerkUserToConvex(clerkUser: ClerkUserForSync): Promise<SyncResult> {
   try {
     console.log(`🔄 Syncing Clerk user: ${clerkUser.id}`);
 
-    const result = await convex.mutation("users:clerkSync:syncClerkUser" as any, {
-      clerkId: clerkUser.id,
-      email: "", // Will be updated when full user data is available
-      username: undefined,
-      firstName: undefined,
-      lastName: undefined,
-      imageUrl: undefined,
-    });
+    const result = await callConvexMutation<ConvexSyncResult>(
+      convex,
+      CONVEX_FUNCTIONS.SYNC_CLERK_USER,
+      {
+        clerkId: clerkUser.id,
+        email: "", // Will be updated when full user data is available
+        username: undefined,
+        firstName: undefined,
+        lastName: undefined,
+        imageUrl: undefined,
+      }
+    );
 
     console.log(`✅ Clerk user sync completed: ${result.action}`);
 
@@ -214,23 +317,27 @@ export async function performFullSync(): Promise<SyncResult> {
 }
 
 // Obtenir les statistiques de synchronisation
-export async function getSyncStats(): Promise<any> {
+export async function getSyncStats(): Promise<SyncStats | null> {
   try {
     const [products, orders] = await Promise.all([
-      convex.query("sync:wordpress:getSyncedProducts" as any, { limit: 1000 }),
-      convex.query("sync:woocommerce:getSyncedOrders" as any, { limit: 1000 }),
+      callConvexQuery<ConvexProductsQueryResult>(convex, CONVEX_FUNCTIONS.GET_SYNCED_PRODUCTS, {
+        limit: 1000,
+      }),
+      callConvexQuery<ConvexOrdersQueryResult>(convex, CONVEX_FUNCTIONS.GET_SYNCED_ORDERS, {
+        limit: 1000,
+      }),
     ]);
 
     return {
       products: {
         total: products.page.length,
-        active: products.page.filter((p: Product) => p.isActive).length,
-        featured: products.page.filter((p: Product) => p.featured).length,
+        active: products.page.filter(p => p.isActive).length,
+        featured: products.page.filter(p => p.featured).length,
       },
       orders: {
         total: orders.page.length,
         byStatus: orders.page.reduce(
-          (acc: Record<string, number>, order: Order) => {
+          (acc: Record<string, number>, order) => {
             acc[order.status] = (acc[order.status] || 0) + 1;
             return acc;
           },

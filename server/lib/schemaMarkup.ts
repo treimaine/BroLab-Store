@@ -1,4 +1,4 @@
-import type { BeatProduct } from "@shared/schema";
+import type { ProcessedBeatData } from "../types/routes";
 
 export interface SchemaMarkupOptions {
   includeOffers?: boolean;
@@ -6,16 +6,66 @@ export interface SchemaMarkupOptions {
   includeReview?: boolean;
 }
 
+// Schema.org JSON-LD type definitions for better type safety
+// Using a more flexible approach that allows for proper JSON-LD structure
+
+export interface JsonLdObject {
+  "@context"?: string;
+  "@type": string;
+  "@id"?: string;
+  [key: string]: unknown;
+}
+
+export interface MusicRecordingSchema extends JsonLdObject {
+  "@type": "MusicRecording";
+  "@context": string;
+  name: string;
+  description?: string;
+  url?: string;
+  image?: string;
+  genre?: string;
+  duration?: string;
+  byArtist?: JsonLdObject;
+  inAlbum?: JsonLdObject;
+  audio?: JsonLdObject;
+  additionalProperty?: JsonLdObject[];
+  offers?: JsonLdObject;
+  aggregateRating?: JsonLdObject;
+}
+
+export interface MusicAlbumSchema extends JsonLdObject {
+  "@type": "MusicAlbum";
+  "@context": string;
+  name: string;
+  description?: string;
+  url?: string;
+  byArtist?: JsonLdObject;
+  tracks?: JsonLdObject[];
+  offers?: JsonLdObject;
+}
+
+export interface OrganizationSchema extends JsonLdObject {
+  "@type": "Organization";
+  "@context": string;
+  name: string;
+  url?: string;
+  logo?: string;
+  description?: string;
+  sameAs?: string[];
+  contactPoint?: JsonLdObject;
+  address?: JsonLdObject;
+}
+
 /**
  * Génère le Schema markup JSON-LD pour un beat
  * Basé sur les données WooCommerce (BPM, genre, producteur, prix)
  */
 export function generateBeatSchemaMarkup(
-  beat: BeatProduct,
+  beat: ProcessedBeatData,
   baseUrl: string,
   options: SchemaMarkupOptions = {}
 ): string {
-  const schema: any = {
+  const schema: MusicRecordingSchema = {
     "@context": "https://schema.org",
     "@type": "MusicRecording",
     "@id": `${baseUrl}/product/${beat.id}`,
@@ -30,15 +80,10 @@ export function generateBeatSchemaMarkup(
     byArtist: {
       "@type": "MusicGroup",
       name: (() => {
-        const producerTag = beat.tags?.find(tag => {
-          const tagName = typeof tag === "string" ? tag : tag.name;
-          return tagName.toLowerCase().includes("producer");
+        const producerTag = beat.tags?.find((tag: string) => {
+          return tag.toLowerCase().includes("producer");
         });
-        return producerTag
-          ? typeof producerTag === "string"
-            ? producerTag
-            : producerTag.name
-          : "BroLab Entertainment";
+        return producerTag || "BroLab Entertainment";
       })(),
     },
     inAlbum: {
@@ -109,11 +154,11 @@ export function generateBeatSchemaMarkup(
  * Génère le Schema markup pour une liste de beats (MusicAlbum)
  */
 export function generateBeatsListSchemaMarkup(
-  beats: BeatProduct[],
+  beats: ProcessedBeatData[],
   baseUrl: string,
   pageTitle: string = "BroLab Beats"
 ): string {
-  const schema = {
+  const schema: MusicAlbumSchema = {
     "@context": "https://schema.org",
     "@type": "MusicAlbum",
     name: pageTitle,
@@ -150,7 +195,7 @@ export function generateBeatsListSchemaMarkup(
  * Génère le Schema markup pour l'organisation BroLab
  */
 export function generateOrganizationSchemaMarkup(baseUrl: string): string {
-  const schema = {
+  const schema: OrganizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: "BroLab Entertainment",

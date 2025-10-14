@@ -8,6 +8,7 @@ import {
   syncWooCommerceToConvex,
   syncWordPressToConvex,
 } from "../services/convexSync";
+import { handleRouteError } from "../types/routes";
 
 const router = express.Router();
 
@@ -31,13 +32,8 @@ router.post("/wordpress", isAuthenticated, async (req, res): Promise<void> => {
         errors: result.errors,
       });
     }
-  } catch (error) {
-    console.error("❌ WordPress sync route error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error during WordPress sync",
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "WordPress sync failed");
   }
 });
 
@@ -61,13 +57,8 @@ router.post("/woocommerce", isAuthenticated, async (req, res): Promise<void> => 
         errors: result.errors,
       });
     }
-  } catch (error) {
-    console.error("❌ WooCommerce sync route error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error during WooCommerce sync",
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "WooCommerce sync failed");
   }
 });
 
@@ -91,13 +82,8 @@ router.post("/full", isAuthenticated, async (req, res): Promise<void> => {
         errors: result.errors,
       });
     }
-  } catch (error) {
-    console.error("❌ Full sync route error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error during full sync",
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Full sync failed");
   }
 });
 
@@ -119,13 +105,8 @@ router.get("/stats", isAuthenticated, async (req, res): Promise<void> => {
         message: "Failed to retrieve sync statistics",
       });
     }
-  } catch (error) {
-    console.error("❌ Sync stats route error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error retrieving sync stats",
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to retrieve sync stats");
   }
 });
 
@@ -158,13 +139,8 @@ router.post("/user", isAuthenticated, async (req, res): Promise<void> => {
         errors: result.errors,
       });
     }
-  } catch (error) {
-    console.error("❌ User sync route error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error during user sync",
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "User sync failed");
   }
 });
 
@@ -186,13 +162,8 @@ router.get("/status", async (req, res): Promise<void> => {
       success: true,
       status,
     });
-  } catch (error) {
-    console.error("❌ Sync status route error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to get sync status",
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to get sync status");
   }
 });
 

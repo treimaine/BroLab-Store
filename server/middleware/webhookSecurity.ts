@@ -1,16 +1,64 @@
 import { NextFunction, Request, Response } from "express";
 import { webhookValidator } from "../lib/webhookValidator";
 
+// Webhook payload types based on provider
+export interface StripeWebhookPayload {
+  id: string;
+  object: "event";
+  type: string;
+  data: {
+    object: Record<string, unknown>;
+  };
+  created: number;
+  livemode: boolean;
+  pending_webhooks: number;
+  request: {
+    id: string | null;
+    idempotency_key: string | null;
+  } | null;
+}
+
+export interface ClerkWebhookPayload {
+  type: string;
+  object: "event";
+  data: Record<string, unknown>;
+}
+
+export interface PayPalWebhookPayload {
+  id: string;
+  event_type: string;
+  resource_type: string;
+  summary: string;
+  resource: Record<string, unknown>;
+  create_time: string;
+  event_version: string;
+}
+
+// Union type for all supported webhook payloads
+export type WebhookPayload =
+  | StripeWebhookPayload
+  | ClerkWebhookPayload
+  | PayPalWebhookPayload
+  | Record<string, unknown>;
+
+// Webhook validation result interface
+export interface WebhookValidationResult {
+  provider: string;
+  payload: WebhookPayload;
+  timestamp?: number;
+  isValid: boolean;
+  errors: string[];
+}
+
+// Custom validation function type
+export type WebhookCustomValidation = (
+  payload: WebhookPayload
+) => Promise<{ valid: boolean; errors: string[] }>;
+
 // Extend Express Request to include webhook validation results
 declare module "express-serve-static-core" {
   interface Request {
-    webhookValidation?: {
-      provider: string;
-      payload: any;
-      timestamp?: number;
-      isValid: boolean;
-      errors: string[];
-    };
+    webhookValidation?: WebhookValidationResult;
   }
 }
 
@@ -18,7 +66,7 @@ export interface WebhookSecurityOptions {
   provider: string;
   required?: boolean;
   skipInTest?: boolean;
-  customValidation?: (payload: any) => Promise<{ valid: boolean; errors: string[] }>;
+  customValidation?: WebhookCustomValidation;
 }
 
 /**
@@ -99,7 +147,7 @@ export function webhookSecurity(options: WebhookSecurityOptions) {
       );
 
       // Run custom validation if provided
-      if (customValidation && validationResult.valid) {
+      if (customValidation && validationResult.valid && validationResult.payload) {
         const customResult = await customValidation(validationResult.payload);
         if (!customResult.valid) {
           validationResult.valid = false;
@@ -110,7 +158,7 @@ export function webhookSecurity(options: WebhookSecurityOptions) {
       // Store validation results in request
       req.webhookValidation = {
         provider,
-        payload: validationResult.payload,
+        payload: validationResult.payload || {},
         timestamp: validationResult.timestamp,
         isValid: validationResult.valid,
         errors: validationResult.errors,
@@ -236,13 +284,29 @@ export function webhookRateLimit(
   };
 }
 
+// Webhook response interface for idempotency storage
+export interface WebhookResponse {
+  received?: boolean;
+  processed?: boolean;
+  synced?: boolean;
+  error?: string;
+  message?: string;
+  [key: string]: unknown;
+}
+
+// Idempotency storage entry interface
+export interface IdempotencyEntry {
+  timestamp: number;
+  response: WebhookResponse;
+}
+
 /**
  * Idempotency middleware for webhooks
  */
 export function webhookIdempotency(
   options: {
     keyExtractor: (req: Request) => string | null;
-    storage?: Map<string, { timestamp: number; response: any }>;
+    storage?: Map<string, IdempotencyEntry>;
     ttl?: number;
   } = {
     keyExtractor: () => null,
@@ -250,7 +314,7 @@ export function webhookIdempotency(
   }
 ) {
   const { keyExtractor, ttl = 24 * 60 * 60 * 1000 } = options;
-  const storage = options.storage || new Map<string, { timestamp: number; response: any }>();
+  const storage = options.storage || new Map<string, IdempotencyEntry>();
 
   return (req: Request, res: Response, next: NextFunction): void => {
     const idempotencyKey = keyExtractor(req);
@@ -271,7 +335,7 @@ export function webhookIdempotency(
 
     // Store original res.json to capture response
     const originalJson = res.json.bind(res);
-    res.json = function (body: any) {
+    res.json = function (body: WebhookResponse) {
       // Store the response for future duplicate requests
       storage.set(idempotencyKey, {
         timestamp: now,
@@ -315,18 +379,24 @@ export function webhookSecurityHeaders(_req: Request, res: Response, next: NextF
   next();
 }
 
+// Webhook security stack options interface
+export interface WebhookSecurityStackOptions {
+  required?: boolean;
+  skipInTest?: boolean;
+  rateLimit?: {
+    windowMs?: number;
+    maxRequests?: number;
+  };
+  idempotencyKeyExtractor?: (req: Request) => string | null;
+  customValidation?: WebhookCustomValidation;
+}
+
 /**
  * Comprehensive webhook security middleware stack
  */
 export function createWebhookSecurityStack(
   provider: string,
-  options: {
-    required?: boolean;
-    skipInTest?: boolean;
-    rateLimit?: { windowMs?: number; maxRequests?: number };
-    idempotencyKeyExtractor?: (req: Request) => string | null;
-    customValidation?: (payload: any) => Promise<{ valid: boolean; errors: string[] }>;
-  } = {}
+  options: WebhookSecurityStackOptions = {}
 ) {
   const middlewares = [webhookSecurityHeaders, webhookRateLimit(options.rateLimit)];
 

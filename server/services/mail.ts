@@ -9,6 +9,20 @@ export interface MailPayload {
   replyTo?: string;
 }
 
+export interface EmailRetryOptions {
+  maxRetries?: number;
+  baseDelay?: number;
+  maxDelay?: number;
+  backoffFactor?: number;
+}
+
+export interface EmailDeliveryResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+  attempts: number;
+}
+
 // Configuration du transporteur SMTP
 const createTransporter = (): Transporter => {
   return nodemailer.createTransport({
@@ -36,6 +50,19 @@ const getTransporter = (): Transporter => {
   return transporter;
 };
 
+// Sleep utility for retry delays
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+// Calculate exponential backoff delay
+const calculateDelay = (attempt: number, options: EmailRetryOptions): number => {
+  const baseDelay = options.baseDelay || 1000;
+  const backoffFactor = options.backoffFactor || 2;
+  const maxDelay = options.maxDelay || 30000;
+
+  const delay = baseDelay * Math.pow(backoffFactor, attempt - 1);
+  return Math.min(delay, maxDelay);
+};
+
 // Strip HTML to create text fallback
 const stripHTML = (html: string): string => {
   return html
@@ -48,38 +75,117 @@ const stripHTML = (html: string): string => {
     .trim();
 };
 
-// Main send mail function
-export async function sendMail(payload: MailPayload): Promise<string> {
-  try {
-    // Handle DRY_RUN mode
-    if (process.env.MAIL_DRY_RUN === "true") {
-      console.log("📧 MAIL DRY RUN:", {
+// Enhanced send mail function with retry logic
+export async function sendMail(
+  payload: MailPayload,
+  retryOptions?: EmailRetryOptions
+): Promise<string> {
+  const options: EmailRetryOptions = {
+    maxRetries: 3,
+    baseDelay: 1000,
+    maxDelay: 30000,
+    backoffFactor: 2,
+    ...retryOptions,
+  };
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= (options.maxRetries || 3); attempt++) {
+    try {
+      // Handle DRY_RUN mode
+      if (process.env.MAIL_DRY_RUN === "true") {
+        console.log("📧 MAIL DRY RUN:", {
+          to: payload.to,
+          subject: payload.subject,
+          from: payload.from || process.env.DEFAULT_FROM,
+          attempt,
+        });
+        return "dry-run-message-id";
+      }
+
+      const transporter = getTransporter();
+
+      const mailOptions = {
+        from:
+          payload.from || process.env.DEFAULT_FROM || "BroLab <contact@brolabentertainment.com>",
         to: payload.to,
         subject: payload.subject,
-        from: payload.from || process.env.DEFAULT_FROM,
-      });
-      return "dry-run-message-id";
+        html: payload.html,
+        text: payload.text || stripHTML(payload.html),
+        replyTo: payload.replyTo,
+      };
+
+      const result = await transporter.sendMail(mailOptions);
+      console.log(`✅ Email sent successfully on attempt ${attempt}:`, result.messageId);
+      return result.messageId;
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(
+        `⚠️ Email sending failed on attempt ${attempt}/${options.maxRetries}:`,
+        lastError.message
+      );
+
+      // Don't retry on the last attempt
+      if (attempt === options.maxRetries) {
+        break;
+      }
+
+      // Calculate delay and wait before retry
+      const delay = calculateDelay(attempt, options);
+      console.log(`⏳ Retrying in ${delay}ms...`);
+      await sleep(delay);
     }
-
-    const transporter = getTransporter();
-
-    const mailOptions = {
-      from: payload.from || process.env.DEFAULT_FROM || "BroLab <contact@brolabentertainment.com>",
-      to: payload.to,
-      subject: payload.subject,
-      html: payload.html,
-      text: payload.text || stripHTML(payload.html),
-      replyTo: payload.replyTo,
-    };
-
-    const result = await transporter.sendMail(mailOptions);
-    console.log("✅ Email sent successfully:", result.messageId);
-    return result.messageId;
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("❌ Failed to send email:", errorMessage);
-    throw new Error(`Email sending failed: ${errorMessage}`);
   }
+
+  // All attempts failed
+  const errorMessage = lastError?.message || "Unknown error";
+  console.error("❌ All email sending attempts failed:", errorMessage);
+  throw new Error(`Email sending failed after ${options.maxRetries} attempts: ${errorMessage}`);
+}
+
+// Send mail with detailed result tracking
+export async function sendMailWithResult(
+  payload: MailPayload,
+  retryOptions?: EmailRetryOptions
+): Promise<EmailDeliveryResult> {
+  const options: EmailRetryOptions = {
+    maxRetries: 3,
+    baseDelay: 1000,
+    maxDelay: 30000,
+    backoffFactor: 2,
+    ...retryOptions,
+  };
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= (options.maxRetries || 3); attempt++) {
+    try {
+      const messageId = await sendMail(payload, { maxRetries: 1 }); // Single attempt per call
+      return {
+        success: true,
+        messageId,
+        attempts: attempt,
+      };
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry on the last attempt
+      if (attempt === options.maxRetries) {
+        break;
+      }
+
+      // Calculate delay and wait before retry
+      const delay = calculateDelay(attempt, options);
+      await sleep(delay);
+    }
+  }
+
+  // All attempts failed
+  return {
+    success: false,
+    error: lastError?.message || "Unknown error",
+    attempts: options.maxRetries || 3,
+  };
 }
 
 // Send admin notification

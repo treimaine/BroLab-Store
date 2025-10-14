@@ -1,5 +1,5 @@
 import { useCartContext } from "@/components/cart-provider";
-import { ClerkPaymentForm } from "@/components/ClerkPaymentForm";
+import { EnhancedPaymentForm } from "@/components/EnhancedPaymentForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -321,9 +321,10 @@ export default function Checkout() {
                 </Button>
               </div>
             ) : (
-              <ClerkPaymentForm
+              <EnhancedPaymentForm
                 amount={total}
                 currency="usd"
+                pendingServices={pendingServices}
                 metadata={{
                   services_count: pendingServices.length.toString(),
                   services_total: pendingServices

@@ -7,11 +7,22 @@ import {
   generateStaticPageOpenGraph,
   type OpenGraphConfig,
 } from "../lib/openGraphGenerator";
+import { handleRouteError, ProcessedBeatData } from "../types/routes";
+import type {
+  WooCommerceCategory,
+  WooCommerceImage,
+  WooCommerceMetaData,
+  WooCommerceProduct,
+  WooCommerceTag,
+} from "../types/woocommerce";
 
 const router = Router();
 
 // WooCommerce API helpers
-async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
+async function wcApiRequest(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<WooCommerceProduct> {
   const WOOCOMMERCE_API_URL =
     process.env.WOOCOMMERCE_API_URL || "https://brolabentertainment.com/wp-json/wc/v3";
   const WC_CONSUMER_KEY = process.env.WOOCOMMERCE_CONSUMER_KEY;
@@ -20,7 +31,7 @@ async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
   if (!WC_CONSUMER_KEY || !WC_CONSUMER_SECRET) {
     if (process.env.NODE_ENV === "test") {
       // Return a minimal shape for tests
-      return {} as any;
+      return {} as WooCommerceProduct;
     }
     throw new Error("WooCommerce API credentials not configured");
   }
@@ -29,9 +40,21 @@ async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
   url.searchParams.append("consumer_key", WC_CONSUMER_KEY);
   url.searchParams.append("consumer_secret", WC_CONSUMER_SECRET);
 
-  const response =
+  interface MockResponse {
+    ok: boolean;
+    status: number;
+    statusText: string;
+    json(): Promise<WooCommerceProduct>;
+  }
+
+  const response: Response | MockResponse =
     process.env.NODE_ENV === "test"
-      ? ({ ok: true, status: 200, statusText: "OK", json: async () => ({}) } as any)
+      ? ({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          json: async () => ({}) as WooCommerceProduct,
+        } as MockResponse)
       : await fetch(url.toString(), {
           ...options,
           headers: {
@@ -66,38 +89,66 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
     const beatId = req.params.id;
 
     // Récupérer les données du beat depuis WooCommerce
-    let product;
+    let product: WooCommerceProduct;
     try {
       product = await wcApiRequest(`/products/${beatId}`);
-    } catch (error: any) {
-      if (error.message?.includes("404")) {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message?.includes("404")) {
         res.status(404).json({ error: "Beat not found" });
-      return;
+        return;
       }
       throw error;
     }
 
-    if (!product) {
+    if (!product || !product.id) {
       res.status(404).json({ error: "Beat not found" });
       return;
     }
 
+    // Helper function to extract BPM from meta data
+    const extractBpmFromMeta = (metaData: WooCommerceMetaData[]): number | undefined => {
+      const bpmMeta = metaData.find((meta: WooCommerceMetaData) => meta.key === "bpm");
+      return bpmMeta?.value ? parseInt(bpmMeta.value.toString()) : undefined;
+    };
+
+    // Helper function to extract string value from meta data
+    const extractStringFromMeta = (metaData: WooCommerceMetaData[], key: string): string | null => {
+      const meta = metaData.find((meta: WooCommerceMetaData) => meta.key === key);
+      return meta?.value?.toString() || null;
+    };
+
     // Transformer les données WooCommerce
-    const beat = {
+    const beat: ProcessedBeatData = {
       id: product.id,
       title: product.name,
+      name: product.name, // Alias for compatibility
       description: product.description,
       genre: product.categories?.[0]?.name || "Unknown",
-      bpm: product.bpm || product.meta_data?.find((meta: any) => meta.key === "bpm")?.value || null,
-      key: product.key || product.meta_data?.find((meta: any) => meta.key === "key")?.value || null,
+      bpm: product.bpm
+        ? parseInt(product.bpm.toString())
+        : product.meta_data
+          ? extractBpmFromMeta(product.meta_data)
+          : undefined,
+      key:
+        product.key || (product.meta_data ? extractStringFromMeta(product.meta_data, "key") : null),
       mood:
-        product.mood || product.meta_data?.find((meta: any) => meta.key === "mood")?.value || null,
+        product.mood ||
+        (product.meta_data ? extractStringFromMeta(product.meta_data, "mood") : null),
       price: parseFloat(product.price) || 0,
       image_url: product.images?.[0]?.src,
-      audio_url: product.audio_url,
-      tags: product.tags?.map((tag: any) => tag.name) || [],
-      duration: product.duration || null,
-      downloads: product.downloads || 0,
+      image: product.images?.[0]?.src, // Alias for compatibility
+      images: product.images?.map((img: WooCommerceImage) => ({ src: img.src, alt: img.alt })),
+      audio_url: product.audio_url || undefined,
+      tags: product.tags?.map((tag: WooCommerceTag) => tag.name) || [],
+      categories: product.categories?.map((cat: WooCommerceCategory) => ({
+        id: cat.id,
+        name: cat.name,
+      })),
+      meta_data: product.meta_data,
+      duration: product.duration ? parseFloat(product.duration.toString()) : undefined,
+      downloads: Array.isArray(product.downloads)
+        ? product.downloads.length
+        : product.downloads || 0,
     };
 
     // Générer les meta tags Open Graph
@@ -108,9 +159,8 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", "public, max-age=3600"); // Cache 1 heure
     res.send(openGraphHTML);
-  } catch (error: any) {
-    console.error("Error generating Open Graph for beat:", error);
-    res.status(500).json({ error: "Failed to generate Open Graph" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate Open Graph for beat");
   }
 });
 
@@ -126,9 +176,8 @@ router.get("/shop", async (req, res): Promise<void> => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(openGraphHTML);
-  } catch (error: any) {
-    console.error("Error generating Open Graph for shop:", error);
-    res.status(500).json({ error: "Failed to generate Open Graph" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate Open Graph for shop");
   }
 });
 
@@ -144,9 +193,8 @@ router.get("/home", async (req, res): Promise<void> => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(openGraphHTML);
-  } catch (error: any) {
-    console.error("Error generating Open Graph for home:", error);
-    res.status(500).json({ error: "Failed to generate Open Graph" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate Open Graph for home");
   }
 });
 
@@ -171,9 +219,8 @@ router.get("/page/:pageName", async (req, res): Promise<void> => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(openGraphHTML);
-  } catch (error: any) {
-    console.error("Error generating Open Graph for page:", error);
-    res.status(500).json({ error: "Failed to generate Open Graph" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate Open Graph for page");
   }
 });
 

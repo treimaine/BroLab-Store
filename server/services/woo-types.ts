@@ -6,19 +6,13 @@
  */
 
 import { z } from "zod";
+import type { WooCommerceMetaData } from "../../shared/types";
 
 // ================================
 // WOOCOMMERCE API TYPES
 // ================================
 
-/**
- * WooCommerce API response metadata
- */
-export interface WooCommerceMetaData {
-  id: number;
-  key: string;
-  value: string | number | boolean | string[] | null;
-}
+// WooCommerceMetaData is imported from shared types to avoid conflicts
 
 /**
  * WooCommerce product category

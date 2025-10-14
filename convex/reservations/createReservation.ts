@@ -12,52 +12,117 @@ export const createReservation = mutation({
     clerkId: v.optional(v.string()), // For server-side calls
   },
   handler: async (ctx, args) => {
+    console.log(`🔄 Convex: Creating reservation for service: ${args.serviceType}`);
+    console.log(
+      `🔄 Convex: ClerkId provided: ${args.clerkId ? `${args.clerkId.substring(0, 8)}...` : "none"}`
+    );
+
     let userId;
 
     if (args.clerkId) {
       // Server-side call with explicit clerkId
-      const clerkId = args.clerkId; // Type narrowing by assigning to local constant
+      const clerkId = args.clerkId;
+      console.log(`🔍 Convex: Looking up user with clerkId: ${clerkId.substring(0, 8)}...`);
+
       const user = await ctx.db
         .query("users")
         .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
         .first();
 
       if (!user) {
-        throw new Error("User not found");
+        // Automatic user creation for server-side calls when user doesn't exist
+        console.log(`🆕 Convex: Creating new user for clerkId: ${clerkId.substring(0, 8)}...`);
+
+        const userDetails = args.details as {
+          name?: string;
+          email?: string;
+          [key: string]: unknown;
+        };
+        const name = userDetails.name || "";
+        const nameParts = name.split(" ");
+
+        try {
+          userId = await ctx.db.insert("users", {
+            clerkId: clerkId,
+            email: userDetails.email || "",
+            firstName: nameParts[0] || "User",
+            lastName: nameParts.slice(1).join(" ") || "",
+            name: name,
+            role: "user",
+            isActive: true,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+          console.log(`✅ Convex: User created successfully with ID: ${userId}`);
+        } catch (createError) {
+          console.error("❌ Convex: Failed to create user:", createError);
+          throw new Error(
+            `Authentication failed: Unable to create user account for clerkId ${clerkId.substring(0, 8)}... Please ensure you are properly authenticated.`
+          );
+        }
+      } else {
+        userId = user._id;
+        console.log(`✅ Convex: Found existing user with ID: ${userId}`);
       }
-      userId = user._id;
     } else {
       // Client-side call with authentication
+      console.log(`🔍 Convex: Using client-side authentication`);
       const identity = await ctx.auth.getUserIdentity();
 
       if (!identity) {
-        throw new Error("Not authenticated");
+        console.error("❌ Convex: No identity found for client-side call");
+        throw new Error("Authentication required: Please log in to create a reservation.");
       }
 
+      console.log(
+        `🔍 Convex: Looking up user with identity subject: ${identity.subject.substring(0, 8)}...`
+      );
       const user = await ctx.db
         .query("users")
         .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
         .first();
 
       if (!user) {
-        throw new Error("User not found");
+        console.error(
+          `❌ Convex: User not found for identity: ${identity.subject.substring(0, 8)}...`
+        );
+        throw new Error("User account not found: Please ensure your account is properly set up.");
       }
       userId = user._id;
+      console.log(`✅ Convex: Found user via identity with ID: ${userId}`);
     }
 
-    const reservationId = await ctx.db.insert("reservations", {
-      userId: userId,
-      serviceType: args.serviceType,
-      status: "pending",
-      details: args.details,
-      preferredDate: args.preferredDate,
-      durationMinutes: args.durationMinutes,
-      totalPrice: args.totalPrice,
-      notes: args.notes,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
+    try {
+      console.log(`🔄 Convex: Inserting reservation into database`);
+      
+      // Normalize details object to ensure referenceLinks is in camelCase
+      // This handles both reference_links (snake_case) and referenceLinks (camelCase)
+      const normalizedDetails = { ...args.details };
+      if ('reference_links' in normalizedDetails) {
+        normalizedDetails.referenceLinks = normalizedDetails.reference_links;
+        delete normalizedDetails.reference_links;
+      }
+      
+      const reservationId = await ctx.db.insert("reservations", {
+        userId: userId,
+        serviceType: args.serviceType,
+        status: "pending",
+        details: normalizedDetails,
+        preferredDate: args.preferredDate,
+        durationMinutes: args.durationMinutes,
+        totalPrice: args.totalPrice,
+        notes: args.notes,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
 
-    return reservationId;
+      console.log(`✅ Convex: Reservation created successfully with ID: ${reservationId}`);
+      return reservationId;
+    } catch (insertError) {
+      console.error("❌ Convex: Failed to create reservation:", insertError);
+      throw new Error(
+        `Failed to create reservation: ${insertError instanceof Error ? insertError.message : "Unknown database error"}. Please try again or contact support if the problem persists.`
+      );
+    }
   },
 });

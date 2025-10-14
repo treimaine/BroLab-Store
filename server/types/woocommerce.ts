@@ -5,18 +5,16 @@
  * replacing all 'any' types with proper TypeScript interfaces.
  */
 
+import type { WooCommerceMetaData } from "../../shared/types";
+
+// Re-export for backward compatibility
+export type { WooCommerceMetaData };
+
 // ================================
 // WOOCOMMERCE PRODUCT TYPES
 // ================================
 
-/**
- * WooCommerce product metadata entry
- */
-export interface WooCommerceMetaData {
-  id: number;
-  key: string;
-  value: string | number | boolean | string[] | null;
-}
+// WooCommerceMetaData is imported from shared types to avoid conflicts
 
 /**
  * WooCommerce product image

@@ -21,6 +21,7 @@ import type {
   GetMyOrdersHandler,
   GetOrderHandler,
 } from "../types/ApiTypes";
+import { handleRouteError } from "../types/routes";
 
 // Interface for Convex order creation
 interface CreateOrderIdempotentArgs {
@@ -127,14 +128,7 @@ const createOrder: CreateOrderHandler = async (req, res) => {
     };
     res.status(201).json(response);
   } catch (error: unknown) {
-    console.error("Create order error:", error);
-    const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
-
-    res.status(500).json({
-      error: "Failed to create order",
-      message: "Unable to process your order. Please try again.",
-      requestId,
-    });
+    handleRouteError(error, res, "Failed to create order");
   }
 };
 
@@ -156,14 +150,7 @@ const getMyOrders: GetMyOrdersHandler = async (req, res) => {
     };
     res.json(response);
   } catch (error: unknown) {
-    console.error("🚨 Error fetching orders:", error);
-    const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
-
-    res.status(500).json({
-      error: "Failed to fetch orders",
-      message: "Unable to load your orders. Please try again.",
-      requestId,
-    });
+    handleRouteError(error, res, "Failed to fetch orders");
   }
 };
 
@@ -193,9 +180,8 @@ const getOrder: GetOrderHandler = async (req, res) => {
       statusHistory: [], // TODO: Implement status history
     };
     res.json(response);
-  } catch (e: unknown) {
-    const errorMessage = e instanceof Error ? e.message : "Invalid order id";
-    res.status(400).json({ error: errorMessage });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to get order");
   }
 };
 
@@ -227,9 +213,8 @@ const getInvoice: GetInvoiceHandler = async (req, res) => {
 
     const response: GetInvoiceResponse = { url: invoiceUrl };
     res.json(response);
-  } catch (e: unknown) {
-    const errorMessage = e instanceof Error ? e.message : "Invalid order id";
-    res.status(400).json({ error: errorMessage });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to get invoice");
   }
 };
 
@@ -258,9 +243,8 @@ ordersRouter.get("/:id/invoice/download", validateParams(CommonParams.id), async
       return;
     }
     res.redirect(invoice.invoice.pdfUrl);
-  } catch (e: unknown) {
-    const errorMessage = e instanceof Error ? e.message : "Invalid order id";
-    res.status(400).json({ error: errorMessage });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to download invoice");
   }
 });
 

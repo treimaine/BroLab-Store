@@ -4,8 +4,43 @@ import {
   generateBeatsListSchemaMarkup,
   generateOrganizationSchemaMarkup,
 } from "../lib/schemaMarkup";
+import { ProcessedBeatData, WooCommerceApiProduct, handleRouteError } from "../types/routes";
+import { WooCommerceMetaData } from "../types/woocommerce";
 
 const router = Router();
+
+// Helper functions for type-safe metadata extraction
+const getBpmFromProduct = (product: WooCommerceApiProduct): number | undefined => {
+  if (product.bpm) return parseInt(product.bpm.toString());
+  const bpmMeta = product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "bpm");
+  return bpmMeta?.value ? parseInt(bpmMeta.value.toString()) : undefined;
+};
+
+const getKeyFromProduct = (product: WooCommerceApiProduct): string | null => {
+  return (
+    product.key ||
+    product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "key")?.value?.toString() ||
+    null
+  );
+};
+
+const getMoodFromProduct = (product: WooCommerceApiProduct): string | null => {
+  return (
+    product.mood ||
+    product.meta_data
+      ?.find((meta: WooCommerceMetaData) => meta.key === "mood")
+      ?.value?.toString() ||
+    null
+  );
+};
+
+const getDurationFromProduct = (product: WooCommerceApiProduct): number | undefined => {
+  return product.duration ? parseFloat(product.duration.toString()) : undefined;
+};
+
+const getTagsFromProduct = (product: WooCommerceApiProduct): string[] => {
+  return product.tags?.map(tag => tag.name) || [];
+};
 
 // WooCommerce API helpers
 async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
@@ -17,7 +52,9 @@ async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
   if (!WC_CONSUMER_KEY || !WC_CONSUMER_SECRET) {
     if (process.env.NODE_ENV === "test") {
       // minimal fallback for tests
-      return endpoint.includes("/products") ? ([] as any) : ({} as any);
+      return endpoint.includes("/products")
+        ? ([] as WooCommerceApiProduct[])
+        : ({} as WooCommerceApiProduct);
     }
     throw new Error("WooCommerce API credentials not configured");
   }
@@ -33,7 +70,7 @@ async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
           status: 200,
           statusText: "OK",
           json: async () => (endpoint.includes("/products") ? [] : {}),
-        } as any)
+        } as Response)
       : await fetch(url.toString(), {
           ...options,
           headers: {
@@ -66,10 +103,10 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
     let product;
     try {
       product = await wcApiRequest(`/products/${beatId}`);
-    } catch (error: any) {
-      if (error.message?.includes("404")) {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message?.includes("404")) {
         res.status(404).json({ error: "Beat not found" });
-      return;
+        return;
       }
       throw error;
     }
@@ -80,20 +117,24 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
     }
 
     // Transformer les données WooCommerce en format BeatProduct
-    const beat = {
+    const beat: ProcessedBeatData = {
       id: product.id,
       title: product.name,
+      name: product.name, // Alias for compatibility
       description: product.description,
       genre: product.categories?.[0]?.name || "Unknown",
-      bpm: product.bpm || product.meta_data?.find((meta: any) => meta.key === "bpm")?.value || null,
-      key: product.key || product.meta_data?.find((meta: any) => meta.key === "key")?.value || null,
-      mood:
-        product.mood || product.meta_data?.find((meta: any) => meta.key === "mood")?.value || null,
+      bpm: getBpmFromProduct(product),
+      key: getKeyFromProduct(product),
+      mood: getMoodFromProduct(product),
       price: parseFloat(product.price) || 0,
       image_url: product.images?.[0]?.src,
+      image: product.images?.[0]?.src, // Alias for compatibility
+      images: product.images,
       audio_url: product.audio_url,
-      tags: product.tags?.map((tag: any) => tag.name) || [],
-      duration: product.duration || null,
+      tags: getTagsFromProduct(product),
+      categories: product.categories,
+      meta_data: product.meta_data,
+      duration: getDurationFromProduct(product),
       downloads: product.downloads || 0,
     };
 
@@ -107,9 +148,8 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
     res.setHeader("Content-Type", "application/ld+json");
     res.setHeader("Cache-Control", "public, max-age=3600"); // Cache 1 heure
     res.send(schemaMarkup);
-  } catch (error: any) {
-    console.error("Error generating beat schema markup:", error);
-    res.status(500).json({ error: "Failed to generate schema markup" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate beat schema markup");
   }
 });
 
@@ -128,20 +168,24 @@ router.get("/beats-list", async (req, res): Promise<void> => {
     }
 
     // Transformer les données WooCommerce
-    const beats = products.map((product: any) => ({
+    const beats: ProcessedBeatData[] = products.map((product: WooCommerceApiProduct) => ({
       id: product.id,
       title: product.name,
+      name: product.name, // Alias for compatibility
       description: product.description,
       genre: product.categories?.[0]?.name || "Unknown",
-      bpm: product.bpm || product.meta_data?.find((meta: any) => meta.key === "bpm")?.value || null,
-      key: product.key || product.meta_data?.find((meta: any) => meta.key === "key")?.value || null,
-      mood:
-        product.mood || product.meta_data?.find((meta: any) => meta.key === "mood")?.value || null,
+      bpm: getBpmFromProduct(product),
+      key: getKeyFromProduct(product),
+      mood: getMoodFromProduct(product),
       price: parseFloat(product.price) || 0,
       image_url: product.images?.[0]?.src,
+      image: product.images?.[0]?.src, // Alias for compatibility
+      images: product.images,
       audio_url: product.audio_url,
-      tags: product.tags?.map((tag: any) => tag.name) || [],
-      duration: product.duration || null,
+      tags: getTagsFromProduct(product),
+      categories: product.categories,
+      meta_data: product.meta_data,
+      duration: getDurationFromProduct(product),
       downloads: product.downloads || 0,
     }));
 
@@ -152,9 +196,8 @@ router.get("/beats-list", async (req, res): Promise<void> => {
     res.setHeader("Content-Type", "application/ld+json");
     res.setHeader("Cache-Control", "public, max-age=1800"); // Cache 30 minutes
     res.send(schemaMarkup);
-  } catch (error: any) {
-    console.error("Error generating beats list schema markup:", error);
-    res.status(500).json({ error: "Failed to generate schema markup" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate beats list schema markup");
   }
 });
 
@@ -170,9 +213,8 @@ router.get("/organization", async (req, res): Promise<void> => {
     res.setHeader("Content-Type", "application/ld+json");
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache 24 heures
     res.send(schemaMarkup);
-  } catch (error: any) {
-    console.error("Error generating organization schema markup:", error);
-    res.status(500).json({ error: "Failed to generate schema markup" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate organization schema markup");
   }
 });
 

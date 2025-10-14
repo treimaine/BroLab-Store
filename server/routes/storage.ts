@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { InsertFile } from "../../shared/schema";
 import { createValidationMiddleware as validateRequest } from "../lib/validation";
 import { downloadRateLimit, uploadRateLimit } from "../middleware/rateLimiter";
+import { handleRouteError } from "../types/routes";
 
 // Define validation schemas for file operations
 const fileUploadValidation = z.object({
@@ -114,9 +115,8 @@ router.post(
         file: data,
         url: fullUrl,
       });
-    } catch (error: any) {
-      console.error("File upload error:", error);
-      res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      handleRouteError(error, res, "File upload failed");
     }
   }
 );
@@ -161,9 +161,8 @@ router.get("/signed-url/:fileId", downloadRateLimit, async (req, res): Promise<v
     const signedUrl = await getSignedUrl(bucket, file.storage_path, 3600);
 
     res.json({ url: signedUrl });
-  } catch (error: any) {
-    console.error("Signed URL error:", error);
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to generate signed URL");
   }
 });
 
@@ -199,12 +198,19 @@ router.get("/files", validateRequest(fileFilterValidation), async (req, res): Pr
 
     // if (error) throw error;
 
-    const files: any[] = [];
+    const files: Array<{
+      id: string;
+      filename: string;
+      original_name: string;
+      mime_type: string;
+      size: number;
+      role: string;
+      created_at: string;
+    }> = [];
 
     res.json({ files });
-  } catch (error: any) {
-    console.error("List files error:", error);
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to list files");
   }
 });
 
@@ -256,9 +262,8 @@ router.delete("/files/:fileId", async (req, res): Promise<void> => {
     // if (deleteError) throw deleteError;
 
     res.json({ success: true });
-  } catch (error: any) {
-    console.error("Delete file error:", error);
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to delete file");
   }
 });
 

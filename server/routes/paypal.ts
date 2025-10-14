@@ -3,6 +3,12 @@ import { isAuthenticated as requireAuth } from "../auth";
 import { PAYPAL_WEBHOOK_ID } from "../config/paypal";
 import { urls } from "../config/urls";
 import PayPalService, { PaymentRequest } from "../services/paypal";
+import {
+  AuthenticatedRequest,
+  PayPalCapturePaymentRequest,
+  PayPalCreateOrderRequest,
+  handleRouteError,
+} from "../types/routes";
 
 const router = Router();
 
@@ -24,12 +30,8 @@ router.get("/test", async (req: Request, res: Response) => {
 
     console.log("✅ PayPal test successful:", testResponse);
     res.json(testResponse);
-  } catch (error) {
-    console.error("❌ PayPal test failed:", error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Test failed",
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "PayPal test failed");
   }
 });
 
@@ -37,33 +39,29 @@ router.get("/test", async (req: Request, res: Response) => {
  * GET /api/paypal/test-auth
  * Route de test pour vérifier l'authentification
  */
-router.get("/test-auth", requireAuth, async (req: any, res: Response) => {
+router.get("/test-auth", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     console.log("🔐 Testing PayPal authentication");
     console.log("👤 User data:", {
-      clerkId: req.user?.clerkId,
-      id: req.user?.id,
-      email: req.user?.email,
-      username: req.user?.username,
+      clerkId: req.user?.clerkId || null,
+      id: req.user?.id || null,
+      email: req.user?.email || null,
+      username: req.user?.username || null,
     });
 
     res.json({
       success: true,
       message: "PayPal authentication test successful",
       user: {
-        clerkId: req.user?.clerkId,
-        id: req.user?.id,
-        email: req.user?.email,
-        username: req.user?.username,
+        clerkId: req.user?.clerkId || null,
+        id: req.user?.id || null,
+        email: req.user?.email || null,
+        username: req.user?.username || null,
       },
       timestamp: new Date().toISOString(),
     });
-  } catch (error) {
-    console.error("❌ PayPal auth test failed:", error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Auth test failed",
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "PayPal auth test failed");
   }
 });
 
@@ -72,9 +70,10 @@ router.get("/test-auth", requireAuth, async (req: any, res: Response) => {
  * Crée une commande PayPal pour le paiement d'une réservation
  * ✅ CORRECTION: Renvoie uniquement l'approvalLink PayPal
  */
-router.post("/create-order", requireAuth, async (req: any, res: Response) => {
+router.post("/create-order", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { serviceType, amount, currency, description, reservationId, customerEmail } = req.body;
+    const { serviceType, amount, currency, description, reservationId, customerEmail } =
+      req.body as PayPalCreateOrderRequest;
 
     // Validation des données requises
     if (!serviceType || !amount || !currency || !description || !reservationId || !customerEmail) {
@@ -87,17 +86,25 @@ router.post("/create-order", requireAuth, async (req: any, res: Response) => {
     }
 
     // ✅ AUTHENTIFICATION VÉRIFIÉE - Utilisateur connecté
+    if (!req.user?.id) {
+      res.status(401).json({
+        success: false,
+        error: "User authentication required",
+      });
+      return;
+    }
+
     console.log("🚀 Creating PayPal order for authenticated user:", req.user);
-    console.log("👤 User ID:", req.user!.id);
+    console.log("👤 User ID:", req.user.id);
 
     // Création de la commande PayPal avec l'utilisateur authentifié
     const paymentRequest: PaymentRequest = {
       serviceType,
-      amount: parseFloat(amount),
+      amount: parseFloat(String(amount)),
       currency: currency.toUpperCase(),
       description,
       reservationId,
-      userId: req.user!.id, // Utiliser l'ID utilisateur authentifié
+      userId: req.user.id, // Utiliser l'ID utilisateur authentifié
       customerEmail,
     };
 
@@ -121,12 +128,8 @@ router.post("/create-order", requireAuth, async (req: any, res: Response) => {
         error: result.error || "Failed to create PayPal order",
       });
     }
-  } catch (error) {
-    console.error("❌ Error in create-order endpoint:", error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Internal server error",
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to create PayPal order");
   }
 });
 
@@ -135,10 +138,10 @@ router.post("/create-order", requireAuth, async (req: any, res: Response) => {
  * Capture un paiement PayPal après approbation
  * ✅ CORRECTION: Utilise le token PayPal (orderId) pour la capture
  */
-router.post("/capture-payment", async (req: any, res: Response) => {
+router.post("/capture-payment", async (req: AuthenticatedRequest, res: Response) => {
   // TEMPORAIRE: Authentification désactivée
   try {
-    const { orderId } = req.body;
+    const { orderId } = req.body as PayPalCapturePaymentRequest;
 
     if (!orderId) {
       res.status(400).json({
@@ -149,7 +152,7 @@ router.post("/capture-payment", async (req: any, res: Response) => {
     }
 
     console.log("🎯 Capturing PayPal payment for order:", orderId);
-    console.log("🔐 User authenticated:", req.user?.clerkId || req.user?.id);
+    console.log("🔐 User authenticated:", req.user?.clerkId || req.user?.id || "anonymous");
 
     // ✅ CORRECTION: orderId est le token PayPal, pas le reservationId
     const result = await PayPalService.capturePayment(orderId);
@@ -168,12 +171,8 @@ router.post("/capture-payment", async (req: any, res: Response) => {
         error: result.error || "Failed to capture payment",
       });
     }
-  } catch (error) {
-    console.error("❌ Error in capture-payment endpoint:", error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Internal server error",
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to capture PayPal payment");
   }
 });
 
@@ -215,10 +214,9 @@ router.get("/capture/:token", async (req: Request, res: Response) => {
       const errorUrl = urls.paypal.error("capture_failed", token);
       res.redirect(errorUrl);
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("❌ Error in auto-capture endpoint:", error);
-
-    // Rediriger vers la page d'erreur
+    // For redirect endpoints, we need to handle errors differently
     const errorUrl = urls.paypal.error("server_error");
     res.redirect(errorUrl);
   }
@@ -274,12 +272,8 @@ router.post("/webhook", async (req: Request, res: Response) => {
       console.error("❌ Failed to process webhook:", result.message);
       res.status(500).json({ success: false, error: result.message });
     }
-  } catch (error) {
-    console.error("❌ Error in webhook endpoint:", error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Internal server error",
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "PayPal webhook processing failed");
   }
 });
 
@@ -288,7 +282,7 @@ router.post("/webhook", async (req: Request, res: Response) => {
  * Obtient les détails d'une commande PayPal
  * ✅ AUTHENTIFICATION ACTIVÉE
  */
-router.get("/order/:orderId", async (req: any, res: Response) => {
+router.get("/order/:orderId", async (req: AuthenticatedRequest, res: Response) => {
   // TEMPORAIRE: Authentification désactivée
   try {
     const { orderId } = req.params;
@@ -302,7 +296,7 @@ router.get("/order/:orderId", async (req: any, res: Response) => {
     }
 
     console.log("📋 Getting PayPal order details:", orderId);
-    console.log("🔐 User authenticated:", req.user?.clerkId || req.user?.id);
+    console.log("🔐 User authenticated:", req.user?.clerkId || req.user?.id || "anonymous");
 
     const orderDetails = await PayPalService.getOrderDetails(orderId);
 
@@ -310,12 +304,8 @@ router.get("/order/:orderId", async (req: any, res: Response) => {
       success: true,
       order: orderDetails,
     });
-  } catch (error) {
-    console.error("❌ Error getting order details:", error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Internal server error",
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to get PayPal order details");
   }
 });
 

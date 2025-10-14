@@ -1,15 +1,28 @@
 import { ConvexHttpClient } from "convex/browser";
 import { Id } from "../../convex/_generated/dataModel";
+import {
+  CONVEX_FUNCTIONS,
+  ConvexOperationWrapper,
+  type ConvexFunctionCaller,
+} from "../../shared/types/ConvexIntegration";
 import type { ConvexUser, ConvexUserInput } from "../../shared/types/ConvexUser";
 
 // Initialize Convex client for server-side operations
-const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL!);
+const convexUrl = process.env.VITE_CONVEX_URL;
+if (!convexUrl) {
+  throw new Error("VITE_CONVEX_URL environment variable is required");
+}
 
-export { convex };
+const convex = new ConvexHttpClient(convexUrl);
+
+// Create type-safe wrapper for Convex operations
+const convexWrapper = new ConvexOperationWrapper(convex as ConvexFunctionCaller);
+
+export { convex, convexWrapper };
 
 // Type definitions that match Convex schema exactly - these are the corrected interface definitions
 
-export interface DownloadData {
+export interface DownloadData extends Record<string, unknown> {
   userId: Id<"users">;
   beatId: number;
   licenseType: string;
@@ -21,7 +34,7 @@ export interface DownloadData {
   userAgent?: string;
 }
 
-export interface OrderData {
+export interface OrderData extends Record<string, unknown> {
   items: Array<{
     productId: number;
     title: string;
@@ -38,7 +51,7 @@ export interface OrderData {
   paymentStatus?: string;
 }
 
-export interface ReservationData {
+export interface ReservationData extends Record<string, unknown> {
   serviceType: string;
   details: Record<string, unknown>; // Flexible to match Convex function signature
   preferredDate: string;
@@ -48,60 +61,112 @@ export interface ReservationData {
   clerkId?: string; // For server-side authentication
 }
 
-export interface SubscriptionData {
+export interface SubscriptionData extends Record<string, unknown> {
   userId: Id<"users">;
   stripeCustomerId?: string;
   plan?: string;
 }
 
-export interface ActivityData {
+export interface ActivityData extends Record<string, unknown> {
   userId: Id<"users">;
   action: string;
   details?: Record<string, unknown>; // Flexible to support various activity event structures
 }
 
-// Placeholder functions that will be implemented when the API import issue is resolved
-// These provide the correct interface definitions for Convex integration
+// Type-safe Convex function implementations using the wrapper
 
-export async function getUserByClerkId(_clerkId: string): Promise<ConvexUser | null> {
-  console.warn("getUserByClerkId: API import issue needs to be resolved");
-  return null;
+export async function getUserByClerkId(clerkId: string): Promise<ConvexUser | null> {
+  try {
+    const result = await convexWrapper.query<ConvexUser>(CONVEX_FUNCTIONS.GET_USER_BY_CLERK_ID, {
+      clerkId,
+    });
+    return result.data || null;
+  } catch (error) {
+    console.error("getUserByClerkId failed:", error);
+    return null;
+  }
 }
 
-export async function upsertUser(_userData: ConvexUserInput): Promise<ConvexUser | null> {
-  console.warn("upsertUser: API import issue needs to be resolved");
-  return null;
+export async function upsertUser(userData: ConvexUserInput): Promise<ConvexUser | null> {
+  try {
+    const result = await convexWrapper.mutation<ConvexUser>(CONVEX_FUNCTIONS.UPSERT_USER, userData);
+    return result.data || null;
+  } catch (error) {
+    console.error("upsertUser failed:", error);
+    return null;
+  }
 }
 
-export async function logDownload(_downloadData: DownloadData): Promise<Id<"downloads"> | null> {
-  console.warn("logDownload: API import issue needs to be resolved");
-  return null;
+export async function logDownload(downloadData: DownloadData): Promise<Id<"downloads"> | null> {
+  try {
+    const result = await convexWrapper.mutation<Id<"downloads">>(
+      CONVEX_FUNCTIONS.LOG_DOWNLOAD,
+      downloadData
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("logDownload failed:", error);
+    return null;
+  }
 }
 
 export async function createOrder(
-  _orderData: OrderData
+  orderData: OrderData
 ): Promise<{ success: boolean; orderId: Id<"orders">; message: string } | null> {
-  console.warn("createOrder: API import issue needs to be resolved");
-  return null;
+  try {
+    const result = await convexWrapper.mutation<{
+      success: boolean;
+      orderId: Id<"orders">;
+      message: string;
+    }>(CONVEX_FUNCTIONS.CREATE_ORDER, orderData);
+    return result.data || null;
+  } catch (error) {
+    console.error("createOrder failed:", error);
+    return null;
+  }
 }
 
 export async function createReservation(
-  _reservationData: ReservationData & { clerkId: string }
+  reservationData: ReservationData & { clerkId?: string }
 ): Promise<Id<"reservations"> | null> {
-  console.warn("createReservation: API import issue needs to be resolved");
-  return null;
+  try {
+    const result = await convexWrapper.mutation<Id<"reservations">>(
+      CONVEX_FUNCTIONS.CREATE_RESERVATION,
+      reservationData
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("createReservation failed:", error);
+    return null;
+  }
 }
 
 export async function upsertSubscription(
-  _subscriptionData: SubscriptionData
+  subscriptionData: SubscriptionData
 ): Promise<Id<"users"> | null> {
-  console.warn("upsertSubscription: API import issue needs to be resolved");
-  return null;
+  try {
+    const result = await convexWrapper.mutation<Id<"users">>(
+      CONVEX_FUNCTIONS.UPSERT_SUBSCRIPTION,
+      subscriptionData
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("upsertSubscription failed:", error);
+    return null;
+  }
 }
 
-export async function logActivity(_activityData: ActivityData): Promise<Id<"activityLog"> | null> {
-  console.warn("logActivity: API import issue needs to be resolved");
-  return null;
+export async function logActivity(activityData: ActivityData): Promise<Id<"activityLog"> | null> {
+  try {
+    const result = await convexWrapper.mutation<Id<"activityLog">>(
+      CONVEX_FUNCTIONS.LOG_ACTIVITY,
+      activityData
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("logActivity failed:", error);
+    return null;
+  }
 }
 
 /**

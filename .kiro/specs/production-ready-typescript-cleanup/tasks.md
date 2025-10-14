@@ -344,44 +344,87 @@ Verify that server-side authentication and database integration types are workin
 - ✅ Build process passes without TypeScript errors
 - ✅ No `any` types introduced as quick fixes
 
-### Task 4.2: Remaining `any` Types Cleanup
+### Task 4.2: Critical TypeScript Compilation Errors
+
+**Priority: Critical**
+**Estimated Time: 1 hour**
+**Status: IN PROGRESS**
+
+Fix remaining TypeScript compilation errors that prevent successful builds. Current status: 3 errors in 3 files (down from 25+ errors).
+
+**Current Issues to Fix:**
+
+- [ ] **Convex Function References** - Fix Convex API function reference issues (2 errors)
+  - Fix `"reservations/checkAndSendReminders:checkAndSendReminders" as unknown` in reminderScheduler.ts
+  - Fix `"reservations/listReservations:getReservation" as unknown` in sendStatusUpdateEmail.ts
+  - Use proper Convex function imports instead of string references
+
+- [ ] **Stripe Webhook Type Safety** - Fix type assertion in server routes (1 error)
+  - Fix `(data as unknown).subscription` in clerk.ts webhook handler
+  - Use proper StripeInvoiceWithSubscription type and getSubscriptionId helper
+
+**Files Requiring Immediate Attention:**
+
+- [ ] `convex/reservations/reminderScheduler.ts` - Fix cron job function reference
+- [ ] `convex/reservations/sendStatusUpdateEmail.ts` - Fix query function reference
+- [ ] `server/routes/clerk.ts` - Fix Stripe invoice subscription typing
+
+**Acceptance Criteria:**
+
+- [ ] TypeScript compilation passes without errors (`npx tsc --noEmit`)
+- [ ] Convex function references use proper imports instead of string casting
+- [ ] Stripe webhook data uses proper type definitions from shared/types/StripeWebhook.ts
+- [ ] All type assertions removed in favor of proper interfaces
+
+_Requirements: All type safety requirements from the specification_
+
+### Task 4.3: Remaining `any` Types Cleanup
 
 **Priority: Medium**
 **Estimated Time: 3 hours**
 **Status: IN PROGRESS**
 
-Clean up remaining `any` types found in production code, focusing on critical areas while maintaining functionality.
+Clean up remaining non-critical `any` types found in production code while maintaining functionality.
 
-**Files to Update:**
+**Production Files with `any` Types (Priority Order):**
 
-- [ ] `shared/utils/system-manager.ts` - Replace `any` types with proper interfaces for offline and optimistic update managers
-- [ ] `shared/utils/error-handler.ts` - Replace `any` type for performance monitor with proper interface
-- [ ] `server/middleware/webhookSecurity.ts` - Replace `any` types with proper webhook payload interfaces
-- [ ] `server/routes/*.ts` - Replace remaining `any` types in error handling and API responses
-- [ ] `server/services/convexSync.ts` - Replace `any` type in auth token interface
+- [ ] `server/app.ts` - Replace WooCommerce product mapping `any` types (4 instances)
+  - Create proper WooCommerce product interface
+  - Replace `(p: any) =>` with typed product interface
+  - Replace `(b: any) =>` with typed beat interface
+  - Replace `catch (e: any)` with proper Error type
 
-**Areas to Address:**
+- [ ] `server/routes/internal.ts` - Replace reservation mapping `any` type (1 instance)
+  - Use proper ReservationEmailData interface for mapping
 
-- ✅ Core business logic - no `any` types remain
-- ✅ API endpoints - mostly typed (some error handlers need cleanup)
-- ✅ Component interfaces - properly typed
-- ✅ Test utilities and mocks - properly typed with mock interfaces
-- ✅ Cache integration utilities - properly typed
-- [ ] System utilities - need proper interfaces for manager dependencies
-- [ ] Webhook security - need proper payload typing
-- [ ] Server error handling - need consistent error response types
+- [ ] `server/lib/audit.ts` - Replace disabled Convex query `any[]` type (1 instance)
+  - Implement proper SecurityEvent interface when Convex integration is fixed
+
+- [ ] `server/lib/dataConsistencyManager.ts` - Replace data comparison `any` types (4 instances)
+  - Create generic type parameters for data comparison methods
+  - Replace `hasDataConflict(localData: any, remoteData: any)` with proper typing
+  - Replace `getConflictingFields(localData: any, remoteData: any)` with proper typing
+
+- [ ] `server/middleware/` - Replace middleware `any` types (5 instances)
+  - Fix `clerkAuth.ts` actor and sessionClaims types
+  - Fix `rateLimit.ts` request parameter types
+  - Fix `errorResponses.ts` error middleware typing
+
+**Test/Script Files (Lower Priority):**
+
+- [ ] `scripts/test_mail.ts` - Replace error `any` type with proper Error interface
 
 **Acceptance Criteria:**
 
-- ✅ All production code free of critical `any` types
-- [ ] System manager dependencies properly typed
-- [ ] Webhook payloads properly validated and typed
-- [ ] Server error responses consistently typed
-- [ ] Documentation updated for type patterns
+- [ ] All production server code free of `any` types
+- [ ] WooCommerce integration properly typed with interfaces
+- [ ] Middleware functions use proper Express types
+- [ ] Data consistency manager uses generic type parameters
+- [ ] Test files use proper mock interfaces instead of `any`
 
 _Requirements: All type safety requirements from the specification_
 
-### Task 4.3: Final Production Readiness Verification
+### Task 4.4: Final Production Readiness Verification
 
 **Priority: High**
 **Estimated Time: 1 hour**
@@ -391,12 +434,22 @@ Verify that the TypeScript cleanup meets all production readiness criteria and d
 
 **Verification Checklist:**
 
-- [ ] Run full TypeScript compilation check (`npx tsc --noEmit`)
-- [ ] Verify no critical `any` types in business logic
-- [ ] Test error boundaries are working correctly
-- [ ] Validate all business type definitions are complete
-- [ ] Confirm validation schemas are properly implemented
-- [ ] Check that build process completes successfully
+- [ ] Run full TypeScript compilation check (`npx tsc --noEmit`) - Currently 3 errors remaining (down from 25+)
+- ✅ Verify no critical `any` types in business logic - Core business types properly implemented
+- ✅ Test error boundaries are working correctly - Comprehensive error boundaries implemented
+- ✅ Validate all business type definitions are complete - Beat, Order, User, Reservation types complete
+- ✅ Confirm validation schemas are properly implemented - Zod schemas implemented
+- [ ] Check that build process completes successfully - Blocked by 3 remaining TypeScript errors
+- [ ] Verify production bundle builds without warnings
+
+**Production Readiness Metrics:**
+
+- ✅ Core business objects (Beat, Order, User, Reservation) fully typed
+- ✅ Error boundaries implemented with BroLab-specific error handling
+- ✅ Validation schemas with Zod for runtime type safety
+- ✅ Server-side type conversions (User/ConvexUser) working properly
+- [ ] Zero TypeScript compilation errors
+- [ ] All `any` types eliminated from production code
 
 **Documentation Updates:**
 
@@ -407,16 +460,16 @@ Verify that the TypeScript cleanup meets all production readiness criteria and d
 
 **Acceptance Criteria:**
 
-- [ ] TypeScript compilation passes without errors
-- [ ] All critical business logic is properly typed
-- [ ] Error boundaries provide meaningful user feedback
+- [ ] TypeScript compilation passes without errors (Currently: 3 errors in 3 files)
+- ✅ All critical business logic is properly typed
+- ✅ Error boundaries provide meaningful user feedback
 - [ ] Documentation reflects completed TypeScript cleanup
 - [ ] Clear guidance on type safety patterns used
 - [ ] Production build completes successfully
 
 _Requirements: All type safety requirements from the specification_
 
-### Task 4.4: Update Documentation
+### Task 4.5: Update Documentation
 
 **Priority: Low**
 **Estimated Time: 2 hours**
@@ -479,36 +532,37 @@ Complete comprehensive documentation updates for the TypeScript cleanup project.
 
 **CURRENT TYPESCRIPT STATUS:**
 
-- ✅ TypeScript compilation passes without errors (`npx tsc --noEmit`)
+- 🔄 TypeScript compilation has 3 errors in 3 files (down from 25+ errors - major progress!)
 - ✅ All critical business logic properly typed
 - ✅ Comprehensive type definitions implemented for all business objects
 - ✅ Validation schemas with Zod implemented
 - ✅ Error boundaries with proper error handling implemented
-- 🔄 Minor `any` types remain in system utilities and middleware (non-critical)
+- 🔄 Most `any` types eliminated from production code (some remain in server/app.ts and middleware)
 
 **REMAINING WORK:**
 
 - ✅ Task 4.1: Server-Side Type Safety Verification (Critical Priority) - COMPLETED
-- [ ] Task 4.2: Remaining `any` Types Cleanup (Medium Priority) - IN PROGRESS
-- [ ] Task 4.3: Final Production Readiness Verification (High Priority) - PENDING
-- [ ] Task 4.4: Update Documentation (Low Priority) - PENDING
+- 🔄 Task 4.2: Critical TypeScript Compilation Errors (Critical Priority) - IN PROGRESS (3 errors remaining)
+- 🔄 Task 4.3: Remaining `any` Types Cleanup (Medium Priority) - IN PROGRESS
+- [ ] Task 4.4: Final Production Readiness Verification (High Priority) - PENDING
+- [ ] Task 4.5: Update Documentation (Low Priority) - PENDING
 
 **PRIORITY NEXT STEPS:**
 
-1. **Task 4.2: Remaining `any` Types Cleanup (Medium Priority) - IN PROGRESS**
-   - Clean up remaining `any` types in system utilities and server middleware
-   - Focus on webhook security, system manager dependencies, and error handlers
-   - Maintain type safety while preserving functionality
+1. **Task 4.2: Critical TypeScript Compilation Errors (Critical Priority) - IN PROGRESS**
+   - Fix 3 remaining TypeScript compilation errors preventing builds
+   - Fix Convex function reference issues (2 errors in reservation files)
+   - Fix Stripe webhook type assertion (1 error in clerk.ts)
 
-2. **Task 4.3: Final Production Readiness Verification (High Priority)**
-   - Verify TypeScript compilation and build process
+2. **Task 4.3: Remaining `any` Types Cleanup (Medium Priority)**
+   - Clean up remaining `any` types in production server code
+   - Focus on WooCommerce integration and middleware typing
+   - Implement proper interfaces for external API data
+
+3. **Task 4.4: Final Production Readiness Verification (High Priority)**
+   - Verify TypeScript compilation passes without errors
    - Test error boundaries and validation schemas
    - Document achievements and create production readiness report
-
-3. **Task 4.4: Update Documentation (Low Priority)**
-   - Complete comprehensive documentation updates
-   - Update developer guides with type safety patterns
-   - Create troubleshooting guide for type-related issues
 
 ## Risk Mitigation
 

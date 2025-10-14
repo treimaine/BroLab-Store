@@ -9,12 +9,88 @@ export interface WebhookConfig {
   headerName: string;
 }
 
+// Base webhook payload interface
+export interface BaseWebhookPayload {
+  [key: string]: unknown;
+}
+
+// Stripe webhook payload interfaces
+export interface StripeWebhookPayload extends BaseWebhookPayload {
+  id: string;
+  object: "event";
+  type: string;
+  data: {
+    object: StripeEventObject;
+    previous_attributes?: Record<string, unknown>;
+  };
+  created: number;
+  livemode: boolean;
+  pending_webhooks: number;
+  request: {
+    id: string | null;
+    idempotency_key: string | null;
+  } | null;
+}
+
+// Stripe event object (can be various types)
+export interface StripeEventObject {
+  id: string;
+  object: string;
+  [key: string]: unknown;
+}
+
+// Clerk webhook payload interface
+export interface ClerkWebhookPayload extends BaseWebhookPayload {
+  type: string;
+  object: "event";
+  data: ClerkEventData;
+}
+
+// Clerk event data (varies by event type)
+export interface ClerkEventData {
+  id?: string;
+  object?: string;
+  [key: string]: unknown;
+}
+
+// PayPal webhook payload interface
+export interface PayPalWebhookPayload extends BaseWebhookPayload {
+  id: string;
+  event_type: string;
+  resource_type: string;
+  summary: string;
+  resource: PayPalResource;
+  create_time: string;
+  event_version: string;
+}
+
+// PayPal resource object
+export interface PayPalResource {
+  id?: string;
+  [key: string]: unknown;
+}
+
+// GitHub webhook payload interface
+export interface GitHubWebhookPayload extends BaseWebhookPayload {
+  action?: string;
+  zen?: string; // For ping events
+  [key: string]: unknown;
+}
+
+// Union type for all webhook payloads
+export type WebhookPayload =
+  | StripeWebhookPayload
+  | ClerkWebhookPayload
+  | PayPalWebhookPayload
+  | GitHubWebhookPayload
+  | BaseWebhookPayload;
+
 // Webhook validation result
 export interface WebhookValidationResult {
   valid: boolean;
   errors: string[];
   timestamp?: number;
-  payload?: any;
+  payload?: WebhookPayload;
 }
 
 // Webhook payload sanitization options
@@ -49,6 +125,27 @@ export const WEBHOOK_CONFIGS = {
   },
 } as const;
 
+// Zod schemas for webhook event objects
+const stripeEventObjectSchema = z
+  .object({
+    id: z.string(),
+    object: z.string(),
+  })
+  .passthrough(); // Allow additional properties
+
+const clerkEventDataSchema = z
+  .object({
+    id: z.string().optional(),
+    object: z.string().optional(),
+  })
+  .passthrough(); // Allow additional properties
+
+const paypalResourceSchema = z
+  .object({
+    id: z.string().optional(),
+  })
+  .passthrough(); // Allow additional properties
+
 // Webhook payload schemas for validation
 export const webhookPayloadSchemas = {
   stripe: z.object({
@@ -56,7 +153,8 @@ export const webhookPayloadSchemas = {
     object: z.literal("event"),
     type: z.string(),
     data: z.object({
-      object: z.any(),
+      object: stripeEventObjectSchema,
+      previous_attributes: z.record(z.unknown()).optional(),
     }),
     created: z.number(),
     livemode: z.boolean(),
@@ -72,7 +170,7 @@ export const webhookPayloadSchemas = {
   clerk: z.object({
     type: z.string(),
     object: z.literal("event"),
-    data: z.any(),
+    data: clerkEventDataSchema,
   }),
 
   paypal: z.object({
@@ -80,7 +178,7 @@ export const webhookPayloadSchemas = {
     event_type: z.string(),
     resource_type: z.string(),
     summary: z.string(),
-    resource: z.any(),
+    resource: paypalResourceSchema,
     create_time: z.string(),
     event_version: z.string(),
   }),
@@ -292,7 +390,7 @@ export class WebhookValidator {
   /**
    * Sanitize webhook payload to prevent injection attacks with enhanced security
    */
-  sanitizePayload(payload: any, depth: number = 0): any {
+  sanitizePayload(payload: unknown, depth: number = 0): unknown {
     try {
       // Prevent infinite recursion and DoS attacks
       if (depth > this.sanitizationOptions.maxDepth) {
@@ -382,7 +480,7 @@ export class WebhookValidator {
 
       // Handle objects with enhanced security
       if (typeof payload === "object") {
-        const sanitized: any = {};
+        const sanitized: Record<string, unknown> = {};
         const maxObjectKeys = 100; // Prevent DoS attacks
         let keyCount = 0;
 
@@ -461,7 +559,7 @@ export class WebhookValidator {
    * Validate webhook payload against schema
    */
   validatePayloadSchema(
-    payload: any,
+    payload: unknown,
     provider: keyof typeof webhookPayloadSchemas
   ): { valid: boolean; errors: string[] } {
     try {
@@ -532,7 +630,7 @@ export class WebhookValidator {
       }
 
       // Parse and validate JSON payload
-      let parsedPayload: any;
+      let parsedPayload: unknown;
       try {
         const payloadString = Buffer.isBuffer(payload) ? payload.toString("utf8") : payload;
 
@@ -628,7 +726,7 @@ export class WebhookValidator {
         valid: isValid,
         errors,
         timestamp: timestamp ?? undefined,
-        payload: sanitizedPayload,
+        payload: sanitizedPayload as WebhookPayload,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown validation error";
@@ -780,7 +878,7 @@ export class WebhookValidator {
    */
   private performProviderSpecificValidation(
     provider: string,
-    payload: any,
+    payload: unknown,
     errors: string[]
   ): void {
     try {
@@ -810,29 +908,39 @@ export class WebhookValidator {
   /**
    * Stripe-specific validation
    */
-  private validateStripeSpecific(payload: any, errors: string[]): void {
-    if (!payload || typeof payload !== "object") return;
+  private validateStripeSpecific(payload: unknown, errors: string[]): void {
+    if (!payload || typeof payload !== "object" || payload === null) return;
+
+    const stripePayload = payload as Record<string, unknown>;
 
     // Validate required Stripe fields
-    if (!payload.id || typeof payload.id !== "string") {
+    if (!stripePayload.id || typeof stripePayload.id !== "string") {
       errors.push("Stripe webhook missing or invalid 'id' field");
     }
 
-    if (payload.object !== "event") {
+    if (stripePayload.object !== "event") {
       errors.push("Stripe webhook 'object' field must be 'event'");
     }
 
-    if (!payload.type || typeof payload.type !== "string") {
+    if (!stripePayload.type || typeof stripePayload.type !== "string") {
       errors.push("Stripe webhook missing or invalid 'type' field");
     }
 
     // Validate Stripe event type format
-    if (payload.type && !payload.type.includes(".")) {
+    if (
+      stripePayload.type &&
+      typeof stripePayload.type === "string" &&
+      !stripePayload.type.includes(".")
+    ) {
       errors.push("Stripe webhook 'type' field has invalid format");
     }
 
     // Check for required data object
-    if (!payload.data || typeof payload.data !== "object") {
+    if (
+      !stripePayload.data ||
+      typeof stripePayload.data !== "object" ||
+      stripePayload.data === null
+    ) {
       errors.push("Stripe webhook missing or invalid 'data' field");
     }
   }
@@ -840,14 +948,16 @@ export class WebhookValidator {
   /**
    * Clerk-specific validation
    */
-  private validateClerkSpecific(payload: any, errors: string[]): void {
-    if (!payload || typeof payload !== "object") return;
+  private validateClerkSpecific(payload: unknown, errors: string[]): void {
+    if (!payload || typeof payload !== "object" || payload === null) return;
 
-    if (payload.object !== "event") {
+    const clerkPayload = payload as Record<string, unknown>;
+
+    if (clerkPayload.object !== "event") {
       errors.push("Clerk webhook 'object' field must be 'event'");
     }
 
-    if (!payload.type || typeof payload.type !== "string") {
+    if (!clerkPayload.type || typeof clerkPayload.type !== "string") {
       errors.push("Clerk webhook missing or invalid 'type' field");
     }
 
@@ -864,28 +974,35 @@ export class WebhookValidator {
     ];
 
     if (
-      payload.type &&
-      !validClerkTypes.some(type => payload.type.startsWith(type.split(".")[0]))
+      clerkPayload.type &&
+      typeof clerkPayload.type === "string" &&
+      !validClerkTypes.some(type => (clerkPayload.type as string).startsWith(type.split(".")[0]))
     ) {
-      console.warn(`Unknown Clerk event type: ${payload.type}`);
+      console.warn(`Unknown Clerk event type: ${clerkPayload.type}`);
     }
   }
 
   /**
    * PayPal-specific validation
    */
-  private validatePayPalSpecific(payload: any, errors: string[]): void {
-    if (!payload || typeof payload !== "object") return;
+  private validatePayPalSpecific(payload: unknown, errors: string[]): void {
+    if (!payload || typeof payload !== "object" || payload === null) return;
 
-    if (!payload.id || typeof payload.id !== "string") {
+    const paypalPayload = payload as Record<string, unknown>;
+
+    if (!paypalPayload.id || typeof paypalPayload.id !== "string") {
       errors.push("PayPal webhook missing or invalid 'id' field");
     }
 
-    if (!payload.event_type || typeof payload.event_type !== "string") {
+    if (!paypalPayload.event_type || typeof paypalPayload.event_type !== "string") {
       errors.push("PayPal webhook missing or invalid 'event_type' field");
     }
 
-    if (!payload.resource || typeof payload.resource !== "object") {
+    if (
+      !paypalPayload.resource ||
+      typeof paypalPayload.resource !== "object" ||
+      paypalPayload.resource === null
+    ) {
       errors.push("PayPal webhook missing or invalid 'resource' field");
     }
   }
@@ -893,17 +1010,19 @@ export class WebhookValidator {
   /**
    * GitHub-specific validation
    */
-  private validateGitHubSpecific(payload: any, errors: string[]): void {
-    if (!payload || typeof payload !== "object") return;
+  private validateGitHubSpecific(payload: unknown, errors: string[]): void {
+    if (!payload || typeof payload !== "object" || payload === null) return;
+
+    const githubPayload = payload as Record<string, unknown>;
 
     // GitHub webhooks can have various structures, so we do minimal validation
-    if (payload.zen && typeof payload.zen === "string") {
+    if (githubPayload.zen && typeof githubPayload.zen === "string") {
       // This is a ping event, which is valid
       return;
     }
 
     // Most GitHub webhooks should have an action field
-    if (payload.action && typeof payload.action !== "string") {
+    if (githubPayload.action && typeof githubPayload.action !== "string") {
       errors.push("GitHub webhook 'action' field must be a string");
     }
   }

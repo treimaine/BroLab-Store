@@ -414,9 +414,105 @@ export const serviceOrderValidation = z.object({
   contact_phone: z.string().optional(),
 });
 
+// Mixing & Mastering form validation schema
+export const mixingMasteringFormSchema = z.object({
+  // Personal Information
+  name: z
+    .string()
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name must be less than 100 characters")
+    .regex(/^[a-zA-Z\s'-]+$/, "Name can only contain letters, spaces, hyphens, and apostrophes"),
+
+  email: z.string().email("Please enter a valid email address").max(255, "Email is too long"),
+
+  phone: z.string().refine(phone => !phone || validatePhoneNumber(phone), {
+    message: "Please enter a valid phone number",
+  }),
+
+  // Booking Details
+  preferredDate: z
+    .string()
+    .min(1, "Please select a preferred date")
+    .refine(
+      date => {
+        const selectedDate = new Date(date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return selectedDate >= today;
+      },
+      {
+        message: "Preferred date must be today or in the future",
+      }
+    ),
+
+  timeSlot: z
+    .string()
+    .min(1, "Please select a time slot")
+    .refine(
+      slot => {
+        const validSlots = [
+          "9:00 AM",
+          "10:00 AM",
+          "11:00 AM",
+          "1:00 PM",
+          "2:00 PM",
+          "3:00 PM",
+          "4:00 PM",
+        ];
+        return validSlots.includes(slot);
+      },
+      {
+        message: "Please select a valid time slot",
+      }
+    ),
+
+  // Project Details
+  projectDetails: z
+    .string()
+    .min(20, "Project details must be at least 20 characters")
+    .max(2000, "Project details must be less than 2000 characters"),
+
+  trackCount: z
+    .string()
+    .optional()
+    .refine(count => !count || (parseInt(count) >= 1 && parseInt(count) <= 100), {
+      message: "Track count must be between 1 and 100",
+    }),
+
+  genre: z.string().optional(),
+
+  reference: z
+    .string()
+    .optional()
+    .refine(ref => !ref || ref.length <= 500, {
+      message: "Reference must be less than 500 characters",
+    }),
+
+  specialRequests: z
+    .string()
+    .optional()
+    .refine(req => !req || req.length <= 1000, {
+      message: "Special requests must be less than 1000 characters",
+    }),
+});
+
+// Service selection validation
+export const serviceSelectionSchema = z.object({
+  selectedService: z.enum(["mixing", "mastering", "mixing-mastering"], {
+    errorMap: () => ({ message: "Please select a valid service" }),
+  }),
+});
+
+// Combined form validation for submission
+export const mixingMasteringSubmissionSchema =
+  mixingMasteringFormSchema.merge(serviceSelectionSchema);
+
 // Enhanced validation types
 export type EnhancedRegisterInput = z.infer<typeof enhancedRegisterSchema>;
 export type EnhancedPaymentIntentInput = z.infer<typeof enhancedPaymentIntentSchema>;
 export type FileUploadInput = z.infer<typeof fileUploadValidation>;
 export type FileFilterInput = z.infer<typeof fileFilterValidation>;
 export type ServiceOrderInput = z.infer<typeof serviceOrderValidation>;
+export type MixingMasteringFormInput = z.infer<typeof mixingMasteringFormSchema>;
+export type ServiceSelectionInput = z.infer<typeof serviceSelectionSchema>;
+export type MixingMasteringSubmissionInput = z.infer<typeof mixingMasteringSubmissionSchema>;

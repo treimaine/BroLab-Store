@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { handleRouteError } from "../types/routes";
 
 const router = Router();
 
@@ -13,9 +14,8 @@ router.get("/", async (_req, res) => {
       { id: 5, name: "Electronic", slug: "electronic", count: 6 },
     ];
     res.json(categories);
-  } catch (error) {
-    console.error("Categories error:", error);
-    res.status(500).json({ error: "Failed to fetch categories" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to fetch categories");
   }
 });
 

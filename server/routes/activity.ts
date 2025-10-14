@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { isAuthenticated } from "../auth";
+import { handleRouteError } from "../types/routes";
 // Supabase removed - using Convex for data
 
 const router = Router();
@@ -15,7 +16,13 @@ router.get("/", isAuthenticated, async (req, res): Promise<void> => {
 
     // TODO: Implement with Convex
     // For now, return empty activity list
-    const recentActivity: any[] = [];
+    const recentActivity: Array<{
+      id: string;
+      type: string;
+      description: string;
+      timestamp: string;
+      metadata?: Record<string, unknown>;
+    }> = [];
 
     console.log("🔧 Activity API Debug:", {
       userId,
@@ -30,9 +37,8 @@ router.get("/", isAuthenticated, async (req, res): Promise<void> => {
       activities: recentActivity,
       message: "Activity data will be available via Convex",
     });
-  } catch (error: any) {
-    console.error("Activity fetch error:", error);
-    res.status(500).json({ error: "Failed to fetch activity" });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Failed to fetch activity");
   }
 });
 

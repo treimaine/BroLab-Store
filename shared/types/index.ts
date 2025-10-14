@@ -217,6 +217,25 @@ export {
 
 // API types
 export {
+  BroLabProductExtensions,
+  BroLabWooCommerceProduct,
+  WooCommerceBillingAddress,
+  WooCommerceCategoryQuery,
+  WooCommerceCouponLine,
+  WooCommerceCustomer,
+  WooCommerceError,
+  WooCommerceErrorResponse,
+  WooCommerceFeeLine,
+  WooCommerceMetaData,
+  WooCommerceOrder,
+  WooCommerceOrderLineItem,
+  WooCommerceProductQuery,
+  WooCommerceRefund,
+  WooCommerceShippingAddress,
+  WooCommerceShippingLine,
+  WooCommerceTaxLine,
+} from "./WooCommerceApi";
+export {
   ActivityDetails,
   ActivityMetadata,
   ApiError,
@@ -252,7 +271,6 @@ export {
   WooCommerceDimensions,
   WooCommerceDownload,
   WooCommerceImage,
-  WooCommerceMetaData,
   WooCommerceProduct,
   WooCommerceTag,
 } from "./api";
@@ -332,6 +350,10 @@ export type {
   RegisterInput,
   UpdateProfileInput,
 } from "../validation";
+
+// Convex and Stripe webhook types
+export * from "./ConvexReservation";
+export * from "./StripeWebhook";
 
 // ================================
 // TYPE UTILITIES

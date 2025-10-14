@@ -5,6 +5,8 @@
  * used across the BroLab Entertainment platform.
  */
 
+import type { WooCommerceMetaData } from "./WooCommerceApi";
+
 /**
  * Standard API response wrapper
  */
@@ -415,11 +417,7 @@ export interface GooglePayTransactionInfo {
 }
 
 // Re-export WooCommerce types from the woocommerce types file
-export interface WooCommerceMetaData {
-  id: number;
-  key: string;
-  value: string | number | boolean | string[] | null;
-}
+// Note: WooCommerceMetaData is now imported from shared/types/WooCommerceApi.ts to avoid conflicts
 
 export interface WooCommerceImage {
   id: number;
