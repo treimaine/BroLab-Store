@@ -4,55 +4,71 @@ A cutting-edge beats marketplace platform revolutionizing music production and l
 
 ## 🎵 Overview
 
-BroLab Entertainment is a modern React-based web application that provides a professional marketplace for music producers and artists. The platform integrates seamlessly with WordPress/WooCommerce for content management while offering advanced features like real-time audio preview, multi-currency support, and comprehensive payment processing.
+BroLab Entertainment is a modern full-stack TypeScript application that provides a professional marketplace for music producers and artists. Built with React 18, Express, and Convex real-time database, the platform offers advanced features like professional audio preview with waveform visualization, comprehensive reservation system, multi-currency support, and seamless payment processing through Stripe and PayPal.
 
 ## ✨ Key Features
 
 ### Core Functionality
 
-- **Professional Audio Preview System**: Waveform visualization with individual preview controls for each beat
+- **Professional Audio Preview System**: WaveSurfer.js waveform visualization with individual preview controls for each beat
+- **Real-time Database**: Convex integration for live updates and real-time features
 - **WooCommerce Integration**: Full product catalog sync with WordPress backend
 - **Multi-Payment Processing**: Stripe and PayPal integration with comprehensive error handling
 - **Responsive Design**: Mobile-first approach with device-specific optimizations (320px-1920px+)
 - **Advanced Cart System**: Persistent cart with license selection and pricing management
-- **Supabase Database**: Modern PostgreSQL database with Row-Level Security (RLS)
+- **Dual Database Strategy**: Convex for new real-time features, Supabase for legacy support
 - **File Management System**: Secure file uploads with antivirus scanning and quota management
-- **Reservation System**: Studio booking and service order management
-- **Advanced Security**: RLS policies, rate limiting, and comprehensive validation
+- **Comprehensive Reservation System**: Studio booking, mixing, mastering, recording, and consultation services
+- **Advanced Security**: Clerk authentication, RLS policies, rate limiting, and comprehensive validation
 
 ### Advanced Features
 
+- **Real-time Updates**: Convex-powered live data synchronization and notifications
 - **Geolocation & Multi-Currency**: Automatic currency detection and conversion based on user location
 - **Multi-Language Support**: 6 languages with automatic IP-based language detection
-- **Professional Waveform Audio Player**: Table view with individual audio previews per product
+- **Professional Waveform Audio Player**: WaveSurfer.js integration with table view and individual audio previews
 - **License Management**: Multiple licensing tiers (Basic $29.99, Premium $49.99, Unlimited $149.99)
 - **Enhanced User Experience**: Professional table layout matching industry standards
-- **Service Orders**: Mixing, mastering, recording, and consultation services
-- **Download Quota System**: License-based download limits with enforcement
-- **Email System**: Comprehensive email templates and delivery management
+- **Comprehensive Service Orders**: Mixing, mastering, recording, and consultation booking system
+- **Subscription Management**: Clerk Billing integration with license-based download quotas
+- **Automated Email System**: Comprehensive email templates with delivery management and scheduling
+- **Advanced Reservation System**: Real-time booking with status updates and reminder notifications
 
 ### Technical Excellence
 
-- **Type-Safe Development**: Full TypeScript implementation with Drizzle ORM
+- **Type-Safe Development**: Full TypeScript strict mode with shared schemas and validation
 - **Modern State Management**: Zustand for client state, TanStack Query for server state
+- **Real-time Architecture**: Convex mutations and queries for live data updates
 - **Accessibility Compliant**: WCAG AA standards with reduced motion support
-- **Performance Optimized**: Lazy loading, caching, virtual scrolling, and CDN integration
-- **Security First**: Row-Level Security, input validation, rate limiting, and file scanning
+- **Performance Optimized**: Lazy loading, code splitting, caching, and CDN integration
+- **Security First**: Clerk authentication, Row-Level Security, input validation, and comprehensive error handling
+- **Testing Strategy**: Jest, React Testing Library, and Supertest for comprehensive coverage
 
 ## 🏗️ Technical Architecture
 
 ### Frontend Stack
 
-- **React 18** with TypeScript and Vite build system
-- **Tailwind CSS** with shadcn/ui component library
-- **Wouter** for lightweight client-side routing
-- **TanStack Query** for advanced server state management
-- **Zustand** for client-side state management
+- **React 18** with TypeScript strict mode and Vite 5.4+ build system
+- **Tailwind CSS** with shadcn/ui + Radix UI component library
+- **Wouter** for lightweight client-side routing (preferred over React Router)
+- **TanStack Query** for advanced server state management and caching
+- **Zustand** for client-side state management (preferred over Redux/Context)
+- **WaveSurfer.js** for professional audio waveform visualization
 
 ### Backend Stack
 
-- **Node.js + Express** server with TypeScript
-- **PostgreSQL** database with Supabase and Drizzle ORM
+- **Node.js 20+** with Express and TypeScript strict mode
+- **Convex** real-time database for new features and live updates
+- **Supabase** PostgreSQL database for legacy support (maintain, don't extend)
+- **Clerk** authentication and user management with billing integration
+- **Stripe + PayPal** payment processing with comprehensive error handling
+
+### Development Tools
+
+- **npm 9+** package management (no yarn/pnpm)
+- **ESLint** with React and TypeScript rules
+- **Jest + React Testing Library** for unit and integration testing
+- **Supertest** for API endpoint testing
 
 ## 📚 Documentation
 
@@ -114,44 +130,61 @@ npm run dev
 
 ```
 brolab-beats/
-├── client/                 # React frontend application
+├── client/                 # React frontend (Vite + TypeScript)
 │   ├── src/
-│   │   ├── components/     # Reusable UI components
+│   │   ├── components/     # Feature-based UI components
 │   │   ├── pages/         # Route components
 │   │   ├── hooks/         # Custom React hooks
+│   │   ├── stores/        # Zustand state management
 │   │   └── lib/           # Utilities and configurations
-├── server/                # Express backend application
-│   ├── routes.ts          # API route definitions
-│   ├── storage.ts         # Database operations
-│   ├── lib/               # Core libraries and utilities
-│   │   ├── supabase.ts    # Supabase client configuration
-│   │   ├── rlsSecurity.ts # Row-Level Security management
-│   │   └── validation.ts  # Input validation schemas
-│   └── wordpress.ts       # WooCommerce integration
+├── server/                # Express backend API
+│   ├── routes/            # API route definitions
+│   ├── services/          # Business logic services
+│   ├── middleware/        # Express middleware
+│   └── lib/               # Core libraries and utilities
+├── convex/                # Convex real-time database
+│   ├── schema.ts          # Database schema definition
+│   ├── reservations/      # Reservation system functions
+│   ├── users/             # User management functions
+│   └── _generated/        # Auto-generated Convex files
 ├── shared/                # Shared TypeScript definitions
-│   └── schema.ts          # Database schema and types
-├── scripts/               # Development and deployment scripts
-└── docs/                  # Documentation files
+│   ├── types/             # Cross-platform interfaces
+│   ├── validation.ts      # Zod schemas
+│   └── constants/         # API endpoints and enums
+├── components/            # Shared UI components (shadcn/ui)
+├── __tests__/             # Test files and utilities
+├── scripts/               # Build, deployment, maintenance scripts
+└── docs/                  # Documentation and reports
 ```
 
 ## 🔧 Development Commands
 
 ```bash
 # Development
-npm run dev                # Start full development server
+npm run dev                # Start full-stack development server
+npm run client             # Frontend-only development
+npm run server             # Backend-only development
 
-# Database
+# Convex Database
+npx convex dev             # Start Convex development server
+npx convex dashboard       # Open Convex dashboard
+npx convex deploy          # Deploy Convex functions
+
+# Legacy Database (Supabase)
 npm run db:push            # Push schema changes
 npm run db:studio          # Open database GUI
 npm run db:generate        # Generate migration files
 
 # Build & Production
-npm run build              # Build for production
+npm run build              # Build for production (client + server)
 npm run start              # Start production server
-npm run check              # TypeScript validation
-npm run test               # Run test suite
-npm run lint               # Lint code
-npm run format             # Format code
+npm run type-check         # TypeScript validation
+npm run test               # Run Jest test suite
+npm run test:watch         # Watch mode for development
+npm run lint               # ESLint code checking
+npm run lint:fix           # Auto-fix linting issues
+npm run verify             # Pre-commit validation
+npm run pre-check          # Type-check + lint validation
 ```
 
 ## 🌐 Environment Configuration
@@ -159,7 +192,16 @@ npm run format             # Format code
 ### Development (.env)
 
 ```env
-# Database Configuration (Supabase)
+# Convex Configuration (Primary Database)
+CONVEX_DEPLOYMENT="your_convex_deployment_name"
+VITE_CONVEX_URL="https://your-deployment.convex.cloud"
+
+# Clerk Authentication
+VITE_CLERK_PUBLISHABLE_KEY="pk_test_your_clerk_key"
+CLERK_SECRET_KEY="sk_test_your_clerk_secret"
+CLERK_WEBHOOK_SECRET="whsec_your_webhook_secret"
+
+# Legacy Database Configuration (Supabase - Maintain Only)
 DATABASE_URL="postgresql://postgres:password@db.your-project.supabase.co:5432/postgres"
 SUPABASE_URL="https://your-project.supabase.co"
 SUPABASE_ANON_KEY="your_anon_key"
@@ -217,52 +259,65 @@ NODE_ENV="development"
 
 ### Waveform Audio Player
 
-- Professional waveform visualization with Canvas rendering
-- Individual audio controls for each product in table view
-- Click-to-seek functionality with visual progress tracking
-- Cyan-themed UI matching modern music platforms
-- Mobile-optimized controls with backdrop blur effects
+- **WaveSurfer.js Integration**: Professional waveform visualization with Canvas rendering
+- **Individual Audio Controls**: Each product has independent audio preview in table view
+- **Click-to-Seek Functionality**: Visual progress tracking with precise seeking
+- **Modern UI Design**: Cyan-themed interface matching industry music platforms
+- **Mobile-Optimized**: Touch-friendly controls with backdrop blur effects
+- **Performance Optimized**: Lazy loading and efficient rendering for large catalogs
 
 ### Table View Layout
 
-- Professional layout matching industry standards
-- Thumbnails, waveforms, genre, duration, and actions per row
-- Independent audio preview for each beat
-- Responsive design with mobile scroll optimization
+- **Professional Design**: Layout matching industry standards (Beatstars, Airbit)
+- **Comprehensive Information**: Thumbnails, waveforms, genre, duration, BPM, and actions per row
+- **Independent Audio Preview**: Each beat has its own audio player and waveform
+- **Responsive Design**: Mobile scroll optimization with touch-friendly interactions
+- **Real-time Updates**: Live status updates for availability and pricing
 
 ## 🔒 Security Features
 
-- Environment variable protection
-- HTTPS enforcement in production
-- Rate limiting and input validation
-- Secure session management
-- Payment data encryption
-- **Row-Level Security (RLS)**: Database-level access control
-- **File Upload Security**: Antivirus scanning and validation
-- **Download Quota Enforcement**: License-based limits
-- **Comprehensive Input Validation**: Zod schema validation
+- **Clerk Authentication**: Enterprise-grade user management and authentication
+- **Environment Variable Protection**: Secure configuration management
+- **HTTPS Enforcement**: SSL/TLS encryption in production
+- **Rate Limiting**: API endpoint protection and abuse prevention
+- **Secure Session Management**: JWT-based authentication with Clerk
+- **Payment Data Encryption**: PCI-compliant Stripe and PayPal integration
+- **Row-Level Security (RLS)**: Database-level access control (Supabase)
+- **File Upload Security**: Antivirus scanning and comprehensive validation
+- **Download Quota Enforcement**: License-based limits with real-time tracking
+- **Comprehensive Input Validation**: Zod schema validation across all endpoints
+- **Real-time Security**: Convex-powered permission validation and access control
 
 ## 📈 Performance Optimizations
 
-- Lazy loading for components and images
-- Virtual scrolling for large product lists
-- CDN integration for static assets
-- Database query optimization
-- Client-side caching strategies
-- **Supabase Edge Functions**: Serverless computing
-- **Database Indexing**: Optimized query performance
-- **File Compression**: Automatic asset optimization
+- **Code Splitting**: Vite-powered lazy loading for components and routes
+- **Virtual Scrolling**: Efficient rendering for large product catalogs
+- **CDN Integration**: Static asset optimization and delivery
+- **Database Query Optimization**: Indexed queries and efficient data fetching
+- **Client-side Caching**: TanStack Query for intelligent server state management
+- **Real-time Efficiency**: Convex optimized queries and mutations
+- **Supabase Edge Functions**: Serverless computing for legacy features
+- **Database Indexing**: Optimized query performance across both databases
+- **File Compression**: Automatic asset optimization and progressive loading
+- **Bundle Optimization**: Tree shaking and dynamic imports for minimal bundle size
 
 ## 🛠️ Development Workflow
 
-1. **Local Development**: Use Supabase or local PostgreSQL
-2. **Feature Development**: Type-safe development with hot reloading
-3. **Testing**: Build and test production builds locally
-4. **Deployment**: Automated scripts for cPanel deployment
-5. **Monitoring**: Comprehensive logging and error tracking
+1. **Local Development**: Convex dev server with Clerk authentication
+2. **Feature Development**: Type-safe development with hot reloading and strict TypeScript
+3. **Real-time Features**: Use Convex mutations and queries for new functionality
+4. **Legacy Maintenance**: Maintain Supabase integration without extending
+5. **Testing**: Comprehensive Jest and React Testing Library test suite
+6. **Deployment**: Automated scripts for production deployment
+7. **Monitoring**: Real-time error tracking and performance monitoring
 
-- **Database Management**: Use Drizzle Studio for schema management
-- **Security Testing**: Validate RLS policies and access controls
+### Database Strategy
+
+- **New Features**: Use Convex mutations/queries for real-time capabilities
+- **Legacy Features**: Maintain Supabase integration, don't extend
+- **Data Flow**: Client → Convex (real-time) or Client → Express → External APIs
+- **Database Management**: Convex dashboard for real-time data, Drizzle Studio for legacy
+- **Security Testing**: Validate Clerk permissions and Convex access controls
 
 ## 📚 Documentation
 
@@ -277,50 +332,69 @@ NODE_ENV="development"
 
 This application is production-ready with:
 
-- Comprehensive error handling and logging
-- Security best practices implementation
-- Performance optimization strategies
-- Scalable architecture patterns
-- Professional deployment workflows
-- **Row-Level Security**: Enterprise-grade data protection
-- **File Management**: Secure upload and storage system
-- **Service Management**: Complete booking and order system
+- **Comprehensive Error Handling**: Robust error boundaries and logging across all layers
+- **Security Best Practices**: Clerk authentication, RLS policies, and comprehensive validation
+- **Performance Optimization**: Code splitting, lazy loading, and efficient data fetching
+- **Scalable Architecture**: Convex real-time database with Express API integration
+- **Professional Deployment**: Automated workflows with comprehensive testing
+- **Real-time Capabilities**: Live updates, notifications, and collaborative features
+- **Enterprise Authentication**: Clerk-powered user management with billing integration
+- **File Management**: Secure upload, storage, and antivirus scanning system
+- **Service Management**: Complete reservation, booking, and order management system
+- **Multi-platform Support**: Responsive design with mobile-first approach
 
 ## 🤝 Support
 
 For development support and questions:
 
-- Check documentation files in the project root
-- Review troubleshooting sections in guides
-- Consult deployment checklist for production issues
-- **Supabase Dashboard**: Database and storage management
-- **Drizzle Studio**: Schema visualization and management
+- **Documentation**: Comprehensive guides in `docs/` directory
+- **Development Setup**: `docs/development/LOCAL_DEVELOPMENT_GUIDE.md`
+- **Deployment Guide**: `docs/deployment/DEPLOYMENT_CHECKLIST.md`
+- **Testing Guide**: `docs/testing/TESTING_GUIDE.md`
+- **Convex Dashboard**: Real-time database and function management
+- **Clerk Dashboard**: User management and authentication settings
+- **Supabase Dashboard**: Legacy database and storage management (maintenance only)
+- **Troubleshooting**: Review error logs and diagnostic tools in development guides
 
 ---
 
 **BroLab Entertainment** - Revolutionizing music production through technology
 
-## Typage TypeScript pour json2csv
+## Import Aliases & TypeScript Configuration
 
-Ce projet utilise la librairie [json2csv](https://www.npmjs.com/package/json2csv) pour l'export CSV côté backend. Comme il n'existe pas de paquet de types officiel, un fichier de déclaration custom a été ajouté :
+This project uses strict TypeScript configuration with import aliases for clean code organization:
 
-- `server/types/json2csv.d.ts` : expose la classe `Parser` et ses options principales.
+```typescript
+// Use these exact aliases in imports
+import { Component } from "@/components/Component"; // client/src/
+import { validateUser } from "@shared/validation"; // shared/
+import { getUserById } from "@convex/users"; // convex/
+```
 
-**À savoir** :
+### TypeScript Standards
 
-- Si l'API de json2csv évolue, il faudra mettre à jour ce fichier.
-- Si un paquet de types officiel apparaît, il est recommandé de le préférer et de supprimer ce .d.ts custom.
-- Ce fichier est référencé dans `tsconfig.json` via `typeRoots`.
+- **Strict Mode Enabled**: No `any` types allowed
+- **Explicit Return Types**: Required for all functions
+- **Proper Error Handling**: Typed exceptions and Result patterns
+- **Zod Validation**: Runtime validation with compile-time type safety
+
+## Custom Type Definitions
+
+- `server/types/json2csv.d.ts`: Custom types for json2csv library (CSV export functionality)
+- `__tests__/types/mocks.ts`: Test utilities and mock type definitions
+- `shared/types/`: Cross-platform interfaces and type definitions
 
 ### Changelog
 
-**2025-01-23** - Documentation Update
+**2025-10-14** - Major Architecture Update
 
-- Added Supabase database integration details
-- Updated environment variables for new services
-- Added Row-Level Security (RLS) documentation
-- Included file management and upload system
-- Added service orders and reservation system
-- Updated development commands and scripts
-- Added security features and performance optimizations
-- Included new API endpoints and services
+- **Convex Integration**: Added real-time database with live updates and notifications
+- **Clerk Authentication**: Implemented enterprise-grade user management and billing
+- **Modern State Management**: Zustand + TanStack Query for optimal performance
+- **WaveSurfer.js**: Professional audio waveform visualization integration
+- **Comprehensive Testing**: Jest + React Testing Library + Supertest coverage
+- **TypeScript Strict Mode**: Full type safety with shared schemas
+- **Real-time Reservation System**: Live booking with status updates and reminders
+- **Advanced Security**: Multi-layer security with Clerk + RLS + comprehensive validation
+- **Performance Optimization**: Code splitting, lazy loading, and efficient data fetching
+- **Production Deployment**: Automated workflows with comprehensive error handling
