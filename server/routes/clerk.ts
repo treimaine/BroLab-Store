@@ -1,6 +1,10 @@
 import { Router } from "express";
 import Stripe from "stripe";
-import { getSubscriptionId } from "../../shared/types/StripeWebhook";
+import {
+  getSubscriptionId,
+  isStripeCheckoutSession,
+  isStripeInvoice,
+} from "../../shared/types/StripeWebhook";
 import { urls } from "../config/urls";
 import { handleRouteError } from "../types/routes";
 
@@ -486,19 +490,35 @@ router.post("/webhooks", async (req, res): Promise<void> => {
     try {
       switch (event.type) {
         case "checkout.session.completed":
-          await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session, webhookId);
+          if (isStripeCheckoutSession(event.data.object)) {
+            await handleCheckoutCompleted(event.data.object, webhookId);
+          } else {
+            console.error("Invalid checkout session data in webhook");
+          }
           break;
 
         case "checkout.session.expired":
-          await handleCheckoutExpired(event.data.object as Stripe.Checkout.Session, webhookId);
+          if (isStripeCheckoutSession(event.data.object)) {
+            await handleCheckoutExpired(event.data.object, webhookId);
+          } else {
+            console.error("Invalid checkout session data in webhook");
+          }
           break;
 
         case "invoice.payment_succeeded":
-          await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice, webhookId);
+          if (isStripeInvoice(event.data.object)) {
+            await handleInvoicePaymentSucceeded(event.data.object, webhookId);
+          } else {
+            console.error("Invalid invoice data in webhook");
+          }
           break;
 
         case "invoice.payment_failed":
-          await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice, webhookId);
+          if (isStripeInvoice(event.data.object)) {
+            await handleInvoicePaymentFailed(event.data.object, webhookId);
+          } else {
+            console.error("Invalid invoice data in webhook");
+          }
           break;
 
         default:
@@ -592,7 +612,7 @@ async function handleInvoicePaymentSucceeded(data: Stripe.Invoice, webhookId: st
     amount: data.amount_paid,
     currency: data.currency,
     customerEmail: data.customer_email,
-    subscriptionId: (data as unknown).subscription || null,
+    subscriptionId: getSubscriptionId(data),
   });
 
   // TODO: Handle successful subscription payments

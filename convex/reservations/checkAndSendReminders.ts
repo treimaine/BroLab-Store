@@ -1,3 +1,4 @@
+import type { FunctionReference } from "convex/server";
 import { internalAction } from "../_generated/server";
 
 export const checkAndSendReminders = internalAction({
@@ -14,13 +15,15 @@ export const checkAndSendReminders = internalAction({
     console.log("🔔 Starting daily reminder check...");
 
     try {
-      // Get all confirmed reservations
-      const reservations = await ctx.runQuery(
-        "reservations/listReservations:getAllReservationsByStatus" as any,
-        {
-          status: "confirmed",
-        }
-      );
+      // Get all confirmed reservations using string-based reference with proper typing
+      const getAllReservationsByStatusRef =
+        "reservations/listReservations:getAllReservationsByStatus" as unknown as FunctionReference<
+          "query",
+          "internal"
+        >;
+      const reservations = await ctx.runQuery(getAllReservationsByStatusRef, {
+        status: "confirmed",
+      });
 
       const now = new Date();
       const tomorrow = new Date(now);
@@ -46,12 +49,14 @@ export const checkAndSendReminders = internalAction({
               `📅 Sending reminder for reservation ${reservation._id} scheduled for ${reservationDate.toISOString()}`
             );
 
-            const result = await ctx.runAction(
-              "reservations/sendReminderEmail:sendReservationReminderEmail" as any,
-              {
-                reservationId: reservation._id,
-              }
-            );
+            const sendReminderEmailRef =
+              "reservations/sendReminderEmail:sendReservationReminderEmail" as unknown as FunctionReference<
+                "action",
+                "internal"
+              >;
+            const result = await ctx.runAction(sendReminderEmailRef, {
+              reservationId: reservation._id,
+            });
 
             if (result.success) {
               remindersSent++;

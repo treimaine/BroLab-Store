@@ -1,3 +1,4 @@
+import type { FunctionReference } from "convex/server";
 import { v } from "convex/values";
 import { action } from "../_generated/server";
 
@@ -6,8 +7,13 @@ export const sendReservationReminderEmail = action({
     reservationId: v.id("reservations"),
   },
   handler: async (ctx, args) => {
-    // Get reservation details
-    const reservation = await ctx.runQuery("reservations/listReservations:getReservation" as any, {
+    // Get reservation details using string-based reference with proper typing
+    const getReservationRef =
+      "reservations/listReservations:getReservation" as unknown as FunctionReference<
+        "query",
+        "public"
+      >;
+    const reservation = await ctx.runQuery(getReservationRef, {
       reservationId: args.reservationId,
     });
 
