@@ -84,7 +84,7 @@ router.get("/products", async (req: Request, res: Response) => {
       return;
     }
 
-    const wooProducts = await fetchWooProducts(req.query as Record<string, unknown>);
+    const wooProducts = await fetchWooProducts(req.query);
 
     // Mapper les produits WooCommerce vers le format attendu
     const beats = wooProducts.map((product: WooCommerceProduct) => {
@@ -129,10 +129,10 @@ router.get("/products", async (req: Request, res: Response) => {
           // Si c'est un objet unique
           const trackData = sonaarData as Record<string, unknown>;
           audioUrl =
-            (trackData.audio_preview as string) ||
-            (trackData.track_mp3 as string) ||
-            (trackData.src as string) ||
-            (trackData.url as string) ||
+            String(trackData.audio_preview || "") ||
+            String(trackData.track_mp3 || "") ||
+            String(trackData.src || "") ||
+            String(trackData.url || "") ||
             null;
           console.log(`🎵 Product ${product.id} - Found audio URL (object):`, audioUrl);
         } else {
@@ -144,7 +144,7 @@ router.get("/products", async (req: Request, res: Response) => {
 
       // Fallback sur meta_data.audio_url si rien trouvé
       if (!audioUrl && audioUrlMeta) {
-        audioUrl = audioUrlMeta.value as string;
+        audioUrl = String(audioUrlMeta.value || "");
         console.log(`🎵 Product ${product.id} - Fallback audio URL:`, audioUrl);
       }
 
@@ -165,7 +165,9 @@ router.get("/products", async (req: Request, res: Response) => {
             if (Array.isArray(trackData) && trackData.length > 0) {
               const firstTrack = trackData[0] as Record<string, unknown>;
               directAudioUrl =
-                (firstTrack.audio_preview as string) || (firstTrack.track_mp3 as string) || null;
+                String(firstTrack.audio_preview || "") ||
+                String(firstTrack.track_mp3 || "") ||
+                null;
             }
           } catch (e) {
             console.error(`Error parsing track data for product ${product.id}:`, e);
@@ -190,7 +192,9 @@ router.get("/products", async (req: Request, res: Response) => {
             if (Array.isArray(trackData) && trackData.length > 0) {
               const firstTrack = trackData[0] as Record<string, unknown>;
               finalAudioUrl =
-                (firstTrack.audio_preview as string) || (firstTrack.track_mp3 as string) || null;
+                String(firstTrack.audio_preview || "") ||
+                String(firstTrack.track_mp3 || "") ||
+                null;
             }
           } catch (e) {
             console.error(`Error parsing track data for product ${product.id}:`, e);
@@ -208,7 +212,7 @@ router.get("/products", async (req: Request, res: Response) => {
       // Helper function to find metadata value
       const findMetaValue = (key: string): string | number | boolean | null => {
         const meta = product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === key);
-        return meta ? (meta.value as string | number | boolean | null) : null;
+        return meta?.value ?? null;
       };
 
       // Helper function to check tags
@@ -232,11 +236,11 @@ router.get("/products", async (req: Request, res: Response) => {
         audio_url: finalAudioUrl,
         hasVocals: findMetaValue("has_vocals") === "yes" || hasTagWithName("vocals"),
         stems: findMetaValue("stems") === "yes" || hasTagWithName("stems"),
-        bpm: findMetaValue("bpm") as string,
-        key: findMetaValue("key") as string,
-        mood: findMetaValue("mood") as string,
-        instruments: findMetaValue("instruments") as string,
-        duration: findMetaValue("duration") as string,
+        bpm: String(findMetaValue("bpm") || ""),
+        key: String(findMetaValue("key") || ""),
+        mood: String(findMetaValue("mood") || ""),
+        instruments: String(findMetaValue("instruments") || ""),
+        duration: String(findMetaValue("duration") || ""),
         is_free: product.price === "0" || product.price === "",
       };
 
@@ -331,26 +335,26 @@ router.get("/products/:id", async (req, res, next): Promise<void> => {
       if (Array.isArray(sonaarData) && sonaarData.length > 0) {
         const firstTrack = sonaarData[0] as Record<string, unknown>;
         audioUrl =
-          (firstTrack.audio_preview as string) ||
-          (firstTrack.track_mp3 as string) ||
-          (firstTrack.src as string) ||
-          (firstTrack.url as string) ||
+          String(firstTrack.audio_preview || "") ||
+          String(firstTrack.track_mp3 || "") ||
+          String(firstTrack.src || "") ||
+          String(firstTrack.url || "") ||
           null;
       } else if (sonaarData && typeof sonaarData === "object") {
         // Si c'est un objet unique
         const trackData = sonaarData as Record<string, unknown>;
         audioUrl =
-          (trackData.audio_preview as string) ||
-          (trackData.track_mp3 as string) ||
-          (trackData.src as string) ||
-          (trackData.url as string) ||
+          String(trackData.audio_preview || "") ||
+          String(trackData.track_mp3 || "") ||
+          String(trackData.src || "") ||
+          String(trackData.url || "") ||
           null;
       }
     }
 
     // Fallback sur meta_data.audio_url si rien trouvé
     if (!audioUrl && audioUrlMeta) {
-      audioUrl = audioUrlMeta.value as string;
+      audioUrl = String(audioUrlMeta.value || "");
     }
 
     // Extraction directe basée sur la structure connue
@@ -368,7 +372,7 @@ router.get("/products/:id", async (req, res, next): Promise<void> => {
           if (Array.isArray(trackData) && trackData.length > 0) {
             const firstTrack = trackData[0] as Record<string, unknown>;
             finalAudioUrl =
-              (firstTrack.audio_preview as string) || (firstTrack.track_mp3 as string) || null;
+              String(firstTrack.audio_preview || "") || String(firstTrack.track_mp3 || "") || null;
           }
         } catch (e) {
           console.error(`Error parsing track data for product ${product.id}:`, e);
@@ -386,7 +390,7 @@ router.get("/products/:id", async (req, res, next): Promise<void> => {
     // Helper function to find metadata value
     const findMetaValue = (key: string): string | number | boolean | null => {
       const meta = product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === key);
-      return meta ? (meta.value as string | number | boolean | null) : null;
+      return meta?.value ?? null;
     };
 
     // Helper function to check tags
@@ -410,11 +414,11 @@ router.get("/products/:id", async (req, res, next): Promise<void> => {
       audio_url: finalAudioUrl,
       hasVocals: findMetaValue("has_vocals") === "yes" || hasTagWithName("vocals"),
       stems: findMetaValue("stems") === "yes" || hasTagWithName("stems"),
-      bpm: findMetaValue("bpm") as string,
-      key: findMetaValue("key") as string,
-      mood: findMetaValue("mood") as string,
-      instruments: findMetaValue("instruments") as string,
-      duration: findMetaValue("duration") as string,
+      bpm: String(findMetaValue("bpm") || ""),
+      key: String(findMetaValue("key") || ""),
+      mood: String(findMetaValue("mood") || ""),
+      instruments: String(findMetaValue("instruments") || ""),
+      duration: String(findMetaValue("duration") || ""),
       is_free: product.price === "0" || product.price === "",
     };
 

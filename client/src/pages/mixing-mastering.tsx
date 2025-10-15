@@ -645,109 +645,20 @@ function MixingMasteringContent() {
           },
         });
 
-        // Create payment intent for the service with enhanced metadata
-        logger.logInfo("Creating payment intent", {
-          component: "mixing_mastering",
-          action: "payment_intent_creation",
-          userId: clerkUser.id,
-          reservationId: reservationResult.id,
-          amount: selectedServiceData?.price || 0,
-        });
-
-        const paymentIntentData = {
-          amount: selectedServiceData?.price || 0,
-          currency: "usd",
-          metadata: {
-            type: "service_reservation",
-            reservationId: reservationResult.id,
-            service: selectedService,
-            serviceName: selectedServiceData?.name || "Mixing & Mastering",
-            customerName: validatedData.name,
-            customerEmail: validatedData.email,
-            userId: clerkUser.id,
-            trackCount: validatedData.trackCount || "1",
-            genre: validatedData.genre || "Unknown",
-            preferredDate: validatedData.preferredDate,
-            timeSlot: validatedData.timeSlot,
-          },
-        };
-
-        const paymentData = (await submitForm(
-          "/api/payment/stripe/create-payment-intent",
-          paymentIntentData
-        )) as {
-          clientSecret: string;
-          paymentIntentId: string;
-        };
-
-        logger.logInfo("Payment intent created successfully", {
-          component: "mixing_mastering",
-          action: "payment_intent_created",
-          userId: clerkUser.id,
-          reservationId: reservationResult.id,
-          paymentIntentId: paymentData.paymentIntentId,
-          hasClientSecret: !!paymentData.clientSecret,
-        });
-
-        // Store payment info in enhanced multi-services format
+        // Create pending payment for checkout (consistent with other services)
         const pendingPayment = {
-          clientSecret: paymentData.clientSecret,
-          paymentIntentId: paymentData.paymentIntentId,
           service: selectedService,
           serviceName: selectedServiceData?.name || "Mixing & Mastering",
           serviceDetails: validatedData.projectDetails,
+          reservationId: reservationResult.id,
           price: selectedServiceData?.price || 0,
           quantity: 1,
-          reservationId: reservationResult.id,
-          metadata: {
-            trackCount: validatedData.trackCount || "1",
-            genre: validatedData.genre || "Unknown",
-            preferredDate: validatedData.preferredDate,
-            timeSlot: validatedData.timeSlot,
-            customerName: validatedData.name,
-            customerEmail: validatedData.email,
-          },
-          createdAt: new Date().toISOString(),
         };
 
-        // Enhanced session storage management
-        try {
-          const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
-
-          // Remove any existing service with the same reservation ID to avoid duplicates
-          const filteredServices = existingServices.filter(
-            (service: any) => service.reservationId !== reservationResult.id
-          );
-
-          const updatedServices = [...filteredServices, pendingPayment];
-          sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
-
-          // Also store a backup in case of session storage issues
-          sessionStorage.setItem("lastReservationPayment", JSON.stringify(pendingPayment));
-
-          logger.logInfo("Session storage updated successfully", {
-            component: "mixing_mastering",
-            action: "session_storage_update",
-            userId: clerkUser.id,
-            reservationId: reservationResult.id,
-            totalServices: updatedServices.length,
-          });
-        } catch (storageError) {
-          logger.logError("Failed to update session storage", storageError, {
-            errorType: "api",
-            component: "mixing_mastering",
-            action: "session_storage_error",
-            userId: clerkUser.id,
-            reservationId: reservationResult.id,
-          });
-
-          // Continue with checkout even if session storage fails
-          toast({
-            title: "Warning",
-            description: "Payment info may not persist. Please complete checkout immediately.",
-            variant: "default",
-          });
-        }
+        // Add to existing services array (consistent with other services)
+        const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
+        const updatedServices = [...existingServices, pendingPayment];
+        sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
 
         const submissionTime = submissionTimer();
 

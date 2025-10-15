@@ -352,7 +352,9 @@ export type {
 } from "../validation";
 
 // Convex and Stripe webhook types
+export * from "./ConvexOrder";
 export * from "./ConvexReservation";
+export * from "./ConvexUser";
 export * from "./StripeWebhook";
 
 // ================================

@@ -33,78 +33,104 @@
     - Include reservation details and next steps in confirmation emails
     - _Requirements: 4.2_
 
-  - [ ]\* 3.3 Add webhook idempotency and error recovery
+  - [x] 3.3 Add webhook idempotency and error recovery
     - Implement duplicate webhook detection and handling
     - Add dead letter queue for failed webhook processing
     - Create manual reconciliation tools for payment issues
     - _Requirements: 4.3, 4.4_
 
-- [ ] 4. Update reservation system integration
-  - [ ] 4.1 Link reservations to Stripe checkout sessions
+- [x] 4. Update reservation system integration
+  - [x] 4.1 Link reservations to Stripe checkout sessions
     - Modify reservation creation to support payment session tracking
     - Add payment status fields to reservation data model
     - Implement proper status transitions throughout payment flow
     - _Requirements: 1.4, 1.5, 4.1_
 
-  - [ ] 4.2 Implement reservation status management
+  - [x] 4.2 Implement reservation status management
     - Create functions to update reservation status based on payment events
     - Add validation for status transitions (pending -> paid -> confirmed)
     - Implement proper error handling for status update failures
     - _Requirements: 1.5, 4.1_
 
-- [ ] 5. Enhance checkout page for mixed cart handling
-  - [ ] 5.1 Update checkout page to properly handle services + beats
+- [x] 5. Enhance checkout page for mixed cart handling
+  - [x] 5.1 Update checkout page to properly handle services + beats
     - Modify checkout logic to combine services and cart items correctly
     - Ensure proper metadata is passed to Stripe for mixed purchases
     - Update UI to clearly show both service and beat items
     - _Requirements: 2.1, 2.2, 2.3_
 
-  - [ ] 5.2 Implement proper session storage cleanup
+  - [x] 5.2 Implement proper session storage cleanup
     - Add cleanup logic for successful payments
     - Ensure pending services are cleared after payment completion
     - Implement proper error recovery for interrupted payment flows
     - _Requirements: 2.4, 3.3_
 
-- [ ] 6. Add comprehensive error handling and user feedback
-  - [ ] 6.1 Implement frontend error recovery mechanisms
+- [x] 6. Add comprehensive error handling and user feedback
+  - [x] 6.1 Implement frontend error recovery mechanisms
     - Add retry buttons for failed payment attempts
     - Implement proper error message display for various failure scenarios
     - Add fallback options when Stripe is unavailable
     - _Requirements: 3.1, 3.2, 3.5_
 
-  - [ ] 6.2 Create authentication error handling
+  - [x] 6.2 Create authentication error handling
     - Add proper handling for expired authentication during checkout
     - Implement re-authentication prompts with session preservation
     - Ensure secure handling of user data during auth failures
     - _Requirements: 5.1, 5.5_
 
-- [ ] 7. Implement security enhancements
-  - [ ] 7.1 Add payment authentication validation
+- [x] 7. Implement security enhancements
+  - [x] 7.1 Add payment authentication validation
     - Validate user authentication before creating checkout sessions
     - Implement proper user identification in payment metadata
     - Add CSRF protection for payment-related endpoints
     - _Requirements: 5.1, 5.2, 5.3_
 
-  - [ ] 7.2 Enhance webhook security validation
+  - [x] 7.2 Enhance webhook security validation
     - Implement additional webhook signature validation
     - Add security headers validation for webhook requests
     - Create logging and alerting for invalid webhook attempts
     - _Requirements: 5.4_
 
-- [ ]\* 8. Add comprehensive testing coverage
-  - [ ]\* 8.1 Create unit tests for payment components
+- [x] 8. Complete webhook handler implementation
+  - [x] 8.1 Finish TODO items in webhook handlers
+    - Complete the handleCheckoutCompleted function implementation
+    - Implement reservation status updates in webhook processing
+    - Add proper error handling for failed webhook operations
+    - _Requirements: 4.1, 4.2, 4.3_
+
+  - [x] 8.2 Fix reservation metadata parsing in webhooks
+    - Update webhook to properly parse reservationIds from JSON string
+    - Ensure proper error handling for malformed reservation data
+    - Add validation for reservation existence before status updates
+    - _Requirements: 4.1, 4.3_
+
+- [x] 9. Resolve TypeScript and code quality issues
+  - [x] 9.1 Fix TypeScript assertion warnings
+    - Remove unnecessary type assertions in server routes
+    - Improve type safety without explicit casting
+    - Update function signatures to match actual usage
+    - _Requirements: All requirements_
+
+  - [x] 9.2 Reduce cognitive complexity in large functions
+    - Refactor complex webhook processing functions
+    - Break down large functions into smaller, focused utilities
+    - Improve code maintainability and readability
+    - _Requirements: All requirements_
+
+- [ ]\* 10. Add comprehensive testing coverage
+  - [ ]\* 10.1 Create unit tests for payment components
     - Write tests for EnhancedPaymentForm component with various scenarios
     - Test checkout page logic with mixed cart combinations
     - Test error handling and retry mechanisms
     - _Requirements: All requirements_
 
-  - [ ]\* 8.2 Create integration tests for payment flow
+  - [ ]\* 10.2 Create integration tests for payment flow
     - Test end-to-end reservation to payment completion flow
     - Test webhook processing with various Stripe events
     - Test error scenarios and recovery mechanisms
     - _Requirements: All requirements_
 
-  - [ ]\* 8.3 Add manual testing scenarios and documentation
+  - [ ]\* 10.3 Add manual testing scenarios and documentation
     - Create test cases for happy path payment flows
     - Document error scenario testing procedures
     - Create debugging guides for payment issues
