@@ -11,7 +11,7 @@ import {
 } from "@/services/OptimizedSyncManager";
 import { useDashboardStore } from "@/store/useDashboardStore";
 import type { DashboardData } from "@shared/types/dashboard";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface UseOptimizedDashboardSyncOptions {
   /** Enable automatic sync on mount */
@@ -155,7 +155,7 @@ export function useOptimizedDashboardSync(options: UseOptimizedDashboardSyncOpti
         }));
       }
     }
-  });
+  }, [state.syncManager, state.isSyncing]);
 
   // Set up periodic sync
   useEffect(() => {
@@ -274,6 +274,7 @@ export function useSectionSync(section: string, priority = 5) {
         unregisterSection(section, element);
       };
     }
+    return undefined;
   }, [section, priority, registerSection, unregisterSection]);
 
   return elementRef;

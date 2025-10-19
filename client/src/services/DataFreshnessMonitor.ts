@@ -40,6 +40,11 @@ export interface FreshnessMonitorConfig {
 }
 
 /**
+ * Freshness status type
+ */
+export type FreshnessStatusType = "fresh" | "warning" | "stale" | "critical";
+
+/**
  * Freshness status for a data section
  */
 export interface SectionFreshnessStatus {
@@ -50,7 +55,7 @@ export interface SectionFreshnessStatus {
   /** Data age in milliseconds */
   age: number;
   /** Freshness status */
-  status: "fresh" | "warning" | "stale" | "critical";
+  status: FreshnessStatusType;
   /** Whether auto-refresh is needed */
   needsRefresh: boolean;
   /** Next check timestamp */
@@ -68,7 +73,7 @@ export interface FreshnessMonitoringStatus {
   /** Next check timestamp */
   nextCheck: number;
   /** Overall freshness status */
-  overallStatus: "fresh" | "warning" | "stale" | "critical";
+  overallStatus: FreshnessStatusType;
   /** Section-specific statuses */
   sections: Record<string, SectionFreshnessStatus>;
   /** Auto-refresh attempts made */
@@ -78,16 +83,21 @@ export interface FreshnessMonitoringStatus {
 }
 
 /**
+ * Freshness event type
+ */
+export type FreshnessEventType =
+  | "freshness_warning"
+  | "freshness_critical"
+  | "auto_refresh_triggered"
+  | "refresh_completed"
+  | "refresh_failed";
+
+/**
  * Freshness event for notifications
  */
 export interface FreshnessEvent {
   /** Event type */
-  type:
-    | "freshness_warning"
-    | "freshness_critical"
-    | "auto_refresh_triggered"
-    | "refresh_completed"
-    | "refresh_failed";
+  type: FreshnessEventType;
   /** Section affected */
   section?: string;
   /** Event timestamp */
@@ -102,12 +112,42 @@ export interface FreshnessEvent {
 
 export class DataFreshnessMonitor {
   private config: FreshnessMonitorConfig;
-  private logger = getErrorLoggingService();
-  private validationService = getDataValidationService();
-  private monitoringStatus: FreshnessMonitoringStatus;
+  private readonly logger = getErrorLoggingService();
+  private readonly validationService = getDataValidationService();
+  private readonly monitoringStatus: FreshnessMonitoringStatus;
   private checkTimer?: NodeJS.Timeout;
-  private eventListeners = new Set<(event: FreshnessEvent) => void>();
+  private readonly eventListeners = new Set<(event: FreshnessEvent) => void>();
   private isDestroyed = false;
+
+  /**
+   * Helper to create browser environment for error logging
+   */
+  private createBrowserEnvironment(): {
+    userAgent: string;
+    url: string;
+    timestamp: number;
+    onlineStatus: boolean;
+    viewport: { width: number; height: number };
+    screen: { width: number; height: number };
+  } {
+    const hasWindow = globalThis.window !== undefined;
+    const hasNavigator = typeof navigator !== "undefined";
+
+    return {
+      userAgent: hasNavigator ? navigator.userAgent : "unknown",
+      url: hasWindow ? globalThis.window.location.href : "unknown",
+      timestamp: Date.now(),
+      onlineStatus: hasNavigator ? navigator.onLine : true,
+      viewport: {
+        width: hasWindow ? globalThis.window.innerWidth : 0,
+        height: hasWindow ? globalThis.window.innerHeight : 0,
+      },
+      screen: {
+        width: hasWindow ? globalThis.window.screen.width : 0,
+        height: hasWindow ? globalThis.window.screen.height : 0,
+      },
+    };
+  }
 
   constructor(config: Partial<FreshnessMonitorConfig> = {}) {
     this.config = {
@@ -253,20 +293,7 @@ export class DataFreshnessMonitor {
           userActions: [],
           technicalDetails: {
             stackTrace: error instanceof Error ? error.stack : undefined,
-            environment: {
-              userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
-              url: typeof window !== "undefined" ? window.location.href : "unknown",
-              timestamp: Date.now(),
-              onlineStatus: typeof navigator !== "undefined" ? navigator.onLine : true,
-              viewport: {
-                width: typeof window !== "undefined" ? window.innerWidth : 0,
-                height: typeof window !== "undefined" ? window.innerHeight : 0,
-              },
-              screen: {
-                width: typeof window !== "undefined" ? window.screen.width : 0,
-                height: typeof window !== "undefined" ? window.screen.height : 0,
-              },
-            },
+            environment: this.createBrowserEnvironment(),
             additionalContext: { component: "DataFreshnessMonitor", action: "checkFreshness" },
           },
           fingerprint: `freshness-check-${Date.now()}`,
@@ -341,20 +368,7 @@ export class DataFreshnessMonitor {
           userActions: [],
           technicalDetails: {
             stackTrace: error instanceof Error ? error.stack : undefined,
-            environment: {
-              userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
-              url: typeof window !== "undefined" ? window.location.href : "unknown",
-              timestamp: Date.now(),
-              onlineStatus: typeof navigator !== "undefined" ? navigator.onLine : true,
-              viewport: {
-                width: typeof window !== "undefined" ? window.innerWidth : 0,
-                height: typeof window !== "undefined" ? window.innerHeight : 0,
-              },
-              screen: {
-                width: typeof window !== "undefined" ? window.screen.width : 0,
-                height: typeof window !== "undefined" ? window.screen.height : 0,
-              },
-            },
+            environment: this.createBrowserEnvironment(),
             additionalContext: { component: "DataFreshnessMonitor", action: "forceRefresh" },
           },
           fingerprint: `refresh-failed-${Date.now()}`,
@@ -438,7 +452,7 @@ export class DataFreshnessMonitor {
   private async performScheduledCheck(): Promise<void> {
     try {
       await this.checkFreshness();
-    } catch (error) {
+    } catch {
       // Error already logged in checkFreshness
     }
 
@@ -455,7 +469,7 @@ export class DataFreshnessMonitor {
       const age = now - lastUpdated;
 
       // Determine freshness status
-      let status: "fresh" | "warning" | "stale" | "critical" = "fresh";
+      let status: FreshnessStatusType = "fresh";
       let needsRefresh = false;
 
       if (age > this.config.criticalThreshold) {
@@ -514,18 +528,20 @@ export class DataFreshnessMonitor {
     const sectionStatuses = Object.values(this.monitoringStatus.sections);
 
     // Determine overall status based on worst section status
-    let overallStatus: "fresh" | "warning" | "stale" | "critical" = "fresh";
+    let overallStatus: FreshnessStatusType = "fresh";
 
     for (const sectionStatus of sectionStatuses) {
       if (sectionStatus.status === "critical") {
         overallStatus = "critical";
         break;
-      } else if (sectionStatus.status === "stale" && overallStatus !== "critical") {
+      }
+
+      if (sectionStatus.status === "stale") {
         overallStatus = "stale";
-      } else if (
-        sectionStatus.status === "warning" &&
-        (overallStatus === "fresh" || overallStatus === "warning")
-      ) {
+        continue;
+      }
+
+      if (sectionStatus.status === "warning" && overallStatus === "fresh") {
         overallStatus = "warning";
       }
     }
@@ -621,20 +637,7 @@ export class DataFreshnessMonitor {
           userActions: [],
           technicalDetails: {
             stackTrace: error instanceof Error ? error.stack : undefined,
-            environment: {
-              userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
-              url: typeof window !== "undefined" ? window.location.href : "unknown",
-              timestamp: Date.now(),
-              onlineStatus: typeof navigator !== "undefined" ? navigator.onLine : true,
-              viewport: {
-                width: typeof window !== "undefined" ? window.innerWidth : 0,
-                height: typeof window !== "undefined" ? window.innerHeight : 0,
-              },
-              screen: {
-                width: typeof window !== "undefined" ? window.screen.width : 0,
-                height: typeof window !== "undefined" ? window.screen.height : 0,
-              },
-            },
+            environment: this.createBrowserEnvironment(),
             additionalContext: { component: "DataFreshnessMonitor", action: "triggerAutoRefresh" },
           },
           fingerprint: `auto-refresh-failed-${Date.now()}`,
@@ -672,9 +675,7 @@ let dataFreshnessMonitorInstance: DataFreshnessMonitor | null = null;
 export const getDataFreshnessMonitor = (
   config?: Partial<FreshnessMonitorConfig>
 ): DataFreshnessMonitor => {
-  if (!dataFreshnessMonitorInstance) {
-    dataFreshnessMonitorInstance = new DataFreshnessMonitor(config);
-  }
+  dataFreshnessMonitorInstance ??= new DataFreshnessMonitor(config);
   return dataFreshnessMonitorInstance;
 };
 

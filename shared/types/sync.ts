@@ -108,13 +108,23 @@ export enum SyncErrorType {
 }
 
 /**
+ * Error severity levels
+ */
+export type ErrorSeverity = "low" | "medium" | "high" | "critical";
+
+/**
+ * Error category types
+ */
+export type ErrorCategory = "connection" | "data" | "auth" | "system" | "user";
+
+/**
  * Enhanced sync error with recovery metadata
  */
 export interface EnhancedSyncError extends SyncError {
   /** Error severity level */
-  severity: "low" | "medium" | "high" | "critical";
+  severity: ErrorSeverity;
   /** Error category for grouping */
-  category: "connection" | "data" | "auth" | "system" | "user";
+  category: ErrorCategory;
   /** Recovery strategy recommendation */
   recoveryStrategy: RecoveryStrategyType;
   /** User-friendly error message */
@@ -764,9 +774,9 @@ export interface EventBusInterface {
   /** Get metrics */
   getMetrics(): EventMetrics;
   /** Add listener (EventEmitter method) */
-  addListener(eventName: string | symbol, listener: (...args: any[]) => void): this;
+  addListener(eventName: string | symbol, listener: (...args: unknown[]) => void): this;
   /** Prepend listener (EventEmitter method) */
-  prependListener(eventName: string | symbol, listener: (...args: any[]) => void): this;
+  prependListener(eventName: string | symbol, listener: (...args: unknown[]) => void): this;
 }
 
 /**
@@ -897,7 +907,7 @@ export type HandlerResult = void | Promise<void> | boolean | Promise<boolean>;
 /**
  * Handler function with error handling
  */
-export interface SafeHandler<T extends (...args: any[]) => unknown> {
+export interface SafeHandler<T extends (...args: unknown[]) => unknown> {
   /** The actual handler function */
   handler: T;
   /** Error handling for the handler */

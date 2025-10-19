@@ -163,7 +163,11 @@ export const ModernDashboard = memo(() => {
   } = useDashboardData({
     includeChartData: true,
     includeTrends: true,
-    activityLimit: isMobile ? 10 : isTablet ? 15 : 20,
+    activityLimit: (() => {
+      if (isMobile) return 10;
+      if (isTablet) return 15;
+      return 20;
+    })(),
     ordersLimit: 20,
     downloadsLimit: 50,
     favoritesLimit: 50,
@@ -215,7 +219,9 @@ export const ModernDashboard = memo(() => {
 
   // Use real stats from unified store - no fallbacks or recalculation needed
   const consistentStats = useMemo(() => {
-    if (!stats || !isInitialized) return null;
+    if (!stats || !isInitialized) {
+      return null;
+    }
 
     // The unified store provides real, validated stats from Convex
     console.log("Real Dashboard Stats:", {
@@ -259,12 +265,9 @@ export const ModernDashboard = memo(() => {
 
   // Memoized components for performance
   const statsComponent = useMemo(() => {
-    if (isLoading && !isInitialized) {
-      return <StatsCardsSkeleton />;
-    }
+    const shouldShowSkeleton = (isLoading && !isInitialized) || !consistentStats;
 
-    // Only show stats if we have real data - no fallback to empty stats
-    if (!consistentStats) {
+    if (shouldShowSkeleton) {
       return <StatsCardsSkeleton />;
     }
 
@@ -280,7 +283,8 @@ export const ModernDashboard = memo(() => {
   }, [consistentStats, isLoading, isInitialized, config.ui.animationDuration]);
 
   // Error handling
-  if (!isAuthenticated && !isLoading) {
+  const shouldShowAuthError = !isAuthenticated && !isLoading;
+  if (shouldShowAuthError) {
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -298,7 +302,8 @@ export const ModernDashboard = memo(() => {
   }
 
   // Loading state
-  if (isLoading && !user) {
+  const shouldShowLoadingSkeleton = isLoading && !user;
+  if (shouldShowLoadingSkeleton) {
     return <DashboardSkeleton />;
   }
 
@@ -379,7 +384,11 @@ export const ModernDashboard = memo(() => {
                         <ActivityFeed
                           activities={activity || []}
                           isLoading={isLoading}
-                          maxItems={isMobile ? 4 : isTablet ? 6 : 8}
+                          maxItems={(() => {
+                            if (isMobile) return 4;
+                            if (isTablet) return 6;
+                            return 8;
+                          })()}
                         />
                       )}
                     </ContentSection>
@@ -394,32 +403,45 @@ export const ModernDashboard = memo(() => {
 
                 {/* Analytics Tab */}
                 <TabContentWrapper value="analytics">
-                  {config.features.analyticsCharts && isInitialized && trends ? (
-                    <EnhancedAnalytics
-                      data={chartData || []}
-                      trends={trends}
-                      isLoading={isLoading}
-                    />
-                  ) : isLoading ? (
-                    <Card className="bg-gray-900/50 border-gray-700/50">
-                      <CardContent className="p-6 text-center">
-                        <div className="animate-pulse">
-                          <div className="h-4 bg-gray-700 rounded w-1/2 mx-auto mb-2" />
-                          <div className="h-3 bg-gray-700 rounded w-1/3 mx-auto" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Card className="bg-gray-900/50 border-gray-700/50">
-                      <CardContent className="p-6 text-center">
-                        <p className="text-gray-400">
-                          {!config.features.analyticsCharts
-                            ? "Analytics features are currently disabled."
-                            : "No analytics data available yet. Start using the platform to see your trends."}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  )}
+                  {(() => {
+                    const hasAnalyticsData =
+                      config.features.analyticsCharts && isInitialized && trends;
+
+                    if (hasAnalyticsData) {
+                      return (
+                        <EnhancedAnalytics
+                          data={chartData || []}
+                          trends={trends}
+                          isLoading={isLoading}
+                        />
+                      );
+                    }
+
+                    if (isLoading) {
+                      return (
+                        <Card className="bg-gray-900/50 border-gray-700/50">
+                          <CardContent className="p-6 text-center">
+                            <div className="animate-pulse">
+                              <div className="h-4 bg-gray-700 rounded w-1/2 mx-auto mb-2" />
+                              <div className="h-3 bg-gray-700 rounded w-1/3 mx-auto" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    }
+
+                    const message = config.features.analyticsCharts
+                      ? "No analytics data available yet. Start using the platform to see your trends."
+                      : "Analytics features are currently disabled.";
+
+                    return (
+                      <Card className="bg-gray-900/50 border-gray-700/50">
+                        <CardContent className="p-6 text-center">
+                          <p className="text-gray-400">{message}</p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
                 </TabContentWrapper>
 
                 {/* Activity Tab */}
@@ -430,7 +452,11 @@ export const ModernDashboard = memo(() => {
                     <ActivityFeed
                       activities={activity || []}
                       isLoading={isLoading}
-                      maxItems={isMobile ? 10 : isTablet ? 15 : 20}
+                      maxItems={(() => {
+                        if (isMobile) return 10;
+                        if (isTablet) return 15;
+                        return 20;
+                      })()}
                       showHeader={false}
                     />
                   )}
@@ -494,9 +520,7 @@ export const ModernDashboard = memo(() => {
                       <CardContent className="space-y-4 p-4 sm:p-6">
                         <div className="space-y-3">
                           <div>
-                            <label className="text-xs sm:text-sm font-medium text-white">
-                              Full Name
-                            </label>
+                            <p className="text-xs sm:text-sm font-medium text-white">Full Name</p>
                             <p className="text-muted-foreground text-xs sm:text-sm">
                               {user?.firstName && user?.lastName
                                 ? `${user.firstName} ${user.lastName}`
@@ -504,26 +528,22 @@ export const ModernDashboard = memo(() => {
                             </p>
                           </div>
                           <div>
-                            <label className="text-xs sm:text-sm font-medium text-white">
-                              Email
-                            </label>
+                            <p className="text-xs sm:text-sm font-medium text-white">Email</p>
                             <p className="text-muted-foreground text-xs sm:text-sm">
                               {user?.email || clerkUser?.primaryEmailAddress?.emailAddress || ""}
                             </p>
                           </div>
                           <div>
-                            <label className="text-xs sm:text-sm font-medium text-white">
-                              Username
-                            </label>
+                            <p className="text-xs sm:text-sm font-medium text-white">Username</p>
                             <p className="text-muted-foreground text-xs sm:text-sm">
                               {user?.username || clerkUser?.username || "Not set"}
                             </p>
                           </div>
                           {user?.subscription && (
                             <div>
-                              <label className="text-xs sm:text-sm font-medium text-white">
+                              <p className="text-xs sm:text-sm font-medium text-white">
                                 Subscription
-                              </label>
+                              </p>
                               <p className="text-muted-foreground text-xs sm:text-sm">
                                 {user.subscription.planId} - {user.subscription.status}
                               </p>
@@ -553,17 +573,17 @@ export const ModernDashboard = memo(() => {
                       <CardContent className="space-y-4 p-4 sm:p-6">
                         <div className="space-y-3">
                           <div>
-                            <label className="text-xs sm:text-sm font-medium text-white">
+                            <p className="text-xs sm:text-sm font-medium text-white">
                               Real-time Updates
-                            </label>
+                            </p>
                             <p className="text-muted-foreground text-xs sm:text-sm">
                               {config.features.realtimeUpdates ? "Enabled" : "Disabled"}
                             </p>
                           </div>
                           <div>
-                            <label className="text-xs sm:text-sm font-medium text-white">
+                            <p className="text-xs sm:text-sm font-medium text-white">
                               Analytics Charts
-                            </label>
+                            </p>
                             <p className="text-muted-foreground text-xs sm:text-sm">
                               {config.features.analyticsCharts ? "Enabled" : "Disabled"}
                             </p>

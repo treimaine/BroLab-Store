@@ -28,11 +28,15 @@ import { SyncManager, type SyncMetrics } from "./SyncManager";
 // ================================
 
 export interface OptimizedSyncConfig {
-  // Base sync config
+  // Base sync config (from ConnectionConfig)
   websocketUrl?: string;
   pollingUrl?: string;
   pollingInterval?: number;
   maxReconnectAttempts?: number;
+  reconnectBackoffBase?: number;
+  reconnectBackoffMax?: number;
+  heartbeatInterval?: number;
+  connectionTimeout?: number;
 
   // Performance optimization config
   enableBatching?: boolean;
@@ -104,7 +108,7 @@ export interface OptimizedSyncMetrics extends SyncMetrics {
 // ================================
 
 export class OptimizedSyncManager extends SyncManager {
-  private override config: OptimizedSyncConfig;
+  private readonly optimizedConfig: OptimizedSyncConfig;
 
   // Performance optimization components
   private batchProcessor: BatchProcessor<DashboardData> | null = null;
@@ -115,19 +119,23 @@ export class OptimizedSyncManager extends SyncManager {
   private smartCache: SmartCache<DashboardData> | null = null;
 
   // Optimization state
-  private pendingUpdates: BatchedUpdate<DashboardData>[] = [];
+  private readonly pendingUpdates: BatchedUpdate<DashboardData>[] = [];
   private memoryCleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(config: OptimizedSyncConfig = {}) {
-    // Initialize base SyncManager
+    // Initialize base SyncManager with all required ConnectionConfig properties
     super({
-      websocketUrl: config.websocketUrl,
-      pollingUrl: config.pollingUrl,
-      pollingInterval: config.pollingInterval,
-      maxReconnectAttempts: config.maxReconnectAttempts,
+      websocketUrl: config.websocketUrl || "",
+      pollingUrl: config.pollingUrl || "",
+      pollingInterval: config.pollingInterval || 30000,
+      maxReconnectAttempts: config.maxReconnectAttempts || 5,
+      reconnectBackoffBase: config.reconnectBackoffBase || 1000,
+      reconnectBackoffMax: config.reconnectBackoffMax || 30000,
+      heartbeatInterval: config.heartbeatInterval || 30000,
+      connectionTimeout: config.connectionTimeout || 10000,
     });
 
-    this.config = {
+    this.optimizedConfig = {
       // Default optimizations enabled
       enableBatching: config.enableBatching ?? true,
       enableDeduplication: config.enableDeduplication ?? true,
@@ -170,83 +178,109 @@ export class OptimizedSyncManager extends SyncManager {
    * Optimized data update with batching and deduplication
    */
   public async updateData(section: string, data: Partial<DashboardData>): Promise<void> {
+    if (this.shouldSkipUpdate(section, data)) {
+      return;
+    }
+
+    this.invalidateCacheForSection(section);
+
+    if (this.shouldBatchUpdate()) {
+      this.addToBatch(section, data);
+    } else {
+      await this.performUpdate(section, data);
+    }
+  }
+
+  private shouldSkipUpdate(section: string, data: Partial<DashboardData>): boolean {
     // Check deduplication
-    if (this.deduplicator && this.config.enableDeduplication) {
+    if (this.deduplicator && this.optimizedConfig.enableDeduplication) {
       if (this.deduplicator.isDuplicate(`update:${section}`, data)) {
-        return; // Skip duplicate update
+        return true;
       }
     }
 
     // Check selective sync
-    if (this.selectiveSyncManager && this.config.enableSelectiveSync) {
+    if (this.selectiveSyncManager && this.optimizedConfig.enableSelectiveSync) {
       if (!this.selectiveSyncManager.shouldSync(section)) {
-        return; // Skip non-visible section
+        return true;
       }
     }
 
-    // Check cache
-    if (this.smartCache && this.config.enableSmartCaching) {
-      // Invalidate related cache entries
+    return false;
+  }
+
+  private invalidateCacheForSection(section: string): void {
+    if (this.smartCache && this.optimizedConfig.enableSmartCaching) {
       this.smartCache.smartInvalidate(section);
     }
+  }
 
-    // Add to batch if batching is enabled
-    if (this.batchProcessor && this.config.enableBatching) {
-      const priority = this.selectiveSyncManager?.getSyncPriority(section) || 5;
+  private shouldBatchUpdate(): boolean {
+    return Boolean(this.batchProcessor && this.optimizedConfig.enableBatching);
+  }
 
-      this.batchProcessor.add({
-        id: `update_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        type: `update:${section}`,
-        data: data as DashboardData,
-        timestamp: Date.now(),
-        priority,
-      });
-    } else {
-      // Direct update without batching
-      await this.performUpdate(section, data);
-    }
+  private addToBatch(section: string, data: Partial<DashboardData>): void {
+    if (!this.batchProcessor) return;
+
+    const priority = this.selectiveSyncManager?.getSyncPriority(section) || 5;
+
+    this.batchProcessor.add({
+      id: `update_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+      type: `update:${section}`,
+      data: data as DashboardData,
+      timestamp: Date.now(),
+      priority,
+    });
   }
 
   /**
    * Get data with caching
    */
   public async getData(section: string): Promise<DashboardData | null> {
-    // Check cache first
-    if (this.smartCache && this.config.enableSmartCaching) {
-      const cached = this.smartCache.get(`data:${section}`);
-      if (cached) {
-        return cached;
-      }
+    const cachedData = this.getCachedData(section);
+    if (cachedData) {
+      return cachedData;
     }
 
-    // Check deduplication for concurrent requests
-    if (this.deduplicator && this.config.enableDeduplication) {
-      if (this.deduplicator.isDuplicate(`get:${section}`)) {
-        // Wait a bit and try cache again
-        await new Promise(resolve => setTimeout(resolve, 50));
-        if (this.smartCache) {
-          const cached = this.smartCache.get(`data:${section}`);
-          if (cached) return cached;
-        }
-      }
+    if (await this.shouldWaitForDuplicate(section)) {
+      const retryCache = this.getCachedData(section);
+      if (retryCache) return retryCache;
     }
 
-    // Fetch data
     const data = await this.fetchData(section);
-
-    // Cache the result
-    if (this.smartCache && this.config.enableSmartCaching && data) {
-      this.smartCache.set(`data:${section}`, data, this.config.cacheTTL);
-    }
+    this.cacheData(section, data);
 
     return data;
+  }
+
+  private getCachedData(section: string): DashboardData | null {
+    if (this.smartCache && this.optimizedConfig.enableSmartCaching) {
+      return this.smartCache.get(`data:${section}`) || null;
+    }
+    return null;
+  }
+
+  private async shouldWaitForDuplicate(section: string): Promise<boolean> {
+    if (this.deduplicator && this.optimizedConfig.enableDeduplication) {
+      if (this.deduplicator.isDuplicate(`get:${section}`)) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private cacheData(section: string, data: DashboardData | null): void {
+    if (this.smartCache && this.optimizedConfig.enableSmartCaching && data) {
+      this.smartCache.set(`data:${section}`, data, this.optimizedConfig.cacheTTL);
+    }
   }
 
   /**
    * Register section for selective sync
    */
   public registerSection(section: string, element: Element, priority = 5): void {
-    if (this.selectiveSyncManager && this.config.enableSelectiveSync) {
+    if (this.selectiveSyncManager && this.optimizedConfig.enableSelectiveSync) {
       this.selectiveSyncManager.registerSection(section, element, priority);
     }
   }
@@ -255,7 +289,7 @@ export class OptimizedSyncManager extends SyncManager {
    * Unregister section
    */
   public unregisterSection(section: string, element: Element): void {
-    if (this.selectiveSyncManager && this.config.enableSelectiveSync) {
+    if (this.selectiveSyncManager && this.optimizedConfig.enableSelectiveSync) {
       this.selectiveSyncManager.unregisterSection(section, element);
     }
   }
@@ -267,9 +301,9 @@ export class OptimizedSyncManager extends SyncManager {
     section: string,
     loader: (offset: number, limit: number) => Promise<T[]>
   ): Promise<T[]> {
-    if (!this.progressiveLoader || !this.config.enableProgressiveLoading) {
+    if (!this.progressiveLoader || !this.optimizedConfig.enableProgressiveLoading) {
       // Fallback to loading all at once
-      return loader(0, this.config.maxPageSize || 100);
+      return loader(0, this.optimizedConfig.maxPageSize || 100);
     }
 
     return this.progressiveLoader.loadNextPage(section, loader) as Promise<T[]>;
@@ -278,9 +312,9 @@ export class OptimizedSyncManager extends SyncManager {
   /**
    * Initialize progressive loading for section
    */
-  public initializeProgressiveLoading(section: string, totalItems: number): void {
-    if (this.progressiveLoader && this.config.enableProgressiveLoading) {
-      this.progressiveLoader.initializeSection(section, totalItems);
+  public initializeProgressiveLoading(_section: string, totalItems: number): void {
+    if (this.progressiveLoader && this.optimizedConfig.enableProgressiveLoading) {
+      this.progressiveLoader.initializeSection(_section, totalItems);
     }
   }
 
@@ -383,61 +417,58 @@ export class OptimizedSyncManager extends SyncManager {
 
   private initializeOptimizations(): void {
     // Initialize batch processor
-    if (this.config.enableBatching) {
-      this.batchProcessor = new BatchProcessor(
-        {
-          maxBatchSize: this.config.maxBatchSize,
-          maxWaitTime: this.config.maxBatchWaitTime,
-          adaptive: true,
-        },
-        this.processBatch.bind(this)
-      );
+    if (this.optimizedConfig.enableBatching) {
+      this.batchProcessor = new BatchProcessor(this.processBatch.bind(this), {
+        maxBatchSize: this.optimizedConfig.maxBatchSize,
+        maxWaitTime: this.optimizedConfig.maxBatchWaitTime,
+        adaptive: true,
+      });
     }
 
     // Initialize deduplicator
-    if (this.config.enableDeduplication) {
+    if (this.optimizedConfig.enableDeduplication) {
       this.deduplicator = new RequestDeduplicator({
-        timeWindow: this.config.deduplicationWindow,
+        timeWindow: this.optimizedConfig.deduplicationWindow,
         useFingerprints: true,
       });
     }
 
     // Initialize memory optimizer
-    if (this.config.enableMemoryOptimization) {
+    if (this.optimizedConfig.enableMemoryOptimization) {
       this.memoryOptimizer = new MemoryOptimizer({
-        maxEventHistory: this.config.maxEventHistory,
-        maxCacheEntries: this.config.maxCacheEntries,
-        cleanupInterval: this.config.memoryCleanupInterval,
+        maxEventHistory: this.optimizedConfig.maxEventHistory,
+        maxCacheEntries: this.optimizedConfig.maxCacheEntries,
+        cleanupInterval: this.optimizedConfig.memoryCleanupInterval,
       });
 
       // Schedule periodic cleanup
       this.memoryCleanupInterval = setInterval(() => {
         this.performMemoryCleanup();
-      }, this.config.memoryCleanupInterval);
+      }, this.optimizedConfig.memoryCleanupInterval);
     }
 
     // Initialize selective sync manager
-    if (this.config.enableSelectiveSync) {
+    if (this.optimizedConfig.enableSelectiveSync) {
       this.selectiveSyncManager = new SelectiveSyncManager({
-        syncOnlyVisible: this.config.syncOnlyVisible,
-        alwaysSyncSections: this.config.alwaysSyncSections,
+        syncOnlyVisible: this.optimizedConfig.syncOnlyVisible,
+        alwaysSyncSections: this.optimizedConfig.alwaysSyncSections,
       });
     }
 
     // Initialize progressive loader
-    if (this.config.enableProgressiveLoading) {
+    if (this.optimizedConfig.enableProgressiveLoading) {
       this.progressiveLoader = new ProgressiveLoader({
-        initialPageSize: this.config.initialPageSize,
-        maxPageSize: this.config.maxPageSize,
+        initialPageSize: this.optimizedConfig.initialPageSize,
+        maxPageSize: this.optimizedConfig.maxPageSize,
         infiniteScroll: true,
       });
     }
 
     // Initialize smart cache
-    if (this.config.enableSmartCaching) {
+    if (this.optimizedConfig.enableSmartCaching) {
       this.smartCache = new SmartCache({
-        defaultTTL: this.config.cacheTTL,
-        maxSize: this.config.maxCacheSize,
+        defaultTTL: this.optimizedConfig.cacheTTL,
+        maxSize: this.optimizedConfig.maxCacheSize,
         lruEviction: true,
         smartInvalidation: true,
       });
@@ -447,30 +478,10 @@ export class OptimizedSyncManager extends SyncManager {
   private async processBatch(items: BatchedUpdate<DashboardData>[]): Promise<BatchFlushResult> {
     const batchId = `batch_${Date.now()}`;
     const startTime = performance.now();
-    const errors: Error[] = [];
 
     try {
-      // Group updates by section
-      const updatesBySection = new Map<string, Partial<DashboardData>[]>();
-
-      for (const item of items) {
-        const section = item.type.replace("update:", "");
-        const existing = updatesBySection.get(section) || [];
-        existing.push(item.data);
-        updatesBySection.set(section, existing);
-      }
-
-      // Process each section
-      for (const [section, updates] of updatesBySection.entries()) {
-        try {
-          // Merge updates for the same section
-          const mergedUpdate = this.mergeUpdates(updates);
-          await this.performUpdate(section, mergedUpdate);
-        } catch (error) {
-          errors.push(error as Error);
-        }
-      }
-
+      const updatesBySection = this.groupUpdatesBySection(items);
+      const errors = await this.processGroupedUpdates(updatesBySection);
       const duration = performance.now() - startTime;
 
       return {
@@ -492,6 +503,38 @@ export class OptimizedSyncManager extends SyncManager {
     }
   }
 
+  private groupUpdatesBySection(
+    items: BatchedUpdate<DashboardData>[]
+  ): Map<string, Partial<DashboardData>[]> {
+    const updatesBySection = new Map<string, Partial<DashboardData>[]>();
+
+    for (const item of items) {
+      const section = item.type.replace("update:", "");
+      const existing = updatesBySection.get(section) || [];
+      existing.push(item.data);
+      updatesBySection.set(section, existing);
+    }
+
+    return updatesBySection;
+  }
+
+  private async processGroupedUpdates(
+    updatesBySection: Map<string, Partial<DashboardData>[]>
+  ): Promise<Error[]> {
+    const errors: Error[] = [];
+
+    for (const [section, updates] of updatesBySection.entries()) {
+      try {
+        const mergedUpdate = this.mergeUpdates(updates);
+        await this.performUpdate(section, mergedUpdate);
+      } catch (error) {
+        errors.push(error as Error);
+      }
+    }
+
+    return errors;
+  }
+
   private mergeUpdates(updates: Partial<DashboardData>[]): Partial<DashboardData> {
     // Merge multiple updates into one
     return updates.reduce((merged, update) => {
@@ -505,7 +548,7 @@ export class OptimizedSyncManager extends SyncManager {
     this.emit("data_updated", { section, data });
   }
 
-  private async fetchData(section: string): Promise<DashboardData | null> {
+  private async fetchData(_section: string): Promise<DashboardData | null> {
     // This would fetch data from the server
     // For now, return null and let the store handle it
     return null;
@@ -522,9 +565,7 @@ let optimizedSyncManagerInstance: OptimizedSyncManager | null = null;
  * Get the singleton OptimizedSyncManager instance
  */
 export const getOptimizedSyncManager = (config?: OptimizedSyncConfig): OptimizedSyncManager => {
-  if (!optimizedSyncManagerInstance) {
-    optimizedSyncManagerInstance = new OptimizedSyncManager(config);
-  }
+  optimizedSyncManagerInstance ??= new OptimizedSyncManager(config);
   return optimizedSyncManagerInstance;
 };
 

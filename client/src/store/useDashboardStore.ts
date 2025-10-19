@@ -167,6 +167,117 @@ const initialState: DashboardStoreState = {
 // ================================
 
 /**
+ * Apply add operation for optimistic update
+ */
+function applyAddOperation(
+  updatedData: DashboardData,
+  section: keyof DashboardData,
+  data: unknown
+): void {
+  if (Array.isArray(updatedData[section])) {
+    const sectionArray = updatedData[section] as unknown[];
+    (updatedData[section] as unknown[]) = [...sectionArray, data];
+  }
+}
+
+/**
+ * Apply update operation for optimistic update
+ */
+function applyUpdateOperation(
+  updatedData: DashboardData,
+  section: keyof DashboardData,
+  updateData: { id?: string | number; [key: string]: unknown }
+): void {
+  if (Array.isArray(updatedData[section])) {
+    const items = updatedData[section] as Array<{ id?: string | number }>;
+    const index = items.findIndex(item => item.id === updateData?.id);
+    if (index !== -1 && updateData) {
+      items[index] = { ...items[index], ...updateData };
+    }
+  } else if (
+    typeof updatedData[section] === "object" &&
+    updateData &&
+    !Array.isArray(updatedData[section])
+  ) {
+    const currentSection = updatedData[section];
+    Object.assign(currentSection, updateData);
+  }
+}
+
+/**
+ * Apply delete operation for optimistic update
+ */
+function applyDeleteOperation(
+  updatedData: DashboardData,
+  section: keyof DashboardData,
+  deleteData: { id?: string | number }
+): void {
+  if (Array.isArray(updatedData[section]) && deleteData?.id) {
+    const sectionArray = updatedData[section] as Array<{ id?: string | number }>;
+    (updatedData[section] as Array<{ id?: string | number }>) = sectionArray.filter(
+      item => item.id !== deleteData.id
+    );
+  }
+}
+
+/**
+ * Check if section needs stats recalculation
+ */
+function needsStatsRecalculation(section: keyof DashboardData): boolean {
+  return section === "favorites" || section === "downloads" || section === "orders";
+}
+
+/**
+ * Rollback add operation
+ */
+function rollbackAddOperation(
+  updatedData: DashboardData,
+  section: keyof DashboardData,
+  addData: { id?: string | number }
+): void {
+  if (Array.isArray(updatedData[section]) && addData?.id) {
+    const sectionArray = updatedData[section] as Array<{ id?: string | number }>;
+    (updatedData[section] as Array<{ id?: string | number }>) = sectionArray.filter(
+      item => item.id !== addData.id
+    );
+  }
+}
+
+/**
+ * Rollback update operation
+ */
+function rollbackUpdateOperation(
+  updatedData: DashboardData,
+  section: keyof DashboardData,
+  rollbackData: { id?: string | number; [key: string]: unknown }
+): void {
+  if (Array.isArray(updatedData[section])) {
+    const items = updatedData[section] as Array<{ id?: string | number }>;
+    const index = items.findIndex(item => item.id === rollbackData.id);
+    if (index !== -1) {
+      items[index] = rollbackData;
+    }
+  } else if (typeof updatedData[section] === "object" && !Array.isArray(updatedData[section])) {
+    const currentSection = updatedData[section];
+    Object.assign(currentSection, rollbackData);
+  }
+}
+
+/**
+ * Rollback delete operation
+ */
+function rollbackDeleteOperation(
+  updatedData: DashboardData,
+  section: keyof DashboardData,
+  rollbackData: unknown
+): void {
+  if (rollbackData && Array.isArray(updatedData[section])) {
+    const sectionArray = updatedData[section] as unknown[];
+    (updatedData[section] as unknown[]) = [...sectionArray, rollbackData];
+  }
+}
+
+/**
  * Generate consistent user stats with validation metadata
  */
 function generateConsistentStats(data: DashboardData): ConsistentUserStats {
@@ -505,40 +616,28 @@ export const useDashboardStore = create<DashboardStoreState & DashboardStoreActi
       const section = update.section as keyof DashboardData;
 
       try {
+        // Apply the appropriate operation based on update type
         switch (update.type) {
-          case "add":
-            if (Array.isArray(updatedData[section])) {
-              (updatedData[section] as any[]) = [...(updatedData[section] as any[]), update.data];
-            }
+          case "add": {
+            applyAddOperation(updatedData, section, update.data);
             break;
+          }
 
-          case "update":
-            // Type guard for update data
-            const updateData = update.data as { id?: string | number; [key: string]: any };
-            if (Array.isArray(updatedData[section])) {
-              const items = updatedData[section] as any[];
-              const index = items.findIndex(item => item.id === updateData?.id);
-              if (index !== -1 && updateData) {
-                items[index] = { ...items[index], ...updateData };
-              }
-            } else if (typeof updatedData[section] === "object" && updateData) {
-              (updatedData[section] as any) = { ...updatedData[section], ...updateData };
-            }
+          case "update": {
+            const updateData = update.data as { id?: string | number; [key: string]: unknown };
+            applyUpdateOperation(updatedData, section, updateData);
             break;
+          }
 
-          case "delete":
-            // Type guard for delete data
+          case "delete": {
             const deleteData = update.data as { id?: string | number };
-            if (Array.isArray(updatedData[section]) && deleteData?.id) {
-              (updatedData[section] as any[]) = (updatedData[section] as any[]).filter(
-                item => item.id !== deleteData.id
-              );
-            }
+            applyDeleteOperation(updatedData, section, deleteData);
             break;
+          }
         }
 
         // Recalculate stats if needed
-        if (section === "favorites" || section === "downloads" || section === "orders") {
+        if (needsStatsRecalculation(section)) {
           updatedData.stats = generateConsistentStats(updatedData);
         }
 
@@ -594,50 +693,33 @@ export const useDashboardStore = create<DashboardStoreState & DashboardStoreActi
         const section = update.section as keyof DashboardData;
 
         try {
-          // Reverse the optimistic update
+          // Reverse the optimistic update based on type
           switch (update.type) {
-            case "add":
-              // Remove the optimistically added item
+            case "add": {
               const addData = update.data as { id?: string | number };
-              if (Array.isArray(updatedData[section]) && addData?.id) {
-                (updatedData[section] as any[]) = (updatedData[section] as any[]).filter(
-                  item => item.id !== addData.id
-                );
-              }
+              rollbackAddOperation(updatedData, section, addData);
               break;
+            }
 
-            case "update":
-              // Restore the original data
+            case "update": {
               const rollbackData = update.rollbackData as {
                 id?: string | number;
-                [key: string]: any;
+                [key: string]: unknown;
               };
               if (rollbackData) {
-                if (Array.isArray(updatedData[section])) {
-                  const items = updatedData[section] as any[];
-                  const index = items.findIndex(item => item.id === rollbackData.id);
-                  if (index !== -1) {
-                    items[index] = rollbackData;
-                  }
-                } else if (typeof updatedData[section] === "object") {
-                  (updatedData[section] as any) = update.rollbackData;
-                }
+                rollbackUpdateOperation(updatedData, section, rollbackData);
               }
               break;
+            }
 
-            case "delete":
-              // Restore the deleted item
-              if (update.rollbackData && Array.isArray(updatedData[section])) {
-                (updatedData[section] as any[]) = [
-                  ...(updatedData[section] as unknown[]),
-                  update.rollbackData,
-                ];
-              }
+            case "delete": {
+              rollbackDeleteOperation(updatedData, section, update.rollbackData);
               break;
+            }
           }
 
           // Recalculate stats if needed
-          if (section === "favorites" || section === "downloads" || section === "orders") {
+          if (needsStatsRecalculation(section)) {
             updatedData.stats = generateConsistentStats(updatedData);
           }
 
@@ -826,13 +908,13 @@ export const useDashboardStore = create<DashboardStoreState & DashboardStoreActi
 
       // Notify subscribers
       if (handlers) {
-        handlers.forEach(handler => {
+        for (const handler of handlers) {
           try {
             handler(event);
           } catch (error) {
             console.error("Error in event handler:", error);
           }
-        });
+        }
       }
     },
 
@@ -860,23 +942,31 @@ export const useDashboardStore = create<DashboardStoreState & DashboardStoreActi
       );
 
       // Set up event listeners for cross-tab communication
-      crossTabSync.on("data_update", (event: any) => {
-        const { section, data } = event;
-        if (section === "all") {
-          get().setData(data);
-        } else {
-          get().updateSection(section, data);
+      crossTabSync.on("data_update", (event: unknown) => {
+        const eventData = event as {
+          section: string;
+          data: DashboardData | Partial<DashboardData>;
+        };
+        const { section, data } = eventData;
+        if (section === "all" && "user" in data && "stats" in data) {
+          get().setData(data as DashboardData);
+        } else if (section !== "all") {
+          get().updateSection(
+            section as keyof DashboardData,
+            data as Partial<DashboardData[keyof DashboardData]>
+          );
         }
       });
 
-      crossTabSync.on("optimistic_update", (event: any) => {
-        const { update } = event;
+      crossTabSync.on("optimistic_update", (event: unknown) => {
+        const eventData = event as { update: OptimisticUpdate };
+        const { update } = eventData;
         get().applyOptimisticUpdate(update);
       });
 
       crossTabSync.on("optimistic_rollback", (event: unknown) => {
-        const { updateId } = event;
-        get().rollbackOptimisticUpdate(updateId);
+        const eventData = event as { updateId: string };
+        get().rollbackOptimisticUpdate(eventData.updateId);
       });
 
       crossTabSync.on("sync_request", () => {
@@ -893,8 +983,9 @@ export const useDashboardStore = create<DashboardStoreState & DashboardStoreActi
         // Auto-resolve by accepting the latest change
         const conflictData = conflict as { id?: string };
         setTimeout(() => {
-          if (conflictData?.id) {
-            crossTabSync.resolveConflict(conflictData.id, "accept");
+          const id = conflictData?.id;
+          if (id) {
+            crossTabSync.resolveConflict(id, "accept");
           }
         }, 1000);
       });

@@ -45,10 +45,10 @@ export const CrossTabSyncExample: React.FC<CrossTabSyncExampleProps> = ({ userId
       id: `counter-${Date.now()}`,
       type: "update",
       section: "test_counter",
-      data: { counter: newValue },
+      data: { id: "test_counter", counter: newValue },
       timestamp: Date.now(),
       confirmed: false,
-      rollbackData: { counter: testCounter },
+      rollbackData: { id: "test_counter", counter: testCounter },
     };
 
     applyOptimisticUpdate(update);

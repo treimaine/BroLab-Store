@@ -148,13 +148,13 @@ export interface ErrorHandlingConfig {
  * Enhanced Error Handling Manager for dashboard sync operations
  */
 export class ErrorHandlingManager extends BrowserEventEmitter {
-  private config: ErrorHandlingConfig;
+  private readonly config: ErrorHandlingConfig;
   private errorHistory: EnhancedSyncError[] = [];
-  private recoveryAttempts = new Map<string, RecoveryAttempt[]>();
-  private recoveryStrategies = new Map<RecoveryStrategyType, RecoveryStrategy>();
-  private activeRecoveries = new Set<string>();
-  private errorFingerprints = new Map<string, number>();
-  private sessionId: string;
+  private readonly recoveryAttempts = new Map<string, RecoveryAttempt[]>();
+  private readonly recoveryStrategies = new Map<RecoveryStrategyType, RecoveryStrategy>();
+  private readonly activeRecoveries = new Set<string>();
+  private readonly errorFingerprints = new Map<string, number>();
+  private readonly sessionId: string;
   private isDestroyed = false;
 
   constructor(config: Partial<ErrorHandlingConfig> = {}) {
@@ -287,7 +287,7 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
     nextAttemptAt?: number;
   } {
     const attempts = this.recoveryAttempts.get(errorId) || [];
-    const lastAttempt = attempts[attempts.length - 1];
+    const lastAttempt = attempts.at(-1);
     const error = this.findErrorById(errorId);
 
     return {
@@ -389,7 +389,7 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
     if (!error) return false;
 
     const action = error.userActions.find(a => a.id === actionId);
-    if (!action || !action.available) return false;
+    if (!action?.available) return false;
 
     try {
       await action.handler();
@@ -573,6 +573,7 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
 
   private generateUserActions(error: SyncError): UserAction[] {
     const actions: UserAction[] = [];
+    const errorId = (error as EnhancedSyncError).fingerprint || `${error.type}-${error.timestamp}`;
 
     // Always provide dismiss action
     actions.push({
@@ -585,7 +586,7 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
       handler: () => {
         this.emit("user_action", {
           action: "dismiss",
-          errorId: (error as EnhancedSyncError).fingerprint || `${error.type}-${error.timestamp}`,
+          errorId,
         });
       },
     });
@@ -600,9 +601,7 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
         primary: true,
         available: true,
         handler: () => {
-          this.attemptRecovery(
-            (error as EnhancedSyncError).fingerprint || `${error.type}-${error.timestamp}`
-          );
+          void this.attemptRecovery(errorId);
         },
       });
     }
@@ -622,7 +621,7 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
         handler: () => {
           this.emit("user_action", {
             action: "refresh",
-            errorId: (error as EnhancedSyncError).fingerprint || `${error.type}-${error.timestamp}`,
+            errorId,
           });
         },
       });
@@ -637,12 +636,13 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
         type: "reload",
         primary: true,
         available: true,
-        handler: () => window.location.reload(),
+        handler: () => globalThis.location.reload(),
       });
     }
 
     // Add contact support action for high severity errors
-    if (this.determineSeverity(error) === "high" || this.determineSeverity(error) === "critical") {
+    const severity = this.determineSeverity(error);
+    if (severity === "high" || severity === "critical") {
       actions.push({
         id: "contact_support",
         label: "Contact Support",
@@ -653,7 +653,7 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
         handler: () => {
           this.emit("user_action", {
             action: "contact_support",
-            errorId: (error as EnhancedSyncError).fingerprint || `${error.type}-${error.timestamp}`,
+            errorId,
           });
         },
       });
@@ -666,37 +666,58 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
     error: SyncError,
     context: Partial<ErrorContext>
   ): TechnicalDetails {
+    const nav = navigator as Navigator & {
+      connection?: {
+        effectiveType?: "slow-2g" | "2g" | "3g" | "4g";
+        downlink?: number;
+        rtt?: number;
+        saveData?: boolean;
+      };
+    };
+
+    const perf = performance as Performance & {
+      memory?: {
+        usedJSHeapSize: number;
+        totalJSHeapSize: number;
+        jsHeapSizeLimit: number;
+      };
+    };
+
     return {
       stackTrace: error.context.stackTrace as string,
       environment: {
         userAgent: navigator.userAgent,
-        url: window.location.href,
+        url: globalThis.location.href,
         timestamp: Date.now(),
-        connectionType: (navigator as any)?.connection?.effectiveType,
+        connectionType: nav.connection?.effectiveType,
         onlineStatus: navigator.onLine,
         viewport: {
-          width: window.innerWidth,
-          height: window.innerHeight,
+          width: globalThis.innerWidth,
+          height: globalThis.innerHeight,
         },
         screen: {
-          width: window.screen.width,
-          height: window.screen.height,
+          width: globalThis.screen.width,
+          height: globalThis.screen.height,
         },
-        memory: (performance as any)?.memory
+        memory: perf.memory
           ? {
-              usedJSHeapSize: (performance as any).memory.usedJSHeapSize,
-              totalJSHeapSize: (performance as any).memory.totalJSHeapSize,
-              jsHeapSizeLimit: (performance as any).memory.jsHeapSizeLimit,
+              usedJSHeapSize: perf.memory.usedJSHeapSize,
+              totalJSHeapSize: perf.memory.totalJSHeapSize,
+              jsHeapSizeLimit: perf.memory.jsHeapSizeLimit,
             }
           : undefined,
-        connection: (navigator as any)?.connection
-          ? {
-              effectiveType: (navigator as any).connection.effectiveType,
-              downlink: (navigator as any).connection.downlink,
-              rtt: (navigator as any).connection.rtt,
-              saveData: (navigator as unknown).connection.saveData,
-            }
-          : undefined,
+        connection:
+          nav.connection?.effectiveType &&
+          nav.connection?.downlink !== undefined &&
+          nav.connection?.rtt !== undefined &&
+          nav.connection?.saveData !== undefined
+            ? {
+                effectiveType: nav.connection.effectiveType,
+                downlink: nav.connection.downlink,
+                rtt: nav.connection.rtt,
+                saveData: nav.connection.saveData,
+              }
+            : undefined,
       },
       additionalContext: {
         ...context,
@@ -751,9 +772,10 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
       });
     }
 
-    // TODO: Implement remote logging if configured
+    // Remote logging implementation would go here
     if (this.config.logging.remote && this.config.logging.remoteEndpoint) {
-      // Send to remote logging service
+      // Future: Send to remote logging service
+      // fetch(this.config.logging.remoteEndpoint, { method: 'POST', body: JSON.stringify(error) })
     }
   }
 
@@ -775,7 +797,7 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
     if (!this.canRetry(error, 0)) return;
 
     const strategy = this.recoveryStrategies.get(error.recoveryStrategy);
-    if (!strategy || !strategy.automatic) return;
+    if (!strategy?.automatic) return;
 
     const delay = this.calculateRetryDelay(0, strategy);
 
@@ -1062,9 +1084,7 @@ let errorHandlingManagerInstance: ErrorHandlingManager | null = null;
 export const getErrorHandlingManager = (
   config?: Partial<ErrorHandlingConfig>
 ): ErrorHandlingManager => {
-  if (!errorHandlingManagerInstance) {
-    errorHandlingManagerInstance = new ErrorHandlingManager(config);
-  }
+  errorHandlingManagerInstance ??= new ErrorHandlingManager(config);
   return errorHandlingManagerInstance;
 };
 

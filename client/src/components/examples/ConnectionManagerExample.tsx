@@ -80,7 +80,21 @@ export const ConnectionManagerExample: React.FC = () => {
   const handleRecoveryAction = useCallback(
     async (action: unknown) => {
       try {
-        switch (action.type) {
+        // Type guard for action object
+        if (typeof action !== "object" || action === null) {
+          console.warn("Invalid recovery action:", action);
+          return;
+        }
+
+        const actionObj = action as Record<string, unknown>;
+
+        // Type guard for action.type
+        if (typeof actionObj.type !== "string") {
+          console.warn("Recovery action missing type:", action);
+          return;
+        }
+
+        switch (actionObj.type) {
           case "retry":
             await reconnect();
             break;
@@ -319,13 +333,20 @@ function getActionLabel(action: unknown): string {
 
   const actionObj = action as Record<string, unknown>;
 
+  // Type guard for action.type
+  if (typeof actionObj.type !== "string") {
+    return "Unknown";
+  }
+
   switch (actionObj.type) {
-    case "retry":
+    case "retry": {
       const delay = typeof actionObj.delay === "number" ? actionObj.delay : 0;
       return `Retry (${Math.round(delay / 1000)}s)`;
-    case "fallback":
+    }
+    case "fallback": {
       const strategy = typeof actionObj.strategy === "string" ? actionObj.strategy : "unknown";
       return `Switch to ${strategy}`;
+    }
     case "force_sync":
       return "Force Sync";
     default:
