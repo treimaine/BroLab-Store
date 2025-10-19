@@ -71,13 +71,14 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
       // User not authenticated or error occurred
       setLoading(false);
       setError({
-        type: "AUTHENTICATION_ERROR" as unknown,
+        type: SyncErrorType.AUTHENTICATION_ERROR,
         message: "Authentication required to load dashboard data",
         retryable: true,
         retryCount: 0,
         maxRetries: 3,
         timestamp: Date.now(),
         context: { source: "useDashboardData", action: "authentication_check" },
+        fingerprint: `auth_error_${Date.now()}`,
       });
       return;
     }
@@ -130,14 +131,17 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
     } catch (error) {
       console.error("❌ Error processing dashboard data:", error);
       setLoading(false);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to process dashboard data";
       setError({
         type: SyncErrorType.DATA_INCONSISTENCY,
-        message: error instanceof Error ? error.message : "Failed to process dashboard data",
+        message: errorMessage,
         retryable: true,
         retryCount: 0,
         maxRetries: 3,
         timestamp: Date.now(),
         context: { source: "useDashboardData", action: "data_processing", error },
+        fingerprint: `data_error_${errorMessage.slice(0, 20)}_${Date.now()}`,
       });
     }
   }, [dashboardData, setData, setLoading, setError, clearError]);

@@ -1,0 +1,546 @@
+/**
+ * Comprehensive Translation System
+ * Provides translations for all dashboard text and labels with pluralization support
+ */
+
+export interface TranslationDictionary {
+  [key: string]: string | TranslationDictionary;
+}
+
+export interface PluralRules {
+  zero?: string;
+  one: string;
+  two?: string;
+  few?: string;
+  many?: string;
+  other: string;
+}
+
+export const translations = {
+  en: {
+    // Navigation
+    nav: {
+      home: "Home",
+      beats: "Beats",
+      membership: "Membership",
+      services: "Services",
+      about: "About",
+      contact: "Contact",
+      dashboard: "Dashboard",
+      login: "Login",
+      logout: "Logout",
+      profile: "Profile",
+      settings: "Settings",
+    },
+
+    // Dashboard sections
+    dashboard: {
+      title: "Dashboard",
+      welcome: "Welcome back",
+      overview: "Overview",
+      analytics: "Analytics",
+      orders: "Orders",
+      downloads: "Downloads",
+      favorites: "Favorites",
+      reservations: "Reservations",
+      activity: "Activity",
+      profile: "Profile",
+      settings: "Settings",
+    },
+
+    // Statistics
+    stats: {
+      totalFavorites: "Total Favorites",
+      totalDownloads: "Total Downloads",
+      totalOrders: "Total Orders",
+      totalSpent: "Total Spent",
+      totalRevenue: "Total Revenue",
+      recentActivity: "Recent Activity",
+      quotaUsed: "Quota Used",
+      quotaLimit: "Quota Limit",
+      memberSince: "Member Since",
+      lastActivity: "Last Activity",
+      averageOrderValue: "Average Order Value",
+      conversionRate: "Conversion Rate",
+      dailyOrders: "Daily Orders",
+      dailyDownloads: "Daily Downloads",
+      dailyFavorites: "Daily Favorites",
+      dailyRevenue: "Daily Revenue",
+    },
+
+    // Trends
+    trends: {
+      thisMonth: "This Month",
+      lastMonth: "Last Month",
+      thisWeek: "This Week",
+      lastWeek: "Last Week",
+      today: "Today",
+      yesterday: "Yesterday",
+      increase: "Increase",
+      decrease: "Decrease",
+      noChange: "No Change",
+      period: {
+        "7d": "Last 7 Days",
+        "30d": "Last 30 Days",
+        "90d": "Last 90 Days",
+        "1y": "Last Year",
+      },
+    },
+
+    // Activity types
+    activity: {
+      favoriteAdded: "Added to favorites",
+      download: "Downloaded",
+      orderPlaced: "Order placed",
+      reservationMade: "Reservation made",
+      profileUpdated: "Profile updated",
+      subscriptionChanged: "Subscription changed",
+      noActivity: "No recent activity",
+      viewAll: "View All Activity",
+      loadMore: "Load More",
+    },
+
+    // Orders
+    orders: {
+      title: "Orders",
+      orderNumber: "Order Number",
+      date: "Date",
+      status: "Status",
+      total: "Total",
+      items: "Items",
+      paymentMethod: "Payment Method",
+      viewDetails: "View Details",
+      downloadInvoice: "Download Invoice",
+      trackOrder: "Track Order",
+      noOrders: "No orders yet",
+      pending: "Pending",
+      processing: "Processing",
+      completed: "Completed",
+      cancelled: "Cancelled",
+      refunded: "Refunded",
+    },
+
+    // Downloads
+    downloads: {
+      title: "Downloads",
+      beatTitle: "Beat Title",
+      format: "Format",
+      quality: "Quality",
+      license: "License",
+      downloadedAt: "Downloaded At",
+      downloadCount: "Download Count",
+      maxDownloads: "Max Downloads",
+      downloadUrl: "Download URL",
+      download: "Download",
+      redownload: "Re-download",
+      noDownloads: "No downloads yet",
+      limitReached: "Download limit reached",
+      available: "Available",
+    },
+
+    // Favorites
+    favorites: {
+      title: "Favorites",
+      addToFavorites: "Add to Favorites",
+      removeFromFavorites: "Remove from Favorites",
+      noFavorites: "No favorites yet",
+      viewBeat: "View Beat",
+      addToCart: "Add to Cart",
+    },
+
+    // Reservations
+    reservations: {
+      title: "Reservations",
+      serviceType: "Service Type",
+      preferredDate: "Preferred Date",
+      duration: "Duration",
+      totalPrice: "Total Price",
+      status: "Status",
+      details: "Details",
+      viewDetails: "View Details",
+      cancel: "Cancel",
+      reschedule: "Reschedule",
+      noReservations: "No reservations yet",
+      mixing: "Mixing",
+      mastering: "Mastering",
+      recording: "Recording",
+      consultation: "Consultation",
+      pending: "Pending",
+      confirmed: "Confirmed",
+      completed: "Completed",
+      cancelled: "Cancelled",
+    },
+
+    // Charts and Analytics
+    analytics: {
+      title: "Analytics Dashboard",
+      subtitle: "Comprehensive insights into your performance",
+      performanceOverview: "Performance Overview",
+      keyMetrics: "Key Metrics",
+      conversionRates: "Conversion Rates",
+      favoritesToDownloads: "Favorites to Downloads",
+      downloadsToOrders: "Downloads to Orders",
+      noData: "No analytics data available for the selected period",
+      chartType: {
+        line: "Line Chart",
+        bar: "Bar Chart",
+      },
+    },
+
+    // Common UI elements
+    common: {
+      loading: "Loading...",
+      error: "Error",
+      success: "Success",
+      warning: "Warning",
+      info: "Info",
+      save: "Save",
+      cancel: "Cancel",
+      delete: "Delete",
+      edit: "Edit",
+      view: "View",
+      close: "Close",
+      back: "Back",
+      next: "Next",
+      previous: "Previous",
+      search: "Search",
+      filter: "Filter",
+      sort: "Sort",
+      refresh: "Refresh",
+      retry: "Retry",
+      confirm: "Confirm",
+      yes: "Yes",
+      no: "No",
+      ok: "OK",
+      apply: "Apply",
+      reset: "Reset",
+      clear: "Clear",
+      selectAll: "Select All",
+      deselectAll: "Deselect All",
+      showMore: "Show More",
+      showLess: "Show Less",
+      viewAll: "View All",
+      loadMore: "Load More",
+      noResults: "No results found",
+      notFound: "Not found",
+      comingSoon: "Coming Soon",
+    },
+
+    // Error messages
+    errors: {
+      network: "Network error. Please check your connection.",
+      authentication: "Authentication failed. Please log in again.",
+      authorization: "You don't have permission to access this resource.",
+      notFound: "The requested resource was not found.",
+      serverError: "Server error. Please try again later.",
+      timeout: "Request timed out. Please try again.",
+      generic: "An error occurred. Please try again.",
+      retry: "Retry",
+      refresh: "Refresh Page",
+      contactSupport: "Contact Support",
+    },
+
+    // Loading states
+    loading: {
+      dashboard: "Loading dashboard...",
+      stats: "Loading statistics...",
+      orders: "Loading orders...",
+      downloads: "Loading downloads...",
+      favorites: "Loading favorites...",
+      activity: "Loading activity...",
+      analytics: "Loading analytics...",
+      profile: "Loading profile...",
+    },
+
+    // Empty states
+    empty: {
+      orders: "You haven't placed any orders yet.",
+      downloads: "You haven't downloaded any beats yet.",
+      favorites: "You haven't added any favorites yet.",
+      activity: "No recent activity to display.",
+      reservations: "You haven't made any reservations yet.",
+      search: "No results match your search.",
+    },
+
+    // Time formatting
+    time: {
+      justNow: "Just now",
+      minutesAgo: "{count} minutes ago",
+      hoursAgo: "{count} hours ago",
+      daysAgo: "{count} days ago",
+      weeksAgo: "{count} weeks ago",
+      monthsAgo: "{count} months ago",
+      yearsAgo: "{count} years ago",
+    },
+
+    // Sync status
+    sync: {
+      syncing: "Syncing...",
+      synced: "Synced",
+      syncFailed: "Sync failed",
+      lastSync: "Last synced",
+      offline: "Offline",
+      online: "Online",
+      reconnecting: "Reconnecting...",
+      connected: "Connected",
+      disconnected: "Disconnected",
+    },
+  },
+
+  fr: {
+    nav: {
+      home: "Accueil",
+      beats: "Beats",
+      membership: "Adhésion",
+      services: "Services",
+      about: "À Propos",
+      contact: "Contact",
+      dashboard: "Tableau de Bord",
+      login: "Connexion",
+      logout: "Déconnexion",
+      profile: "Profil",
+      settings: "Paramètres",
+    },
+
+    dashboard: {
+      title: "Tableau de Bord",
+      welcome: "Bon retour",
+      overview: "Aperçu",
+      analytics: "Analytique",
+      orders: "Commandes",
+      downloads: "Téléchargements",
+      favorites: "Favoris",
+      reservations: "Réservations",
+      activity: "Activité",
+      profile: "Profil",
+      settings: "Paramètres",
+    },
+
+    stats: {
+      totalFavorites: "Total des Favoris",
+      totalDownloads: "Total des Téléchargements",
+      totalOrders: "Total des Commandes",
+      totalSpent: "Total Dépensé",
+      totalRevenue: "Revenu Total",
+      recentActivity: "Activité Récente",
+      quotaUsed: "Quota Utilisé",
+      quotaLimit: "Limite de Quota",
+      memberSince: "Membre Depuis",
+      lastActivity: "Dernière Activité",
+      averageOrderValue: "Valeur Moyenne des Commandes",
+      conversionRate: "Taux de Conversion",
+      dailyOrders: "Commandes Quotidiennes",
+      dailyDownloads: "Téléchargements Quotidiens",
+      dailyFavorites: "Favoris Quotidiens",
+      dailyRevenue: "Revenu Quotidien",
+    },
+
+    trends: {
+      thisMonth: "Ce Mois-ci",
+      lastMonth: "Le Mois Dernier",
+      thisWeek: "Cette Semaine",
+      lastWeek: "La Semaine Dernière",
+      today: "Aujourd'hui",
+      yesterday: "Hier",
+      increase: "Augmentation",
+      decrease: "Diminution",
+      noChange: "Aucun Changement",
+      period: {
+        "7d": "7 Derniers Jours",
+        "30d": "30 Derniers Jours",
+        "90d": "90 Derniers Jours",
+        "1y": "Dernière Année",
+      },
+    },
+
+    activity: {
+      favoriteAdded: "Ajouté aux favoris",
+      download: "Téléchargé",
+      orderPlaced: "Commande passée",
+      reservationMade: "Réservation effectuée",
+      profileUpdated: "Profil mis à jour",
+      subscriptionChanged: "Abonnement modifié",
+      noActivity: "Aucune activité récente",
+      viewAll: "Voir Toute l'Activité",
+      loadMore: "Charger Plus",
+    },
+
+    orders: {
+      title: "Commandes",
+      orderNumber: "Numéro de Commande",
+      date: "Date",
+      status: "Statut",
+      total: "Total",
+      items: "Articles",
+      paymentMethod: "Méthode de Paiement",
+      viewDetails: "Voir les Détails",
+      downloadInvoice: "Télécharger la Facture",
+      trackOrder: "Suivre la Commande",
+      noOrders: "Aucune commande pour le moment",
+      pending: "En Attente",
+      processing: "En Traitement",
+      completed: "Terminée",
+      cancelled: "Annulée",
+      refunded: "Remboursée",
+    },
+
+    downloads: {
+      title: "Téléchargements",
+      beatTitle: "Titre du Beat",
+      format: "Format",
+      quality: "Qualité",
+      license: "Licence",
+      downloadedAt: "Téléchargé le",
+      downloadCount: "Nombre de Téléchargements",
+      maxDownloads: "Téléchargements Maximum",
+      downloadUrl: "URL de Téléchargement",
+      download: "Télécharger",
+      redownload: "Retélécharger",
+      noDownloads: "Aucun téléchargement pour le moment",
+      limitReached: "Limite de téléchargement atteinte",
+      available: "Disponible",
+    },
+
+    favorites: {
+      title: "Favoris",
+      addToFavorites: "Ajouter aux Favoris",
+      removeFromFavorites: "Retirer des Favoris",
+      noFavorites: "Aucun favori pour le moment",
+      viewBeat: "Voir le Beat",
+      addToCart: "Ajouter au Panier",
+    },
+
+    reservations: {
+      title: "Réservations",
+      serviceType: "Type de Service",
+      preferredDate: "Date Préférée",
+      duration: "Durée",
+      totalPrice: "Prix Total",
+      status: "Statut",
+      details: "Détails",
+      viewDetails: "Voir les Détails",
+      cancel: "Annuler",
+      reschedule: "Reprogrammer",
+      noReservations: "Aucune réservation pour le moment",
+      mixing: "Mixage",
+      mastering: "Mastering",
+      recording: "Enregistrement",
+      consultation: "Consultation",
+      pending: "En Attente",
+      confirmed: "Confirmée",
+      completed: "Terminée",
+      cancelled: "Annulée",
+    },
+
+    analytics: {
+      title: "Tableau de Bord Analytique",
+      subtitle: "Aperçu complet de vos performances",
+      performanceOverview: "Aperçu des Performances",
+      keyMetrics: "Métriques Clés",
+      conversionRates: "Taux de Conversion",
+      favoritesToDownloads: "Favoris vers Téléchargements",
+      downloadsToOrders: "Téléchargements vers Commandes",
+      noData: "Aucune donnée analytique disponible pour la période sélectionnée",
+      chartType: {
+        line: "Graphique Linéaire",
+        bar: "Graphique à Barres",
+      },
+    },
+
+    common: {
+      loading: "Chargement...",
+      error: "Erreur",
+      success: "Succès",
+      warning: "Avertissement",
+      info: "Info",
+      save: "Enregistrer",
+      cancel: "Annuler",
+      delete: "Supprimer",
+      edit: "Modifier",
+      view: "Voir",
+      close: "Fermer",
+      back: "Retour",
+      next: "Suivant",
+      previous: "Précédent",
+      search: "Rechercher",
+      filter: "Filtrer",
+      sort: "Trier",
+      refresh: "Actualiser",
+      retry: "Réessayer",
+      confirm: "Confirmer",
+      yes: "Oui",
+      no: "Non",
+      ok: "OK",
+      apply: "Appliquer",
+      reset: "Réinitialiser",
+      clear: "Effacer",
+      selectAll: "Tout Sélectionner",
+      deselectAll: "Tout Désélectionner",
+      showMore: "Afficher Plus",
+      showLess: "Afficher Moins",
+      viewAll: "Voir Tout",
+      loadMore: "Charger Plus",
+      noResults: "Aucun résultat trouvé",
+      notFound: "Non trouvé",
+      comingSoon: "Bientôt Disponible",
+    },
+
+    errors: {
+      network: "Erreur réseau. Veuillez vérifier votre connexion.",
+      authentication: "Échec de l'authentification. Veuillez vous reconnecter.",
+      authorization: "Vous n'avez pas la permission d'accéder à cette ressource.",
+      notFound: "La ressource demandée n'a pas été trouvée.",
+      serverError: "Erreur serveur. Veuillez réessayer plus tard.",
+      timeout: "Délai d'attente dépassé. Veuillez réessayer.",
+      generic: "Une erreur s'est produite. Veuillez réessayer.",
+      retry: "Réessayer",
+      refresh: "Actualiser la Page",
+      contactSupport: "Contacter le Support",
+    },
+
+    loading: {
+      dashboard: "Chargement du tableau de bord...",
+      stats: "Chargement des statistiques...",
+      orders: "Chargement des commandes...",
+      downloads: "Chargement des téléchargements...",
+      favorites: "Chargement des favoris...",
+      activity: "Chargement de l'activité...",
+      analytics: "Chargement de l'analytique...",
+      profile: "Chargement du profil...",
+    },
+
+    empty: {
+      orders: "Vous n'avez pas encore passé de commandes.",
+      downloads: "Vous n'avez pas encore téléchargé de beats.",
+      favorites: "Vous n'avez pas encore ajouté de favoris.",
+      activity: "Aucune activité récente à afficher.",
+      reservations: "Vous n'avez pas encore fait de réservations.",
+      search: "Aucun résultat ne correspond à votre recherche.",
+    },
+
+    time: {
+      justNow: "À l'instant",
+      minutesAgo: "Il y a {count} minutes",
+      hoursAgo: "Il y a {count} heures",
+      daysAgo: "Il y a {count} jours",
+      weeksAgo: "Il y a {count} semaines",
+      monthsAgo: "Il y a {count} mois",
+      yearsAgo: "Il y a {count} ans",
+    },
+
+    sync: {
+      syncing: "Synchronisation...",
+      synced: "Synchronisé",
+      syncFailed: "Échec de la synchronisation",
+      lastSync: "Dernière synchronisation",
+      offline: "Hors ligne",
+      online: "En ligne",
+      reconnecting: "Reconnexion...",
+      connected: "Connecté",
+      disconnected: "Déconnecté",
+    },
+  },
+} as const;
+
+export type TranslationKey = keyof typeof translations.en;
+export type Language = keyof typeof translations;
