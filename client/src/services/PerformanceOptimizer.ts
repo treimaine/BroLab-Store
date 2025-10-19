@@ -165,9 +165,9 @@ export interface CacheStats {
 export class BatchProcessor<T = unknown> {
   private batch: BatchedUpdate<T>[] = [];
   private flushTimer: NodeJS.Timeout | null = null;
-  private config: BatchConfig;
+  private readonly config: BatchConfig;
   private processingBatch = false;
-  private stats = {
+  private readonly stats = {
     totalBatches: 0,
     totalItems: 0,
     averageBatchSize: 0,
@@ -175,8 +175,8 @@ export class BatchProcessor<T = unknown> {
   };
 
   constructor(
-    config: Partial<BatchConfig> = {},
-    private processor: (items: BatchedUpdate<T>[]) => Promise<BatchFlushResult>
+    private readonly processor: (items: BatchedUpdate<T>[]) => Promise<BatchFlushResult>,
+    config: Partial<BatchConfig> = {}
   ) {
     this.config = {
       maxBatchSize: config.maxBatchSize || 50,
@@ -302,9 +302,9 @@ export class BatchProcessor<T = unknown> {
 // ================================
 
 export class RequestDeduplicator {
-  private requestCache = new Map<string, RequestFingerprint>();
-  private config: DeduplicationConfig;
-  private stats = {
+  private readonly requestCache = new Map<string, RequestFingerprint>();
+  private readonly config: DeduplicationConfig;
+  private readonly stats = {
     totalRequests: 0,
     duplicatesFiltered: 0,
     cacheHits: 0,
@@ -380,7 +380,7 @@ export class RequestDeduplicator {
     const str = JSON.stringify(data);
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
+      const char = str.codePointAt(i) || 0;
       hash = (hash << 5) - hash + char;
       hash = hash & hash;
     }
@@ -420,9 +420,9 @@ export class RequestDeduplicator {
 // ================================
 
 export class MemoryOptimizer {
-  private config: MemoryConfig;
+  private readonly config: MemoryConfig;
   private cleanupInterval: NodeJS.Timeout | null = null;
-  private stats: MemoryStats = {
+  private readonly stats: MemoryStats = {
     eventHistorySize: 0,
     cacheSize: 0,
     estimatedMemoryUsage: 0,
@@ -563,10 +563,10 @@ export class MemoryOptimizer {
 // ================================
 
 export class SelectiveSyncManager {
-  private config: SelectiveSyncConfig;
-  private sectionVisibility = new Map<string, SectionVisibility>();
+  private readonly config: SelectiveSyncConfig;
+  private readonly sectionVisibility = new Map<string, SectionVisibility>();
   private visibilityObserver: IntersectionObserver | null = null;
-  private debounceTimers = new Map<string, NodeJS.Timeout>();
+  private readonly debounceTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(config: Partial<SelectiveSyncConfig> = {}) {
     this.config = {
@@ -690,12 +690,12 @@ export class SelectiveSyncManager {
   private setupVisibilityObserver(): void {
     this.visibilityObserver = new IntersectionObserver(
       entries => {
-        entries.forEach(entry => {
+        for (const entry of entries) {
           const section = (entry.target as HTMLElement).dataset.section;
-          if (!section) return;
+          if (!section) continue;
 
           this.handleVisibilityChange(section, entry.isIntersecting);
-        });
+        }
       },
       {
         threshold: 0.1, // Consider visible if 10% is showing
@@ -731,8 +731,8 @@ export class SelectiveSyncManager {
 // ================================
 
 export class ProgressiveLoader<T = unknown> {
-  private config: ProgressiveLoadConfig;
-  private loadingStates = new Map<string, LoadingState>();
+  private readonly config: ProgressiveLoadConfig;
+  private readonly loadingStates = new Map<string, LoadingState>();
 
   constructor(config: Partial<ProgressiveLoadConfig> = {}) {
     this.config = {
@@ -828,9 +828,9 @@ export class ProgressiveLoader<T = unknown> {
 // ================================
 
 export class SmartCache<T = unknown> {
-  private cache = new Map<string, CacheEntry<T>>();
-  private config: CacheConfig;
-  private stats: CacheStats = {
+  private readonly cache = new Map<string, CacheEntry<T>>();
+  private readonly config: CacheConfig;
+  private readonly stats: CacheStats = {
     hits: 0,
     misses: 0,
     hitRate: 0,
@@ -936,7 +936,9 @@ export class SmartCache<T = unknown> {
 
     // Invalidate related sections
     const relatedPatterns = this.getRelatedPatterns(section);
-    relatedPatterns.forEach(pattern => this.invalidatePattern(pattern));
+    for (const pattern of relatedPatterns) {
+      this.invalidatePattern(pattern);
+    }
   }
 
   /**
@@ -1003,6 +1005,10 @@ export class SmartCache<T = unknown> {
     };
 
     const related = relationships[section] || [];
-    return related.map(rel => new RegExp(`^${rel}:`));
+    const patterns: RegExp[] = [];
+    for (const rel of related) {
+      patterns.push(new RegExp(`^${rel}:`));
+    }
+    return patterns;
   }
 }

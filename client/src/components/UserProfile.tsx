@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useDashboardSection } from "@/store/useDashboardStore";
-import { useClerk, useUser } from "@clerk/clerk-react";
+import { useUser } from "@clerk/clerk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Calendar,
@@ -38,7 +38,6 @@ interface UserStats {
 
 const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
   const { user, isLoaded } = useUser();
-  const { openUserProfile } = useClerk();
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [formData, setFormData] = useState({
@@ -46,8 +45,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
     lastName: "",
     username: "",
   });
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Get real stats from unified dashboard store
   const stats = useDashboardSection("stats");
@@ -101,37 +98,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
     }
   }, [user]);
 
-  const handlePhotoUpload = useCallback(
-    async (file: File) => {
-      if (!user) return;
-
-      setIsUploadingPhoto(true);
-      try {
-        // Validate file type
-        if (!file.type.startsWith("image/")) {
-          toast.error("Please select a valid image file");
-          return;
-        }
-
-        // Validate size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-          toast.error("Image must be smaller than 5MB");
-          return;
-        }
-
-        // Update profile photo via Clerk
-        await user.setProfileImage({ file });
-        toast.success("Profile photo updated successfully");
-      } catch (error) {
-        console.error("Error uploading photo:", error);
-        toast.error("Error uploading photo");
-      } finally {
-        setIsUploadingPhoto(false);
-      }
-    },
-    [user]
-  );
-
   const handleSave = useCallback(async () => {
     if (!user) return;
 
@@ -155,13 +121,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
   const handleInputChange = useCallback((field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
-
-  const getUserInitials = useCallback(() => {
-    if (!user) return "U";
-    const firstName = user.firstName || "";
-    const lastName = user.lastName || "";
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
-  }, [user]);
 
   const getUserRole = useCallback(() => {
     // Rôle affiché de façon neutre tant que la billing réelle n'est pas branchée
@@ -220,9 +179,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
                   alt={user.fullName || "User"}
                   size="lg"
                   className="w-16 h-16"
-                  onUpload={url => {
-                    // Mettre à jour l'avatar dans Clerk
-                    user.setProfileImage({ file: url });
+                  onUpload={(url: string) => {
+                    // The AvatarUpload component handles the upload internally
+                    // and returns the URL. We just need to update the user's profile
+                    // with the new URL if needed.
+                    console.log("Avatar uploaded:", url);
                   }}
                 />
               </div>

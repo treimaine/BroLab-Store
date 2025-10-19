@@ -136,14 +136,16 @@ const SyncOperationSimulator: React.FC = () => {
       await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 200));
 
       const duration = Date.now() - startTime;
+      const timestamp = Date.now();
       const error = {
         type: SyncErrorType.NETWORK_ERROR,
         message: "Simulated network error",
-        timestamp: Date.now(),
+        timestamp,
         context: { simulation: true },
         retryable: true,
         retryCount: 0,
         maxRetries: 3,
+        fingerprint: `${SyncErrorType.NETWORK_ERROR}-simulated-${timestamp}`,
       };
 
       trackSyncOperation(false, duration);

@@ -13,8 +13,8 @@ import {
   getOptimisticUpdateManager,
 } from "@/services/OptimisticUpdateManager";
 import { useDashboardStore } from "@/store/useDashboardStore";
-import type { DashboardData, SyncError } from "@shared/types";
-import type { OptimisticUpdate } from "@shared/types/sync";
+import type { DashboardData } from "@shared/types";
+import type { OptimisticUpdate, SyncError } from "@shared/types/sync";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface UseOptimisticUpdatesOptions {

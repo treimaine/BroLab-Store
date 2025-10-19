@@ -283,10 +283,10 @@ export * from "./analytics";
 // Dashboard types
 export * from "./dashboard";
 
-// Sync types
+// Sync types - Export all types from sync.ts (includes SyncError as canonical definition)
 export * from "./sync";
 
-// System optimization types
+// System optimization types - Export all except SyncError, SyncStatus, SyncOperation, SyncManager (use sync.ts versions)
 export type {
   BundleAnalysis,
   BundleComparison,
@@ -309,7 +309,6 @@ export type {
   MetricTrend,
   OfflineManager,
   OfflineOperation,
-  OptimisticUpdate,
   OptimisticUpdateManager,
   OptimizationRecommendation,
   PerformanceMetric,
@@ -323,11 +322,8 @@ export type {
   RetryConfig,
   RetryManager,
   RollbackOperation,
-  SyncError,
-  SyncManager,
-  SyncOperation,
-  SyncStatus,
   SystemHealth,
+  OptimisticUpdate as SystemOptimisticUpdate,
   TimeRange,
   Timer,
   WebVitals,
