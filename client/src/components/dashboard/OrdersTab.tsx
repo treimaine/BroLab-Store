@@ -59,7 +59,7 @@ const OrdersTab = memo<OrdersTabProps>(
             </h2>
             <div className="space-y-3 sm:space-y-4">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="animate-pulse">
+                <div key={`orders-loading-${i}`} className="animate-pulse">
                   <div className="h-16 sm:h-20 bg-[var(--dark-gray)] rounded-lg" />
                 </div>
               ))}

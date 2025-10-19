@@ -302,3 +302,18 @@ export interface DashboardConfig {
     advancedFilters: boolean;
   };
 }
+
+// Re-export sync types for convenience
+export type {
+  ConnectionStatus,
+  ConsistentUserStats,
+  CrossValidationResult,
+  DashboardEvent,
+  Inconsistency,
+  MemoryStats,
+  OptimisticUpdate,
+  SyncError,
+  SyncMetrics,
+  SyncStatus,
+  ValidationResult,
+} from "./sync";

@@ -128,6 +128,7 @@ function Router() {
       <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/admin/files" component={lazy(() => import("./pages/admin/files"))} />
       <Route path="/test-convex" component={lazy(() => import("./pages/test-convex"))} />
+      <Route path="/test-mock-alert" component={lazy(() => import("./pages/test-mock-alert"))} />
       {/* PaymentTestComponent removed - using Clerk native interface */}
 
       <Route component={NotFound} />

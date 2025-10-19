@@ -8,7 +8,6 @@
  */
 
 // Main dashboard components
-export { default as LazyDashboard } from "../LazyDashboard";
 export { default as ModernDashboard } from "./ModernDashboard";
 
 // Layout components

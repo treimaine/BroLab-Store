@@ -23,4 +23,9 @@ export const api = {
       getForYouBeats: "products/forYou:getForYouBeats" as any,
     },
   },
+  dashboard: {
+    getDashboardData: "dashboard:getDashboardData" as any,
+    getDashboardStats: "dashboard:getDashboardStats" as any,
+    getAnalyticsData: "dashboard:getAnalyticsData" as any,
+  },
 };

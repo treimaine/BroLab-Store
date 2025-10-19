@@ -20,9 +20,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile, useIsTablet } from "@/hooks/useBreakpoint";
-import { useDashboard } from "@/hooks/useDashboard";
 import { useDashboardConfig } from "@/hooks/useDashboardConfig";
 import { useComponentPerformance } from "@/hooks/usePerformanceMonitoring";
+import {
+  useDashboardData,
+  useDashboardError,
+  useDashboardLoading,
+  useDashboardStore,
+} from "@/store/useDashboardStore";
 import { useUser } from "@clerk/clerk-react";
 import { motion } from "framer-motion";
 import {
@@ -90,15 +95,22 @@ export const OptimizedDashboard = memo(() => {
   const [activeTab, setActiveTab] = useState("overview");
   const [convexError, setConvexError] = useState<string | null>(null);
 
-  // Unified dashboard data with performance monitoring
-  const dashboardData = useDashboard({
-    includeChartData: activeTab === "analytics",
-    includeTrends: activeTab === "analytics",
-    enableRealtime: true,
-    activityLimit: activeTab === "activity" ? 100 : 20, // Load more for activity tab
-    ordersLimit: activeTab === "orders" ? 100 : 20,
-    downloadsLimit: activeTab === "downloads" ? 200 : 50,
-  });
+  // Unified store data - single source of truth for all dashboard data
+  const dashboardData = useDashboardData();
+  const isLoading = useDashboardLoading();
+  const error = useDashboardError();
+  const { forceSync, clearError } = useDashboardStore();
+
+  // Create a compatible interface for LazyDashboardTabs
+  const compatibleDashboardData = useMemo(
+    () => ({
+      ...dashboardData,
+      isLoading,
+      error,
+      refetch: forceSync,
+    }),
+    [dashboardData, isLoading, error, forceSync]
+  );
 
   // Memoize tab triggers to prevent unnecessary re-renders
   const tabTriggers = useMemo(() => {
@@ -120,8 +132,9 @@ export const OptimizedDashboard = memo(() => {
   // Handle refresh with error clearing
   const handleRefresh = useCallback(async () => {
     setConvexError(null);
-    await dashboardData.refetch();
-  }, [dashboardData]);
+    clearError();
+    await forceSync();
+  }, [forceSync, clearError]);
 
   // Handle retry with error handling
   const handleRetry = useCallback(async () => {
@@ -180,12 +193,19 @@ export const OptimizedDashboard = memo(() => {
               delay: 0.1,
             }}
           >
-            {dashboardData.isLoading ? (
+            {isLoading ? (
               <StatsCardsSkeleton />
             ) : (
               <StatsCards
-                stats={dashboardData.stats}
-                isLoading={dashboardData.isLoading}
+                stats={
+                  dashboardData?.stats || {
+                    totalFavorites: 0,
+                    totalDownloads: 0,
+                    totalOrders: 0,
+                    totalSpent: 0,
+                  }
+                }
+                isLoading={isLoading}
                 className="mb-6 sm:mb-8"
               />
             )}
@@ -225,7 +245,7 @@ export const OptimizedDashboard = memo(() => {
                   ease: "easeOut",
                 }}
               >
-                <LazyDashboardTabs activeTab={activeTab} dashboardData={dashboardData} />
+                <LazyDashboardTabs activeTab={activeTab} dashboardData={compatibleDashboardData} />
               </motion.div>
             </Tabs>
           </motion.div>

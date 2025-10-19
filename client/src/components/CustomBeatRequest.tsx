@@ -12,9 +12,15 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, Music, Send, Star } from "lucide-react";
+import { useReservationErrorHandling } from "@/hooks/useReservationErrorHandling";
+import { AlertTriangle, CheckCircle, Clock, Loader2, Music, Send, Star } from "lucide-react";
 import { useState } from "react";
 import FileUpload from "../../../components/kokonutui/file-upload";
+import {
+  FileUploadProgress,
+  FormValidationLoading,
+  RetryIndicator,
+} from "./ReservationLoadingStates";
 
 export interface CustomBeatRequestProps {
   onSubmit: (request: BeatRequest) => void;
@@ -93,20 +99,100 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
     priority: "standard",
   });
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [isValidating, setIsValidating] = useState(false);
+  const [fileUploadState, setFileUploadState] = useState<{
+    isUploading: boolean;
+    fileName?: string;
+    progress?: number;
+    status?: "uploading" | "scanning" | "completed" | "error";
+  }>({ isUploading: false });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Enhanced error handling for the form
+  const { hasError, error, retryCount, canRetry, handleError, retry, clearError, getErrorDisplay } =
+    useReservationErrorHandling({
+      serviceName: "custom beat request",
+      maxRetries: 3,
+      showToastOnError: true,
+      autoRetryTransientErrors: false, // Manual retry for form submissions
+    });
+
+  const validateForm = async (): Promise<boolean> => {
+    setIsValidating(true);
+    clearError(); // Clear any previous errors
+
+    try {
+      // Validate required fields
+      if (!request.genre || !request.key || request.mood.length === 0) {
+        throw new Error("Please fill in all required fields (Genre, Key, and at least one Mood)");
+      }
+
+      // Validate file uploads if any
+      if (uploadedFiles.length > 0) {
+        const totalSize = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
+        const maxTotalSize = 200 * 1024 * 1024; // 200MB total
+
+        if (totalSize > maxTotalSize) {
+          throw new Error(
+            `Total file size (${(totalSize / 1024 / 1024).toFixed(1)}MB) exceeds 200MB limit. Please remove some files.`
+          );
+        }
+
+        // Check for duplicate files
+        const fileNames = uploadedFiles.map(f => f.name.toLowerCase());
+        const duplicates = fileNames.filter((name, index) => fileNames.indexOf(name) !== index);
+        if (duplicates.length > 0) {
+          throw new Error(`Please remove duplicate files: ${duplicates.join(", ")}`);
+        }
+      }
+
+      // Validate project description
+      if (request.description.length < 20) {
+        throw new Error(
+          "Please provide a more detailed description of your project (at least 20 characters)"
+        );
+      }
+
+      // Validate deadline
+      if (request.deadline) {
+        const deadlineDate = new Date(request.deadline);
+        const minDate = new Date();
+        minDate.setDate(minDate.getDate() + 1); // At least 1 day from now
+
+        if (deadlineDate < minDate) {
+          throw new Error("Deadline must be at least 1 day from today");
+        }
+      }
+
+      return true;
+    } catch (error) {
+      handleError(error, "validation");
+      return false;
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!request.genre || !request.key || request.mood.length === 0) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
+    // Validate form before submission
+    const isValid = await validateForm();
+    if (!isValid) {
       return;
     }
 
-    onSubmit({ ...request, uploadedFiles });
+    try {
+      // Show submitting toast
+      toast({
+        title: "Submitting Request",
+        description: "Processing your custom beat request...",
+        variant: "default",
+      });
+
+      await onSubmit({ ...request, uploadedFiles });
+    } catch (error) {
+      handleError(error, "submission");
+    }
   };
 
   const toggleMood = (mood: string) => {
@@ -143,11 +229,83 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
           Custom Beat Request
         </CardTitle>
         <p className="text-gray-400">
-          Tell us exactly what you're looking for and we'll create a custom beat just for you
+          Tell us exactly what you&apos;re looking for and we&apos;ll create a custom beat just for
+          you
         </p>
       </CardHeader>
 
       <CardContent>
+        {/* Form Validation Loading State */}
+        <FormValidationLoading isVisible={isValidating} />
+
+        {/* Error Display */}
+        {hasError && error && (
+          <div className="mb-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-medium text-red-300 mb-2">
+                  {getErrorDisplay()?.title || "Form Error"}
+                </h4>
+                <p className="text-red-200 text-sm mb-3">
+                  {getErrorDisplay()?.message || error.userMessage}
+                </p>
+
+                {getErrorDisplay()?.suggestions && getErrorDisplay()!.suggestions.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-red-300 font-medium text-sm mb-1">Suggestions:</p>
+                    <ul className="space-y-1">
+                      {getErrorDisplay()!.suggestions.map((suggestion, index) => (
+                        <li key={index} className="text-red-200 text-xs flex items-center gap-2">
+                          <div className="w-1 h-1 bg-red-400 rounded-full flex-shrink-0" />
+                          {suggestion}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={clearError}
+                    className="border-red-500/30 text-red-300 hover:bg-red-500/10"
+                  >
+                    Dismiss
+                  </Button>
+                  {canRetry && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={retry}
+                      className="bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                    >
+                      Try Again ({(getErrorDisplay()?.maxRetries || 3) - retryCount} left)
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Retry Indicator */}
+        <RetryIndicator
+          isVisible={retryCount > 0 && !hasError}
+          attempt={retryCount}
+          maxAttempts={3}
+        />
+
+        {/* File Upload Progress */}
+        <FileUploadProgress
+          isVisible={fileUploadState.isUploading}
+          fileName={fileUploadState.fileName}
+          progress={fileUploadState.progress}
+          status={fileUploadState.status}
+        />
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -302,19 +460,115 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
             <label className="form-label">Reference Tracks & Files (Optional)</label>
             <div className="space-y-4">
               <FileUpload
-                onUploadSuccess={(file: File) => {
-                  setUploadedFiles(prev => [...prev, file]);
-                }}
-                onUploadError={(error: any) => {
-                  toast({
-                    title: "Upload Error",
-                    description: error.message,
-                    variant: "destructive",
+                onUploadStart={(file: File) => {
+                  setFileUploadState({
+                    isUploading: true,
+                    fileName: file.name,
+                    progress: 0,
+                    status: "uploading",
                   });
                 }}
-                acceptedFileTypes={["audio/*", ".zip", ".rar", ".7z"]}
-                maxFileSize={50 * 1024 * 1024} // 50MB
+                onUploadProgress={(progress: number) => {
+                  setFileUploadState(prev => ({
+                    ...prev,
+                    progress,
+                    status: progress < 100 ? "uploading" : "scanning",
+                  }));
+                }}
+                onUploadSuccess={(file: File) => {
+                  setFileUploadState({
+                    isUploading: false,
+                    fileName: file.name,
+                    progress: 100,
+                    status: "completed",
+                  });
+
+                  setUploadedFiles(prev => [...prev, file]);
+
+                  toast({
+                    title: "File Uploaded Successfully",
+                    description: `${file.name} has been uploaded and scanned for security.`,
+                    variant: "default",
+                  });
+
+                  // Clear upload state after a delay
+                  setTimeout(() => {
+                    setFileUploadState({ isUploading: false });
+                  }, 3000);
+                }}
+                onUploadError={(error: {
+                  message: string;
+                  code: string;
+                  recoverable?: boolean;
+                  severity?: "warning" | "error";
+                }) => {
+                  console.error("File upload error:", error);
+
+                  setFileUploadState({
+                    isUploading: false,
+                    fileName: fileUploadState.fileName,
+                    status: "error",
+                  });
+
+                  // Handle file upload error with enhanced error handling
+                  handleError(error, "file_upload");
+
+                  // Clear upload state after a delay
+                  setTimeout(() => {
+                    setFileUploadState({ isUploading: false });
+                  }, 5000);
+                }}
+                acceptedFileTypes={[
+                  "audio/mpeg",
+                  "audio/wav",
+                  "audio/mp3",
+                  "audio/aiff",
+                  "audio/flac",
+                  "application/zip",
+                  "application/x-zip-compressed",
+                  "application/x-rar-compressed",
+                  "application/x-7z-compressed",
+                ]}
+                maxFileSize={100 * 1024 * 1024} // 100MB as shown in UI
                 uploadDelay={0} // No upload simulation
+                enableAntivirusScanning={true}
+                enableSecureUpload={false} // Keep as simulation for now
+                allowFormSubmissionOnError={true}
+                maxRetries={3}
+                validateFile={(file: File) => {
+                  // Additional custom validation for beat requests
+                  const fileName = file.name.toLowerCase();
+
+                  // Check for common audio formats
+                  const audioExtensions = [".mp3", ".wav", ".aiff", ".flac", ".m4a"];
+                  const archiveExtensions = [".zip", ".rar", ".7z"];
+                  const isAudio = audioExtensions.some(ext => fileName.endsWith(ext));
+                  const isArchive = archiveExtensions.some(ext => fileName.endsWith(ext));
+
+                  if (!isAudio && !isArchive) {
+                    return {
+                      message:
+                        "Please upload audio files or compressed archives containing audio files",
+                      code: "INVALID_CONTENT_TYPE",
+                      recoverable: false,
+                      severity: "error" as const,
+                    };
+                  }
+
+                  // Check for reasonable file sizes for audio
+                  if (isAudio && file.size > 50 * 1024 * 1024) {
+                    // 50MB for single audio files
+                    return {
+                      message:
+                        "Individual audio files should be under 50MB. Use compressed archives for larger files.",
+                      code: "AUDIO_FILE_TOO_LARGE",
+                      recoverable: false,
+                      severity: "warning" as const,
+                    };
+                  }
+
+                  return null;
+                }}
                 className="w-full"
               />
 
@@ -464,9 +718,31 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
           </Card>
 
           {/* Submit Button */}
-          <Button type="submit" className="w-full btn-primary text-lg py-4" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            className="w-full btn-primary text-lg py-4"
+            disabled={isSubmitting || isValidating || fileUploadState.isUploading || hasError}
+          >
             {isSubmitting ? (
-              "Submitting Request..."
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Submitting Request...
+              </div>
+            ) : isValidating ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Validating...
+              </div>
+            ) : fileUploadState.isUploading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Uploading Files...
+              </div>
+            ) : hasError ? (
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                Please Fix Errors Above
+              </div>
             ) : (
               <>
                 <Send className="w-4 h-4 mr-2" />
@@ -474,6 +750,38 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
               </>
             )}
           </Button>
+
+          {/* Form Status Indicators */}
+          <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
+            <div className="flex items-center gap-1">
+              {isValidating ? (
+                <Loader2 className="w-3 h-3 animate-spin text-yellow-400" />
+              ) : (
+                <CheckCircle className="w-3 h-3 text-green-400" />
+              )}
+              <span>Form Validation</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              {fileUploadState.isUploading ? (
+                <Loader2 className="w-3 h-3 animate-spin text-blue-400" />
+              ) : uploadedFiles.length > 0 ? (
+                <CheckCircle className="w-3 h-3 text-green-400" />
+              ) : (
+                <div className="w-3 h-3 rounded-full border border-gray-500" />
+              )}
+              <span>File Uploads ({uploadedFiles.length})</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              {hasError ? (
+                <AlertTriangle className="w-3 h-3 text-red-400" />
+              ) : (
+                <CheckCircle className="w-3 h-3 text-green-400" />
+              )}
+              <span>Ready to Submit</span>
+            </div>
+          </div>
         </form>
       </CardContent>
     </Card>

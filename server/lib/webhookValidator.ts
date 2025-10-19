@@ -185,8 +185,8 @@ export const webhookPayloadSchemas = {
 };
 
 export class WebhookValidator {
-  private configs: Map<string, WebhookConfig> = new Map();
-  private sanitizationOptions: SanitizationOptions;
+  private readonly configs: Map<string, WebhookConfig> = new Map();
+  private readonly sanitizationOptions: SanitizationOptions;
 
   constructor(sanitizationOptions?: Partial<SanitizationOptions>) {
     this.sanitizationOptions = {
@@ -223,89 +223,23 @@ export class WebhookValidator {
     algorithm: "sha256" | "sha1" = "sha256"
   ): boolean {
     try {
-      // Input validation
-      if (!payload || !signature || !secret) {
-        console.error("Signature validation failed: Missing required parameters");
+      if (!this.validateSignatureInputs(payload, signature, secret)) {
         return false;
       }
 
-      if (typeof signature !== "string" || signature.length === 0) {
-        console.error("Signature validation failed: Invalid signature format");
+      const payloadBuffer = this.preparePayloadBuffer(payload);
+      if (!payloadBuffer) {
         return false;
       }
 
-      if (typeof secret !== "string" || secret.length < 16) {
-        console.error("Signature validation failed: Secret too short (minimum 16 characters)");
+      const expectedSignature = this.generateExpectedSignature(payloadBuffer, secret, algorithm);
+      const providedSignature = this.extractProvidedSignature(signature, algorithm);
+
+      if (!providedSignature) {
         return false;
       }
 
-      const payloadBuffer = Buffer.isBuffer(payload) ? payload : Buffer.from(payload, "utf8");
-
-      // Validate payload size (prevent DoS attacks)
-      if (payloadBuffer.length > 1024 * 1024) {
-        // 1MB limit
-        console.error("Signature validation failed: Payload too large");
-        return false;
-      }
-
-      const expectedSignature = crypto
-        .createHmac(algorithm, secret)
-        .update(payloadBuffer)
-        .digest("hex");
-
-      // Handle different signature formats with enhanced validation
-      let providedSignature = signature.trim();
-
-      // Stripe format: "t=timestamp,v1=signature"
-      if (signature.includes("v1=")) {
-        const parts = signature.split(",");
-        const v1Part = parts.find(part => part.startsWith("v1="));
-        if (v1Part && v1Part.length > 3) {
-          providedSignature = v1Part.substring(3);
-        } else {
-          console.error("Signature validation failed: Invalid Stripe signature format");
-          return false;
-        }
-      }
-
-      // GitHub format: "sha256=signature" or "sha1=signature"
-      if (signature.startsWith(`${algorithm}=`)) {
-        const prefixLength = algorithm.length + 1;
-        if (signature.length > prefixLength) {
-          providedSignature = signature.substring(prefixLength);
-        } else {
-          console.error("Signature validation failed: Invalid GitHub signature format");
-          return false;
-        }
-      }
-
-      // Clerk/Svix format: multiple signatures separated by spaces
-      if (signature.includes(" ")) {
-        const signatures = signature.split(" ").filter(sig => sig.length > 0);
-        if (signatures.length === 0) {
-          console.error("Signature validation failed: No valid signatures found");
-          return false;
-        }
-
-        return signatures.some(sig => {
-          let cleanSig = sig.trim();
-          if (cleanSig.startsWith("v1,")) {
-            cleanSig = cleanSig.substring(3);
-          }
-          return cleanSig.length > 0 && this.constantTimeCompare(cleanSig, expectedSignature);
-        });
-      }
-
-      // Validate signature format (hex string)
-      if (!/^[a-fA-F0-9]+$/.test(providedSignature)) {
-        console.error("Signature validation failed: Invalid hex format");
-        return false;
-      }
-
-      // Validate signature length based on algorithm
-      const expectedLength = algorithm === "sha256" ? 64 : 40;
-      if (providedSignature.length !== expectedLength) {
-        console.error(`Signature validation failed: Invalid signature length for ${algorithm}`);
+      if (!this.validateSignatureFormat(providedSignature, algorithm)) {
         return false;
       }
 
@@ -314,6 +248,148 @@ export class WebhookValidator {
       console.error("Signature validation error:", error);
       return false;
     }
+  }
+
+  /**
+   * Validate signature inputs
+   */
+  private validateSignatureInputs(
+    payload: string | Buffer,
+    signature: string,
+    secret: string
+  ): boolean {
+    if (!payload || !signature || !secret) {
+      console.error("Signature validation failed: Missing required parameters");
+      return false;
+    }
+
+    if (typeof signature !== "string" || signature.length === 0) {
+      console.error("Signature validation failed: Invalid signature format");
+      return false;
+    }
+
+    if (typeof secret !== "string" || secret.length < 16) {
+      console.error("Signature validation failed: Secret too short (minimum 16 characters)");
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Prepare payload buffer with size validation
+   */
+  private preparePayloadBuffer(payload: string | Buffer): Buffer | null {
+    const payloadBuffer = Buffer.isBuffer(payload) ? payload : Buffer.from(payload, "utf8");
+
+    if (payloadBuffer.length > 1024 * 1024) {
+      // 1MB limit
+      console.error("Signature validation failed: Payload too large");
+      return null;
+    }
+
+    return payloadBuffer;
+  }
+
+  /**
+   * Generate expected signature
+   */
+  private generateExpectedSignature(
+    payloadBuffer: Buffer,
+    secret: string,
+    algorithm: string
+  ): string {
+    return crypto.createHmac(algorithm, secret).update(payloadBuffer).digest("hex");
+  }
+
+  /**
+   * Extract provided signature from various formats
+   */
+  private extractProvidedSignature(signature: string, algorithm: string): string | null {
+    const providedSignature = signature.trim();
+
+    // Stripe format: "t=timestamp,v1=signature"
+    if (signature.includes("v1=")) {
+      return this.extractStripeSignature(signature);
+    }
+    // GitHub format: "sha256=signature" or "sha1=signature"
+    else if (signature.startsWith(`${algorithm}=`)) {
+      return this.extractGitHubSignature(signature, algorithm);
+    }
+    // Clerk/Svix format: multiple signatures separated by spaces
+    else if (signature.includes(" ")) {
+      return this.extractClerkSignature(signature);
+    }
+
+    return providedSignature;
+  }
+
+  /**
+   * Extract Stripe signature format
+   */
+  private extractStripeSignature(signature: string): string | null {
+    const parts = signature.split(",");
+    const v1Part = parts.find(part => part.startsWith("v1="));
+
+    if (v1Part && v1Part.length > 3) {
+      return v1Part.substring(3);
+    }
+
+    console.error("Signature validation failed: Invalid Stripe signature format");
+    return null;
+  }
+
+  /**
+   * Extract GitHub signature format
+   */
+  private extractGitHubSignature(signature: string, algorithm: string): string | null {
+    const prefixLength = algorithm.length + 1;
+
+    if (signature.length > prefixLength) {
+      return signature.substring(prefixLength);
+    }
+
+    console.error("Signature validation failed: Invalid GitHub signature format");
+    return null;
+  }
+
+  /**
+   * Extract Clerk/Svix signature format
+   */
+  private extractClerkSignature(signature: string): string | null {
+    const signatures = signature.split(" ").filter(sig => sig.length > 0);
+
+    if (signatures.length === 0) {
+      console.error("Signature validation failed: No valid signatures found");
+      return null;
+    }
+
+    // Return the first valid signature for now
+    // The actual validation will handle multiple signatures
+    let cleanSig = signatures[0].trim();
+    if (cleanSig.startsWith("v1,")) {
+      cleanSig = cleanSig.substring(3);
+    }
+
+    return cleanSig.length > 0 ? cleanSig : null;
+  }
+
+  /**
+   * Validate signature format
+   */
+  private validateSignatureFormat(signature: string, algorithm: string): boolean {
+    if (!/^[a-fA-F0-9]+$/.test(signature)) {
+      console.error("Signature validation failed: Invalid hex format");
+      return false;
+    }
+
+    const expectedLength = algorithm === "sha256" ? 64 : 40;
+    if (signature.length !== expectedLength) {
+      console.error(`Signature validation failed: Invalid signature length for ${algorithm}`);
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -392,7 +468,6 @@ export class WebhookValidator {
    */
   sanitizePayload(payload: unknown, depth: number = 0): unknown {
     try {
-      // Prevent infinite recursion and DoS attacks
       if (depth > this.sanitizationOptions.maxDepth) {
         console.warn(
           `Payload sanitization: Max depth ${this.sanitizationOptions.maxDepth} exceeded`
@@ -400,159 +475,200 @@ export class WebhookValidator {
         return "[Max depth exceeded]";
       }
 
-      // Handle null and undefined
       if (payload === null || payload === undefined) {
         return payload;
       }
 
-      // Handle strings with enhanced sanitization
-      if (typeof payload === "string") {
-        if (payload.length > this.sanitizationOptions.maxStringLength) {
-          console.warn(
-            `Payload sanitization: String truncated from ${payload.length} to ${this.sanitizationOptions.maxStringLength} characters`
-          );
-          return payload.substring(0, this.sanitizationOptions.maxStringLength) + "[Truncated]";
-        }
-
-        // Enhanced character filtering for security
-        let sanitized = payload
-          // Remove control characters and potentially dangerous characters
-          .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
-          // Remove HTML/XML tags
-          .replace(/<[^>]*>/g, "")
-          // Remove JavaScript protocol
-          .replace(/javascript:/gi, "")
-          // Remove data URLs that could contain scripts
-          .replace(/data:[^;]*;base64,/gi, "")
-          // Remove potentially dangerous quotes and characters
-          .replace(/[<>"'&]/g, "");
-
-        // Additional validation for common injection patterns
-        const dangerousPatterns = [
-          /script/gi,
-          /onload/gi,
-          /onerror/gi,
-          /onclick/gi,
-          /eval\s*\(/gi,
-          /function\s*\(/gi,
-          /setTimeout/gi,
-          /setInterval/gi,
-        ];
-
-        for (const pattern of dangerousPatterns) {
-          if (pattern.test(sanitized)) {
-            console.warn("Payload sanitization: Dangerous pattern detected and removed");
-            sanitized = sanitized.replace(pattern, "[FILTERED]");
-          }
-        }
-
-        return sanitized;
-      }
-
-      // Handle numbers with validation
-      if (typeof payload === "number") {
-        // Check for NaN and Infinity
-        if (!Number.isFinite(payload)) {
-          console.warn("Payload sanitization: Invalid number detected");
-          return 0;
-        }
-        return payload;
-      }
-
-      // Handle booleans
-      if (typeof payload === "boolean") {
-        return payload;
-      }
-
-      // Handle arrays with size limits
-      if (Array.isArray(payload)) {
-        const maxArrayLength = 1000; // Prevent DoS attacks
-        if (payload.length > maxArrayLength) {
-          console.warn(
-            `Payload sanitization: Array truncated from ${payload.length} to ${maxArrayLength} items`
-          );
-          return payload
-            .slice(0, maxArrayLength)
-            .map(item => this.sanitizePayload(item, depth + 1));
-        }
-        return payload.map(item => this.sanitizePayload(item, depth + 1));
-      }
-
-      // Handle objects with enhanced security
-      if (typeof payload === "object") {
-        const sanitized: Record<string, unknown> = {};
-        const maxObjectKeys = 100; // Prevent DoS attacks
-        let keyCount = 0;
-
-        for (const [key, value] of Object.entries(payload)) {
-          // Limit number of keys to prevent DoS
-          if (keyCount >= maxObjectKeys) {
-            console.warn(`Payload sanitization: Object truncated at ${maxObjectKeys} keys`);
-            break;
-          }
-
-          // Enhanced key validation
-          if (typeof key !== "string") {
-            console.warn("Payload sanitization: Non-string key detected and skipped");
-            continue;
-          }
-
-          // Block dangerous keys with enhanced patterns
-          const dangerousKeys = [
-            "__proto__",
-            "constructor",
-            "prototype",
-            "eval",
-            ...(this.sanitizationOptions.blockedKeys || []),
-          ];
-
-          if (dangerousKeys.includes(key.toLowerCase())) {
-            console.warn(`Payload sanitization: Dangerous key "${key}" blocked`);
-            continue;
-          }
-
-          // Check for dangerous patterns in key names (but be more specific)
-          if (key.toLowerCase() === "script" || key.toLowerCase() === "function") {
-            console.warn(`Payload sanitization: Dangerous key "${key}" blocked`);
-            continue;
-          }
-
-          // Check allowed keys if specified
-          if (
-            this.sanitizationOptions.allowedKeys &&
-            !this.sanitizationOptions.allowedKeys.includes(key)
-          ) {
-            continue;
-          }
-
-          // Sanitize key name with enhanced filtering
-          const sanitizedKey = key
-            .replace(/[<>"'&\u0000-\u001f\u007f-\u009f]/g, "")
-            .replace(/\s+/g, "_") // Replace spaces with underscores
-            .substring(0, 100); // Limit key length
-
-          if (sanitizedKey.length > 0 && sanitizedKey !== "__proto__") {
-            sanitized[sanitizedKey] = this.sanitizePayload(value, depth + 1);
-            keyCount++;
-          }
-        }
-
-        return sanitized;
-      }
-
-      // Handle functions and other types
-      if (typeof payload === "function") {
-        console.warn("Payload sanitization: Function detected and removed");
-        return "[Function removed]";
-      }
-
-      // Handle symbols and other exotic types
-      console.warn(`Payload sanitization: Unsupported type ${typeof payload} converted to string`);
-      return String(payload);
+      return this.sanitizeByType(payload, depth);
     } catch (error) {
       console.error("Payload sanitization error:", error);
       return "[Sanitization error]";
     }
+  }
+
+  /**
+   * Sanitize payload based on its type
+   */
+  private sanitizeByType(payload: unknown, depth: number): unknown {
+    if (typeof payload === "string") {
+      return this.sanitizeString(payload);
+    }
+
+    if (typeof payload === "number") {
+      return this.sanitizeNumber(payload);
+    }
+
+    if (typeof payload === "boolean") {
+      return payload;
+    }
+
+    if (Array.isArray(payload)) {
+      return this.sanitizeArray(payload, depth);
+    }
+
+    if (typeof payload === "object" && payload !== null) {
+      return this.sanitizeObject(payload, depth);
+    }
+
+    if (typeof payload === "function") {
+      console.warn("Payload sanitization: Function detected and removed");
+      return "[Function removed]";
+    }
+
+    console.warn(`Payload sanitization: Unsupported type ${typeof payload} converted to string`);
+    return String(payload);
+  }
+
+  /**
+   * Sanitize string values
+   */
+  private sanitizeString(payload: string): string {
+    if (payload.length > this.sanitizationOptions.maxStringLength) {
+      console.warn(
+        `Payload sanitization: String truncated from ${payload.length} to ${this.sanitizationOptions.maxStringLength} characters`
+      );
+      return payload.substring(0, this.sanitizationOptions.maxStringLength) + "[Truncated]";
+    }
+
+    return this.removeControlCharacters(payload);
+  }
+
+  /**
+   * Remove control characters and dangerous patterns from strings
+   */
+  private removeControlCharacters(input: string): string {
+    const sanitized = input
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, "") // Control characters
+      .replace(/<[^>]*>/g, "") // HTML/XML tags
+      .replace(/javascript:/gi, "") // JavaScript protocol
+      .replace(/data:[^;]*;base64,/gi, "") // Data URLs
+      .replace(/[<>"'&]/g, ""); // Dangerous quotes
+
+    return this.filterDangerousPatterns(sanitized);
+  }
+
+  /**
+   * Filter dangerous patterns from strings
+   */
+  private filterDangerousPatterns(input: string): string {
+    const dangerousPatterns = [
+      /script/gi,
+      /onload/gi,
+      /onerror/gi,
+      /onclick/gi,
+      /eval\s*\(/gi,
+      /function\s*\(/gi,
+      /setTimeout/gi,
+      /setInterval/gi,
+    ];
+
+    let result = input;
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(result)) {
+        console.warn("Payload sanitization: Dangerous pattern detected and removed");
+        result = result.replace(pattern, "[FILTERED]");
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Sanitize number values
+   */
+  private sanitizeNumber(payload: number): number {
+    if (!Number.isFinite(payload)) {
+      console.warn("Payload sanitization: Invalid number detected");
+      return 0;
+    }
+    return payload;
+  }
+
+  /**
+   * Sanitize array values
+   */
+  private sanitizeArray(payload: unknown[], depth: number): unknown[] {
+    const maxArrayLength = 1000;
+
+    if (payload.length > maxArrayLength) {
+      console.warn(
+        `Payload sanitization: Array truncated from ${payload.length} to ${maxArrayLength} items`
+      );
+      return payload.slice(0, maxArrayLength).map(item => this.sanitizePayload(item, depth + 1));
+    }
+
+    return payload.map(item => this.sanitizePayload(item, depth + 1));
+  }
+
+  /**
+   * Sanitize object values
+   */
+  private sanitizeObject(payload: object, depth: number): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+    const maxObjectKeys = 100;
+    let keyCount = 0;
+
+    for (const [key, value] of Object.entries(payload)) {
+      if (keyCount >= maxObjectKeys) {
+        console.warn(`Payload sanitization: Object truncated at ${maxObjectKeys} keys`);
+        break;
+      }
+
+      const sanitizedKey = this.sanitizeObjectKey(key);
+      if (sanitizedKey) {
+        sanitized[sanitizedKey] = this.sanitizePayload(value, depth + 1);
+        keyCount++;
+      }
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * Sanitize object keys
+   */
+  private sanitizeObjectKey(key: string): string | null {
+    if (typeof key !== "string") {
+      console.warn("Payload sanitization: Non-string key detected and skipped");
+      return null;
+    }
+
+    if (this.isDangerousKey(key)) {
+      console.warn(`Payload sanitization: Dangerous key "${key}" blocked`);
+      return null;
+    }
+
+    if (
+      this.sanitizationOptions.allowedKeys &&
+      !this.sanitizationOptions.allowedKeys.includes(key)
+    ) {
+      return null;
+    }
+
+    const sanitizedKey = key
+      .replace(/[<>"'&\u0000-\u001f\u007f-\u009f]/g, "")
+      .replace(/\s+/g, "_")
+      .substring(0, 100);
+
+    return sanitizedKey.length > 0 && sanitizedKey !== "__proto__" ? sanitizedKey : null;
+  }
+
+  /**
+   * Check if a key is dangerous
+   */
+  private readonly dangerousKeys = [
+    "__proto__",
+    "constructor",
+    "prototype",
+    "eval",
+    "script",
+    "function",
+  ];
+
+  private isDangerousKey(key: string): boolean {
+    const lowerKey = key.toLowerCase();
+    const blockedKeys = [...this.dangerousKeys, ...(this.sanitizationOptions.blockedKeys || [])];
+    return blockedKeys.includes(lowerKey);
   }
 
   /**

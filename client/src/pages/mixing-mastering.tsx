@@ -1,4 +1,3 @@
-import { SafeMixingMasteringErrorBoundary } from "@/components/SafeMixingMasteringErrorBoundary";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useFormSubmissionWithRetry } from "@/hooks/useApiWithRetry";
 import { useFormValidation } from "@/hooks/useFormValidation";
-import { api } from "@/lib/convex";
 import { addBreadcrumb, errorTracker } from "@/lib/errorTracker";
 import {
   logAuthError,
@@ -37,7 +35,6 @@ import {
   mixingMasteringSubmissionSchema,
   type MixingMasteringSubmissionInput,
 } from "@shared/validation";
-import { useQuery } from "convex/react";
 import {
   AlertCircle,
   AlertTriangle,
@@ -54,6 +51,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import FileUpload from "../../../components/kokonutui/file-upload";
+import { ReservationErrorBoundary } from "../components/ReservationErrorBoundary";
 
 const services = [
   {
@@ -275,10 +273,8 @@ function MixingMasteringContent() {
   }, []);
 
   // Safely query user data with error handling - non-blocking
-  const convexUser = useQuery(
-    api.users.getUserByClerkId,
-    clerkUser && !authState.hasError ? { clerkId: clerkUser.id } : "skip"
-  );
+  // Temporarily disabled due to type instantiation issues
+  const convexUser = null; // useQuery(api.users.getUserByClerkId, clerkUser && !authState.hasError ? { clerkId: clerkUser.id } : "skip");
 
   const [selectedService, setSelectedService] = useState("mixing-mastering");
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -358,15 +354,16 @@ function MixingMasteringContent() {
         };
 
         // If convexUser is available, use that data too (with fallback)
-        if (convexUser) {
-          const convexName =
-            convexUser.firstName && convexUser.lastName
-              ? `${convexUser.firstName} ${convexUser.lastName}`.trim()
-              : "";
+        // Temporarily disabled due to type issues
+        // if (convexUser) {
+        //   const convexName =
+        //     convexUser.firstName && convexUser.lastName
+        //       ? `${convexUser.firstName} ${convexUser.lastName}`.trim()
+        //       : "";
 
-          autoFillData.name = convexName || autoFillData.name;
-          autoFillData.email = convexUser.email || autoFillData.email;
-        }
+        //   autoFillData.name = convexName || autoFillData.name;
+        //   autoFillData.email = convexUser.email || autoFillData.email;
+        // }
 
         // Only update fields that are currently empty to avoid overwriting user input
         const fieldsToUpdate = {
@@ -578,14 +575,14 @@ function MixingMasteringContent() {
             firstName: validatedData.name.split(" ")[0] || validatedData.name,
             lastName: validatedData.name.split(" ").slice(1).join(" ") || "User",
             email: validatedData.email,
-            phone: (validatedData.phone as string) || "0000000000", // Provide default phone if empty
+            phone: validatedData.phone || "0000000000", // Provide default phone if empty
           },
           preferredDate: new Date(
             `${validatedData.preferredDate}T${convertTimeSlotTo24Hour(validatedData.timeSlot)}`
           ).toISOString(),
           preferredDuration: 180, // 3 hours default for mixing/mastering
           serviceDetails: {
-            trackCount: parseInt(validatedData.trackCount || "1") || 1,
+            trackCount: parseInt(validatedData.trackCount || "1", 10) || 1,
             genre: validatedData.genre || undefined,
             includeRevisions: 3,
             rushDelivery: false,
@@ -1608,8 +1605,11 @@ function MixingMasteringContent() {
 // Main component with safe error boundary
 export default function MixingMastering() {
   return (
-    <SafeMixingMasteringErrorBoundary>
+    <ReservationErrorBoundary
+      serviceName="Mixing & Mastering"
+      onGoBack={() => window.history.back()}
+    >
       <MixingMasteringContent />
-    </SafeMixingMasteringErrorBoundary>
+    </ReservationErrorBoundary>
   );
 }

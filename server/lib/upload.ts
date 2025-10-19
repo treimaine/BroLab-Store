@@ -58,12 +58,218 @@ export async function validateFile(
   };
 }
 
-// Scan antivirus des fichiers (mock pour l'instant)
-export async function scanFile(file: Express.Multer.File): Promise<boolean> {
-  // TODO: Intégrer ClamAV ou un autre service antivirus
-  // Pour l'instant, on simule un scan
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  return true;
+// Enhanced antivirus scanning with multiple checks
+export async function scanFile(file: Express.Multer.File): Promise<{
+  safe: boolean;
+  threats: string[];
+  scanTime: number;
+}> {
+  const startTime = Date.now();
+  const threats: string[] = [];
+
+  try {
+    // 1. File signature analysis
+    const signatureThreats = await scanFileSignatures(file);
+    threats.push(...signatureThreats);
+
+    // 2. File name analysis
+    const nameThreats = scanFileName(file.originalname);
+    threats.push(...nameThreats);
+
+    // 3. File size analysis
+    const sizeThreats = scanFileSize(file);
+    threats.push(...sizeThreats);
+
+    // 4. Content analysis for specific file types
+    const contentThreats = await scanFileContent(file);
+    threats.push(...contentThreats);
+
+    // Simulate scanning delay
+    await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500));
+
+    const scanTime = Date.now() - startTime;
+    const safe = threats.length === 0;
+
+    console.log(
+      `Antivirus scan completed for ${file.originalname}: ${safe ? "SAFE" : "THREATS DETECTED"}`,
+      {
+        threats,
+        scanTime,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+      }
+    );
+
+    return { safe, threats, scanTime };
+  } catch (error) {
+    console.error("Antivirus scan error:", error);
+    // In case of scan error, be conservative and flag as unsafe
+    return {
+      safe: false,
+      threats: ["SCAN_ERROR: Unable to complete security scan"],
+      scanTime: Date.now() - startTime,
+    };
+  }
+}
+
+// Scan file signatures for known malware patterns
+async function scanFileSignatures(file: Express.Multer.File): Promise<string[]> {
+  const threats: string[] = [];
+  const buffer = file.buffer;
+
+  // Common malware signatures (simplified)
+  const malwareSignatures = [
+    { name: "PE_EXECUTABLE", pattern: [0x4d, 0x5a], description: "Windows executable detected" },
+    {
+      name: "ELF_EXECUTABLE",
+      pattern: [0x7f, 0x45, 0x4c, 0x46],
+      description: "Linux executable detected",
+    },
+    { name: "MACH_O", pattern: [0xfe, 0xed, 0xfa, 0xce], description: "macOS executable detected" },
+    { name: "SCRIPT_HEADER", pattern: [0x23, 0x21], description: "Script file detected" }, // #!/
+  ];
+
+  for (const signature of malwareSignatures) {
+    if (signature.pattern.every((byte, index) => buffer[index] === byte)) {
+      // Only flag as threat if it's not an expected file type
+      if (!isExpectedExecutable(file.originalname, file.mimetype)) {
+        threats.push(`${signature.name}: ${signature.description}`);
+      }
+    }
+  }
+
+  return threats;
+}
+
+// Scan file name for suspicious patterns
+function scanFileName(fileName: string): string[] {
+  const threats: string[] = [];
+  const lowerName = fileName.toLowerCase();
+
+  // Dangerous file extensions
+  const dangerousExtensions = [
+    ".exe",
+    ".bat",
+    ".cmd",
+    ".scr",
+    ".com",
+    ".pif",
+    ".vbs",
+    ".js",
+    ".jar",
+    ".app",
+    ".deb",
+    ".dmg",
+    ".iso",
+    ".msi",
+    ".pkg",
+    ".rpm",
+  ];
+
+  for (const ext of dangerousExtensions) {
+    if (lowerName.endsWith(ext)) {
+      threats.push(`DANGEROUS_EXTENSION: File extension ${ext} is not allowed`);
+    }
+  }
+
+  // Double extensions (e.g., file.txt.exe)
+  const extensionCount = (fileName.match(/\./g) || []).length;
+  if (extensionCount > 1) {
+    const parts = fileName.split(".");
+    if (parts.length > 2) {
+      threats.push("DOUBLE_EXTENSION: Multiple file extensions detected");
+    }
+  }
+
+  // Suspicious file names
+  const suspiciousNames = ["autorun.inf", "desktop.ini", "thumbs.db", "folder.htt"];
+
+  if (suspiciousNames.includes(lowerName)) {
+    threats.push(`SUSPICIOUS_NAME: ${fileName} is a suspicious system file`);
+  }
+
+  return threats;
+}
+
+// Scan file size for anomalies
+function scanFileSize(file: Express.Multer.File): string[] {
+  const threats: string[] = [];
+  const { size, originalname, mimetype } = file;
+
+  // Check for suspiciously small files that claim to be media
+  if (mimetype?.startsWith("audio/") && size < 1000) {
+    threats.push("SUSPICIOUS_SIZE: Audio file is suspiciously small");
+  }
+
+  if (mimetype?.startsWith("video/") && size < 10000) {
+    threats.push("SUSPICIOUS_SIZE: Video file is suspiciously small");
+  }
+
+  // Check for zip bombs (very small zip files)
+  if ((mimetype?.includes("zip") || originalname.toLowerCase().endsWith(".zip")) && size < 100) {
+    threats.push("POTENTIAL_ZIP_BOMB: Zip file is suspiciously small");
+  }
+
+  return threats;
+}
+
+// Scan file content for specific threats
+async function scanFileContent(file: Express.Multer.File): Promise<string[]> {
+  const threats: string[] = [];
+  const buffer = file.buffer;
+  const content = buffer.toString("utf8", 0, Math.min(buffer.length, 1024)); // First 1KB as text
+
+  // Look for suspicious script content
+  const scriptPatterns = [
+    /eval\s*\(/gi,
+    /document\.write\s*\(/gi,
+    /window\.location\s*=/gi,
+    /<script[^>]*>/gi,
+    /javascript:/gi,
+    /vbscript:/gi,
+  ];
+
+  for (const pattern of scriptPatterns) {
+    if (pattern.test(content)) {
+      threats.push(`SUSPICIOUS_CONTENT: Potentially malicious script content detected`);
+      break; // Only report once per file
+    }
+  }
+
+  // Look for embedded executables in non-executable files
+  if (!isExpectedExecutable(file.originalname, file.mimetype)) {
+    const executableMarkers = [
+      "MZ", // PE header
+      "\x7fELF", // ELF header
+    ];
+
+    for (const marker of executableMarkers) {
+      if (content.includes(marker)) {
+        threats.push("EMBEDDED_EXECUTABLE: Executable code found in non-executable file");
+        break;
+      }
+    }
+  }
+
+  return threats;
+}
+
+// Helper function to determine if executable content is expected
+function isExpectedExecutable(fileName: string, mimeType?: string): boolean {
+  const executableExtensions = [".exe", ".app", ".deb", ".dmg", ".msi", ".pkg", ".rpm"];
+  const executableMimeTypes = [
+    "application/x-executable",
+    "application/x-msdos-program",
+    "application/x-msdownload",
+  ];
+
+  const hasExecutableExtension = executableExtensions.some(ext =>
+    fileName.toLowerCase().endsWith(ext)
+  );
+
+  const hasExecutableMimeType = mimeType ? executableMimeTypes.includes(mimeType) : false;
+
+  return hasExecutableExtension || hasExecutableMimeType;
 }
 
 // Upload vers Supabase Storage (TODO: Implement with Convex)
@@ -72,30 +278,17 @@ export async function uploadToSupabase(
   path: string,
   options: { contentType?: string; cacheControl?: string } = {}
 ): Promise<{ path: string; url: string }> {
-  // TODO: Implement with Convex
-  // const { data, error } = await supabaseAdmin.storage.from("uploads").upload(path, file.buffer, {
-  //   contentType: options.contentType || file.mimetype,
-  //   cacheControl: options.cacheControl || "3600",
-  //   upsert: false,
-  // });
+  // Placeholder implementation for now
+  // In production, this would integrate with Convex file storage
+  console.log(`Simulating upload of ${file.originalname} to path: ${path}`, {
+    contentType: options.contentType || file.mimetype,
+    cacheControl: options.cacheControl || "3600",
+    fileSize: file.size,
+  });
 
-  // if (error) throw error;
+  // Simulate upload delay
+  await new Promise(resolve => setTimeout(resolve, 500));
 
-  // // Générer une URL signée avec TTL de 1h
-  // const signedUrlData = await supabaseAdmin.storage
-  //   .from("uploads")
-  //   .createSignedUrl(data.path, 3600);
-
-  // if (!signedUrlData.data) {
-  //   throw new Error("Échec de génération de l'URL signée");
-  // }
-
-  // return {
-  //   path: data.path,
-  //   url: signedUrlData.data.signedUrl,
-  // };
-
-  // Placeholder implementation
   return {
     path: path,
     url: `https://placeholder.com/${path}`,

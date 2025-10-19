@@ -280,6 +280,12 @@ export * from "./apiEndpoints";
 // Analytics types
 export * from "./analytics";
 
+// Dashboard types
+export * from "./dashboard";
+
+// Sync types
+export * from "./sync";
+
 // System optimization types
 export type {
   BundleAnalysis,

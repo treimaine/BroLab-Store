@@ -149,8 +149,11 @@ export function StatsCards({ stats, previousStats, isLoading, className }: Stats
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i} className="bg-gray-900/50 border-gray-700/50 animate-pulse">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card
+            key={`stats-loading-${i}`}
+            className="bg-gray-900/50 border-gray-700/50 animate-pulse"
+          >
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center space-x-2 sm:space-x-3">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gray-700 rounded-lg" />

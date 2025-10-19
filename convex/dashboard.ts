@@ -245,14 +245,43 @@ export const getDashboardData = query({
           : undefined,
       };
 
-      // Calculate comprehensive statistics using enhanced calculator
+      // Calculate comprehensive statistics with REAL totals (not limited arrays)
+      const [totalFavoritesCount, totalDownloadsCount, totalOrdersCount] = await Promise.all([
+        // Count ALL favorites (not limited)
+        ctx.db
+          .query("favorites")
+          .withIndex("by_user_created", q => q.eq("userId", user._id))
+          .collect()
+          .then(results => results.length),
+
+        // Count ALL downloads (not limited)
+        ctx.db
+          .query("downloads")
+          .withIndex("by_user_timestamp", q => q.eq("userId", user._id))
+          .collect()
+          .then(results => results.length),
+
+        // Count ALL orders (not limited)
+        ctx.db
+          .query("orders")
+          .withIndex("by_user", q => q.eq("userId", user._id))
+          .collect()
+          .then(results => results.length),
+      ]);
+
+      // Calculate statistics with real totals - no mock arrays
       const stats: UserStats = StatisticsCalculator.calculateUserStats({
-        favorites,
-        downloads,
-        orders,
+        favorites: new Array(totalFavoritesCount).fill({}), // Array with correct length for counting
+        downloads: new Array(totalDownloadsCount).fill({}), // Array with correct length for counting
+        orders: orders, // Use real orders for revenue calculation
         quotas,
         activityLog,
       });
+
+      // Override with real totals
+      stats.totalFavorites = totalFavoritesCount;
+      stats.totalDownloads = totalDownloadsCount;
+      stats.totalOrders = totalOrdersCount;
 
       // Transform favorites with beat enrichment
       const enrichedFavorites: Favorite[] = favorites.map(fav => {
@@ -681,7 +710,7 @@ export const getDashboardStats = query({
         .query("downloads")
         .withIndex("by_user", q => q.eq("userId", user._id))
         .collect()
-        .then((results: any[]) => results.length),
+        .then((results: unknown[]) => results.length),
 
       ctx.db
         .query("orders")
@@ -703,11 +732,11 @@ export const getDashboardStats = query({
 
     // Use enhanced statistics calculator for consistent calculations
     return StatisticsCalculator.calculateUserStats({
-      favorites: Array(favoritesCount).fill({}), // Mock array for count
-      downloads: Array(downloadsCount).fill({}), // Mock array for count
+      favorites: new Array(favoritesCount).fill({}), // Array for count calculation
+      downloads: new Array(downloadsCount).fill({}), // Array for count calculation
       orders,
       quotas,
-      activityLog: Array(activityCount).fill({}), // Mock array for count
+      activityLog: new Array(activityCount).fill({}), // Array for count calculation
     });
   },
 });

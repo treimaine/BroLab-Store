@@ -90,27 +90,67 @@ export interface StripeOrderItem {
   totalPrice?: number;
   qty?: number;
   quantity?: number;
-  productId?: string;
+  productId?: string | number; // Support both string and number for compatibility
   type?: string;
 }
 
 /**
- * Order data from Convex
+ * Convex order item from database (matches schema)
+ */
+export interface ConvexOrderItem {
+  _id: string;
+  _creationTime: number;
+  orderId: string;
+  productId: number; // Always number in Convex schema
+  type: string;
+  title: string;
+  sku?: string;
+  qty: number;
+  unitPrice: number;
+  totalPrice: number;
+  metadata?: {
+    beatGenre?: string;
+    beatBpm?: number;
+    beatKey?: string;
+    downloadFormat?: string;
+    licenseTerms?: string;
+  };
+}
+
+/**
+ * Order data from Convex getOrderWithRelations
  */
 export interface ConvexOrderData {
   order: {
-    items?: StripeOrderItem[];
-    currency?: string;
-    totalAmount?: number;
-    status?: string;
-    invoiceNumber?: string;
+    _id: string;
+    _creationTime: number;
     userId?: string;
+    email: string;
+    status: string;
+    total: number;
+    currency?: string;
     sessionId?: string;
-    email?: string;
-    total?: number;
     paymentIntentId?: string;
+    invoiceNumber?: string;
+    invoiceId?: string;
+    createdAt: number;
+    updatedAt?: number;
   };
-  items?: StripeOrderItem[];
+  items: ConvexOrderItem[];
+  payments?: Array<{
+    _id: string;
+    _creationTime: number;
+    orderId: string;
+    provider: string;
+    status: string;
+    amount: number;
+    currency: string;
+    stripeEventId?: string;
+    stripePaymentIntentId?: string;
+    stripeChargeId?: string;
+    createdAt: number;
+  }>;
+  invoice?: unknown;
 }
 
 /**

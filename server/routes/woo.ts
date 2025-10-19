@@ -210,7 +210,7 @@ router.get("/products", async (req: Request, res: Response) => {
       console.log(`🎯 Product ${product.id} - FINAL audio_url:`, finalAudioUrl);
 
       // Helper function to find metadata value
-      const findMetaValue = (key: string): string | number | boolean | null => {
+      const findMetaValue = (key: string): string | number | boolean | string[] | null => {
         const meta = product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === key);
         return meta?.value ?? null;
       };
@@ -390,7 +390,12 @@ router.get("/products/:id", async (req, res, next): Promise<void> => {
     // Helper function to find metadata value
     const findMetaValue = (key: string): string | number | boolean | null => {
       const meta = product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === key);
-      return meta?.value ?? null;
+      const value: string | number | boolean | string[] | null = meta?.value ?? null;
+      // Handle array values by converting to string or returning first element
+      if (Array.isArray(value)) {
+        return value.length > 0 ? String(value[0]) : null;
+      }
+      return value as string | number | boolean | null;
     };
 
     // Helper function to check tags

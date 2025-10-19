@@ -1,0 +1,1011 @@
+/**
+ * Connection Manager with Fallback Strategies
+ *
+ * Manages WebSocket-first, HTTP-polling fallback strategy for real-time dashboard synchronization.
+ * Provides connection health monitoring, automatic strategy switching, and graceful degradation.
+ */
+
+import BrowserEventEmitter from "@/utils/BrowserEventEmitter";
+import type {
+  ConnectionStatus,
+  RecoveryAction,
+  SyncError,
+  SyncErrorType,
+} from "@shared/types/sync";
+
+// ================================
+// CONNECTION INTERFACES
+// ================================
+
+export interface ConnectionConfig {
+  /** WebSocket endpoint URL */
+  websocketUrl: string;
+  /** HTTP polling endpoint URL */
+  pollingUrl: string;
+  /** Initial connection timeout (ms) */
+  connectionTimeout: number;
+  /** Heartbeat interval for WebSocket (ms) */
+  heartbeatInterval: number;
+  /** Polling interval for HTTP fallback (ms) */
+  pollingInterval: number;
+  /** Maximum reconnection attempts */
+  maxReconnectAttempts: number;
+  /** Base delay for exponential backoff (ms) */
+  reconnectDelayBase: number;
+  /** Maximum reconnect delay (ms) */
+  maxReconnectDelay: number;
+  /** Connection quality check interval (ms) */
+  qualityCheckInterval: number;
+  /** Latency threshold for connection quality (ms) */
+  latencyThreshold: number;
+  /** Error rate threshold for fallback */
+  errorRateThreshold: number;
+  /** Enable debug mode logging */
+  debugMode?: boolean;
+}
+
+export interface Connection {
+  /** Connection type */
+  type: "websocket" | "polling";
+  /** Send message through connection */
+  send: (message: ConnectionMessage) => Promise<void>;
+  /** Close the connection */
+  close: () => void;
+  /** Register message handler */
+  onMessage: (handler: (message: ConnectionMessage) => void) => void;
+  /** Register error handler */
+  onError: (handler: (error: Error) => void) => void;
+  /** Register close handler */
+  onClose: (handler: () => void) => void;
+  /** Get connection statistics */
+  getStats: () => ConnectionStats;
+}
+
+export interface ConnectionMessage {
+  /** Message type */
+  type: string;
+  /** Message payload */
+  payload: unknown;
+  /** Message ID for tracking */
+  id: string;
+  /** Timestamp */
+  timestamp: number;
+  /** Correlation ID for request/response */
+  correlationId?: string;
+}
+
+export interface ConnectionStats {
+  /** Connection uptime (ms) */
+  uptime: number;
+  /** Messages sent */
+  messagesSent: number;
+  /** Messages received */
+  messagesReceived: number;
+  /** Average latency (ms) */
+  averageLatency: number;
+  /** Error count */
+  errorCount: number;
+  /** Last error timestamp */
+  lastError?: number;
+  /** Connection quality score (0-1) */
+  qualityScore: number;
+}
+
+export interface ConnectionMetrics {
+  /** Current connection status */
+  status: ConnectionStatus;
+  /** Connection statistics */
+  stats: ConnectionStats;
+  /** Strategy performance history */
+  strategyPerformance: Map<string, StrategyMetrics>;
+  /** Recent latency measurements */
+  latencyHistory: number[];
+  /** Error rate over time */
+  errorRate: number;
+}
+
+export interface StrategyMetrics {
+  /** Strategy name */
+  name: string;
+  /** Success rate (0-1) */
+  successRate: number;
+  /** Average latency (ms) */
+  averageLatency: number;
+  /** Total connection attempts */
+  connectionAttempts: number;
+  /** Successful connections */
+  successfulConnections: number;
+  /** Total uptime (ms) */
+  totalUptime: number;
+  /** Last used timestamp */
+  lastUsed: number;
+}
+
+export type ConnectionStrategy = "websocket" | "polling" | "offline";
+
+export type FallbackStrategy = "immediate" | "gradual" | "quality_based" | "manual";
+
+// ================================
+// CONNECTION IMPLEMENTATIONS
+// ================================
+
+/**
+ * WebSocket connection implementation
+ */
+class WebSocketConnection implements Connection {
+  public readonly type = "websocket" as const;
+  private ws: WebSocket | null = null;
+  private messageHandlers = new Set<(message: ConnectionMessage) => void>();
+  private errorHandlers = new Set<(error: Error) => void>();
+  private closeHandlers = new Set<() => void>();
+  private stats: ConnectionStats;
+  private startTime: number;
+  private latencyMeasurements: number[] = [];
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+
+  constructor(
+    private url: string,
+    private config: ConnectionConfig
+  ) {
+    this.startTime = Date.now();
+    this.stats = {
+      uptime: 0,
+      messagesSent: 0,
+      messagesReceived: 0,
+      averageLatency: 0,
+      errorCount: 0,
+      qualityScore: 1,
+    };
+  }
+
+  public async connect(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.ws = new WebSocket(this.url);
+
+        const timeout = setTimeout(() => {
+          this.ws?.close();
+          reject(new Error("WebSocket connection timeout"));
+        }, this.config.connectionTimeout);
+
+        this.ws.onopen = () => {
+          clearTimeout(timeout);
+          this.startHeartbeat();
+          resolve();
+        };
+
+        this.ws.onmessage = event => {
+          try {
+            const message: ConnectionMessage = JSON.parse(event.data);
+            this.stats.messagesReceived++;
+            this.updateLatency(message);
+            this.messageHandlers.forEach(handler => handler(message));
+          } catch (error) {
+            this.handleError(new Error(`Failed to parse WebSocket message: ${error}`));
+          }
+        };
+
+        this.ws.onerror = () => {
+          clearTimeout(timeout);
+          this.handleError(new Error("WebSocket connection error"));
+          reject(new Error("WebSocket connection failed"));
+        };
+
+        this.ws.onclose = () => {
+          clearTimeout(timeout);
+          this.stopHeartbeat();
+          this.closeHandlers.forEach(handler => handler());
+        };
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  public async send(message: ConnectionMessage): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error("WebSocket not connected");
+    }
+
+    try {
+      this.ws.send(JSON.stringify(message));
+      this.stats.messagesSent++;
+    } catch (error) {
+      this.handleError(error as Error);
+      throw error;
+    }
+  }
+
+  public close(): void {
+    this.stopHeartbeat();
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+  }
+
+  public onMessage(handler: (message: ConnectionMessage) => void): void {
+    this.messageHandlers.add(handler);
+  }
+
+  public onError(handler: (error: Error) => void): void {
+    this.errorHandlers.add(handler);
+  }
+
+  public onClose(handler: () => void): void {
+    this.closeHandlers.add(handler);
+  }
+
+  public getStats(): ConnectionStats {
+    this.stats.uptime = Date.now() - this.startTime;
+    this.stats.averageLatency = this.calculateAverageLatency();
+    this.stats.qualityScore = this.calculateQualityScore();
+    return { ...this.stats };
+  }
+
+  private startHeartbeat(): void {
+    this.heartbeatInterval = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        const heartbeat: ConnectionMessage = {
+          type: "heartbeat",
+          payload: { timestamp: Date.now() },
+          id: `hb_${Date.now()}`,
+          timestamp: Date.now(),
+        };
+        this.send(heartbeat).catch(() => {
+          // Heartbeat failed, connection might be dead
+          this.handleError(new Error("Heartbeat failed"));
+        });
+      }
+    }, this.config.heartbeatInterval);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  private updateLatency(message: ConnectionMessage): void {
+    if (message.type === "heartbeat_response" && message.payload) {
+      const sentTime = (message.payload as { timestamp: number }).timestamp;
+      const latency = Date.now() - sentTime;
+      this.latencyMeasurements.push(latency);
+
+      // Keep only last 100 measurements
+      if (this.latencyMeasurements.length > 100) {
+        this.latencyMeasurements.shift();
+      }
+    }
+  }
+
+  private calculateAverageLatency(): number {
+    if (this.latencyMeasurements.length === 0) return 0;
+    return (
+      this.latencyMeasurements.reduce((sum, lat) => sum + lat, 0) / this.latencyMeasurements.length
+    );
+  }
+
+  private calculateQualityScore(): number {
+    const latency = this.calculateAverageLatency();
+    const errorRate = this.stats.errorCount / Math.max(this.stats.messagesSent, 1);
+
+    // Quality score based on latency and error rate
+    const latencyScore = Math.max(0, 1 - latency / this.config.latencyThreshold);
+    const errorScore = Math.max(0, 1 - errorRate / this.config.errorRateThreshold);
+
+    return (latencyScore + errorScore) / 2;
+  }
+
+  private handleError(error: Error): void {
+    this.stats.errorCount++;
+    this.stats.lastError = Date.now();
+    this.errorHandlers.forEach(handler => handler(error));
+  }
+}
+
+/**
+ * HTTP polling connection implementation
+ */
+class PollingConnection implements Connection {
+  public readonly type = "polling" as const;
+  private pollingInterval: NodeJS.Timeout | null = null;
+  private messageHandlers = new Set<(message: ConnectionMessage) => void>();
+  private errorHandlers = new Set<(error: Error) => void>();
+  private closeHandlers = new Set<() => void>();
+  private stats: ConnectionStats;
+  private startTime: number;
+  private isActive = false;
+  private lastPollTime = 0;
+
+  constructor(
+    private url: string,
+    private config: ConnectionConfig
+  ) {
+    this.startTime = Date.now();
+    this.stats = {
+      uptime: 0,
+      messagesSent: 0,
+      messagesReceived: 0,
+      averageLatency: 0,
+      errorCount: 0,
+      qualityScore: 0.8, // Lower than WebSocket by default
+    };
+  }
+
+  public async connect(): Promise<void> {
+    this.isActive = true;
+    this.startPolling();
+  }
+
+  public async send(message: ConnectionMessage): Promise<void> {
+    try {
+      const response = await fetch(`${this.url}/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(message),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      this.stats.messagesSent++;
+    } catch (error) {
+      this.handleError(error as Error);
+      throw error;
+    }
+  }
+
+  public close(): void {
+    this.isActive = false;
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
+    this.closeHandlers.forEach(handler => handler());
+  }
+
+  public onMessage(handler: (message: ConnectionMessage) => void): void {
+    this.messageHandlers.add(handler);
+  }
+
+  public onError(handler: (error: Error) => void): void {
+    this.errorHandlers.add(handler);
+  }
+
+  public onClose(handler: () => void): void {
+    this.closeHandlers.add(handler);
+  }
+
+  public getStats(): ConnectionStats {
+    this.stats.uptime = Date.now() - this.startTime;
+    return { ...this.stats };
+  }
+
+  private startPolling(): void {
+    this.pollingInterval = setInterval(async () => {
+      if (!this.isActive) return;
+
+      try {
+        const pollStart = Date.now();
+        const response = await fetch(`${this.url}/poll?since=${this.lastPollTime}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const latency = Date.now() - pollStart;
+
+        // Update average latency
+        this.stats.averageLatency = (this.stats.averageLatency + latency) / 2;
+
+        if (data.messages && Array.isArray(data.messages)) {
+          data.messages.forEach((message: ConnectionMessage) => {
+            this.stats.messagesReceived++;
+            this.messageHandlers.forEach(handler => handler(message));
+          });
+        }
+
+        this.lastPollTime = Date.now();
+      } catch (error) {
+        this.handleError(error as Error);
+      }
+    }, this.config.pollingInterval);
+  }
+
+  private handleError(error: Error): void {
+    this.stats.errorCount++;
+    this.stats.lastError = Date.now();
+    this.errorHandlers.forEach(handler => handler(error));
+  }
+}
+
+// ================================
+// CONNECTION MANAGER
+// ================================
+
+/**
+ * Connection Manager with WebSocket-first, HTTP-polling fallback strategy
+ */
+export class ConnectionManager extends BrowserEventEmitter {
+  private config: ConnectionConfig;
+  private currentConnection: Connection | null = null;
+  private connectionStatus: ConnectionStatus;
+  private metrics: ConnectionMetrics;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private qualityCheckInterval: NodeJS.Timeout | null = null;
+  private fallbackStrategy: FallbackStrategy = "quality_based";
+  private isDestroyed = false;
+
+  constructor(config: Partial<ConnectionConfig> = {}) {
+    super();
+
+    this.config = {
+      websocketUrl: config.websocketUrl || "ws://localhost:3001/ws",
+      pollingUrl: config.pollingUrl || "http://localhost:3001/api/sync",
+      connectionTimeout: config.connectionTimeout || 10000,
+      heartbeatInterval: config.heartbeatInterval || 30000,
+      pollingInterval: config.pollingInterval || 5000,
+      maxReconnectAttempts: config.maxReconnectAttempts || 10,
+      reconnectDelayBase: config.reconnectDelayBase || 1000,
+      maxReconnectDelay: config.maxReconnectDelay || 30000,
+      qualityCheckInterval: config.qualityCheckInterval || 60000,
+      latencyThreshold: config.latencyThreshold || 1000,
+      errorRateThreshold: config.errorRateThreshold || 0.1,
+    };
+
+    this.connectionStatus = {
+      type: "offline",
+      connected: false,
+      reconnecting: false,
+      lastConnected: 0,
+      reconnectAttempts: 0,
+      maxReconnectAttempts: this.config.maxReconnectAttempts,
+    };
+
+    this.metrics = {
+      status: this.connectionStatus,
+      stats: {
+        uptime: 0,
+        messagesSent: 0,
+        messagesReceived: 0,
+        averageLatency: 0,
+        errorCount: 0,
+        qualityScore: 0,
+      },
+      strategyPerformance: new Map(),
+      latencyHistory: [],
+      errorRate: 0,
+    };
+
+    this.initializeStrategyMetrics();
+    this.startQualityMonitoring();
+  }
+
+  /**
+   * Connect using the best available strategy
+   */
+  public async connect(): Promise<void> {
+    if (this.isDestroyed) {
+      throw new Error("ConnectionManager has been destroyed");
+    }
+
+    const strategy = this.selectBestStrategy();
+    await this.connectWithStrategy(strategy);
+  }
+
+  /**
+   * Disconnect current connection
+   */
+  public disconnect(): void {
+    this.clearReconnectTimeout();
+
+    if (this.currentConnection) {
+      this.currentConnection.close();
+      this.currentConnection = null;
+    }
+
+    this.updateConnectionStatus({
+      connected: false,
+      reconnecting: false,
+      type: "offline",
+    });
+  }
+
+  /**
+   * Reconnect with exponential backoff
+   */
+  public async reconnect(): Promise<void> {
+    if (this.connectionStatus.reconnecting) {
+      return; // Already reconnecting
+    }
+
+    this.updateConnectionStatus({ reconnecting: true });
+
+    const delay = this.calculateReconnectDelay();
+
+    this.reconnectTimeout = setTimeout(async () => {
+      try {
+        await this.connect();
+        this.connectionStatus.reconnectAttempts = 0; // Reset on success
+      } catch (error) {
+        this.connectionStatus.reconnectAttempts++;
+
+        if (this.connectionStatus.reconnectAttempts < this.config.maxReconnectAttempts) {
+          // Try again with next strategy
+          await this.reconnect();
+        } else {
+          // Max attempts reached, go offline
+          this.updateConnectionStatus({
+            connected: false,
+            reconnecting: false,
+            type: "offline",
+          });
+
+          this.emit("max_reconnect_attempts_reached");
+        }
+      }
+    }, delay);
+
+    this.updateConnectionStatus({ nextReconnectIn: delay });
+  }
+
+  /**
+   * Send message through current connection
+   */
+  public async send(message: ConnectionMessage): Promise<void> {
+    if (!this.currentConnection || !this.connectionStatus.connected) {
+      throw new Error("No active connection");
+    }
+
+    try {
+      await this.currentConnection.send(message);
+      this.updateMetrics();
+    } catch (error) {
+      this.handleConnectionError(error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Enable fallback strategy
+   */
+  public enableFallback(strategy: FallbackStrategy): void {
+    this.fallbackStrategy = strategy;
+    this.emit("fallback_strategy_changed", { strategy });
+  }
+
+  /**
+   * Fallback to polling connection method
+   */
+  public async fallbackToPolling(): Promise<void> {
+    this.log("Falling back to polling connection");
+
+    // Disconnect current connection if any
+    if (this.currentConnection) {
+      this.currentConnection.close();
+      this.currentConnection = null;
+    }
+
+    // Update status to indicate fallback
+    this.updateConnectionStatus({
+      type: "polling",
+      connected: false,
+      reconnecting: true,
+    });
+
+    // Connect using polling strategy
+    try {
+      await this.connectWithStrategy("polling");
+    } catch (error) {
+      this.handleConnectionError(error as Error);
+    }
+  }
+
+  /**
+   * Get current connection strategy
+   */
+  public getCurrentStrategy(): ConnectionStrategy {
+    return this.connectionStatus.type;
+  }
+
+  /**
+   * Get connection metrics
+   */
+  public getConnectionMetrics(): ConnectionMetrics {
+    this.updateMetrics();
+    return { ...this.metrics };
+  }
+
+  /**
+   * Register connection status change handler
+   */
+  public onStatusChange(callback: (status: ConnectionStatus) => void): () => void {
+    this.on("status_change", callback);
+    return () => this.off("status_change", callback);
+  }
+
+  /**
+   * Register message handler
+   */
+  public onMessage(handler: (message: ConnectionMessage) => void): () => void {
+    const wrappedHandler = (message: ConnectionMessage) => {
+      try {
+        handler(message);
+      } catch (error) {
+        this.emit("message_handler_error", { error, message });
+      }
+    };
+
+    this.on("message", wrappedHandler);
+    return () => this.off("message", wrappedHandler);
+  }
+
+  /**
+   * Destroy the connection manager
+   */
+  public destroy(): void {
+    this.isDestroyed = true;
+    this.disconnect();
+    this.clearQualityMonitoring();
+    this.removeAllListeners();
+  }
+
+  // Private methods
+
+  private async connectWithStrategy(strategy: ConnectionStrategy): Promise<void> {
+    if (strategy === "offline") {
+      throw new Error("Cannot connect in offline mode");
+    }
+
+    // Disconnect current connection
+    if (this.currentConnection) {
+      this.currentConnection.close();
+    }
+
+    // Create new connection based on strategy
+    const connection = this.createConnection(strategy);
+
+    try {
+      // Set up event handlers
+      connection.onMessage(message => {
+        this.emit("message", message);
+      });
+
+      connection.onError(error => {
+        this.handleConnectionError(error);
+      });
+
+      connection.onClose(() => {
+        this.handleConnectionClose();
+      });
+
+      // Attempt connection
+      if (connection.type === "websocket") {
+        await (connection as WebSocketConnection).connect();
+      } else if (connection.type === "polling") {
+        await (connection as PollingConnection).connect();
+      }
+
+      // Success - update state
+      this.currentConnection = connection;
+      this.updateConnectionStatus({
+        type: strategy,
+        connected: true,
+        reconnecting: false,
+        lastConnected: Date.now(),
+        reconnectAttempts: 0,
+      });
+
+      // Update strategy metrics
+      this.updateStrategyMetrics(strategy, true);
+
+      this.emit("connected", { strategy });
+    } catch (error) {
+      // Connection failed
+      this.updateStrategyMetrics(strategy, false);
+
+      // Try fallback strategy if available
+      const fallbackStrategy = this.getFallbackStrategy(strategy);
+      if (fallbackStrategy && fallbackStrategy !== strategy) {
+        await this.connectWithStrategy(fallbackStrategy);
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  private createConnection(strategy: ConnectionStrategy): Connection {
+    switch (strategy) {
+      case "websocket":
+        return new WebSocketConnection(this.config.websocketUrl, this.config);
+      case "polling":
+        return new PollingConnection(this.config.pollingUrl, this.config);
+      default:
+        throw new Error(`Unsupported connection strategy: ${strategy}`);
+    }
+  }
+
+  private selectBestStrategy(): ConnectionStrategy {
+    const strategies: ConnectionStrategy[] = ["websocket", "polling"];
+
+    // Sort strategies by performance
+    strategies.sort((a, b) => {
+      const aMetrics = this.metrics.strategyPerformance.get(a);
+      const bMetrics = this.metrics.strategyPerformance.get(b);
+
+      if (!aMetrics && !bMetrics) return 0;
+      if (!aMetrics) return 1;
+      if (!bMetrics) return -1;
+
+      // Score based on success rate and latency
+      const aScore = aMetrics.successRate - aMetrics.averageLatency / 1000;
+      const bScore = bMetrics.successRate - bMetrics.averageLatency / 1000;
+
+      return bScore - aScore;
+    });
+
+    return strategies[0];
+  }
+
+  private getFallbackStrategy(currentStrategy: ConnectionStrategy): ConnectionStrategy | null {
+    switch (this.fallbackStrategy) {
+      case "immediate":
+        return currentStrategy === "websocket" ? "polling" : null;
+
+      case "gradual":
+        return currentStrategy === "websocket" ? "polling" : "offline";
+
+      case "quality_based": {
+        // Check if current strategy quality is below threshold
+        const metrics = this.metrics.strategyPerformance.get(currentStrategy);
+        if (metrics && metrics.successRate < 0.5) {
+          return currentStrategy === "websocket" ? "polling" : null;
+        }
+        return null;
+      }
+
+      case "manual":
+        return null; // No automatic fallback
+
+      default:
+        return null;
+    }
+  }
+
+  private calculateReconnectDelay(): number {
+    const baseDelay = this.config.reconnectDelayBase;
+    const attempts = this.connectionStatus.reconnectAttempts;
+    const exponentialDelay = baseDelay * Math.pow(2, attempts);
+
+    return Math.min(exponentialDelay, this.config.maxReconnectDelay);
+  }
+
+  private handleConnectionError(error: Error): void {
+    this.emit("connection_error", { error });
+
+    // Create sync error
+    const syncError: SyncError = {
+      type: "NETWORK_ERROR" as SyncErrorType,
+      message: error.message,
+      timestamp: Date.now(),
+      context: { connectionType: this.connectionStatus.type },
+      retryable: true,
+      retryCount: this.connectionStatus.reconnectAttempts,
+      maxRetries: this.config.maxReconnectAttempts,
+      fingerprint: this.generateErrorFingerprint(error.message, "NETWORK_ERROR"),
+    };
+
+    this.emit("sync_error", { error: syncError });
+
+    // Trigger reconnection if not already reconnecting
+    if (!this.connectionStatus.reconnecting) {
+      this.reconnect().catch(() => {
+        // Reconnection failed, will be handled by reconnect logic
+      });
+    }
+  }
+
+  private handleConnectionClose(): void {
+    this.updateConnectionStatus({
+      connected: false,
+      type: "offline",
+    });
+
+    this.emit("disconnected");
+
+    // Auto-reconnect if not manually disconnected
+    if (!this.isDestroyed && !this.connectionStatus.reconnecting) {
+      this.reconnect().catch(() => {
+        // Reconnection failed, will be handled by reconnect logic
+      });
+    }
+  }
+
+  private updateConnectionStatus(updates: Partial<ConnectionStatus>): void {
+    this.connectionStatus = { ...this.connectionStatus, ...updates };
+    this.metrics.status = this.connectionStatus;
+    this.emit("status_change", this.connectionStatus);
+  }
+
+  private updateMetrics(): void {
+    if (this.currentConnection) {
+      const connectionStats = this.currentConnection.getStats();
+      this.metrics.stats = connectionStats;
+
+      // Update latency history
+      this.metrics.latencyHistory.push(connectionStats.averageLatency);
+      if (this.metrics.latencyHistory.length > 100) {
+        this.metrics.latencyHistory.shift();
+      }
+
+      // Calculate error rate
+      const totalMessages = connectionStats.messagesSent + connectionStats.messagesReceived;
+      this.metrics.errorRate = totalMessages > 0 ? connectionStats.errorCount / totalMessages : 0;
+    }
+  }
+
+  private updateStrategyMetrics(strategy: ConnectionStrategy, success: boolean): void {
+    let metrics = this.metrics.strategyPerformance.get(strategy);
+
+    if (!metrics) {
+      metrics = {
+        name: strategy,
+        successRate: 0,
+        averageLatency: 0,
+        connectionAttempts: 0,
+        successfulConnections: 0,
+        totalUptime: 0,
+        lastUsed: Date.now(),
+      };
+    }
+
+    metrics.connectionAttempts++;
+    if (success) {
+      metrics.successfulConnections++;
+    }
+    metrics.successRate = metrics.successfulConnections / metrics.connectionAttempts;
+    metrics.lastUsed = Date.now();
+
+    this.metrics.strategyPerformance.set(strategy, metrics);
+  }
+
+  private initializeStrategyMetrics(): void {
+    const strategies: ConnectionStrategy[] = ["websocket", "polling"];
+
+    strategies.forEach(strategy => {
+      this.metrics.strategyPerformance.set(strategy, {
+        name: strategy,
+        successRate: 1, // Start optimistic
+        averageLatency: strategy === "websocket" ? 100 : 500, // Estimated defaults
+        connectionAttempts: 0,
+        successfulConnections: 0,
+        totalUptime: 0,
+        lastUsed: 0,
+      });
+    });
+  }
+
+  private log(message: string, ...args: unknown[]): void {
+    if (this.config.debugMode) {
+      console.log(`[ConnectionManager] ${message}`, ...args);
+    }
+  }
+
+  private generateErrorFingerprint(message: string, type: string): string {
+    const fingerprintData = {
+      type,
+      message: message.substring(0, 100), // First 100 chars
+    };
+
+    return btoa(JSON.stringify(fingerprintData)).substring(0, 16);
+  }
+
+  private startQualityMonitoring(): void {
+    this.qualityCheckInterval = setInterval(() => {
+      if (this.currentConnection && this.connectionStatus.connected) {
+        const stats = this.currentConnection.getStats();
+
+        // Check if quality is below threshold
+        if (stats.qualityScore < 0.5) {
+          this.emit("connection_quality_degraded", { stats });
+
+          // Consider switching strategy
+          if (this.fallbackStrategy === "quality_based") {
+            const fallback = this.getFallbackStrategy(this.connectionStatus.type);
+            if (fallback) {
+              this.connectWithStrategy(fallback).catch(() => {
+                // Fallback failed, stay with current connection
+              });
+            }
+          }
+        }
+      }
+    }, this.config.qualityCheckInterval);
+  }
+
+  private clearQualityMonitoring(): void {
+    if (this.qualityCheckInterval) {
+      clearInterval(this.qualityCheckInterval);
+      this.qualityCheckInterval = null;
+    }
+  }
+
+  private clearReconnectTimeout(): void {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+  }
+}
+
+// ================================
+// SINGLETON AND UTILITIES
+// ================================
+
+let connectionManagerInstance: ConnectionManager | null = null;
+
+/**
+ * Get the singleton ConnectionManager instance
+ */
+export const getConnectionManager = (config?: Partial<ConnectionConfig>): ConnectionManager => {
+  if (!connectionManagerInstance) {
+    connectionManagerInstance = new ConnectionManager(config);
+  }
+  return connectionManagerInstance;
+};
+
+/**
+ * Destroy the ConnectionManager instance
+ */
+export const destroyConnectionManager = (): void => {
+  if (connectionManagerInstance) {
+    connectionManagerInstance.destroy();
+    connectionManagerInstance = null;
+  }
+};
+
+/**
+ * Create recovery actions for connection errors
+ */
+export const createConnectionRecoveryActions = (
+  error: SyncError,
+  connectionManager: ConnectionManager
+): RecoveryAction[] => {
+  const actions: RecoveryAction[] = [];
+
+  // Always offer retry for retryable errors
+  if (error.retryable && error.retryCount < error.maxRetries) {
+    actions.push({
+      type: "retry",
+      delay: Math.min(1000 * Math.pow(2, error.retryCount), 30000),
+    });
+  }
+
+  // Offer fallback strategy
+  const currentStrategy = connectionManager.getCurrentStrategy();
+  if (currentStrategy === "websocket") {
+    actions.push({
+      type: "fallback",
+      strategy: "polling",
+    });
+  }
+
+  // Force sync as last resort
+  actions.push({
+    type: "force_sync",
+    sections: ["all"],
+  });
+
+  return actions;
+};

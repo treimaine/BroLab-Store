@@ -8,7 +8,7 @@ describe("WebhookValidator", () => {
     id: "evt_test_123",
     object: "event",
     type: "payment_intent.succeeded",
-    data: { object: { id: "pi_test_123" } },
+    data: { object: { id: "pi_test_123", object: "payment_intent" } },
     created: Math.floor(Date.now() / 1000),
     livemode: false,
     pending_webhooks: 1,
@@ -219,7 +219,7 @@ describe("WebhookValidator", () => {
         id: "evt_test_123",
         object: "event",
         type: "payment_intent.succeeded",
-        data: { object: { id: "pi_test_123" } },
+        data: { object: { id: "pi_test_123", object: "payment_intent" } },
         created: Math.floor(Date.now() / 1000),
         livemode: false,
         pending_webhooks: 1,
@@ -477,7 +477,7 @@ describe("Singleton WebhookValidator", () => {
 
     // Re-import to trigger initialization
     jest.resetModules();
-    const { webhookValidator: newValidator} = require("../server/lib/webhookValidator");
+    const { webhookValidator: newValidator } = require("../server/lib/webhookValidator");
 
     expect(newValidator.getConfig("stripe")).toBeDefined();
     expect(newValidator.getConfig("clerk")).toBeDefined();

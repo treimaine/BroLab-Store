@@ -14,6 +14,7 @@
  * - 9.2: Guide users to re-authenticate when needed
  */
 
+import { api } from "@/lib/convex-api";
 import { useUser } from "@clerk/clerk-react";
 import type {
   Activity,
@@ -29,6 +30,7 @@ import type {
   UserStats,
 } from "@shared/types/dashboard";
 import { useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "convex/react";
 import { useCallback, useMemo, useRef } from "react";
 
 // Error types for comprehensive error handling
@@ -169,14 +171,10 @@ export function useDashboard(options: DashboardOptions = {}): DashboardHookRetur
   }, [isAuthenticated, config]);
 
   // Main dashboard data query using the unified Convex function
-  // Temporarily use a mock implementation to avoid Convex type instantiation issues
-  // This will be replaced with the actual Convex query once the type issues are resolved
-  const dashboardData: DashboardData | undefined = useMemo(() => {
-    if (!isAuthenticated) return undefined;
-
-    // Return mock data structure for now
-    return undefined;
-  }, [isAuthenticated, queryArgs]);
+  const dashboardData = useQuery(
+    api.dashboard.getDashboardData,
+    queryArgs === "skip" ? "skip" : queryArgs
+  );
 
   // Loading state
   const isLoading = useMemo(() => {
@@ -354,11 +352,7 @@ export function useDashboardStats(): {
   const queryClient = useQueryClient();
 
   const isAuthenticated = Boolean(clerkUser && isLoaded);
-  // Mock implementation to avoid Convex type instantiation issues
-  const statsData: UserStats | undefined = useMemo(() => {
-    if (!isAuthenticated) return undefined;
-    return undefined;
-  }, [isAuthenticated]);
+  const statsData = useQuery(api.dashboard.getDashboardStats, isAuthenticated ? {} : "skip");
 
   const isLoading = !isLoaded || (isAuthenticated && statsData === undefined);
 
