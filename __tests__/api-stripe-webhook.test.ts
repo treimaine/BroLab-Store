@@ -72,15 +72,19 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
   it("prevents duplicate processing via idempotency guard", async () => {
     // First call: not processed
     mockConvex.mutation.mockImplementationOnce(
-      async (_fn: string, args?: Record<string, unknown>) => {
-        if (args && args.provider === "stripe") return { alreadyProcessed: false };
+      async (fn: string, args?: Record<string, unknown>) => {
+        if (fn === "orders:markProcessedEvent" && args && args.provider === "stripe") {
+          return { alreadyProcessed: false };
+        }
         return {};
       }
     );
     // Second call: already processed
     mockConvex.mutation.mockImplementationOnce(
-      async (_fn: string, args?: Record<string, unknown>) => {
-        if (args && args.provider === "stripe") return { alreadyProcessed: true };
+      async (fn: string, args?: Record<string, unknown>) => {
+        if (fn === "orders:markProcessedEvent" && args && args.provider === "stripe") {
+          return { alreadyProcessed: true };
+        }
         return {};
       }
     );
@@ -88,7 +92,7 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
     const eventBody = {
       id: "evt_test_1",
       type: "unknown.event",
-      data: { object: {} },
+      data: { object: { object: "unknown" } },
     };
 
     const res1 = await request(app)
@@ -96,7 +100,13 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
       .set("stripe-signature", "t=123,v1=dummy")
       .send(eventBody);
     expect([200, 204]).toContain(res1.status);
-    expect(mockConvex.mutation).toHaveBeenCalled();
+    expect(mockConvex.mutation).toHaveBeenCalledWith(
+      "orders:markProcessedEvent",
+      expect.objectContaining({
+        eventId: "evt_test_1",
+        provider: "stripe",
+      })
+    );
 
     const res2 = await request(app)
       .post("/api/payment/stripe/webhook")
@@ -108,53 +118,82 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
   it("generates invoice and sends email on checkout.session.completed", async () => {
     // Idempotency first call
     mockConvex.mutation.mockImplementationOnce(
-      async (_fn: string, args?: Record<string, unknown>) => {
-        if (args && args.provider === "stripe") return { alreadyProcessed: false };
+      async (fn: string, args?: Record<string, unknown>) => {
+        if (fn === "orders:markProcessedEvent" && args && args.provider === "stripe") {
+          return { alreadyProcessed: false };
+        }
         return {};
       }
     );
 
-    // recordPayment
-    mockConvex.mutation.mockImplementationOnce(async () => ({ success: true }));
+    // recordPayment mutation
+    mockConvex.mutation.mockImplementationOnce(
+      async (fn: string, args?: Record<string, unknown>) => {
+        if (fn === "orders:recordPayment") {
+          return { success: true };
+        }
+        return {};
+      }
+    );
 
-    // getOrderWithRelations
-    mockConvex.query.mockResolvedValueOnce({
-      order: {
-        _id: "orders:1",
-        email: "buyer@example.com",
-        total: 1000,
-        currency: "USD",
-        userId: "user:1",
-        sessionId: "session:1",
-        invoiceNumber: "INV-001",
-        paymentIntentId: "pi_123",
-      },
-      items: [
-        {
-          productId: 42,
-          type: "basic",
-          totalPrice: 1000,
-          unitPrice: 1000,
-          qty: 1,
-        },
-      ],
+    // getOrderWithRelations query
+    mockConvex.query.mockImplementationOnce(async (fn: string, args?: Record<string, unknown>) => {
+      if (fn === "orders:getOrderWithRelations") {
+        return {
+          order: {
+            _id: "orders:1",
+            email: "buyer@example.com",
+            total: 1000,
+            currency: "USD",
+            userId: "user:1",
+            sessionId: "session:1",
+            invoiceNumber: "INV-001",
+            paymentIntentId: "pi_123",
+          },
+          items: [
+            {
+              productId: 42,
+              title: "Test Beat",
+              type: "basic",
+              totalPrice: 1000,
+              unitPrice: 1000,
+              qty: 1,
+            },
+          ],
+        };
+      }
+      return null;
     });
 
     // generateUploadUrl action
-    mockConvex.action.mockResolvedValueOnce({ url: "http://upload.local" });
+    mockConvex.action.mockImplementationOnce(async (fn: string, args?: Record<string, unknown>) => {
+      if (fn === "files:generateUploadUrl") {
+        return { url: "http://upload.local" };
+      }
+      return {};
+    });
 
-    // setInvoiceForOrder
-    mockConvex.mutation.mockImplementationOnce(async () => ({
-      invoiceId: "inv:1",
-      number: "BRL-2025-0001",
-      url: "http://cdn/invoice.pdf",
-    }));
+    // setInvoiceForOrder mutation
+    mockConvex.mutation.mockImplementationOnce(
+      async (fn: string, args?: Record<string, unknown>) => {
+        if (fn === "orders:setInvoiceForOrder") {
+          return {
+            invoiceId: "inv:1",
+            number: "BRL-2025-0001",
+            url: "http://cdn/invoice.pdf",
+          };
+        }
+        return {};
+      }
+    );
 
     const eventBody = {
       id: "evt_test_2",
       type: "checkout.session.completed",
       data: {
         object: {
+          object: "checkout.session", // Required by type guard
+          id: "cs_test_123",
           metadata: { orderId: "orders:1" },
           amount_total: 1000,
           currency: "usd",
@@ -171,15 +210,35 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
 
     expect([200, 400]).toContain(res.status);
 
-    // Check that the basic Convex operations were called
-    expect(mockConvex.mutation).toHaveBeenCalledWith(
+    // Check that the Convex operations were called in the correct order
+    expect(mockConvex.mutation).toHaveBeenNthCalledWith(
+      1,
       "orders:markProcessedEvent",
-      expect.any(Object)
+      expect.objectContaining({
+        eventId: "evt_test_2",
+        provider: "stripe",
+      })
     );
-    expect(mockConvex.mutation).toHaveBeenCalledWith("orders:recordPayment", expect.any(Object));
+
+    expect(mockConvex.mutation).toHaveBeenNthCalledWith(
+      2,
+      "orders:recordPayment",
+      expect.objectContaining({
+        orderId: "orders:1",
+        provider: "stripe",
+        status: "succeeded",
+        amount: 1000,
+        currency: "USD",
+        stripeEventId: "evt_test_2",
+        stripePaymentIntentId: "pi_123",
+      })
+    );
+
     expect(mockConvex.query).toHaveBeenCalledWith(
       "orders:getOrderWithRelations",
-      expect.any(Object)
+      expect.objectContaining({
+        orderId: "orders:1",
+      })
     );
 
     // The PDF generation and email sending might fail due to async issues in tests

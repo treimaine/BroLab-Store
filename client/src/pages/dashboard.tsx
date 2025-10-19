@@ -1,12 +1,14 @@
-import React from "react";
-import { LazyDashboard } from "@/components/LazyDashboard";
+import { ModernDashboard } from "@/components/dashboard/ModernDashboard";
+import { DashboardDataProvider } from "@/providers/DashboardDataProvider";
 import { RedirectToSignIn, SignedIn, SignedOut } from "@clerk/clerk-react";
 
 export default function Dashboard() {
   return (
     <>
       <SignedIn>
-        <LazyDashboard />
+        <DashboardDataProvider>
+          <ModernDashboard />
+        </DashboardDataProvider>
       </SignedIn>
       <SignedOut>
         <RedirectToSignIn />

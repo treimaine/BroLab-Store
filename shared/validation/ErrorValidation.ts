@@ -69,6 +69,11 @@ export const ErrorType = z.enum([
   "file_type_not_allowed",
   "virus_detected",
   "upload_failed",
+  "file_validation_failed",
+  "security_threat_detected",
+  "security_check_failed",
+  "upload_rate_limit",
+  "upload_size_limit",
 
   // Database errors
   "connection_failed",

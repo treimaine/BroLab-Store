@@ -31,21 +31,9 @@ export default function ReservationsTab({
   const { toast } = useToast();
   const [limit, setLimit] = useState<number>(20);
 
+  // Use only real reservations data - no mock or fallback data
   const localReservations = useMemo(() => {
-    if (reservations && reservations.length > 0) return reservations;
-    const raw = [] as Reservation[];
-    return raw.map((r: Reservation) => ({
-      id: String(r.id),
-      serviceType: r.serviceType,
-      preferredDate: r.preferredDate,
-      duration: r.duration,
-      totalPrice: r.totalPrice,
-      status: r.status,
-      details: r.details,
-      notes: r.notes,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-    }));
+    return reservations || [];
   }, [reservations]);
 
   const isLoadingReservations = reservations.length === 0 || isLoading;
@@ -142,7 +130,7 @@ export default function ReservationsTab({
         </h2>
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="animate-pulse">
+            <div key={`reservations-loading-${i}`} className="animate-pulse">
               <div className="h-32 bg-gray-800 rounded-lg" />
             </div>
           ))}
@@ -259,8 +247,8 @@ export default function ReservationsTab({
                         className="flex-1"
                         onClick={() => {
                           toast({
-                            title: "Fonctionnalité à venir",
-                            description: "La gestion des réservations sera bientôt disponible.",
+                            title: "Feature Coming Soon",
+                            description: "Reservation management will be available soon.",
                             variant: "default",
                           });
                         }}
@@ -273,8 +261,8 @@ export default function ReservationsTab({
                         className="flex-1"
                         onClick={() => {
                           toast({
-                            title: "Fonctionnalité à venir",
-                            description: "L'annulation des réservations sera bientôt disponible.",
+                            title: "Feature Coming Soon",
+                            description: "Reservation cancellation will be available soon.",
                             variant: "default",
                           });
                         }}
@@ -289,8 +277,8 @@ export default function ReservationsTab({
                       className="flex-1 bg-[var(--accent-purple)] hover:bg-purple-700"
                       onClick={() => {
                         toast({
-                          title: "Fonctionnalité à venir",
-                          description: "La gestion des sessions sera bientôt disponible.",
+                          title: "Feature Coming Soon",
+                          description: "Session management will be available soon.",
                           variant: "default",
                         });
                       }}

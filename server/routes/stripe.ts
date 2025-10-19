@@ -1,7 +1,6 @@
 import { ConvexHttpClient } from "convex/browser";
 import { Request, Response, Router } from "express";
 import Stripe from "stripe";
-import { api } from "../../convex/_generated/api.js";
 import { Id } from "../../convex/_generated/dataModel";
 import type { LicenseTypeEnum } from "../../shared/schema";
 import type { ConvexReservationDocument } from "../../shared/types/ConvexReservation";
@@ -135,23 +134,24 @@ router.post("/checkout", async (req, res): Promise<void> => {
     const convexOrderId = orderId as Id<"orders">;
 
     // Use proper Convex API with type safety
-    const orderData = await convex.query(api.orders.getOrderWithRelations, {
+    const orderData: any = await (convex.query as any)("orders:getOrderWithRelations", {
       orderId: convexOrderId,
     });
+
     if (!orderData?.order) {
       res.status(404).json({ error: "Order not found" });
       return;
     }
 
-    const { order } = orderData;
+    const { order, items } = orderData;
 
-    const lineItems = (order.items || []).map((it: StripeOrderItem) => ({
+    const lineItems = (items || []).map((it: any) => ({
       price_data: {
         currency: (order.currency || "usd").toLowerCase(),
         product_data: { name: it.title || "Unknown Item" },
         unit_amount: Number(it.unitPrice || it.totalPrice || 0) || 0,
       },
-      quantity: Number(it.qty || it.quantity || 1),
+      quantity: Number(it.qty || 1),
     }));
 
     const session = await stripeClient.checkout.sessions.create(
@@ -172,7 +172,7 @@ router.post("/checkout", async (req, res): Promise<void> => {
       checkoutSessionId: string,
       paymentIntentId?: string
     ) => {
-      return await convex.mutation(api.orders.saveStripeCheckoutSession, {
+      return await (convex.mutation as any)("orders:saveStripeCheckoutSession", {
         orderId,
         checkoutSessionId,
         paymentIntentId,
@@ -225,9 +225,12 @@ const handlePaymentIntentFailed = async (
         try {
           // Validate reservation exists before updating
           const reservationIdTyped: Id<"reservations"> = reservationId as Id<"reservations">;
-          const reservation = await convex.query(api.reservations.listReservations.getReservation, {
-            reservationId: reservationIdTyped,
-          });
+          const reservation = await (convex.query as any)(
+            "reservations/listReservations:getReservation",
+            {
+              reservationId: reservationIdTyped,
+            }
+          );
 
           if (!reservation) {
             console.error(
@@ -236,12 +239,15 @@ const handlePaymentIntentFailed = async (
             return { reservationId, success: false, error: "Reservation not found" };
           }
 
-          await convex.mutation(api.reservations.updateReservationStatus.updateReservationStatus, {
-            reservationId: reservationIdTyped,
-            status: "pending",
-            notes: `Payment failed for Stripe payment intent ${pi.id}. Please try again.`,
-            skipEmailNotification: true, // We'll send our own failure email
-          });
+          await (convex.mutation as any)(
+            "reservations/updateReservationStatus:updateReservationStatus",
+            {
+              reservationId: reservationIdTyped,
+              status: "pending",
+              notes: `Payment failed for Stripe payment intent ${pi.id}. Please try again.`,
+              skipEmailNotification: true, // We'll send our own failure email
+            }
+          );
 
           console.log(
             `⚠️ Updated reservation ${reservationId} back to pending due to payment failure`
@@ -286,7 +292,7 @@ const handlePaymentIntentFailed = async (
     // Handle regular order payment failures - orderId will be resolved later via session link
     // Use a placeholder ID for API compatibility - will be resolved later via session link
     const nullOrderId = "" as Id<"orders">;
-    await convex.mutation(api.orders.recordPayment, {
+    await (convex.mutation as any)("orders:recordPayment", {
       orderId: nullOrderId,
       provider: "stripe",
       status: "failed",
@@ -335,21 +341,27 @@ const handleCheckoutCompleted = async (
         try {
           // Validate reservation exists before updating
           const reservationIdTyped: Id<"reservations"> = reservationId as Id<"reservations">;
-          const reservation = await convex.query(api.reservations.listReservations.getReservation, {
-            reservationId: reservationIdTyped,
-          });
+          const reservation = await (convex.query as any)(
+            "reservations/listReservations:getReservation",
+            {
+              reservationId: reservationIdTyped,
+            }
+          );
 
           if (!reservation) {
             console.error(`❌ Reservation ${reservationId} not found`);
             return { reservationId, success: false, error: "Reservation not found" };
           }
 
-          await convex.mutation(api.reservations.updateReservationStatus.updateReservationStatus, {
-            reservationId: reservationIdTyped,
-            status: "confirmed",
-            notes: `Payment confirmed via Stripe session ${session.id}`,
-            skipEmailNotification: true, // We'll send our own confirmation email
-          });
+          await (convex.mutation as any)(
+            "reservations/updateReservationStatus:updateReservationStatus",
+            {
+              reservationId: reservationIdTyped,
+              status: "confirmed",
+              notes: `Payment confirmed via Stripe session ${session.id}`,
+              skipEmailNotification: true, // We'll send our own confirmation email
+            }
+          );
 
           console.log(`✅ Updated reservation ${reservationId} to confirmed status`);
           return { reservationId, success: true };
@@ -453,7 +465,7 @@ const sendReservationConfirmationEmail = async (
       reservationIds.map(async id => {
         try {
           const reservationIdTyped: Id<"reservations"> = id as Id<"reservations">;
-          return await convex.query(api.reservations.listReservations.getReservation, {
+          return await (convex.query as any)("reservations/listReservations:getReservation", {
             reservationId: reservationIdTyped,
           });
         } catch (error) {
@@ -609,8 +621,8 @@ const generateInvoicePdf = async (
     total: order.total || session.amount_total || 0,
     stripe_payment_intent_id: order.paymentIntentId || null,
     items: items.map((it: StripeOrderItem) => ({
-      id: parseInt(it.productId || "0") || 0,
-      beat_id: parseInt(it.productId || "0") || 0,
+      id: parseInt(String(it.productId || "0")) || 0,
+      beat_id: parseInt(String(it.productId || "0")) || 0,
       license_type: it.type && typeof it.type === "string" ? (it.type as LicenseTypeEnum) : "basic",
       price: it.unitPrice || 0,
       quantity: it.qty || 1,
@@ -622,16 +634,22 @@ const generateInvoicePdf = async (
     shipping_address: null,
   };
 
-  const pdfItems = items.map((it: StripeOrderItem) => {
+  const pdfItems = items.map((it: any) => {
     const validLicenseTypes = ["unlimited", "basic", "premium"] as const;
     const licenseType =
-      it.type && validLicenseTypes.includes(it.type as unknown)
+      it.type && typeof it.type === "string" && validLicenseTypes.includes(it.type as any)
         ? (it.type as "unlimited" | "basic" | "premium")
         : ("basic" as const);
 
     return {
-      id: parseInt(it.productId || "0") || 0,
-      beat_id: parseInt(it.productId || "0") || 0,
+      id:
+        typeof it.productId === "number"
+          ? it.productId
+          : parseInt(String(it.productId || "0")) || 0,
+      beat_id:
+        typeof it.productId === "number"
+          ? it.productId
+          : parseInt(String(it.productId || "0")) || 0,
       license_type: licenseType,
       price: (it.totalPrice || it.unitPrice || 0) / 100,
       quantity: it.qty || 1,
@@ -652,7 +670,7 @@ const generateInvoicePdf = async (
 
   const buffer = Buffer.concat(chunks);
 
-  const { url } = (await convex.action(api.files.generateUploadUrl, {})) as { url: string };
+  const { url } = (await (convex.action as any)("files:generateUploadUrl", {})) as { url: string };
   const uploadRes = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/pdf" },
@@ -666,7 +684,7 @@ const generateInvoicePdf = async (
     throw new Error("Invalid storage ID returned from upload");
   }
 
-  const result = await convex.mutation(api.orders.setInvoiceForOrder, {
+  const result = await (convex.mutation as any)("orders:setInvoiceForOrder", {
     orderId: convexOrderId,
     storageId: storageId,
     amount: Number(order.total || session.amount_total || 0),
@@ -704,7 +722,7 @@ const handleCheckoutSessionCompleted = async (
   if (orderId && typeof orderId === "string") {
     const convexOrderId = orderId as Id<"orders">;
 
-    await convex.mutation(api.orders.recordPayment, {
+    await (convex.mutation as any)("orders:recordPayment", {
       orderId: convexOrderId,
       provider: "stripe",
       status: "succeeded",
@@ -717,7 +735,7 @@ const handleCheckoutSessionCompleted = async (
     });
 
     // Generate invoice PDF and upload to Convex storage
-    const data = await convex.query(api.orders.getOrderWithRelations, {
+    const data: any = await (convex.query as any)("orders:getOrderWithRelations", {
       orderId: convexOrderId,
     });
 
@@ -725,7 +743,16 @@ const handleCheckoutSessionCompleted = async (
     const items = data?.items || [];
 
     if (order) {
-      await generateInvoicePdf(order, items, session, convex, convexOrderId);
+      // Convert items to compatible format for PDF generation
+      const compatibleItems: StripeOrderItem[] = items.map((item: any) => ({
+        productId: String(item.productId || "0"),
+        title: item.title || "Unknown Item",
+        unitPrice: item.unitPrice || 0,
+        totalPrice: item.totalPrice || 0,
+        qty: item.qty || 1,
+        type: item.type,
+      }));
+      await generateInvoicePdf(order, compatibleItems, session, convex, convexOrderId);
     }
   }
 };
@@ -738,7 +765,7 @@ const handlePaymentIntentSucceeded = async (
 ): Promise<void> => {
   const nullOrderId = "" as Id<"orders">;
 
-  await convex.mutation(api.orders.recordPayment, {
+  await (convex.mutation as any)("orders:recordPayment", {
     orderId: nullOrderId,
     provider: "stripe",
     status: "succeeded",
@@ -765,7 +792,7 @@ const stripeWebhook = async (req: Request, res: Response): Promise<void> => {
     const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL!);
 
     // Idempotency guard
-    const processed = await convex.mutation(api.orders.markProcessedEvent, {
+    const processed = await (convex.mutation as any)("orders:markProcessedEvent", {
       provider: "stripe",
       eventId: event.id,
     });

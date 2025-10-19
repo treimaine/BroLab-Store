@@ -324,7 +324,7 @@ export function BroLabMusicMetrics({
       items: [
         {
           label: "Avg Beat Price",
-          value: stats.averageBeatPrice ? `$${stats.averageBeatPrice.toFixed(2)}` : "$0.00",
+          value: stats.averageBeatPrice ? `$${stats.averageBeatPrice.toFixed(2)}` : "",
           icon: <DollarSign className="w-3 h-3" />,
           color: "text-green-400",
         },

@@ -292,34 +292,11 @@ export function EnhancedAnalytics({
     return data.filter(item => new Date(item.date) >= cutoffDate);
   }, [data, selectedPeriod]);
 
-  // Default trends if none provided
-  const defaultTrends: TrendData = {
-    orders: { period: selectedPeriod, value: 0, change: 0, changePercent: 0, isPositive: true },
-    downloads: { period: selectedPeriod, value: 0, change: 0, changePercent: 0, isPositive: true },
-    revenue: { period: selectedPeriod, value: 0, change: 0, changePercent: 0, isPositive: true },
-    favorites: { period: selectedPeriod, value: 0, change: 0, changePercent: 0, isPositive: true },
-  };
+  // Use only real trends data - no defaults or fallbacks
+  const displayTrends = trends;
 
-  const displayTrends = trends || defaultTrends;
-
-  // Default advanced metrics if none provided
-  const defaultAdvancedMetrics = {
-    conversionRates: {
-      favoriteToDownload: 0,
-      downloadToOrder: 0,
-    },
-    averageOrderValue: 0,
-    dailyAverages: {
-      orders: 0,
-      downloads: 0,
-      favorites: 0,
-      revenue: 0,
-    },
-    totalRevenue: 0,
-    periodDays: 30,
-  };
-
-  const displayAdvancedMetrics = advancedMetrics || defaultAdvancedMetrics;
+  // Use only real advanced metrics - no defaults or fallbacks
+  const displayAdvancedMetrics = advancedMetrics;
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -363,7 +340,7 @@ export function EnhancedAnalytics({
             </div>
           ))}
         </div>
-      ) : (
+      ) : displayTrends ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <TrendCard
             title="Orders"
@@ -394,6 +371,12 @@ export function EnhancedAnalytics({
             icon={<Heart className="w-full h-full" />}
             color="bg-red-500/20"
           />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gray-800/50 rounded-lg p-6">
+            <p className="text-gray-400 text-center">No trend data available</p>
+          </div>
         </div>
       )}
 
@@ -439,7 +422,7 @@ export function EnhancedAnalytics({
             <div className="h-80 flex items-center justify-center">
               <div className="text-center">
                 <Activity className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400">No data available for the selected period</p>
+                <p className="text-gray-400">No analytics data available for the selected period</p>
               </div>
             </div>
           ) : (
@@ -561,7 +544,7 @@ export function EnhancedAnalytics({
           ))}
         </div>
       ) : (
-        <AdvancedMetrics metrics={displayAdvancedMetrics} />
+        displayAdvancedMetrics && <AdvancedMetrics metrics={displayAdvancedMetrics} />
       )}
     </div>
   );

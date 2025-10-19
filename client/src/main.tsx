@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { initializePerformanceMonitoring } from "./lib/performanceMonitoring";
+import "./styles/z-index.css";
 import { optimizeImageLoading } from "./utils/clsOptimization";
 import { optimizeScrolling, preloadCriticalResources } from "./utils/performance";
 import { initPerformanceMonitoring } from "./utils/performanceMonitoring";

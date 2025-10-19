@@ -13,7 +13,7 @@ import {
   SubscriptionPlan,
   UserRole,
   UserStatus,
-} from "@shared/types";
+} from "../../shared/types";
 
 // ================================
 // PRODUCT MOCK TYPES

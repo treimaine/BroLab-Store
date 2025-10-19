@@ -1,0 +1,82 @@
+/**
+ * Z-Index Management
+ *
+ * Centralized z-index values to prevent layering conflicts
+ * and ensure proper stacking order for UI elements.
+ */
+
+:root {
+  /* Base layers */
+  --z-base: 0;
+  --z-content: 10;
+  --z-elevated: 20;
+
+  /* UI Components */
+  --z-dropdown: 30;
+  --z-tooltip: 40;
+  --z-modal-backdrop: 50;
+  --z-modal: 60;
+
+  /* Navigation */
+  --z-navbar: 50;
+  --z-mobile-nav: 55;
+
+  /* Alerts and Notifications */
+  --z-alert: 60;
+  --z-notification: 70;
+  --z-toast: 80;
+
+  /* Critical overlays */
+  --z-loading-overlay: 90;
+  --z-error-boundary: 100;
+  --z-debug-panel: 999;
+}
+
+/* Utility classes for z-index management */
+.z-navbar {
+  z-index: var(--z-navbar);
+}
+
+.z-alert {
+  z-index: var(--z-alert);
+}
+
+.z-notification {
+  z-index: var(--z-notification);
+}
+
+.z-modal {
+  z-index: var(--z-modal);
+}
+
+.z-toast {
+  z-index: var(--z-toast);
+}
+
+/* Ensure alerts are always above navbar */
+.alert-above-navbar {
+  z-index: calc(var(--z-navbar) + 10);
+}
+
+/* Responsive navbar spacing */
+.navbar-spacing {
+  padding-top: 3.5rem; /* 56px - h-14 navbar height */
+}
+
+@media (min-width: 640px) {
+  .navbar-spacing {
+    padding-top: 4rem; /* 64px - h-16 navbar height */
+  }
+}
+
+@media (min-width: 768px) {
+  .navbar-spacing {
+    padding-top: 5rem; /* 80px - h-20 navbar height */
+  }
+}
+
+@media (min-width: 1024px) {
+  .navbar-spacing {
+    padding-top: 6rem; /* 96px - h-24 navbar height */
+  }
+}

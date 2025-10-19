@@ -507,6 +507,111 @@ export const serviceSelectionSchema = z.object({
 export const mixingMasteringSubmissionSchema =
   mixingMasteringFormSchema.merge(serviceSelectionSchema);
 
+// Custom Beat Request validation schema
+export const customBeatRequestSchema = z.object({
+  // Basic beat specifications
+  genre: z.string().min(1, "Genre is required"),
+  subGenre: z.string().optional(),
+  bpm: z.number().min(60, "BPM must be at least 60").max(200, "BPM must be at most 200"),
+  key: z.string().min(1, "Key is required"),
+
+  // Creative specifications
+  mood: z.array(z.string()).min(1, "At least one mood is required"),
+  instruments: z.array(z.string()).optional(),
+  duration: z
+    .number()
+    .min(60, "Duration must be at least 60 seconds")
+    .max(600, "Duration must be at most 10 minutes"),
+
+  // Project details
+  description: z
+    .string()
+    .min(20, "Description must be at least 20 characters")
+    .max(2000, "Description must be less than 2000 characters"),
+  referenceTrack: z.string().optional(),
+
+  // Business details
+  budget: z.number().min(50, "Minimum budget is $50").max(1000, "Maximum budget is $1000"),
+  deadline: z
+    .string()
+    .optional()
+    .refine(
+      date => {
+        if (!date) return true;
+        const deadlineDate = new Date(date);
+        const minDate = new Date();
+        minDate.setDate(minDate.getDate() + 1);
+        return deadlineDate >= minDate;
+      },
+      {
+        message: "Deadline must be at least 1 day from today",
+      }
+    ),
+
+  revisions: z.number().min(0).max(5, "Maximum 5 revisions allowed"),
+  priority: z.enum(["standard", "priority", "express"]),
+  additionalNotes: z
+    .string()
+    .max(1000, "Additional notes must be less than 1000 characters")
+    .optional(),
+
+  // File uploads
+  uploadedFiles: z
+    .array(
+      z.object({
+        name: z.string(),
+        size: z.number().max(100 * 1024 * 1024, "Individual files must be under 100MB"),
+        type: z.string(),
+        lastModified: z.number().optional(),
+      })
+    )
+    .optional()
+    .refine(
+      files => {
+        if (!files) return true;
+        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+        return totalSize <= 200 * 1024 * 1024; // 200MB total
+      },
+      {
+        message: "Total file size must be under 200MB",
+      }
+    )
+    .refine(
+      files => {
+        if (!files) return true;
+        const fileNames = files.map(f => f.name.toLowerCase());
+        const uniqueNames = new Set(fileNames);
+        return uniqueNames.size === fileNames.length;
+      },
+      {
+        message: "Duplicate file names are not allowed",
+      }
+    ),
+});
+
+// Enhanced file upload validation for custom beats
+export const customBeatFileValidation = z.object({
+  name: z
+    .string()
+    .min(1, "Filename is required")
+    .refine(
+      name => {
+        const lowerName = name.toLowerCase();
+        const audioExtensions = [".mp3", ".wav", ".aiff", ".flac", ".m4a"];
+        const archiveExtensions = [".zip", ".rar", ".7z"];
+        const isAudio = audioExtensions.some(ext => lowerName.endsWith(ext));
+        const isArchive = archiveExtensions.some(ext => lowerName.endsWith(ext));
+        return isAudio || isArchive;
+      },
+      {
+        message: "File must be an audio file or compressed archive",
+      }
+    ),
+  size: z.number().max(100 * 1024 * 1024, "File size exceeds 100MB limit"),
+  type: z.string().min(1, "File type is required"),
+  lastModified: z.number().optional(),
+});
+
 // Enhanced validation types
 export type EnhancedRegisterInput = z.infer<typeof enhancedRegisterSchema>;
 export type EnhancedPaymentIntentInput = z.infer<typeof enhancedPaymentIntentSchema>;
@@ -516,3 +621,5 @@ export type ServiceOrderInput = z.infer<typeof serviceOrderValidation>;
 export type MixingMasteringFormInput = z.infer<typeof mixingMasteringFormSchema>;
 export type ServiceSelectionInput = z.infer<typeof serviceSelectionSchema>;
 export type MixingMasteringSubmissionInput = z.infer<typeof mixingMasteringSubmissionSchema>;
+export type CustomBeatRequestInput = z.infer<typeof customBeatRequestSchema>;
+export type CustomBeatFileInput = z.infer<typeof customBeatFileValidation>;

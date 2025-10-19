@@ -17,7 +17,7 @@ describe("Webhook Security Middleware", () => {
     id: "evt_test_123",
     object: "event",
     type: "test.event",
-    data: { object: { id: "test_123" } },
+    data: { object: { id: "test_123", object: "test_object" } },
     created: Math.floor(Date.now() / 1000),
     livemode: false,
     pending_webhooks: 1,

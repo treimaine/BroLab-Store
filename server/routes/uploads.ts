@@ -2,7 +2,8 @@ import { Router } from "express";
 import multer from "multer";
 import { createApiError } from "../../shared/validation/index";
 import { isAuthenticated } from "../auth";
-import { scanFile, uploadToSupabase, validateFile } from "../lib/upload";
+import { uploadToSupabase, validateFile } from "../lib/upload";
+import { enhancedFileUploadSecurity, fileUploadRateLimit } from "../middleware/fileUploadSecurity";
 import { uploadRateLimit } from "../middleware/rateLimiter";
 import { validateFileUpload } from "../middleware/validation";
 import { handleRouteError } from "../types/routes";
@@ -15,26 +16,36 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
 });
 
-// Route d'upload sécurisée
+// Enhanced secure upload route
 router.post(
   "/upload",
   isAuthenticated,
+  fileUploadRateLimit({
+    maxUploadsPerHour: 20,
+    maxTotalSizePerHour: 1000 * 1024 * 1024, // 1GB per hour
+  }),
   uploadRateLimit,
   upload.single("file"),
   validateFileUpload({
-    maxSize: 50 * 1024 * 1024, // 50MB
+    maxSize: 100 * 1024 * 1024, // 100MB
     allowedTypes: [
       "audio/mpeg",
       "audio/wav",
       "audio/mp3",
       "audio/aiff",
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "application/pdf",
+      "audio/flac",
       "application/zip",
+      "application/x-zip-compressed",
+      "application/x-rar-compressed",
+      "application/x-7z-compressed",
     ],
     required: true,
+  }),
+  enhancedFileUploadSecurity({
+    maxFileSize: 100 * 1024 * 1024,
+    enableAntivirusScanning: true,
+    enableContentAnalysis: true,
+    quarantineThreats: true,
   }),
   async (req, res): Promise<void> => {
     try {
@@ -62,14 +73,8 @@ router.post(
         return;
       }
 
-      // Scan antivirus
-      const isSafe = await scanFile(req.file);
-      if (!isSafe) {
-        res.status(400).json({
-          error: "Le fichier n'a pas passé le scan de sécurité",
-        });
-        return;
-      }
+      // Security scanning is now handled by enhancedFileUploadSecurity middleware
+      // Additional validation can be added here if needed
 
       // Génération du chemin de stockage
       const timestamp = Date.now();
@@ -80,6 +85,9 @@ router.post(
       // Upload vers Supabase
       const { path, url } = await uploadToSupabase(req.file, filePath);
 
+      // Include security information in response
+      const securityInfo = (req as any).fileSecurity || {};
+
       res.json({
         success: true,
         file: {
@@ -88,6 +96,15 @@ router.post(
           name: req.file.originalname,
           type: req.file.mimetype,
           size: req.file.size,
+          hash: securityInfo.fileHash,
+          scanned: securityInfo.scanned,
+          scanTimestamp: securityInfo.scanTimestamp,
+        },
+        security: {
+          scanned: securityInfo.scanned || false,
+          suspicious: securityInfo.suspicious || false,
+          riskLevel: securityInfo.riskLevel || "low",
+          features: securityInfo.features || [],
         },
       });
     } catch (error: unknown) {

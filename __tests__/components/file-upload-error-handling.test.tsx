@@ -2,6 +2,21 @@ import "@testing-library/jest-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import FileUpload from "../../components/kokonutui/file-upload";
 
+// Mock framer-motion to avoid DOM issues in tests
+jest.mock("framer-motion", () => ({
+  motion: {
+    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+    span: ({ children, ...props }: any) => <span {...props}>{children}</span>,
+  },
+  AnimatePresence: ({ children }: unknown) => children,
+  useAnimation: () => ({
+    start: jest.fn(),
+    stop: jest.fn(),
+    set: jest.fn(),
+  }),
+}));
+
 // Mock file for testing
 const createMockFile = (name: string, size: number, type: string) => {
   const file = new File(["test content"], name, { type });
@@ -116,11 +131,29 @@ describe("FileUpload Error Handling", () => {
     );
   });
 
-  it("should display form submission message when allowFormSubmissionOnError is true", () => {
-    render(<FileUpload allowFormSubmissionOnError={true} maxRetries={3} />);
+  it("should display form submission message when allowFormSubmissionOnError is true", async () => {
+    const onUploadError = jest.fn();
 
-    // Check for the form submission message
-    expect(screen.getByText(/You can still submit the form/)).toBeInTheDocument();
+    render(
+      <FileUpload
+        allowFormSubmissionOnError={true}
+        maxRetries={3}
+        onUploadError={onUploadError}
+        maxFileSize={1024} // Small limit to trigger error
+      />
+    );
+
+    // Create a file that exceeds the size limit to trigger error state
+    const largeFile = createMockFile("large-file.mp3", 2048, "audio/mp3");
+    const fileInput = screen.getByLabelText("File input");
+    fireEvent.change(fileInput, { target: { files: [largeFile] } });
+
+    // Wait for error state and check for the form submission message
+    await waitFor(() => {
+      expect(
+        screen.getByText(/You can still submit the form without uploading files/)
+      ).toBeInTheDocument();
+    });
   });
 
   it("should handle file extension validation correctly", async () => {
