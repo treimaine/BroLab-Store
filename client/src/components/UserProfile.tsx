@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { useDashboardSection } from "@/store/useDashboardStore";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -19,7 +20,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 interface UserProfileProps {
@@ -48,15 +49,32 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Statistiques utilisateur (placeholder soft) – affichage non trompeur
-  const userStats: UserStats = {
-    totalOrders: 0,
-    totalDownloads: 0,
-    totalFavorites: 0,
-    totalSpent: 0,
-    memberSince: user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US") : "N/A",
-    lastActivity: "—",
-  };
+  // Get real stats from unified dashboard store
+  const stats = useDashboardSection("stats");
+  const activity = useDashboardSection("activity");
+
+  // Calculate user stats from real data
+  const userStats: UserStats = useMemo(() => {
+    // Get last activity timestamp
+    const lastActivityTime =
+      activity && activity.length > 0
+        ? new Date(activity[0].timestamp).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "—";
+
+    return {
+      totalOrders: stats?.totalOrders || 0,
+      totalDownloads: stats?.totalDownloads || 0,
+      totalFavorites: stats?.totalFavorites || 0,
+      totalSpent: stats?.totalSpent || 0,
+      memberSince: user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US") : "N/A",
+      lastActivity: lastActivityTime,
+    };
+  }, [stats, activity, user?.createdAt]);
 
   React.useEffect(() => {
     if (user) {
