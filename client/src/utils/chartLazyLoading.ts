@@ -112,7 +112,7 @@ export const chartBundleOptimization = {
    * Lazy load heavy chart components
    */
   loadAnalyticsCharts: () => import("@/components/dashboard/AnalyticsCharts"),
-  loadBroLabTrendCharts: () => import("@/components/dashboard/BroLabTrendCharts"),
+  loadTrendCharts: () => import("@/components/dashboard/TrendCharts"),
   loadEnhancedAnalytics: () => import("@/components/dashboard/EnhancedAnalytics"),
 
   /**
@@ -121,7 +121,7 @@ export const chartBundleOptimization = {
   preloadOnTabChange: (tabName: string) => {
     switch (tabName) {
       case "analytics":
-        chartBundleOptimization.loadBroLabTrendCharts();
+        chartBundleOptimization.loadTrendCharts();
         chartBundleOptimization.loadEnhancedAnalytics();
         break;
       case "overview":

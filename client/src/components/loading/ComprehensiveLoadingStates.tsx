@@ -3,9 +3,9 @@
  * Provides all types of loading indicators and skeleton loaders
  */
 
+import { BeatCardSkeleton, BeatGridSkeleton } from "@/components/beats/BeatCardSkeleton";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { BeatCardSkeleton, BeatGridSkeleton } from "@/components/beats/BeatCardSkeleton";
 import { LoadingSpinner } from "./LoadingSpinner";
 
 // Enhanced loading spinner with different variants
@@ -308,7 +308,7 @@ export function FormLoadingState({
 }
 
 // Export all loading components
-export { DashboardContentSkeleton } from "@/components/dashboard/DashboardSkeleton";
+export { DashboardSkeleton as DashboardContentSkeleton } from "@/components/dashboard/DashboardSkeletons";
 export { BeatCardSkeleton, BeatGridSkeleton, LoadingSpinner };
 
 // Loading state hook for components

@@ -18,6 +18,44 @@ import React, { useState } from "react";
 import MockDataBanner from "../alerts/MockDataBanner";
 
 // ================================
+// TYPE DEFINITIONS
+// ================================
+
+interface MockIndicator {
+  type: string;
+  confidence: number;
+  description?: string;
+}
+
+interface IdValidations {
+  hasValidIds: boolean;
+  invalidIds?: string[];
+}
+
+interface SourceValidation {
+  hasMockData: boolean;
+  source?: string;
+  idValidations?: IdValidations;
+  mockIndicators?: MockIndicator[];
+  isRealData?: boolean;
+  isFresh?: boolean;
+}
+
+interface DataIntegrityReport {
+  status: "valid" | "warning" | "error" | "critical";
+  reportId: string;
+  sourceValidation: SourceValidation;
+  inconsistencies?: Array<{
+    type: string;
+    description: string;
+  }>;
+  recommendations?: Array<{
+    type?: string;
+    description?: string;
+  }>;
+}
+
+// ================================
 // HELPER FUNCTIONS
 // ================================
 
@@ -31,7 +69,7 @@ import MockDataBanner from "../alerts/MockDataBanner";
  * - 10.4: Never show mock data warnings in production for authenticated sources
  */
 function shouldShowMockDataBanner(
-  report: any,
+  report: DataIntegrityReport,
   isProduction: boolean,
   dismissedMockAlert: boolean
 ): boolean {
@@ -69,7 +107,7 @@ function shouldShowMockDataBanner(
 
     // Calculate average confidence of mock indicators
     const avgConfidence =
-      mockIndicators.reduce((sum: number, ind: any) => sum + ind.confidence, 0) /
+      mockIndicators.reduce((sum: number, ind: MockIndicator) => sum + ind.confidence, 0) /
       mockIndicators.length;
 
     // Require very high confidence (>= 0.95) AND multiple indicators
@@ -88,7 +126,7 @@ function shouldShowMockDataBanner(
   }
 
   const avgConfidence =
-    mockIndicators.reduce((sum: number, ind: any) => sum + ind.confidence, 0) /
+    mockIndicators.reduce((sum: number, ind: MockIndicator) => sum + ind.confidence, 0) /
     mockIndicators.length;
   return avgConfidence >= 0.85;
 }
@@ -123,7 +161,7 @@ interface ValidationStatusBarProps {
   onRefresh: () => void;
   showDetailed: boolean;
   isProduction: boolean;
-  integrityReport: any;
+  integrityReport: DataIntegrityReport | null;
 }
 
 // ================================
@@ -361,7 +399,7 @@ const ValidationStatusBar: React.FC<ValidationStatusBarProps> = ({
       if (mockIndicators.length === 0) return false;
 
       const avgConfidence =
-        mockIndicators.reduce((sum: number, ind: any) => sum + ind.confidence, 0) /
+        mockIndicators.reduce((sum: number, ind: MockIndicator) => sum + ind.confidence, 0) /
         mockIndicators.length;
 
       // Require >= 0.95 confidence in production
@@ -424,7 +462,7 @@ const ValidationStatusBar: React.FC<ValidationStatusBarProps> = ({
 // ================================
 
 interface ValidationDetailsPanelProps {
-  report: any; // DataIntegrityReport type would be imported
+  report: DataIntegrityReport;
 }
 
 const ValidationDetailsPanel: React.FC<ValidationDetailsPanelProps> = ({ report }) => {
@@ -448,19 +486,19 @@ const ValidationDetailsPanel: React.FC<ValidationDetailsPanelProps> = ({ report 
               <span className="font-medium">Overall Status:</span>
               <span
                 className={cn("ml-2 capitalize", {
-                  "text-green-600": (report as any).status === "valid",
-                  "text-yellow-600": (report as any).status === "warning",
-                  "text-orange-600": (report as any).status === "error",
-                  "text-red-600": (report as any).status === "critical",
+                  "text-green-600": report.status === "valid",
+                  "text-yellow-600": report.status === "warning",
+                  "text-orange-600": report.status === "error",
+                  "text-red-600": report.status === "critical",
                 })}
               >
-                {(report as any).status}
+                {report.status}
               </span>
             </div>
             <div>
               <span className="font-medium">Report ID:</span>
               <span className="ml-2 text-gray-600 dark:text-gray-400 font-mono text-xs">
-                {(report as any).reportId}
+                {report.reportId}
               </span>
             </div>
           </div>
@@ -471,35 +509,38 @@ const ValidationDetailsPanel: React.FC<ValidationDetailsPanelProps> = ({ report 
             <div className="grid grid-cols-3 gap-2 text-xs">
               <div
                 className={cn("p-2 rounded", {
-                  "bg-green-100 text-green-800": (report as any).sourceValidation?.isRealData,
-                  "bg-red-100 text-red-800": !(report as any).sourceValidation?.isRealData,
+                  "bg-green-100 text-green-800": report.sourceValidation?.isRealData,
+                  "bg-red-100 text-red-800": !report.sourceValidation?.isRealData,
                 })}
               >
-                {(report as any).sourceValidation?.isRealData ? "Real Data" : "Mock Data"}
+                {report.sourceValidation?.isRealData ? "Real Data" : "Mock Data"}
               </div>
               <div
                 className={cn("p-2 rounded", {
-                  "bg-green-100 text-green-800": (report as any).sourceValidation?.isFresh,
-                  "bg-yellow-100 text-yellow-800": !(report as any).sourceValidation?.isFresh,
+                  "bg-green-100 text-green-800": report.sourceValidation?.isFresh,
+                  "bg-yellow-100 text-yellow-800": !report.sourceValidation?.isFresh,
                 })}
               >
-                {(report as any).sourceValidation?.isFresh ? "Fresh" : "Stale"}
+                {report.sourceValidation?.isFresh ? "Fresh" : "Stale"}
               </div>
               <div className="p-2 rounded bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">
-                {(report as any).sourceValidation?.source || "Unknown"}
+                {report.sourceValidation?.source || "Unknown"}
               </div>
             </div>
           </div>
 
           {/* Inconsistencies */}
-          {(report as any).inconsistencies?.length > 0 && (
+          {report.inconsistencies && report.inconsistencies.length > 0 && (
             <div>
               <h4 className="text-sm font-medium mb-2">
-                Inconsistencies ({(report as any).inconsistencies.length})
+                Inconsistencies ({report.inconsistencies.length})
               </h4>
               <div className="space-y-1 max-h-32 overflow-y-auto">
-                {(report as any).inconsistencies.map((inconsistency: any, index: number) => (
-                  <div key={index} className="text-xs p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                {report.inconsistencies.map((inconsistency, index) => (
+                  <div
+                    key={`inconsistency-${inconsistency.type}-${index}`}
+                    className="text-xs p-2 bg-gray-50 dark:bg-gray-800 rounded"
+                  >
                     <div className="font-medium">{inconsistency.type}</div>
                     <div className="text-gray-600 dark:text-gray-400">
                       {inconsistency.description}
@@ -511,24 +552,20 @@ const ValidationDetailsPanel: React.FC<ValidationDetailsPanelProps> = ({ report 
           )}
 
           {/* Recommendations */}
-          {(report as any).recommendations?.length > 0 && (
+          {report.recommendations && report.recommendations.length > 0 && (
             <div>
               <h4 className="text-sm font-medium mb-2">Recommendations</h4>
               <div className="space-y-1">
-                {(report as any).recommendations.map((rec: unknown, index: number) => {
-                  // Type guard for recommendation object
-                  const isValidRec = (
-                    obj: unknown
-                  ): obj is { type?: string; description?: string } => {
-                    return typeof obj === "object" && obj !== null;
-                  };
-
-                  if (!isValidRec(rec)) {
+                {report.recommendations.map((rec, index) => {
+                  if (!rec || typeof rec !== "object") {
                     return null;
                   }
 
                   return (
-                    <div key={index} className="text-xs p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+                    <div
+                      key={`recommendation-${rec.type || "unknown"}-${index}`}
+                      className="text-xs p-2 bg-blue-50 dark:bg-blue-900/20 rounded"
+                    >
                       <div className="font-medium capitalize">
                         {rec.type?.replaceAll("_", " ") || "Unknown"}
                       </div>

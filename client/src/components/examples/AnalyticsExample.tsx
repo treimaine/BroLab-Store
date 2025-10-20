@@ -1,6 +1,6 @@
 // Example component demonstrating analytics usage
 
-import AnalyticsDashboard from "@/components/dashboard/AnalyticsDashboard";
+import EnhancedAnalytics from "@/components/dashboard/EnhancedAnalytics";
 import ConversionFunnelTracker from "@/components/monitoring/ConversionFunnelTracker";
 import AnalyticsProvider from "@/components/providers/AnalyticsProvider";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -224,7 +224,9 @@ const AnalyticsExample: React.FC = () => {
         <main>
           {currentPage === "product" && <ProductPage />}
           {currentPage === "checkout" && <CheckoutPage />}
-          {currentPage === "dashboard" && <AnalyticsDashboard />}
+          {currentPage === "dashboard" && (
+            <EnhancedAnalytics data={[]} trends={undefined} isLoading={false} />
+          )}
         </main>
 
         {/* Conversion funnel tracker (hidden component) */}

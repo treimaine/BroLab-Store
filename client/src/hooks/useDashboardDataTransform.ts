@@ -14,6 +14,7 @@ import type {
   Reservation,
 } from "../../../shared/types/dashboard";
 
+import { useDashboard } from "@/hooks/useDashboard";
 import {
   beatMetadataService,
   extractBeatIdsNeedingMetadata,
@@ -26,7 +27,6 @@ import {
   transformOrdersData,
   transformReservationsData,
 } from "../services/dashboardDataTransform";
-import { useDashboardDataOptimized } from "./useDashboardDataOptimized";
 
 // ================================
 // HOOK INTERFACE
@@ -72,9 +72,16 @@ interface UseDashboardDataTransformResult {
 // ================================
 
 export const useDashboardDataTransform = (): UseDashboardDataTransformResult => {
-  // Get raw data from the optimized hook
-  const { orders, reservations, recentActivity, favorites, downloads, isLoading, refetch } =
-    useDashboardDataOptimized();
+  // Get raw data from the unified dashboard hook
+  const {
+    orders,
+    reservations,
+    activity: recentActivity,
+    favorites,
+    downloads,
+    isLoading,
+    refetch,
+  } = useDashboard();
 
   // Local state for transformation
   const [isTransforming, setIsTransforming] = useState(false);
@@ -87,14 +94,14 @@ export const useDashboardDataTransform = (): UseDashboardDataTransformResult => 
   // Transform orders data
   const transformedOrders = useMemo(() => {
     try {
-      if (!orders?.items) return [];
-      return transformOrdersData(orders.items);
+      if (!orders) return [];
+      return transformOrdersData(orders);
     } catch (error) {
       console.error("Error transforming orders:", error);
       setTransformError("Failed to transform orders data");
       return [];
     }
-  }, [orders?.items]);
+  }, [orders]);
 
   // Transform reservations data
   const transformedReservations = useMemo(() => {
