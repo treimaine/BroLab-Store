@@ -23,7 +23,7 @@ import {
   useDashboardSection,
   useDashboardStore,
   useSyncStatus,
-} from "@/store/useDashboardStore";
+} from "@/stores/useDashboardStore";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import type { Download, Favorite } from "@shared/types/dashboard";
 import { motion } from "framer-motion";
@@ -55,8 +55,8 @@ import { ValidatedDashboard } from "./ValidatedDashboard";
 
 // Import other dashboard tabs (removed lazy loading)
 import { useDashboardData } from "../../hooks/useDashboardData";
-import DownloadsTable from "../DownloadsTable";
-import UserProfile from "../UserProfile";
+import DownloadsTable from "@/components/dashboard/DownloadsTable";
+import UserProfile from "@/components/auth/UserProfile";
 import AnalyticsFixInfo from "./AnalyticsFixInfo";
 import EnhancedAnalytics from "./EnhancedAnalytics";
 import OrdersTab from "./OrdersTab";

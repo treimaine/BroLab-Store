@@ -16,7 +16,7 @@ import {
   getDataValidationService,
   type DataIntegrityReport,
 } from "@/services/DataValidationService";
-import { useDashboardStore } from "@/store/useDashboardStore";
+import { useDashboardStore } from "@/stores/useDashboardStore";
 import { AlertCircle, CheckCircle, Clock, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 

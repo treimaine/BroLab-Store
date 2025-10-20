@@ -12,7 +12,7 @@ import type {
   SyncReport,
 } from "@/services/SyncMonitoring";
 import { getSyncMonitoring } from "@/services/SyncMonitoring";
-import { useDashboardStore } from "@/store/useDashboardStore";
+import { useDashboardStore } from "@/stores/useDashboardStore";
 import type {
   MemoryStats,
   SyncError,

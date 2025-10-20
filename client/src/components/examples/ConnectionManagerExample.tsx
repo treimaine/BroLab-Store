@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useConnectionManager, useConnectionMetrics } from "@/hooks/useConnectionManager";
-import { useDashboardStore } from "@/store/useDashboardStore";
+import { useDashboardStore } from "@/stores/useDashboardStore";
 import React, { useCallback, useEffect, useState } from "react";
 
 /**

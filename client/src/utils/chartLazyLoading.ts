@@ -111,7 +111,7 @@ export const chartBundleOptimization = {
   /**
    * Lazy load heavy chart components
    */
-  loadAnalyticsCharts: () => import("@/components/AnalyticsCharts"),
+  loadAnalyticsCharts: () => import("@/components/dashboard/AnalyticsCharts"),
   loadBroLabTrendCharts: () => import("@/components/dashboard/BroLabTrendCharts"),
   loadEnhancedAnalytics: () => import("@/components/dashboard/EnhancedAnalytics"),
 

@@ -15,7 +15,7 @@ import {
   getDataValidationService,
   type DataIntegrityReport,
 } from "@/services/DataValidationService";
-import { useDashboardStore } from "@/store/useDashboardStore";
+import { useDashboardStore } from "@/stores/useDashboardStore";
 import type { DashboardData } from "@shared/types/dashboard";
 import { useCallback, useEffect, useRef, useState } from "react";
 

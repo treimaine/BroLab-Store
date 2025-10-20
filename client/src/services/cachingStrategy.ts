@@ -10,7 +10,7 @@
  */
 
 import { QueryClient } from "@tanstack/react-query";
-import { cacheManager } from "../../../shared/utils/cache-manager";
+import { cacheManager } from "@shared/utils/cache-manager";
 import { queryClient } from "../lib/queryClient";
 
 // Cache strategy types

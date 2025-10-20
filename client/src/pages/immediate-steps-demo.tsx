@@ -7,9 +7,9 @@ import { useState } from "react";
 import {
   CurrencyLanguageProvider,
   CurrencyLanguageSwitcher,
-} from "@/components/CurrencyLanguageProvider";
-import { EnhancedErrorProvider } from "@/components/EnhancedErrorHandling";
-import { OptimizedSuspense, PerformanceDashboard } from "@/components/PerformanceOptimizations";
+} from "@/components/providers/CurrencyLanguageProvider";
+import { EnhancedErrorProvider } from "@/components/errors/EnhancedErrorHandling";
+import { OptimizedSuspense, PerformanceDashboard } from "@/components/monitoring/PerformanceOptimizations";
 import {
   AlertTriangle,
   ArrowRight,

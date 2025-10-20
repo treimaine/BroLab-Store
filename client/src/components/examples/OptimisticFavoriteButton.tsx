@@ -6,7 +6,7 @@
  */
 
 import { useOptimisticFavorites } from "@/hooks/useOptimisticUpdates";
-import { useDashboardSection } from "@/store/useDashboardStore";
+import { useDashboardSection } from "@/stores/useDashboardStore";
 import type { Favorite } from "@shared/types";
 import { Heart } from "lucide-react";
 import React, { useState } from "react";

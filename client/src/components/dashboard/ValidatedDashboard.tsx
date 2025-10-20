@@ -12,10 +12,86 @@ import {
 } from "@/components/dashboard/DataFreshnessIndicator";
 import { useDataValidation, useProductionDataMonitoring } from "@/hooks/useDataValidation";
 import { cn } from "@/lib/utils";
-import { useDashboardStore } from "@/store/useDashboardStore";
+import { useDashboardStore } from "@/stores/useDashboardStore";
 import { AlertTriangle, CheckCircle, RefreshCw, Shield, Wifi, WifiOff } from "lucide-react";
 import React, { useState } from "react";
 import MockDataBanner from "../alerts/MockDataBanner";
+
+// ================================
+// HELPER FUNCTIONS
+// ================================
+
+/**
+ * Determine if mock data banner should be shown
+ * Implements high-confidence threshold and production-specific behavior
+ *
+ * Requirements:
+ * - 3.1: Require multiple strong indicators before flagging
+ * - 10.1: Use conservative validation settings in production
+ * - 10.4: Never show mock data warnings in production for authenticated sources
+ */
+function shouldShowMockDataBanner(
+  report: any,
+  isProduction: boolean,
+  dismissedMockAlert: boolean
+): boolean {
+  // Don't show if already dismissed
+  if (dismissedMockAlert) {
+    return false;
+  }
+
+  // Don't show if no mock data detected
+  if (!report.sourceValidation.hasMockData) {
+    return false;
+  }
+
+  // Production-specific behavior: Never show warnings for authenticated sources
+  // Requirement 10.4: Default to trusting data when validation is uncertain
+  if (isProduction) {
+    const sourceValidation = report.sourceValidation;
+
+    // If data comes from authenticated database, never show warning
+    if (sourceValidation.source === "database") {
+      return false;
+    }
+
+    // If we have valid IDs, trust the data
+    if (sourceValidation.idValidations?.hasValidIds) {
+      return false;
+    }
+
+    // In production, only show for very high confidence mock data (>= 0.95)
+    // This prevents false positives
+    const mockIndicators = sourceValidation.mockIndicators || [];
+    if (mockIndicators.length === 0) {
+      return false;
+    }
+
+    // Calculate average confidence of mock indicators
+    const avgConfidence =
+      mockIndicators.reduce((sum: number, ind: any) => sum + ind.confidence, 0) /
+      mockIndicators.length;
+
+    // Require very high confidence (>= 0.95) AND multiple indicators
+    // Requirement 3.1: Require multiple strong indicators
+    const hasHighConfidence = avgConfidence >= 0.95;
+    const hasMultipleIndicators = mockIndicators.length >= 3;
+
+    return hasHighConfidence && hasMultipleIndicators;
+  }
+
+  // Development mode: Show warnings with lower threshold for debugging
+  // But still require reasonable confidence (>= 0.85)
+  const mockIndicators = report.sourceValidation.mockIndicators || [];
+  if (mockIndicators.length === 0) {
+    return false;
+  }
+
+  const avgConfidence =
+    mockIndicators.reduce((sum: number, ind: any) => sum + ind.confidence, 0) /
+    mockIndicators.length;
+  return avgConfidence >= 0.85;
+}
 
 // ================================
 // COMPONENT INTERFACES
@@ -46,6 +122,8 @@ interface ValidationStatusBarProps {
   isValidating: boolean;
   onRefresh: () => void;
   showDetailed: boolean;
+  isProduction: boolean;
+  integrityReport: any;
 }
 
 // ================================
@@ -64,6 +142,10 @@ export const ValidatedDashboard: React.FC<ValidatedDashboardProps> = ({
   const [showMockDataAlert, setShowMockDataAlert] = useState(false);
   const [dismissedMockAlert, setDismissedMockAlert] = useState(false);
 
+  // Detect environment
+  const isProduction = import.meta.env.PROD;
+  const isDevelopment = import.meta.env.DEV;
+
   // Use comprehensive validation for full monitoring
   const validation = useDataValidation({
     includeSourceValidation: true,
@@ -73,8 +155,12 @@ export const ValidatedDashboard: React.FC<ValidatedDashboardProps> = ({
     autoRefresh: enableAutoRefresh,
     validateOnChange: true,
     onValidationComplete: report => {
-      // Show mock data alert if detected and not dismissed
-      if (report.sourceValidation.hasMockData && !dismissedMockAlert) {
+      // Only show mock data alert for high-confidence detections
+      // Requirement 3.1: Require multiple strong indicators before flagging
+      // Requirement 10.1: Use conservative validation settings in production
+      const shouldShowAlert = shouldShowMockDataBanner(report, isProduction, dismissedMockAlert);
+
+      if (shouldShowAlert) {
         setShowMockDataAlert(true);
       }
 
@@ -139,6 +225,7 @@ export const ValidatedDashboard: React.FC<ValidatedDashboardProps> = ({
 
       <div className={cn("space-y-4 navbar-spacing pb-20", className)}>
         {/* Validation Status Bar */}
+        {/* Requirement 10.1: Production-specific warning behavior */}
         {showValidationStatus && (
           <ValidationStatusBar
             isValid={isValid}
@@ -148,6 +235,8 @@ export const ValidatedDashboard: React.FC<ValidatedDashboardProps> = ({
             isValidating={isValidating}
             onRefresh={handleRefresh}
             showDetailed={showDetailedValidation}
+            isProduction={isProduction}
+            integrityReport={integrityReport}
           />
         )}
 
@@ -197,7 +286,8 @@ export const ValidatedDashboard: React.FC<ValidatedDashboardProps> = ({
         {/* Dashboard Content */}
         <div className="relative">
           {/* Validation Overlay for Critical Issues */}
-          {integrityReport?.status === "critical" && (
+          {/* Requirement 10.2: Fail silently in production, only show critical issues in development */}
+          {integrityReport?.status === "critical" && !isProduction && (
             <div className="absolute inset-0 bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg z-10 flex items-center justify-center">
               <div className="text-center p-6">
                 <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -228,8 +318,9 @@ export const ValidatedDashboard: React.FC<ValidatedDashboardProps> = ({
           {/* Dashboard Content */}
           {children}
 
-          {/* Detailed Validation Info */}
-          {showDetailedValidation && integrityReport && (
+          {/* Detailed Validation Info - Development Mode Only */}
+          {/* Requirement 10.4: Add detailed validation info in development mode only */}
+          {showDetailedValidation && integrityReport && isDevelopment && (
             <ValidationDetailsPanel report={integrityReport} />
           )}
         </div>
@@ -250,9 +341,40 @@ const ValidationStatusBar: React.FC<ValidationStatusBarProps> = ({
   isValidating,
   onRefresh,
   showDetailed: _showDetailed,
+  isProduction,
+  integrityReport,
 }) => {
+  // In production, apply high-confidence threshold before showing mock data warnings
+  // Requirement 10.1: Conservative validation settings in production
+  const shouldShowMockWarning = React.useMemo(() => {
+    if (!hasMockData) return false;
+
+    if (isProduction) {
+      // Check if data is from authenticated source
+      const sourceValidation = integrityReport?.sourceValidation;
+      if (sourceValidation?.source === "database") {
+        return false; // Never show warning for database data
+      }
+
+      // Check confidence threshold
+      const mockIndicators = sourceValidation?.mockIndicators || [];
+      if (mockIndicators.length === 0) return false;
+
+      const avgConfidence =
+        mockIndicators.reduce((sum: number, ind: any) => sum + ind.confidence, 0) /
+        mockIndicators.length;
+
+      // Require >= 0.95 confidence in production
+      return avgConfidence >= 0.95 && mockIndicators.length >= 3;
+    }
+
+    // In development, show with lower threshold
+    return true;
+  }, [hasMockData, isProduction, integrityReport]);
+
   const getStatusColor = () => {
-    if (hasMockData) return "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800";
+    if (shouldShowMockWarning)
+      return "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800";
     if (!isValid)
       return "bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800";
     if (!isFresh)
@@ -261,13 +383,14 @@ const ValidationStatusBar: React.FC<ValidationStatusBarProps> = ({
   };
 
   const getStatusIcon = () => {
-    if (hasMockData || !isValid) return <AlertTriangle className="h-4 w-4 text-red-500" />;
+    if (shouldShowMockWarning || !isValid)
+      return <AlertTriangle className="h-4 w-4 text-red-500" />;
     if (!isFresh) return <RefreshCw className="h-4 w-4 text-yellow-500" />;
     return <CheckCircle className="h-4 w-4 text-green-500" />;
   };
 
   const getStatusMessage = () => {
-    if (hasMockData) return "Mock or placeholder data detected";
+    if (shouldShowMockWarning) return "Mock or placeholder data detected";
     if (!isValid) return "Data validation issues found";
     if (!isFresh) return "Data may be outdated";
     return "Data is valid and up to date";

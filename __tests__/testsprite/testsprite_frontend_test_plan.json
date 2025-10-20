@@ -1,0 +1,603 @@
+[
+  {
+    "id": "TC001",
+    "title": "User Registration with Valid Data",
+    "description": "Verify that a user can successfully register using valid credentials and required fields are saved properly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the sign-up page."
+      },
+      {
+        "type": "action",
+        "description": "Enter valid username, email, and strong password."
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that the registration is successful and user receives confirmation."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm that the user data is saved correctly in the system."
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "User Login with Correct Credentials",
+    "description": "Check that a registered user can log in successfully with correct username/email and password.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Go to the login page."
+      },
+      {
+        "type": "action",
+        "description": "Enter valid registered username/email and password."
+      },
+      {
+        "type": "action",
+        "description": "Click on login button."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm user is redirected to the dashboard."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user session is established and role-based access is applied."
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "User Login Failure with Incorrect Password",
+    "description": "Verify login failure and error message display when incorrect password is entered.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page."
+      },
+      {
+        "type": "action",
+        "description": "Input valid username/email with incorrect password."
+      },
+      {
+        "type": "action",
+        "description": "Click login button."
+      },
+      {
+        "type": "assertion",
+        "description": "Check that login fails and appropriate error message is displayed."
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Beat Store Search and Filtering Functionality",
+    "description": "Validate that the beat catalog can be searched and filtered using different criteria and results update accordingly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the Beat Store page."
+      },
+      {
+        "type": "action",
+        "description": "Enter a search term in the search bar."
+      },
+      {
+        "type": "action",
+        "description": "Apply various filters such as genre, mood, BPM, and price."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the beats displayed match search criteria and filters."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm no unrelated beats appear in the results."
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Audio Preview Playback with Waveform Player",
+    "description": "Ensure audio previews on beat cards and global players play correctly, and playback controls respond instantly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Browse beats and select various beats with waveform players."
+      },
+      {
+        "type": "action",
+        "description": "Click play on each audio preview."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm audio plays with low latency."
+      },
+      {
+        "type": "action",
+        "description": "Use pause, seek, and volume controls."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify controls function correctly and update UI accordingly."
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Add Beats to Cart with License Selection",
+    "description": "Verify users can add selected beats to cart and choose license types for each beat before proceeding to checkout.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Browse the beat catalog and select a beat."
+      },
+      {
+        "type": "action",
+        "description": "Choose the desired license type (e.g., basic, artist, ultimate)."
+      },
+      {
+        "type": "action",
+        "description": "Add the beat with the selected license to the shopping cart."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the cart displays the beat with correct license and price."
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Checkout Flow with Clerk Billing Integration",
+    "description": "Test the checkout process from cart to payment completion using Clerk Billing, verifying order creation and payment success.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Go to the shopping cart with valid items."
+      },
+      {
+        "type": "action",
+        "description": "Proceed to checkout."
+      },
+      {
+        "type": "action",
+        "description": "Enter valid payment and billing details."
+      },
+      {
+        "type": "action",
+        "description": "Confirm purchase and submit payment."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify payment success notification and order confirmation."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm order is recorded and visible in the user’s order history."
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Subscription Management: Upgrade, Downgrade, Cancel",
+    "description": "Verify subscription plan changes (Basic, Artist, Ultimate) and cancellation are handled properly with billing updates.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the subscription management page on the user dashboard."
+      },
+      {
+        "type": "action",
+        "description": "Upgrade the current subscription plan."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm billing reflects the upgrade and subscription plan is updated."
+      },
+      {
+        "type": "action",
+        "description": "Downgrade the subscription plan to a lower tier."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify billing adjusts accordingly and plan updates."
+      },
+      {
+        "type": "action",
+        "description": "Cancel the active subscription."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure subscription status is shown as canceled and billing stops appropriately."
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "User Dashboard Data Accuracy",
+    "description": "Confirm user dashboard displays accurate analytics, download history, order overview, and subscription status.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a registered user with existing orders and subscriptions."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the dashboard page."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify download history shows correct files and dates."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure order management displays complete and recent orders with statuses."
+      },
+      {
+        "type": "assertion",
+        "description": "Check analytics cards for correct statistics."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm subscription status and details are correctly shown."
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Service Reservation Booking",
+    "description": "Test the service reservation system by booking mixing, mastering, and recording sessions with calendar integration.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Access the reservation form from the dashboard."
+      },
+      {
+        "type": "action",
+        "description": "Select a service type (mixing, mastering, recording)."
+      },
+      {
+        "type": "action",
+        "description": "Choose a valid date and time slot using the integrated calendar."
+      },
+      {
+        "type": "action",
+        "description": "Provide required session details and submit the booking."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm booking is accepted and visible in reservation history."
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "File Upload with Quota Enforcement",
+    "description": "Verify secure file upload via the File Management system and enforcement of user storage quotas.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login and navigate to the file upload section."
+      },
+      {
+        "type": "action",
+        "description": "Upload a file within the allowed quota limit."
+      },
+      {
+        "type": "assertion",
+        "description": "Check that the file uploads successfully and appears in user file list."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to upload a file exceeding quota limits."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify upload is rejected and a quota exceeded error message is shown."
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "File Download Security and Access Control",
+    "description": "Ensure only authorized users can download their files and no unauthorized access is permitted.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as a user with uploaded files."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to download own files."
+      },
+      {
+        "type": "assertion",
+        "description": "Validate successful and secure download of user files."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to access or download files belonging to another user."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm access is denied and proper error message is shown."
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Internationalization and Language Switching",
+    "description": "Verify that the user interface supports English and French languages and language can be switched dynamically.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Load the application default in English."
+      },
+      {
+        "type": "assertion",
+        "description": "Check that all UI components display text in English."
+      },
+      {
+        "type": "action",
+        "description": "Use the language switcher control to change language to French."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm all UI texts update and display correctly in French."
+      },
+      {
+        "type": "action",
+        "description": "Switch back to English and verify UI text reverts."
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Accessibility Compliance Testing",
+    "description": "Confirm that the platform UI adheres to WCAG 2.1 AA standards including keyboard navigation, screen reader support, and color contrast compliance.",
+    "category": "accessibility",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate through all major UI components entirely using keyboard."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify clear focus indicators and logical tab order."
+      },
+      {
+        "type": "action",
+        "description": "Test navigation and element reading using screen reader software."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm all interactive elements are readable and announced properly."
+      },
+      {
+        "type": "assertion",
+        "description": "Check color contrast ratios meet WCAG 2.1 AA standards across all UI elements."
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Responsive Design and Cross-Browser Compatibility",
+    "description": "Verify UI responsiveness across mobile, tablet, desktop, large desktop, and ultrawide viewports and validate consistency on Chrome, Firefox, Safari, and Edge browsers.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open the application on different devices/emulators with varying screen sizes."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm UI components adapt correctly without layout breakage."
+      },
+      {
+        "type": "action",
+        "description": "Access the application in Chrome, Firefox, Safari, and Edge browsers."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify consistent styling, functionality, and performance across all browsers."
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Security: Verify Protection of Authentication and Payment Flows",
+    "description": "Test that authentication credentials and payment information are securely processed and protected from common vulnerabilities.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Attempt SQL injection and XSS attacks on login and payment forms."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm input validation prevents injection attacks."
+      },
+      {
+        "type": "action",
+        "description": "Inspect data transmission during login and payment for encryption (e.g., via HTTPS)."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify credentials and payment data are encrypted and not exposed."
+      },
+      {
+        "type": "action",
+        "description": "Check session management and token handling for security best practices."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm no session hijacking or token leakage vulnerabilities exist."
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Handle Invalid Payment Details During Checkout",
+    "description": "Verify the system properly handles invalid payment inputs or declined transactions with clear error messages.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Proceed to checkout with an invalid credit card number."
+      },
+      {
+        "type": "action",
+        "description": "Submit the payment form."
+      },
+      {
+        "type": "assertion",
+        "description": "Validate the payment is declined and user sees a meaningful error message."
+      },
+      {
+        "type": "action",
+        "description": "Try payment with expired card or insufficient funds."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm system handles failures gracefully without crashes."
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Order Management Synchronization with WooCommerce",
+    "description": "Validate orders placed on the platform synchronize correctly with WooCommerce backend and order statuses update accordingly.",
+    "category": "integration",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create a new order via the platform checkout process."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the order is created in WooCommerce backend with matching details."
+      },
+      {
+        "type": "action",
+        "description": "Update order status in WooCommerce."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the updated status reflects back in the user’s order history on the platform."
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "State Management Consistency Using Zustand and TanStack Query",
+    "description": "Ensure that central state management handles data correctly across components and updates are reflected in UI without inconsistency.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Trigger data queries and mutations in various components (e.g., beat selection, cart updates, subscription changes)."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify UI components display consistent state reflecting the latest data."
+      },
+      {
+        "type": "action",
+        "description": "Simulate race conditions by triggering multiple requests rapidly."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm no stale or conflicting data appears in the UI."
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Performance: Page Load and Interaction Timing",
+    "description": "Measure critical performance metrics like First Contentful Paint, Time to Interactive, and frame rate to ensure the platform meets performance targets.",
+    "category": "performance",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Load homepage and major feature pages (Store, Dashboard, Checkout) on a standard broadband connection."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify First Contentful Paint is under 2 seconds."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm Time to Interactive is under 3 seconds."
+      },
+      {
+        "type": "action",
+        "description": "Interact with UI components like audio players and filters."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm UI interactions are smooth with 60fps frame rate."
+      }
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Visual Regression Testing Across UI Components",
+    "description": "Verify no unintended UI changes or layout shifts occur during updates by comparing visual snapshots across releases.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Capture baseline screenshots of all key UI components on multiple viewport sizes."
+      },
+      {
+        "type": "action",
+        "description": "Run visual regression tests after code changes or deployments."
+      },
+      {
+        "type": "assertion",
+        "description": "Check for unexpected visual differences and confirm all UI elements are consistent."
+      }
+    ]
+  }
+]

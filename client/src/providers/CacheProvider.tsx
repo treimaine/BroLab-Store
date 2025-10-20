@@ -6,8 +6,8 @@
  */
 
 import { ReactNode, createContext, useEffect, useState } from "react";
-import { useCache } from "../hooks/useCache";
-import { useCacheWarming } from "../hooks/useCachingStrategy";
+import { useCache } from "@/hooks/useCache";
+import { useCacheWarming } from "@/hooks/useCachingStrategy";
 import { DataType, cachingStrategy } from "../services/cachingStrategy";
 
 interface CacheContextValue {

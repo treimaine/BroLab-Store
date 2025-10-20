@@ -1,4 +1,4 @@
-import { BeatCard } from "@/components/beat-card";
+import { BeatCard } from "@/components/beats/beat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

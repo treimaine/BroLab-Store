@@ -1,19 +1,19 @@
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ScrollToTop } from "@/components/ScrollToTop";
-import { CartProvider } from "@/components/cart-provider";
+import { ErrorBoundary } from "@/components/errors/ErrorBoundary";
+import { ScrollToTop } from "@/components/layout/ScrollToTop";
+import { CartProvider } from "@/components/cart/cart-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import React, { Suspense, lazy, useState } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Route, Switch } from "wouter";
-import { GlobalLoadingIndicator, LoadingStateProvider } from "./components/LoadingStateProvider";
+import { GlobalLoadingIndicator, LoadingStateProvider } from "@/components/providers/LoadingStateProvider";
 import { queryClient, warmCache } from "./lib/queryClient";
 
 // Critical components - loaded immediately for core UX
 import { Navbar } from "@/components/layout/navbar";
 
-import { ComponentPreloader, useInteractionPreloader } from "@/components/ComponentPreloader";
+import { ComponentPreloader, useInteractionPreloader } from "@/components/loading/ComponentPreloader";
 import {
   bundleOptimization,
   createLazyComponent,
@@ -25,19 +25,19 @@ const Footer = createLazyComponent(() =>
   import("@/components/layout/footer").then(module => ({ default: module.Footer }))
 );
 const MobileBottomNav = createLazyComponent(() =>
-  import("@/components/MobileBottomNav").then(module => ({ default: module.MobileBottomNav }))
+  import("@/components/layout/MobileBottomNav").then(module => ({ default: module.MobileBottomNav }))
 );
 const OfflineIndicator = createLazyComponent(() =>
-  import("@/components/OfflineIndicator").then(module => ({ default: module.OfflineIndicator }))
+  import("@/components/loading/OfflineIndicator").then(module => ({ default: module.OfflineIndicator }))
 );
 const NewsletterModal = createLazyComponent(() =>
-  import("@/components/NewsletterModal").then(module => ({ default: module.NewsletterModal }))
+  import("@/components/newsletter/NewsletterModal").then(module => ({ default: module.NewsletterModal }))
 );
 
 // Audio player - lazy loaded as it's heavy and not immediately needed
 const EnhancedGlobalAudioPlayer = createLazyComponent(
   () =>
-    import("@/components/EnhancedGlobalAudioPlayer").then(module => ({
+    import("@/components/audio/EnhancedGlobalAudioPlayer").then(module => ({
       default: module.EnhancedGlobalAudioPlayer,
     })),
   { preloadDelay: 2000 } // Preload after 2 seconds
@@ -86,8 +86,8 @@ import {
   MinimalLoadingFallback,
   OptimizedLoadingFallback,
   RouteLoadingFallback,
-} from "./components/OptimizedLoadingFallback";
-import { BundleSizeAnalyzer, PerformanceMonitor } from "./components/PerformanceMonitor";
+} from "@/components/loading/OptimizedLoadingFallback";
+import { BundleSizeAnalyzer, PerformanceMonitor } from "@/components/monitoring/PerformanceMonitor";
 import { CacheProvider } from "./providers/CacheProvider";
 
 function Router() {

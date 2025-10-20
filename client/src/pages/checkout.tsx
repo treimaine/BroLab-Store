@@ -1,5 +1,5 @@
-import { useCartContext } from "@/components/cart-provider";
-import { EnhancedPaymentForm } from "@/components/EnhancedPaymentForm";
+import { useCartContext } from "@/components/cart/cart-provider";
+import { EnhancedPaymentForm } from "@/components/payments/EnhancedPaymentForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";

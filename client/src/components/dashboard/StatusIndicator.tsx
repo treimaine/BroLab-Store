@@ -8,7 +8,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { useDashboardStore } from "@/store/useDashboardStore";
+import { useDashboardStore } from "@/stores/useDashboardStore";
 import { AlertTriangle, CheckCircle, Wifi, WifiOff, XCircle } from "lucide-react";
 import React from "react";
 

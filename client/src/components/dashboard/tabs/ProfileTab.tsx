@@ -5,7 +5,7 @@
  * This component is lazy-loaded to improve initial bundle size.
  */
 
-import UserProfile from "@/components/UserProfile";
+import UserProfile from "@/components/auth/UserProfile";
 import { memo } from "react";
 
 interface ProfileTabProps {

@@ -6,7 +6,7 @@
  */
 
 import { useOptimisticDownloads } from "@/hooks/useOptimisticUpdates";
-import { useDashboardSection } from "@/store/useDashboardStore";
+import { useDashboardSection } from "@/stores/useDashboardStore";
 import type { Download as DownloadType } from "@shared/types/dashboard";
 import { AlertCircle, Check, Download } from "lucide-react";
 import React, { useState } from "react";

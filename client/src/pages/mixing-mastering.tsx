@@ -50,8 +50,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import FileUpload from "../../../components/kokonutui/file-upload";
-import { ReservationErrorBoundary } from "../components/ReservationErrorBoundary";
+import FileUpload from "@/components/ui/file-upload";
+import { ReservationErrorBoundary } from "@/components/reservations/ReservationErrorBoundary";
 
 const services = [
   {

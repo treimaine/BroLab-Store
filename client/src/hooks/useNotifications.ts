@@ -1,4 +1,4 @@
-import type { Notification } from "@/components/NotificationCenter";
+import type { Notification } from "@/components/alerts/NotificationCenter";
 import { useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
