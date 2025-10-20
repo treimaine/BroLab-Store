@@ -1,11 +1,11 @@
-import { CustomBeatRequest } from "@/components/CustomBeatRequest";
-import { ReservationErrorBoundary } from "@/components/ReservationErrorBoundary";
+import { CustomBeatRequest } from "@/components/reservations/CustomBeatRequest";
+import { ReservationErrorBoundary } from "@/components/reservations/ReservationErrorBoundary";
 import {
   AuthenticationLoading,
   FormSubmissionProgress,
   SuccessState,
   defaultReservationSteps,
-} from "@/components/ReservationLoadingStates";
+} from "@/components/reservations/ReservationLoadingStates";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";

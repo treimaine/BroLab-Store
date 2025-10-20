@@ -27,7 +27,7 @@ import {
   User,
 } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
-import { VirtualScrollList } from "../VirtualScrollList";
+import { VirtualScrollList } from "@/components/loading/VirtualScrollList";
 
 interface VirtualActivityFeedProps {
   activities: Activity[];

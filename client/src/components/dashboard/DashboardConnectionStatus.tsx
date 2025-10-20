@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useConnectionManager } from "@/hooks/useConnectionManager";
 import { cn } from "@/lib/utils";
-import { useSyncStatus } from "@/store/useDashboardStore";
+import { useSyncStatus } from "@/stores/useDashboardStore";
 import { CheckCircle, Clock, RefreshCw, WifiOff, XCircle, Zap } from "lucide-react";
 import React, { useCallback } from "react";
 

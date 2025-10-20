@@ -1,11 +1,11 @@
-import { BeatCard } from "@/components/beat-card";
-import { TableBeatView } from "@/components/TableBeatView";
+import { BeatCard } from "@/components/beats/beat-card";
+import { TableBeatView } from "@/components/beats/TableBeatView";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { StandardHero } from "@/components/ui/StandardHero";
-import { UnifiedFilterPanel } from "@/components/UnifiedFilterPanel";
+import { UnifiedFilterPanel } from "@/components/filters/UnifiedFilterPanel";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { useUnifiedFilters } from "@/hooks/useUnifiedFilters";
 import { UnifiedFilters } from "@/lib/unifiedFilters";

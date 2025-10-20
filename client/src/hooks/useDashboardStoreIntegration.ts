@@ -14,7 +14,7 @@ import {
   useDashboardLoading,
   useDashboardStore,
   useSyncStatus,
-} from "@/store/useDashboardStore";
+} from "@/stores/useDashboardStore";
 import { useUser } from "@clerk/clerk-react";
 import type { DashboardData } from "@shared/types/dashboard";
 import { useQuery } from "convex/react";

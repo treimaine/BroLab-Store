@@ -1,4 +1,4 @@
-import { ProtectedPage } from "@/components/AuthenticatedContent";
+import { ProtectedPage } from "@/components/auth/AuthenticatedContent";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

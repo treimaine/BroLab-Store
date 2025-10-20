@@ -5,9 +5,9 @@
  * with real-time feedback and error handling.
  */
 
-import OptimisticUpdateFeedback from "@/components/OptimisticUpdateFeedback";
+import OptimisticUpdateFeedback from "@/components/errors/OptimisticUpdateFeedback";
 import { useOptimisticUpdates } from "@/hooks/useOptimisticUpdates";
-import { useDashboardData } from "@/store/useDashboardStore";
+import { useDashboardData } from "@/stores/useDashboardStore";
 import { AlertCircle, Download, Heart, ShoppingCart } from "lucide-react";
 import React from "react";
 

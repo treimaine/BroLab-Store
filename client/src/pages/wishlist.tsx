@@ -1,5 +1,5 @@
-import { BeatCard } from "@/components/beat-card";
-import { useCartContext } from "@/components/cart-provider";
+import { BeatCard } from "@/components/beats/beat-card";
+import { useCartContext } from "@/components/cart/cart-provider";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useWooCommerce } from "@/hooks/use-woocommerce";

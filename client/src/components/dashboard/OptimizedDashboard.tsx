@@ -27,7 +27,7 @@ import {
   useDashboardError,
   useDashboardLoading,
   useDashboardStore,
-} from "@/store/useDashboardStore";
+} from "@/stores/useDashboardStore";
 import { useUser } from "@clerk/clerk-react";
 import { motion } from "framer-motion";
 import {

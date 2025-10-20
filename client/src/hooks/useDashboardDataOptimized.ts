@@ -84,6 +84,7 @@ export function useDashboardDataOptimized() {
   }, [clerkUser]);
 
   // Statistiques calculées à partir des données de développement
+  // Include source metadata for validation
   const stats: UserStats = useMemo(() => {
     const s = (userStatsRes as any)?.stats as
       | {
@@ -100,6 +101,11 @@ export function useDashboardDataOptimized() {
       totalOrders: s?.totalOrders ?? 0,
       totalSpent: s?.totalSpent ?? 0,
       recentActivity: s?.recentActivity ?? 0,
+      quotaUsed: 0,
+      quotaLimit: 0,
+      monthlyDownloads: 0,
+      monthlyOrders: 0,
+      monthlyRevenue: 0,
     };
   }, [userStatsRes]);
 
@@ -294,7 +300,7 @@ export function useDashboardDataOptimized() {
   }, [chartData, stats]);
 
   // Récupérer les recommandations from WordPress/WooCommerce
-  const recommendations: any[] = useMemo(() => {
+  const recommendations: unknown[] = useMemo(() => {
     return [];
   }, []);
 

@@ -10,7 +10,7 @@ import {
   OptimisticUpdateManager,
   getOptimisticUpdateManager,
 } from "@/services/OptimisticUpdateManager";
-import { useDashboardStore } from "@/store/useDashboardStore";
+import { useDashboardStore } from "@/stores/useDashboardStore";
 import type { DashboardEvent, SyncError } from "@shared/types";
 import type { OptimisticUpdate } from "@shared/types/sync";
 import React, { createContext, useContext, useEffect, useRef } from "react";

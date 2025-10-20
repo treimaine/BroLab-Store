@@ -6,9 +6,9 @@
  * real-time data across all dashboard sections.
  */
 
-import { useDashboardStore } from "@/store/useDashboardStore";
+import { useDashboardStore } from "@/stores/useDashboardStore";
 import type { DashboardData } from "@shared/types/dashboard";
-import { SyncErrorType } from "@shared/types/sync";
+import { SyncErrorType, type ConsistentUserStats } from "@shared/types/sync";
 import { useQuery } from "convex/react";
 import { useEffect, useRef } from "react";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -88,9 +88,14 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
 
     // Data loaded successfully
     try {
-      // Transform and validate the data
+      // Transform and validate the data with proper source metadata
+      // Ensure all Convex IDs and timestamps are preserved for validation
       const transformedData: DashboardData = {
-        user: dashboardData.user,
+        user: {
+          ...dashboardData.user,
+          // Ensure user ID is preserved for Convex ID validation
+          id: dashboardData.user.id,
+        },
         stats: {
           ...dashboardData.stats,
           // Ensure all stats are numbers and properly formatted
@@ -104,12 +109,41 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
           monthlyDownloads: Number(dashboardData.stats.monthlyDownloads) || 0,
           monthlyOrders: Number(dashboardData.stats.monthlyOrders) || 0,
           monthlyRevenue: Number(dashboardData.stats.monthlyRevenue) || 0,
-        },
-        favorites: dashboardData.favorites || [],
-        orders: dashboardData.orders || [],
-        downloads: dashboardData.downloads || [],
-        reservations: dashboardData.reservations || [],
-        activity: dashboardData.activity || [],
+          // Add source metadata for validation (ConsistentUserStats fields)
+          source: "database" as const,
+          calculatedAt: new Date().toISOString(),
+          dataHash: "", // Will be calculated by validation service
+          version: 1,
+        } as ConsistentUserStats,
+        // Preserve Convex IDs and timestamps in all collections
+        // These are critical for source validation
+        favorites: (dashboardData.favorites || []).map(fav => ({
+          ...fav,
+          id: fav.id, // Preserve Convex ID
+          createdAt: fav.createdAt, // Preserve timestamp
+        })),
+        orders: (dashboardData.orders || []).map(order => ({
+          ...order,
+          id: order.id, // Preserve Convex ID
+          createdAt: order.createdAt, // Preserve timestamp
+          updatedAt: order.updatedAt, // Preserve timestamp
+        })),
+        downloads: (dashboardData.downloads || []).map(download => ({
+          ...download,
+          id: download.id, // Preserve Convex ID
+          downloadedAt: download.downloadedAt, // Preserve timestamp
+        })),
+        reservations: (dashboardData.reservations || []).map(reservation => ({
+          ...reservation,
+          id: reservation.id, // Preserve Convex ID
+          createdAt: reservation.createdAt, // Preserve timestamp
+          updatedAt: reservation.updatedAt, // Preserve timestamp
+        })),
+        activity: (dashboardData.activity || []).map(activity => ({
+          ...activity,
+          id: activity.id, // Preserve Convex ID
+          timestamp: activity.timestamp, // Preserve timestamp
+        })),
         chartData: dashboardData.chartData || [],
         trends: dashboardData.trends,
       };

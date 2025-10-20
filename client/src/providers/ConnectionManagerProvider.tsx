@@ -11,7 +11,7 @@ import {
   ConnectionMessage,
   getConnectionManager,
 } from "@/services/ConnectionManager";
-import { useDashboardStore } from "@/store/useDashboardStore";
+import { useDashboardStore } from "@/stores/useDashboardStore";
 import type { ConnectionStatus, RecoveryAction, SyncError } from "@shared/types/sync";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 

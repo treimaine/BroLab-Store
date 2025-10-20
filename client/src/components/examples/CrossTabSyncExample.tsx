@@ -8,7 +8,7 @@
  * - Active tab monitoring
  */
 
-import { useCrossTabInfo, useDashboardStore } from "@/store/useDashboardStore";
+import { useCrossTabInfo, useDashboardStore } from "@/stores/useDashboardStore";
 import type { OptimisticUpdate } from "@shared/types/sync";
 import React, { useEffect, useState } from "react";
 

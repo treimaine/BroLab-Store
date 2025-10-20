@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { AlertCircle, CheckCircle, Clock, Download, FileAudio, RefreshCw } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { VirtualScrollList } from "../VirtualScrollList";
+import { VirtualScrollList } from "@/components/loading/VirtualScrollList";
 
 interface DownloadItem {
   id: string;

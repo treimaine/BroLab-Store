@@ -3,7 +3,7 @@ import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useCartContext } from '@/components/cart-provider';
+import { useCartContext } from '@/components/cart/cart-provider';
 import { LicenseTypeEnum, LicensePricing } from '@shared/schema';
 
 export default function Cart() {

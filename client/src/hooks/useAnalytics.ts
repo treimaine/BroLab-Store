@@ -10,8 +10,8 @@ import {
   RealTimeMetrics,
   TimeRange,
   UserBehaviorInsight,
-} from "../../../shared/types/analytics";
-import { analyticsManager } from "../../../shared/utils/analytics-manager";
+} from "@shared/types/analytics";
+import { analyticsManager } from "@shared/utils/analytics-manager";
 
 export interface UseAnalyticsOptions {
   autoTrackPageViews?: boolean;

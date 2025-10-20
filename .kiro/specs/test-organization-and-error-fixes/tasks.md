@@ -28,8 +28,6 @@
   - Update test mocks to handle proper object serialization
   - _Requirements: 3.1, 3.2, 4.1_
 
--
-
 - [x] 5. Fix mixing mastering component test failures
   - Fix component loading issues in `__tests__/integration/mixing-mastering-error-handling.test.tsx`
   - Update test expectations to handle error boundary fallback states
@@ -43,3 +41,26 @@
   - Verify that webhook validation works correctly
   - Confirm Stripe integration tests pass with proper mocking
   - _Requirements: 2.1, 3.1, 3.2, 3.3, 4.1, 4.2_
+
+- [x] 7. Move remaining misplaced test file to **tests** directory
+  - Move `client/src/__tests__/data-validation-integration.test.ts` to `__tests__/client/data-validation-integration.test.ts`
+  - Update import paths to use correct aliases (@/ paths should work from **tests**)
+  - Verify test still runs correctly after move
+  - _Requirements: 1.1, 1.2, 1.3, 3.1_
+
+- [x] 8. Fix data validation integration test import errors
+  - Fix import path for `useDataValidation` hook in `__tests__/client/data-validation-integration.test.ts`
+  - Fix import paths for `DataFreshnessMonitor` and `DataValidationService`
+  - Fix import path for `@shared/types/dashboard`
+  - Replace `vi` with `jest` for test mocking (Jest is the test framework, not Vitest)
+  - Replace `require()` style imports with ES6 imports for better type safety
+  - Add proper type annotations to avoid implicit 'any' types
+  - _Requirements: 2.1, 2.5, 3.1, 3.2_
+
+- [x] 9. Fix connection manager test failures
+  - Fix WebSocket connection error handling tests in `__tests__/connection-manager.test.ts`
+  - Update test expectations for connection status changes (polling vs websocket)
+  - Fix reconnection logic tests with proper async handling
+  - Fix error emission tests for connection failures
+  - Add proper WebSocket mock implementation for test scenarios
+  - _Requirements: 3.1, 3.2, 4.1_

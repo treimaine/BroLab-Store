@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useCodeSplittingMonitor } from "../hooks/useCodeSplittingMonitor";
+import { useCodeSplittingMonitor } from "@/hooks/useCodeSplittingMonitor";
 /**
  * Higher-order component to track component render performance
  */

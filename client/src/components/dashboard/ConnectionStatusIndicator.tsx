@@ -23,7 +23,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useConnectionManager, useConnectionMetrics } from "@/hooks/useConnectionManager";
 import { cn } from "@/lib/utils";
-import { useSyncStatus } from "@/store/useDashboardStore";
+import { useSyncStatus } from "@/stores/useDashboardStore";
 import type { ConnectionStatus } from "@shared/types/sync";
 import {
   AlertCircle,

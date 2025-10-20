@@ -1,21 +1,17 @@
+import { useCartContext } from "@/components/cart/cart-provider";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useToast } from "@/hooks/use-toast";
-import { useIsMobile } from "@/hooks/useBreakpoint";
 import { SignOutButton, useUser } from "@clerk/clerk-react";
 import { LogOut, Menu, ShoppingCart, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useCartContext } from "../cart-provider";
 
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
   const { getItemCount } = useCartContext();
   const [scrollY, setScrollY] = useState(0);
   const isHomePage = location === "/";
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
 
   // Use Clerk for authentication
   const { user, isSignedIn } = useUser();

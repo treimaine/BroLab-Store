@@ -1,9 +1,9 @@
-import { DiscountBanner } from "@/components/DiscountBanner";
-import { HoverPlayButton } from "@/components/HoverPlayButton";
-import { SearchHero } from "@/components/SearchHero";
-import { ServicesStrip } from "@/components/ServicesStrip";
-import { SocialProofStrip } from "@/components/SocialProofStrip";
-import { SubscriberPerksStrip } from "@/components/SubscriberPerksStrip";
+import { DiscountBanner } from "@/components/alerts/DiscountBanner";
+import { HoverPlayButton } from "@/components/audio/HoverPlayButton";
+import { SearchHero } from "@/components/layout/SearchHero";
+import { ServicesStrip } from "@/components/layout/ServicesStrip";
+import { SocialProofStrip } from "@/components/layout/SocialProofStrip";
+import { SubscriberPerksStrip } from "@/components/subscriptions/SubscriberPerksStrip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

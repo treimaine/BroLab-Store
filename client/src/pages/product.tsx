@@ -1,8 +1,8 @@
-import { LazyBeatSimilarityRecommendations } from "@/components/LazyComponents";
-import { LicensePreviewModal } from "@/components/LicensePreviewModal";
-import { OpenGraphMeta } from "@/components/OpenGraphMeta";
-import { SchemaMarkup } from "@/components/SchemaMarkup";
-import { useCartContext } from "@/components/cart-provider";
+import { LazyBeatSimilarityRecommendations } from "@/components/loading/LazyComponents";
+import { LicensePreviewModal } from "@/components/licenses/LicensePreviewModal";
+import { OpenGraphMeta } from "@/components/seo/OpenGraphMeta";
+import { SchemaMarkup } from "@/components/seo/SchemaMarkup";
+import { useCartContext } from "@/components/cart/cart-provider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";

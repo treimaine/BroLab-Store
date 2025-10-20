@@ -7,7 +7,7 @@
 export const loadHeavyFeatures = {
   // Load audio visualization only when needed
   async audioVisualization() {
-    const { WaveformAudioPlayer } = await import("../components/WaveformAudioPlayer");
+    const { WaveformAudioPlayer } = await import("@/components/audio/WaveformAudioPlayer");
     return WaveformAudioPlayer;
   },
 
@@ -22,9 +22,9 @@ export const loadHeavyFeatures = {
   // Load advanced features only when user accesses them
   async advancedFeatures() {
     const [filtersModule, recommendationsModule, customRequestModule] = await Promise.all([
-      import("../components/AdvancedBeatFilters"),
-      import("../components/BeatSimilarityRecommendations"),
-      import("../components/CustomBeatRequest"),
+      import("@/components/filters/AdvancedBeatFilters"),
+      import("@/components/beats/BeatSimilarityRecommendations"),
+      import("@/components/reservations/CustomBeatRequest"),
     ]);
     return {
       AdvancedBeatFilters: filtersModule,
@@ -36,8 +36,8 @@ export const loadHeavyFeatures = {
   // Load geolocation and currency features only when needed
   async locationServices() {
     const [geoModule, currencyModule] = await Promise.all([
-      import("../components/GeolocationProvider"),
-      import("../components/CurrencyLanguageProvider"),
+      import("@/components/providers/GeolocationProvider"),
+      import("@/components/providers/CurrencyLanguageProvider"),
     ]);
     return {
       GeolocationProvider: geoModule,
@@ -56,7 +56,7 @@ export const optimizedImports = {
   loadFeature: async (featureName: string) => {
     switch (featureName) {
       case "advanced-audio":
-        return import("../components/EnhancedWaveformPlayer");
+        return import("@/components/audio/EnhancedWaveformPlayer");
       case "subscription-management":
         return import("../pages/MembershipPageFixed");
       default:

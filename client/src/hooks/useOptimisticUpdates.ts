@@ -12,7 +12,7 @@ import {
   UserFeedback,
   getOptimisticUpdateManager,
 } from "@/services/OptimisticUpdateManager";
-import { useDashboardStore } from "@/store/useDashboardStore";
+import { useDashboardStore } from "@/stores/useDashboardStore";
 import type { DashboardData } from "@shared/types";
 import type { OptimisticUpdate, SyncError } from "@shared/types/sync";
 import { useCallback, useEffect, useRef, useState } from "react";

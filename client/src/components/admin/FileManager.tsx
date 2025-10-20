@@ -26,7 +26,7 @@ import {
   User,
 } from "lucide-react";
 import { useState } from "react";
-import FileUpload from "../../../../components/kokonutui/file-upload";
+import FileUpload from "@/components/ui/file-upload";
 
 interface FileRecord {
   id: string;

@@ -228,6 +228,160 @@ export interface DataIntegrityReport {
   generatedAt: number;
   /** Report ID for tracking */
   reportId: string;
+  /** Detailed validation report (development mode only) */
+  detailedReport?: DetailedValidationReport;
+}
+
+/**
+ * Detailed validation report for debugging and development
+ */
+export interface DetailedValidationReport {
+  /** Confidence breakdown with component scores */
+  confidenceBreakdown: ConfidenceBreakdown;
+  /** Detailed mock indicator analysis */
+  mockIndicatorAnalysis: MockIndicatorAnalysis;
+  /** Validation reasoning and decision process */
+  validationReasoning: ValidationReasoning;
+  /** Performance metrics */
+  performanceMetrics: ValidationPerformanceMetrics;
+  /** Environment context */
+  environmentContext: ValidationEnvironmentContext;
+}
+
+/**
+ * Mock indicator analysis with detailed field information
+ */
+export interface MockIndicatorAnalysis {
+  /** Total indicators found */
+  totalIndicators: number;
+  /** Indicators grouped by type */
+  byType: Record<string, MockDataIndicator[]>;
+  /** Indicators grouped by field */
+  byField: Record<string, MockDataIndicator[]>;
+  /** High confidence indicators (>= 0.8) */
+  highConfidenceIndicators: MockDataIndicator[];
+  /** Medium confidence indicators (0.5-0.8) */
+  mediumConfidenceIndicators: MockDataIndicator[];
+  /** Low confidence indicators (< 0.5) */
+  lowConfidenceIndicators: MockDataIndicator[];
+  /** Average confidence score */
+  averageConfidence: number;
+  /** Fields affected by mock data */
+  affectedFields: string[];
+  /** Summary of findings */
+  summary: string;
+}
+
+/**
+ * Validation reasoning explaining the decision process
+ */
+export interface ValidationReasoning {
+  /** Final decision (real data vs mock data) */
+  decision: "real_data" | "mock_data" | "uncertain";
+  /** Overall confidence in decision (0-1) */
+  confidence: number;
+  /** Key factors that influenced the decision */
+  keyFactors: ValidationFactor[];
+  /** Decision rationale in plain language */
+  rationale: string;
+  /** Validation steps performed */
+  stepsPerformed: ValidationStep[];
+  /** Why certain checks were skipped */
+  skippedChecks: SkippedCheck[];
+}
+
+/**
+ * Validation factor that influenced the decision
+ */
+export interface ValidationFactor {
+  /** Factor name */
+  name: string;
+  /** Factor type */
+  type: "positive" | "negative" | "neutral";
+  /** Impact on confidence (-1 to 1) */
+  impact: number;
+  /** Weight in final decision (0-1) */
+  weight: number;
+  /** Description of the factor */
+  description: string;
+  /** Evidence supporting this factor */
+  evidence?: string;
+}
+
+/**
+ * Validation step performed during analysis
+ */
+export interface ValidationStep {
+  /** Step name */
+  name: string;
+  /** Step order */
+  order: number;
+  /** Step result */
+  result: "passed" | "failed" | "skipped" | "warning";
+  /** Duration in milliseconds */
+  duration: number;
+  /** Details about the step */
+  details: string;
+  /** Data collected during step */
+  data?: Record<string, unknown>;
+}
+
+/**
+ * Skipped validation check
+ */
+export interface SkippedCheck {
+  /** Check name */
+  name: string;
+  /** Reason for skipping */
+  reason: string;
+  /** Whether this was intentional */
+  intentional: boolean;
+}
+
+/**
+ * Validation performance metrics
+ */
+export interface ValidationPerformanceMetrics {
+  /** Total validation duration (ms) */
+  totalDuration: number;
+  /** Source validation duration (ms) */
+  sourceValidationDuration: number;
+  /** Content validation duration (ms) */
+  contentValidationDuration: number;
+  /** Confidence calculation duration (ms) */
+  confidenceCalculationDuration: number;
+  /** Number of IDs validated */
+  idsValidated: number;
+  /** Number of timestamps validated */
+  timestampsValidated: number;
+  /** Number of fields checked */
+  fieldsChecked: number;
+  /** Cache hit */
+  cacheHit: boolean;
+}
+
+/**
+ * Validation environment context
+ */
+export interface ValidationEnvironmentContext {
+  /** Environment type */
+  environment: Environment;
+  /** Validation configuration used */
+  config: {
+    trustAuthenticatedSources: boolean;
+    failSilently: boolean;
+    enableDetailedLogging: boolean;
+    showMockDataBanners: boolean;
+    mockDataThreshold: number;
+  };
+  /** User context */
+  userContext: {
+    userId: string;
+    hasData: boolean;
+    dataAge: number;
+  };
+  /** Timestamp of validation */
+  validatedAt: number;
 }
 
 /**
@@ -279,20 +433,23 @@ export class SourceValidator {
       return this.createConvexDatabaseResult(data);
     }
 
-    // Priority 2: Validate Convex IDs
+    // Priority 2-4: Validate IDs, timestamps, and calculate final result
+    return this.validateSourceWithFallbacks(data);
+  }
+
+  private validateSourceWithFallbacks(data: DashboardData): SourceValidationResult {
     const idValidations = this.config.validateConvexIds ? this.validateAllIds(data) : [];
+
     const idResult = this.checkIdConfidence(data, idValidations);
     if (idResult) {
       return idResult;
     }
 
-    // Priority 3: Validate timestamps
     const timestampResult = this.checkTimestampConfidence(data, idValidations);
     if (timestampResult) {
       return timestampResult;
     }
 
-    // Priority 4: Calculate overall confidence
     return this.calculateFinalSourceResult(data, idValidations);
   }
 
@@ -552,7 +709,7 @@ export class SourceValidator {
     hasValidTimestamps: boolean,
     timestampCount: number,
     totalIds: number,
-    timestampConfidence: number = 0
+    timestampConfidence = 0
   ): number {
     const weights = {
       ids: 0.5,
@@ -597,47 +754,31 @@ export class SourceValidator {
   private validateAllIds(data: DashboardData): ConvexIdValidation[] {
     const validations: ConvexIdValidation[] = [];
 
-    // Validate user ID
+    this.validateUserId(data, validations);
+    this.validateCollectionIds(data.favorites, validations);
+    this.validateCollectionIds(data.orders, validations);
+    this.validateCollectionIds(data.downloads, validations);
+    this.validateCollectionIds(data.reservations, validations);
+    this.validateCollectionIds(data.activity, validations);
+
+    return validations;
+  }
+
+  private validateUserId(data: DashboardData, validations: ConvexIdValidation[]): void {
     if (data.user.id) {
       validations.push(this.validateConvexId(data.user.id));
     }
+  }
 
-    // Validate favorites IDs
-    for (const favorite of data.favorites) {
-      if (favorite.id) {
-        validations.push(this.validateConvexId(favorite.id));
+  private validateCollectionIds(
+    collection: Array<{ id?: string }>,
+    validations: ConvexIdValidation[]
+  ): void {
+    for (const item of collection) {
+      if (item.id) {
+        validations.push(this.validateConvexId(item.id));
       }
     }
-
-    // Validate order IDs
-    for (const order of data.orders) {
-      if (order.id) {
-        validations.push(this.validateConvexId(order.id));
-      }
-    }
-
-    // Validate download IDs
-    for (const download of data.downloads) {
-      if (download.id) {
-        validations.push(this.validateConvexId(download.id));
-      }
-    }
-
-    // Validate reservation IDs
-    for (const reservation of data.reservations) {
-      if (reservation.id) {
-        validations.push(this.validateConvexId(reservation.id));
-      }
-    }
-
-    // Validate activity IDs
-    for (const activity of data.activity) {
-      if (activity.id) {
-        validations.push(this.validateConvexId(activity.id));
-      }
-    }
-
-    return validations;
   }
 
   /**
@@ -832,7 +973,7 @@ export class SourceValidator {
    * Count total timestamps in data
    * Enhanced to count all timestamp fields
    */
-  private countTimestamps(data: DashboardData): number {
+  public countTimestamps(data: DashboardData): number {
     const stats = data.stats as ConsistentUserStats;
     const statsCount = stats.calculatedAt ? 1 : 0;
     const activityCount = data.activity.filter(a => a.timestamp).length;
@@ -1716,127 +1857,31 @@ export class DataValidationService {
 
     try {
       // Check cache first
-      const cacheKey = this.generateCacheKey(data);
-      if (cacheResults && this.validationCache.has(cacheKey)) {
-        const cachedReport = this.validationCache.get(cacheKey)!;
-        // Return cached result if it's less than 30 seconds old
-        if (Date.now() - cachedReport.generatedAt < 30000) {
-          return cachedReport;
-        }
+      const cachedReport = this.checkValidationCache(cacheResults, data);
+      if (cachedReport) {
+        return cachedReport;
       }
 
       // Perform validations
-      const sourceValidation = includeSourceValidation
-        ? await this.validateDataSource(data)
-        : this.createEmptySourceValidation();
-
-      const crossValidation = includeCrossValidation
-        ? this.validateCrossSection(data)
-        : this.createEmptyCrossValidation();
-
-      const dataValidation = includeDataValidation
-        ? validateDashboardData(data)
-        : this.createEmptyDataValidation();
-
-      // Detect inconsistencies
-      const inconsistencies = this.detectAllInconsistencies(
+      const validations = await this.performAllValidations(
         data,
-        sourceValidation,
-        crossValidation,
-        dataValidation
+        includeSourceValidation,
+        includeCrossValidation,
+        includeDataValidation
       );
 
-      // Determine overall status
-      const status = this.determineOverallStatus(
-        sourceValidation,
-        crossValidation,
-        dataValidation,
-        inconsistencies
-      );
+      // Build and cache report
+      const report = this.buildIntegrityReport(data, validations, reportId, startTime);
 
-      // Generate recommendations
-      const recommendations = this.generateRecommendations(
-        status,
-        sourceValidation,
-        crossValidation,
-        inconsistencies
-      );
-
-      const report: DataIntegrityReport = {
-        status,
-        sourceValidation,
-        crossValidation,
-        dataValidation,
-        inconsistencies,
-        recommendations,
-        generatedAt: startTime,
-        reportId,
-      };
-
-      // Cache the result
       if (cacheResults) {
-        this.validationCache.set(cacheKey, report);
-        // Clean up old cache entries
-        this.cleanupValidationCache();
+        this.cacheValidationReport(data, report);
       }
 
-      // Log the validation
-      let logLevel: "info" | "warn" | "error" = "error";
-      if (status === "valid") {
-        logLevel = "info";
-      } else if (status === "warning") {
-        logLevel = "warn";
-      }
-
-      this.logger.logSystemEvent(`Data integrity validation completed: ${status}`, logLevel, {
-        component: "DataValidationService",
-      });
+      this.logValidationResult(report.status);
 
       return report;
     } catch (error) {
-      // Log error based on environment settings
-      if (this.behaviorConfig.logValidationErrors) {
-        this.logger.logError(
-          {
-            type: SyncErrorType.VALIDATION_ERROR,
-            message: `Data integrity validation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-            timestamp: Date.now(),
-            context: { reportId, error },
-            retryable: true,
-            retryCount: 0,
-            maxRetries: 3,
-            severity: "high" as const,
-            category: "data" as const,
-            recoveryStrategy: "immediate_retry" as const,
-            userMessage: this.behaviorConfig.failSilently
-              ? ""
-              : "Data validation failed. Please refresh the page.",
-            userActions: [],
-            technicalDetails: {
-              stackTrace: error instanceof Error ? error.stack : undefined,
-              environment: {
-                ...getBrowserEnvironment(),
-                timestamp: Date.now(),
-              },
-              additionalContext: {
-                component: "DataValidationService",
-                action: "validateDataIntegrity",
-                reportId,
-              },
-            },
-            fingerprint: `validation-failed-${reportId}`,
-          },
-          { component: "DataValidationService", action: "validateDataIntegrity" }
-        );
-      }
-
-      // In production with silent failure mode, return a safe fallback result
-      if (this.behaviorConfig.failSilently) {
-        return this.createFallbackIntegrityReport(data, reportId, startTime);
-      }
-
-      // Otherwise, throw the error
-      throw error;
+      return this.handleIntegrityValidationError(error, data, reportId, startTime);
     }
   }
 
@@ -1859,45 +1904,858 @@ export class DataValidationService {
       // Perform detailed validation
       return this.performDetailedValidation(data, sourceResult, startTime);
     } catch (error) {
-      // Log error with context
-      if (this.behaviorConfig.logValidationErrors) {
-        this.logger.logError(
-          {
-            type: SyncErrorType.VALIDATION_ERROR,
-            message: `Data source validation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-            timestamp: Date.now(),
-            context: { error, userId: data.user.id },
-            retryable: true,
-            retryCount: 0,
-            maxRetries: 3,
-            severity: "medium" as const,
-            category: "data" as const,
-            recoveryStrategy: "immediate_retry" as const,
-            userMessage: this.behaviorConfig.failSilently
-              ? ""
-              : "Unable to validate data source. Using default validation.",
-            userActions: [],
-            technicalDetails: {
-              stackTrace: error instanceof Error ? error.stack : undefined,
-              environment: {
-                ...getBrowserEnvironment(),
-                timestamp: Date.now(),
-              },
-              additionalContext: {
-                component: "DataValidationService",
-                action: "validateDataSource",
-                userId: data.user.id,
-              },
-            },
-            fingerprint: `source-validation-failed-${data.user.id}`,
-          },
-          { component: "DataValidationService", action: "validateDataSource" }
+      this.handleValidationError(error, data.user.id);
+      return this.createFallbackSourceValidation(data, startTime);
+    }
+  }
+
+  /**
+   * Check validation cache with confidence-based TTL
+   * Enhanced to use dynamic TTL based on validation confidence
+   */
+  private checkValidationCache(
+    cacheResults: boolean,
+    data: DashboardData
+  ): DataIntegrityReport | null {
+    if (!cacheResults) {
+      return null;
+    }
+
+    const cacheKey = this.generateCacheKey(data);
+    const cachedReport = this.validationCache.get(cacheKey);
+
+    if (cachedReport && this.isCacheValid(cachedReport)) {
+      // Log cache hit in development mode
+      if (this.behaviorConfig.enableDetailedLogging) {
+        const age = Date.now() - cachedReport.generatedAt;
+        this.logger.logSystemEvent(
+          `Validation cache hit (age: ${Math.round(age / 1000)}s, source: ${cachedReport.sourceValidation.source})`,
+          "info",
+          { component: "DataValidationService" }
         );
       }
 
-      // Return fallback validation result - default to trusting data
-      return this.createFallbackSourceValidation(data, startTime);
+      return cachedReport;
     }
+
+    // Remove stale cache entry
+    if (cachedReport) {
+      this.validationCache.delete(cacheKey);
+    }
+
+    return null;
+  }
+
+  private async performAllValidations(
+    data: DashboardData,
+    includeSource: boolean,
+    includeCross: boolean,
+    includeData: boolean
+  ): Promise<{
+    sourceValidation: DataSourceValidation;
+    crossValidation: CrossValidationResult;
+    dataValidation: ValidationResult;
+  }> {
+    const sourceValidation = includeSource
+      ? await this.validateDataSource(data)
+      : this.createEmptySourceValidation();
+
+    const crossValidation = includeCross
+      ? this.validateCrossSection(data)
+      : this.createEmptyCrossValidation();
+
+    const dataValidation = includeData
+      ? validateDashboardData(data)
+      : this.createEmptyDataValidation();
+
+    return { sourceValidation, crossValidation, dataValidation };
+  }
+
+  private buildIntegrityReport(
+    data: DashboardData,
+    validations: {
+      sourceValidation: DataSourceValidation;
+      crossValidation: CrossValidationResult;
+      dataValidation: ValidationResult;
+    },
+    reportId: string,
+    startTime: number
+  ): DataIntegrityReport {
+    const { sourceValidation, crossValidation, dataValidation } = validations;
+
+    const inconsistencies = this.detectAllInconsistencies(
+      data,
+      sourceValidation,
+      crossValidation,
+      dataValidation
+    );
+
+    const status = this.determineOverallStatus(
+      sourceValidation,
+      crossValidation,
+      dataValidation,
+      inconsistencies
+    );
+
+    const recommendations = this.generateRecommendations(
+      status,
+      sourceValidation,
+      crossValidation,
+      inconsistencies
+    );
+
+    // Create detailed report for development/staging environments
+    const detailedReport = this.behaviorConfig.enableDetailedLogging
+      ? this.createDetailedValidationReport(data, sourceValidation, startTime)
+      : undefined;
+
+    // Log validation report based on environment
+    this.logValidationReport(
+      {
+        status,
+        sourceValidation,
+        crossValidation,
+        dataValidation,
+        inconsistencies,
+        recommendations,
+        generatedAt: startTime,
+        reportId,
+        detailedReport,
+      },
+      data
+    );
+
+    return {
+      status,
+      sourceValidation,
+      crossValidation,
+      dataValidation,
+      inconsistencies,
+      recommendations,
+      generatedAt: startTime,
+      reportId,
+      detailedReport,
+    };
+  }
+
+  /**
+   * Create detailed validation report for development and debugging
+   * Includes confidence breakdown, mock indicator analysis, and validation reasoning
+   */
+  private createDetailedValidationReport(
+    data: DashboardData,
+    sourceValidation: DataSourceValidation,
+    startTime: number
+  ): DetailedValidationReport {
+    const endTime = Date.now();
+    const totalDuration = endTime - startTime;
+
+    // Get confidence breakdown from the last validation
+    const mockIndicators = sourceValidation.mockIndicators;
+    const contentResult: ContentValidationResult = {
+      indicators: mockIndicators,
+      confidence: this.confidenceCalculator.calculateContentConfidence(mockIndicators),
+      appearsReal: mockIndicators.length === 0,
+    };
+
+    // Create a source result for breakdown calculation
+    const sourceResult: SourceValidationResult = {
+      source:
+        sourceValidation.source === "database"
+          ? "database"
+          : sourceValidation.source === "cache"
+            ? "cache"
+            : "unknown",
+      isAuthenticated: sourceValidation.isRealData,
+      confidence: sourceValidation.idValidations?.confidence || 0.5,
+      details: {
+        hasValidIds: sourceValidation.idValidations?.hasValidIds || false,
+        hasValidTimestamps: sourceValidation.freshnessWarnings.length === 0,
+        idValidations: sourceValidation.idValidations?.results || [],
+        timestampCount: this.sourceValidator.countTimestamps(data),
+      },
+    };
+
+    const confidenceScore = this.confidenceCalculator.calculateOverallConfidence(
+      sourceResult,
+      contentResult
+    );
+
+    const confidenceBreakdown = this.confidenceCalculator.getConfidenceBreakdown(
+      sourceResult,
+      contentResult,
+      confidenceScore
+    );
+
+    const mockIndicatorAnalysis = this.analyzeMockIndicators(mockIndicators);
+    const validationReasoning = this.generateValidationReasoning(
+      sourceValidation,
+      confidenceScore,
+      confidenceBreakdown
+    );
+
+    const performanceMetrics: ValidationPerformanceMetrics = {
+      totalDuration,
+      sourceValidationDuration: totalDuration * 0.6, // Estimated
+      contentValidationDuration: totalDuration * 0.3, // Estimated
+      confidenceCalculationDuration: totalDuration * 0.1, // Estimated
+      idsValidated: sourceValidation.idValidations?.validIdCount || 0,
+      timestampsValidated: this.sourceValidator.countTimestamps(data),
+      fieldsChecked: this.countFieldsChecked(data),
+      cacheHit: false,
+    };
+
+    const environmentContext: ValidationEnvironmentContext = {
+      environment: this.environment,
+      config: {
+        trustAuthenticatedSources: this.behaviorConfig.trustAuthenticatedSources,
+        failSilently: this.behaviorConfig.failSilently,
+        enableDetailedLogging: this.behaviorConfig.enableDetailedLogging,
+        showMockDataBanners: this.behaviorConfig.showMockDataBanners,
+        mockDataThreshold: this.confidenceCalculator.getThresholds().mockDataThreshold,
+      },
+      userContext: {
+        userId: data.user.id,
+        hasData: this.hasUserData(data),
+        dataAge: sourceValidation.dataAge,
+      },
+      validatedAt: startTime,
+    };
+
+    return {
+      confidenceBreakdown,
+      mockIndicatorAnalysis,
+      validationReasoning,
+      performanceMetrics,
+      environmentContext,
+    };
+  }
+
+  /**
+   * Analyze mock indicators and group them by type and field
+   */
+  private analyzeMockIndicators(indicators: MockDataIndicator[]): MockIndicatorAnalysis {
+    const byType: Record<string, MockDataIndicator[]> = {};
+    const byField: Record<string, MockDataIndicator[]> = {};
+    const highConfidenceIndicators: MockDataIndicator[] = [];
+    const mediumConfidenceIndicators: MockDataIndicator[] = [];
+    const lowConfidenceIndicators: MockDataIndicator[] = [];
+    const affectedFields = new Set<string>();
+
+    for (const indicator of indicators) {
+      // Group by type
+      if (!byType[indicator.type]) {
+        byType[indicator.type] = [];
+      }
+      byType[indicator.type].push(indicator);
+
+      // Group by field
+      if (!byField[indicator.field]) {
+        byField[indicator.field] = [];
+      }
+      byField[indicator.field].push(indicator);
+
+      // Categorize by confidence
+      if (indicator.confidence >= 0.8) {
+        highConfidenceIndicators.push(indicator);
+      } else if (indicator.confidence >= 0.5) {
+        mediumConfidenceIndicators.push(indicator);
+      } else {
+        lowConfidenceIndicators.push(indicator);
+      }
+
+      // Track affected fields
+      affectedFields.add(indicator.field);
+    }
+
+    const averageConfidence =
+      indicators.length > 0
+        ? indicators.reduce((sum, ind) => sum + ind.confidence, 0) / indicators.length
+        : 0;
+
+    const summary = this.generateMockIndicatorSummary(
+      indicators.length,
+      highConfidenceIndicators.length,
+      affectedFields.size
+    );
+
+    return {
+      totalIndicators: indicators.length,
+      byType,
+      byField,
+      highConfidenceIndicators,
+      mediumConfidenceIndicators,
+      lowConfidenceIndicators,
+      averageConfidence,
+      affectedFields: Array.from(affectedFields),
+      summary,
+    };
+  }
+
+  /**
+   * Generate a human-readable summary of mock indicators
+   */
+  private generateMockIndicatorSummary(
+    total: number,
+    highConfidence: number,
+    affectedFields: number
+  ): string {
+    if (total === 0) {
+      return "No mock data indicators found. Data appears to be real.";
+    }
+
+    if (highConfidence === 0) {
+      return `Found ${total} low-confidence mock indicator${total > 1 ? "s" : ""} across ${affectedFields} field${affectedFields > 1 ? "s" : ""}. Data is likely real.`;
+    }
+
+    if (highConfidence >= 3) {
+      return `Found ${highConfidence} high-confidence mock indicators across ${affectedFields} field${affectedFields > 1 ? "s" : ""}. Data is likely mock or placeholder.`;
+    }
+
+    return `Found ${total} mock indicator${total > 1 ? "s" : ""} (${highConfidence} high-confidence) across ${affectedFields} field${affectedFields > 1 ? "s" : ""}. Further investigation recommended.`;
+  }
+
+  /**
+   * Generate validation reasoning explaining the decision process
+   */
+  private generateValidationReasoning(
+    sourceValidation: DataSourceValidation,
+    confidenceScore: ConfidenceScore,
+    breakdown: ConfidenceBreakdown
+  ): ValidationReasoning {
+    const decision = this.determineValidationDecision(sourceValidation, confidenceScore);
+    const keyFactors = this.extractKeyFactors(breakdown, sourceValidation);
+    const rationale = this.generateRationale(decision, confidenceScore, keyFactors);
+    const stepsPerformed = this.generateValidationSteps(sourceValidation);
+    const skippedChecks = this.identifySkippedChecks(sourceValidation);
+
+    return {
+      decision,
+      confidence: confidenceScore.overall,
+      keyFactors,
+      rationale,
+      stepsPerformed,
+      skippedChecks,
+    };
+  }
+
+  /**
+   * Determine the final validation decision
+   */
+  private determineValidationDecision(
+    sourceValidation: DataSourceValidation,
+    confidenceScore: ConfidenceScore
+  ): "real_data" | "mock_data" | "uncertain" {
+    const thresholds = this.confidenceCalculator.getThresholds();
+
+    if (sourceValidation.isRealData && confidenceScore.overall >= thresholds.realDataThreshold) {
+      return "real_data";
+    }
+
+    if (sourceValidation.hasMockData && confidenceScore.overall < thresholds.mockDataThreshold) {
+      return "mock_data";
+    }
+
+    return "uncertain";
+  }
+
+  /**
+   * Extract key factors from confidence breakdown
+   */
+  private extractKeyFactors(
+    breakdown: ConfidenceBreakdown,
+    sourceValidation: DataSourceValidation
+  ): ValidationFactor[] {
+    const factors: ValidationFactor[] = [];
+
+    // Add positive factors
+    for (const factor of breakdown.positiveFactors) {
+      factors.push({
+        name: factor,
+        type: "positive",
+        impact: 0.2,
+        weight: 0.8,
+        description: factor,
+        evidence: this.getFactorEvidence(factor, sourceValidation),
+      });
+    }
+
+    // Add negative factors
+    for (const factor of breakdown.negativeFactors) {
+      factors.push({
+        name: factor,
+        type: "negative",
+        impact: -0.2,
+        weight: 0.8,
+        description: factor,
+        evidence: this.getFactorEvidence(factor, sourceValidation),
+      });
+    }
+
+    return factors;
+  }
+
+  /**
+   * Get evidence for a validation factor
+   */
+  private getFactorEvidence(factor: string, sourceValidation: DataSourceValidation): string {
+    if (factor.includes("Convex IDs")) {
+      return `${sourceValidation.idValidations?.validIdCount || 0} valid Convex IDs found`;
+    }
+
+    if (factor.includes("timestamps")) {
+      return `${sourceValidation.idValidations?.results.length || 0} timestamps validated`;
+    }
+
+    if (factor.includes("authenticated")) {
+      return `Source: ${sourceValidation.source}`;
+    }
+
+    if (factor.includes("Mock data indicators")) {
+      return `${sourceValidation.mockIndicators.length} indicators found`;
+    }
+
+    return "";
+  }
+
+  /**
+   * Generate human-readable rationale for the decision
+   */
+  private generateRationale(
+    decision: "real_data" | "mock_data" | "uncertain",
+    confidenceScore: ConfidenceScore,
+    keyFactors: ValidationFactor[]
+  ): string {
+    const confidencePercent = (confidenceScore.overall * 100).toFixed(1);
+    const positiveCount = keyFactors.filter(f => f.type === "positive").length;
+    const negativeCount = keyFactors.filter(f => f.type === "negative").length;
+
+    if (decision === "real_data") {
+      return `Data is determined to be real with ${confidencePercent}% confidence. Found ${positiveCount} positive indicator${positiveCount !== 1 ? "s" : ""} supporting authenticity.`;
+    }
+
+    if (decision === "mock_data") {
+      return `Data appears to be mock or placeholder with ${confidencePercent}% confidence. Found ${negativeCount} negative indicator${negativeCount !== 1 ? "s" : ""} suggesting test data.`;
+    }
+
+    return `Data authenticity is uncertain (${confidencePercent}% confidence). Found ${positiveCount} positive and ${negativeCount} negative indicators. Additional validation recommended.`;
+  }
+
+  /**
+   * Generate list of validation steps performed
+   */
+  private generateValidationSteps(sourceValidation: DataSourceValidation): ValidationStep[] {
+    const steps: ValidationStep[] = [];
+
+    steps.push({
+      name: "Source Validation",
+      order: 1,
+      result: sourceValidation.isRealData ? "passed" : "failed",
+      duration: 0,
+      details: `Validated data source: ${sourceValidation.source}`,
+      data: {
+        source: sourceValidation.source,
+        isAuthenticated: sourceValidation.isRealData,
+      },
+    });
+
+    if (sourceValidation.idValidations) {
+      steps.push({
+        name: "ID Validation",
+        order: 2,
+        result: sourceValidation.idValidations.hasValidIds ? "passed" : "failed",
+        duration: 0,
+        details: `Validated ${sourceValidation.idValidations.validIdCount} Convex IDs`,
+        data: {
+          validIdCount: sourceValidation.idValidations.validIdCount,
+          confidence: sourceValidation.idValidations.confidence,
+        },
+      });
+    }
+
+    steps.push({
+      name: "Timestamp Validation",
+      order: 3,
+      result: sourceValidation.freshnessWarnings.length === 0 ? "passed" : "warning",
+      duration: 0,
+      details: `Checked data freshness, found ${sourceValidation.freshnessWarnings.length} warning${sourceValidation.freshnessWarnings.length !== 1 ? "s" : ""}`,
+      data: {
+        warnings: sourceValidation.freshnessWarnings.length,
+      },
+    });
+
+    steps.push({
+      name: "Content Validation",
+      order: 4,
+      result: sourceValidation.mockIndicators.length === 0 ? "passed" : "warning",
+      duration: 0,
+      details: `Checked for mock data patterns, found ${sourceValidation.mockIndicators.length} indicator${sourceValidation.mockIndicators.length !== 1 ? "s" : ""}`,
+      data: {
+        indicators: sourceValidation.mockIndicators.length,
+      },
+    });
+
+    return steps;
+  }
+
+  /**
+   * Identify validation checks that were skipped
+   */
+  private identifySkippedChecks(sourceValidation: DataSourceValidation): SkippedCheck[] {
+    const skipped: SkippedCheck[] = [];
+
+    // Check if content validation was skipped due to high source confidence
+    if (sourceValidation.isRealData && sourceValidation.mockIndicators.length === 0) {
+      const idConfidence = sourceValidation.idValidations?.confidence || 0;
+      if (idConfidence > 0.9) {
+        skipped.push({
+          name: "Detailed Content Validation",
+          reason: "Skipped due to high source confidence from authenticated database",
+          intentional: true,
+        });
+      }
+    }
+
+    return skipped;
+  }
+
+  /**
+   * Count total fields checked during validation
+   */
+  private countFieldsChecked(data: DashboardData): number {
+    let count = 0;
+
+    // User fields
+    count += Object.keys(data.user).length;
+
+    // Stats fields
+    count += Object.keys(data.stats).length;
+
+    // Array items
+    count += data.favorites.length;
+    count += data.orders.length;
+    count += data.downloads.length;
+    count += data.reservations.length;
+    count += data.activity.length;
+
+    return count;
+  }
+
+  /**
+   * Check if user has any data
+   */
+  private hasUserData(data: DashboardData): boolean {
+    return (
+      data.favorites.length > 0 ||
+      data.orders.length > 0 ||
+      data.downloads.length > 0 ||
+      data.reservations.length > 0 ||
+      data.activity.length > 0
+    );
+  }
+
+  /**
+   * Log validation report based on environment configuration
+   * Development: Detailed logging with full breakdown
+   * Production: Alert logging without user warnings
+   */
+  private logValidationReport(report: DataIntegrityReport, data: DashboardData): void {
+    if (this.environment === "production") {
+      this.logProductionValidationReport(report, data);
+    } else {
+      this.logDevelopmentValidationReport(report, data);
+    }
+  }
+
+  /**
+   * Log validation report in production (alerts only, no user warnings)
+   */
+  private logProductionValidationReport(report: DataIntegrityReport, data: DashboardData): void {
+    // Only log if there are issues
+    if (report.status === "valid") {
+      return;
+    }
+
+    // Log alert without showing to user
+    const logMethod = report.status === "critical" ? console.error : console.warn;
+    logMethod(
+      `[DataValidationService] Data validation alert [${report.reportId}]: ${report.status} status detected for user ${data.user.id}`,
+      {
+        status: report.status,
+        hasMockData: report.sourceValidation.hasMockData,
+        inconsistencies: report.inconsistencies.length,
+        userId: data.user.id,
+      }
+    );
+
+    // Log mock data indicators if found (for monitoring)
+    if (report.sourceValidation.hasMockData && report.sourceValidation.mockIndicators.length > 0) {
+      console.warn(
+        `[DataValidationService] Mock data detected in production [${report.reportId}] for user ${data.user.id}: ${report.sourceValidation.mockIndicators.length} indicators`,
+        {
+          indicators: report.sourceValidation.mockIndicators.map(ind => ({
+            field: ind.field,
+            type: ind.type,
+            confidence: ind.confidence,
+          })),
+        }
+      );
+    }
+  }
+
+  /**
+   * Log validation report in development (detailed logging with full breakdown)
+   */
+  private logDevelopmentValidationReport(report: DataIntegrityReport, data: DashboardData): void {
+    if (!this.behaviorConfig.enableDetailedLogging) {
+      return;
+    }
+
+    // Log overall validation result
+    const logMethod = report.status === "valid" ? console.info : console.warn;
+    logMethod(`[DataValidationService] Validation Report [${report.reportId}]: ${report.status}`, {
+      userId: data.user.id,
+    });
+
+    // Log detailed report if available
+    if (report.detailedReport) {
+      this.logDetailedReportBreakdown(report.detailedReport, report.reportId);
+    }
+
+    // Log mock indicators if found
+    if (report.sourceValidation.mockIndicators.length > 0) {
+      this.logMockIndicators(report.sourceValidation.mockIndicators, report.reportId);
+    }
+
+    // Log confidence breakdown
+    if (report.detailedReport?.confidenceBreakdown) {
+      this.logConfidenceBreakdownDetails(
+        report.detailedReport.confidenceBreakdown,
+        report.reportId
+      );
+    }
+
+    // Log validation reasoning
+    if (report.detailedReport?.validationReasoning) {
+      this.logValidationReasoning(report.detailedReport.validationReasoning, report.reportId);
+    }
+  }
+
+  /**
+   * Log detailed report breakdown
+   */
+  private logDetailedReportBreakdown(
+    detailedReport: DetailedValidationReport,
+    reportId: string
+  ): void {
+    console.info(
+      `[DataValidationService] Detailed Report [${reportId}]: ${detailedReport.mockIndicatorAnalysis.summary}`,
+      {
+        mockIndicators: detailedReport.mockIndicatorAnalysis.totalIndicators,
+        affectedFields: detailedReport.mockIndicatorAnalysis.affectedFields.length,
+        averageConfidence: detailedReport.mockIndicatorAnalysis.averageConfidence,
+        decision: detailedReport.validationReasoning.decision,
+        confidence: detailedReport.validationReasoning.confidence,
+      }
+    );
+  }
+
+  /**
+   * Log mock indicators with field names
+   */
+  private logMockIndicators(indicators: MockDataIndicator[], reportId: string): void {
+    for (const indicator of indicators) {
+      console.warn(
+        `[DataValidationService] Mock Indicator [${reportId}]: ${indicator.field} - ${indicator.reason}`,
+        {
+          field: indicator.field,
+          type: indicator.type,
+          confidence: indicator.confidence,
+          value: indicator.value,
+        }
+      );
+    }
+  }
+
+  /**
+   * Log confidence breakdown details
+   */
+  private logConfidenceBreakdownDetails(breakdown: ConfidenceBreakdown, reportId: string): void {
+    const components = breakdown.components;
+    console.info(
+      `[DataValidationService] Confidence Breakdown [${reportId}]: ${breakdown.reasoning}`,
+      {
+        source: {
+          score: components.source.score,
+          contribution: components.source.contribution,
+        },
+        ids: {
+          score: components.ids.score,
+          contribution: components.ids.contribution,
+        },
+        timestamps: {
+          score: components.timestamps.score,
+          contribution: components.timestamps.contribution,
+        },
+        content: {
+          score: components.content.score,
+          contribution: components.content.contribution,
+        },
+        positiveFactors: breakdown.positiveFactors,
+        negativeFactors: breakdown.negativeFactors,
+      }
+    );
+  }
+
+  /**
+   * Log validation reasoning
+   */
+  private logValidationReasoning(reasoning: ValidationReasoning, reportId: string): void {
+    console.info(
+      `[DataValidationService] Validation Reasoning [${reportId}]: ${reasoning.rationale}`,
+      {
+        decision: reasoning.decision,
+        confidence: reasoning.confidence,
+        keyFactors: reasoning.keyFactors.map(f => ({
+          name: f.name,
+          type: f.type,
+          impact: f.impact,
+        })),
+        stepsPerformed: reasoning.stepsPerformed.map(s => ({
+          name: s.name,
+          result: s.result,
+        })),
+      }
+    );
+  }
+
+  /**
+   * Cache validation report with confidence-based TTL
+   * Enhanced to log caching activity and perform cleanup
+   */
+  private cacheValidationReport(data: DashboardData, report: DataIntegrityReport): void {
+    const cacheKey = this.generateCacheKey(data);
+    this.validationCache.set(cacheKey, report);
+
+    // Log cache write in development mode
+    if (this.behaviorConfig.enableDetailedLogging) {
+      const confidence = report.sourceValidation.isRealData ? 0.9 : 0.5;
+      const ttl = this.getCacheTTL(confidence);
+      this.logger.logSystemEvent(
+        `Cached validation report (TTL: ${Math.round(ttl / 1000)}s, source: ${report.sourceValidation.source}, key: ${cacheKey.substring(0, 16)}..., confidence: ${confidence})`,
+        "info",
+        {
+          component: "DataValidationService",
+        }
+      );
+    }
+
+    // Cleanup old entries
+    this.cleanupValidationCache();
+  }
+
+  private logValidationResult(status: IntegrityStatus): void {
+    let logLevel: "info" | "warn" | "error" = "error";
+    if (status === "valid") {
+      logLevel = "info";
+    } else if (status === "warning") {
+      logLevel = "warn";
+    }
+
+    this.logger.logSystemEvent(`Data integrity validation completed: ${status}`, logLevel, {
+      component: "DataValidationService",
+    });
+  }
+
+  private handleIntegrityValidationError(
+    error: unknown,
+    data: DashboardData,
+    reportId: string,
+    startTime: number
+  ): DataIntegrityReport {
+    if (this.behaviorConfig.logValidationErrors) {
+      this.logIntegrityValidationError(error, reportId);
+    }
+
+    if (this.behaviorConfig.failSilently) {
+      return this.createFallbackIntegrityReport(data, reportId, startTime);
+    }
+
+    throw error;
+  }
+
+  private logIntegrityValidationError(error: unknown, reportId: string): void {
+    this.logger.logError(
+      {
+        type: SyncErrorType.VALIDATION_ERROR,
+        message: `Data integrity validation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        timestamp: Date.now(),
+        context: { reportId, error },
+        retryable: true,
+        retryCount: 0,
+        maxRetries: 3,
+        severity: "high" as const,
+        category: "data" as const,
+        recoveryStrategy: "immediate_retry" as const,
+        userMessage: this.behaviorConfig.failSilently
+          ? ""
+          : "Data validation failed. Please refresh the page.",
+        userActions: [],
+        technicalDetails: {
+          stackTrace: error instanceof Error ? error.stack : undefined,
+          environment: {
+            ...getBrowserEnvironment(),
+            timestamp: Date.now(),
+          },
+          additionalContext: {
+            component: "DataValidationService",
+            action: "validateDataIntegrity",
+            reportId,
+          },
+        },
+        fingerprint: `validation-failed-${reportId}`,
+      },
+      { component: "DataValidationService", action: "validateDataIntegrity" }
+    );
+  }
+
+  private handleValidationError(error: unknown, userId: string): void {
+    if (!this.behaviorConfig.logValidationErrors) {
+      return;
+    }
+
+    this.logger.logError(
+      {
+        type: SyncErrorType.VALIDATION_ERROR,
+        message: `Data source validation failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        timestamp: Date.now(),
+        context: { error, userId },
+        retryable: true,
+        retryCount: 0,
+        maxRetries: 3,
+        severity: "medium" as const,
+        category: "data" as const,
+        recoveryStrategy: "immediate_retry" as const,
+        userMessage: this.behaviorConfig.failSilently
+          ? ""
+          : "Unable to validate data source. Using default validation.",
+        userActions: [],
+        technicalDetails: {
+          stackTrace: error instanceof Error ? error.stack : undefined,
+          environment: {
+            ...getBrowserEnvironment(),
+            timestamp: Date.now(),
+          },
+          additionalContext: {
+            component: "DataValidationService",
+            action: "validateDataSource",
+            userId,
+          },
+        },
+        fingerprint: `source-validation-failed-${userId}`,
+      },
+      { component: "DataValidationService", action: "validateDataSource" }
+    );
   }
 
   private createHighConfidenceValidation(
@@ -2011,7 +2869,8 @@ export class DataValidationService {
     sourceResult: SourceValidationResult
   ): MockDataIndicator[] {
     try {
-      if (!this.config.checkMockData || sourceResult.confidence >= 0.7) {
+      const CONFIDENCE_THRESHOLD = 0.7;
+      if (!this.config.checkMockData || sourceResult.confidence >= CONFIDENCE_THRESHOLD) {
         return [];
       }
       return this.detectMockData(data);
@@ -2035,10 +2894,11 @@ export class DataValidationService {
     try {
       const contentConfidence =
         this.confidenceCalculator.calculateContentConfidence(mockIndicators);
+      const CONFIDENCE_THRESHOLD = 0.7;
       return {
         indicators: mockIndicators,
         confidence: contentConfidence,
-        appearsReal: contentConfidence > 0.7,
+        appearsReal: contentConfidence > CONFIDENCE_THRESHOLD,
       };
     } catch (error) {
       // Log error but don't fail - return safe default
@@ -2055,7 +2915,7 @@ export class DataValidationService {
       // Default to trusting the data when content validation fails
       return {
         indicators: [],
-        confidence: 1.0,
+        confidence: 1,
         appearsReal: true,
       };
     }
@@ -2269,41 +3129,58 @@ export class DataValidationService {
     const ageMinutes = Math.floor(sourceValidation.dataAge / (1000 * 60));
 
     if (!sourceValidation.isRealData) {
-      return {
-        status: "unknown",
-        color: "gray",
-        message: "Mock or placeholder data detected",
-        lastUpdated: "Unknown",
-      };
+      return this.createUnknownFreshnessIndicator();
     }
 
     if (sourceValidation.isFresh && ageMinutes < 2) {
-      let lastUpdated = "Just now";
-      if (ageMinutes > 0) {
-        const plural = ageMinutes > 1 ? "s" : "";
-        lastUpdated = `${ageMinutes} minute${plural} ago`;
-      }
-
-      return {
-        status: "fresh",
-        color: "green",
-        message: "Data is up to date",
-        lastUpdated,
-      };
+      return this.createFreshIndicator(ageMinutes);
     }
 
     if (ageMinutes < 10) {
-      const plural = ageMinutes > 1 ? "s" : "";
-      return {
-        status: "stale",
-        color: "yellow",
-        message: "Data may be slightly outdated",
-        lastUpdated: `${ageMinutes} minute${plural} ago`,
-      };
+      return this.createStaleIndicator(ageMinutes);
     }
 
+    return this.createOutdatedIndicator(ageMinutes);
+  }
+
+  private createUnknownFreshnessIndicator() {
+    return {
+      status: "unknown" as const,
+      color: "gray" as const,
+      message: "Mock or placeholder data detected",
+      lastUpdated: "Unknown",
+    };
+  }
+
+  private createFreshIndicator(ageMinutes: number) {
+    let lastUpdated = "Just now";
+    if (ageMinutes > 0) {
+      const plural = ageMinutes > 1 ? "s" : "";
+      lastUpdated = `${ageMinutes} minute${plural} ago`;
+    }
+
+    return {
+      status: "fresh" as const,
+      color: "green" as const,
+      message: "Data is up to date",
+      lastUpdated,
+    };
+  }
+
+  private createStaleIndicator(ageMinutes: number) {
+    const plural = ageMinutes > 1 ? "s" : "";
+    return {
+      status: "stale" as const,
+      color: "yellow" as const,
+      message: "Data may be slightly outdated",
+      lastUpdated: `${ageMinutes} minute${plural} ago`,
+    };
+  }
+
+  private createOutdatedIndicator(ageMinutes: number) {
     const hours = Math.floor(ageMinutes / 60);
     let lastUpdated: string;
+
     if (ageMinutes > 60) {
       const hourPlural = hours > 1 ? "s" : "";
       lastUpdated = `${hours} hour${hourPlural} ago`;
@@ -2313,8 +3190,8 @@ export class DataValidationService {
     }
 
     return {
-      status: "outdated",
-      color: "red",
+      status: "outdated" as const,
+      color: "red" as const,
       message: "Data is outdated and should be refreshed",
       lastUpdated,
     };
@@ -2341,85 +3218,85 @@ export class DataValidationService {
   /**
    * Check user data for mock indicators with strict pattern matching
    * Enhanced to avoid false positives with common names and legitimate values
+   * Only flags obvious test domains and placeholder text patterns
    */
   private checkUserMockData(user: DashboardData["user"]): MockDataIndicator[] {
     const indicators: MockDataIndicator[] = [];
 
-    // Check email for test patterns (only obvious test domains)
-    // Use context-aware validation
-    if (user.email && this.isGenericValue(user.email) && !this.isExcludedValue(user.email)) {
-      // Additional check: only flag if it's truly a test email
-      if (!this.isLegitimateValueForContext(user.email, "email")) {
-        indicators.push({
-          field: "user.email",
-          type: "generic_value",
-          value: user.email,
-          confidence: 0.9,
-          reason: "Email matches common test email pattern",
-        });
-      }
-    }
+    // Only check email for obvious test domains
+    this.checkUserEmail(user, indicators);
 
-    // Check name for placeholder text (exclude common legitimate names)
-    const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
-    if (fullName && !this.isExcludedName(fullName)) {
-      // Use strict placeholder checking
-      if (this.isStrictPlaceholderText(fullName)) {
-        // Additional context check: only flag if it's truly a placeholder
-        if (!this.isLegitimateValueForContext(fullName, "name")) {
-          indicators.push({
-            field: "user.name",
-            type: "placeholder_text",
-            value: fullName,
-            confidence: 0.8,
-            reason: "Name appears to be placeholder text",
-          });
-        }
-      }
-    }
-
-    // Check individual name fields for strict placeholders
-    if (user.firstName && this.isStrictPlaceholderText(user.firstName)) {
-      if (!this.isLegitimateValueForContext(user.firstName, "name")) {
-        indicators.push({
-          field: "user.firstName",
-          type: "placeholder_text",
-          value: user.firstName,
-          confidence: 0.85,
-          reason: "First name appears to be placeholder text",
-        });
-      }
-    }
-
-    if (user.lastName && this.isStrictPlaceholderText(user.lastName)) {
-      if (!this.isLegitimateValueForContext(user.lastName, "name")) {
-        indicators.push({
-          field: "user.lastName",
-          type: "placeholder_text",
-          value: user.lastName,
-          confidence: 0.85,
-          reason: "Last name appears to be placeholder text",
-        });
-      }
-    }
+    // Do NOT check names - common names like "John Smith" are legitimate
+    // Only check if the full name is an exact placeholder match
+    this.checkUserFullName(user, indicators);
 
     return indicators;
+  }
+
+  private checkUserEmail(user: DashboardData["user"], indicators: MockDataIndicator[]): void {
+    // Only flag emails with obvious test domains
+    if (!user.email) {
+      return;
+    }
+
+    // Check if it's a legitimate email (not a test domain)
+    if (this.isLegitimateValueForContext(user.email, "email")) {
+      return;
+    }
+
+    // Only flag if it's in the generic values list (test emails)
+    if (this.isGenericValue(user.email)) {
+      indicators.push({
+        field: "user.email",
+        type: "generic_value",
+        value: user.email,
+        confidence: 0.9,
+        reason: "Email matches obvious test email pattern (example.com, test.com)",
+      });
+    }
+  }
+
+  private checkUserFullName(user: DashboardData["user"], indicators: MockDataIndicator[]): void {
+    const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+
+    // Don't check if empty
+    if (!fullName) {
+      return;
+    }
+
+    // Don't check if it's a common legitimate name
+    if (this.isExcludedName(fullName)) {
+      return;
+    }
+
+    // Only flag if it's an EXACT placeholder text match (e.g., "PLACEHOLDER", "TODO")
+    // NOT partial matches or common names
+    if (this.isStrictPlaceholderText(fullName)) {
+      indicators.push({
+        field: "user.name",
+        type: "placeholder_text",
+        value: fullName,
+        confidence: 0.8,
+        reason: "Name is exact placeholder text match",
+      });
+    }
   }
 
   /**
    * Check stats for mock data patterns
    * Enhanced to NOT flag zero values, round numbers, or common statistics
    * Only flags very specific mock data patterns
+   *
+   * IMPORTANT: Zero values are legitimate for new users
+   * Round numbers (10, 20, 50, 100) are legitimate
+   * Common small numbers (1, 2, 3, 5) are legitimate
    */
   private checkStatsMockData(stats: UserStats | ConsistentUserStats): MockDataIndicator[] {
     const indicators: MockDataIndicator[] = [];
 
-    // Zero values are completely legitimate for new users or users with no activity
-    // Round numbers (10, 20, 50, 100) are also legitimate
-    // Common small numbers (1, 2, 3, 5) are legitimate
-
     // We only flag stats if they contain obvious test patterns
     // For example, all stats being exactly 999999999 or 123456789
+    // These are clearly test values, not real user data
 
     const suspiciousTestValues = new Set([999999999, 123456789, -1]);
     const statsValues = [
@@ -2457,39 +3334,46 @@ export class DataValidationService {
    * Check array data for mock patterns
    * Enhanced to handle empty arrays as legitimate (new users, no activity)
    * Uses context-aware validation for array items
+   *
+   * IMPORTANT: Empty arrays are completely legitimate and should NEVER be flagged
+   * New users will have empty favorites, orders, downloads, etc.
    */
   private checkArrayMockData(arrayName: string, array: unknown[]): MockDataIndicator[] {
-    const indicators: MockDataIndicator[] = [];
-
-    // Empty arrays are completely legitimate and expected for:
-    // - New users with no favorites
-    // - Users with no orders yet
-    // - Users with no downloads
-    // - Users with no reservations
-    // - Users with no recent activity
-    // DO NOT flag empty arrays as mock data
+    // Empty arrays are legitimate for new users - do NOT flag
     if (array.length === 0) {
-      return indicators;
+      return [];
     }
 
-    // Check individual items for mock patterns using context-aware validation
+    return this.validateArrayItems(arrayName, array);
+  }
+
+  private validateArrayItems(arrayName: string, array: unknown[]): MockDataIndicator[] {
+    const indicators: MockDataIndicator[] = [];
+
     for (const [itemIndex, item] of array.entries()) {
       if (typeof item === "object" && item !== null) {
         const itemIndicators = this.checkObjectMockData(item as Record<string, unknown>);
-        // Only add indicators if they're high confidence
-        // This prevents false positives from legitimate data
-        for (const indicator of itemIndicators) {
-          if (indicator.confidence >= 0.7) {
-            indicators.push({
-              ...indicator,
-              field: `${arrayName}[${itemIndex}].${indicator.field}`,
-            });
-          }
-        }
+        this.addHighConfidenceIndicators(indicators, itemIndicators, arrayName, itemIndex);
       }
     }
 
     return indicators;
+  }
+
+  private addHighConfidenceIndicators(
+    indicators: MockDataIndicator[],
+    itemIndicators: MockDataIndicator[],
+    arrayName: string,
+    itemIndex: number
+  ): void {
+    for (const indicator of itemIndicators) {
+      if (indicator.confidence >= 0.7) {
+        indicators.push({
+          ...indicator,
+          field: `${arrayName}[${itemIndex}].${indicator.field}`,
+        });
+      }
+    }
   }
 
   /**
@@ -2501,55 +3385,64 @@ export class DataValidationService {
 
     for (const [key, value] of Object.entries(obj)) {
       if (typeof value === "string") {
-        // Context-aware validation: consider field name and value together
-        const context = this.getFieldContext(key);
-
-        // Use strict placeholder checking and exclude common values
-        if (!this.isExcludedValue(value) && this.isStrictPlaceholderText(value)) {
-          // Only flag if it's truly a placeholder, not a legitimate value
-          if (!this.isLegitimateValueForContext(value, context)) {
-            indicators.push({
-              field: key,
-              type: "placeholder_text",
-              value,
-              confidence: 0.8,
-              reason: `Text matches strict placeholder pattern in ${context} context`,
-            });
-          }
-        } else if (!this.isExcludedValue(value) && this.isGenericValue(value)) {
-          // Only flag generic values if they're truly suspicious in context
-          if (!this.isLegitimateValueForContext(value, context)) {
-            indicators.push({
-              field: key,
-              type: "generic_value",
-              value,
-              confidence: 0.7,
-              reason: `Value matches common test data pattern in ${context} context`,
-            });
-          }
-        }
+        this.validateStringField(key, value, indicators);
       } else if (typeof value === "number") {
-        // Context-aware number validation
-        const context = this.getFieldContext(key);
-
-        // Don't flag common numbers, zero values, or round numbers
-        // Only flag if it's a very specific test value AND not excluded
-        if (!this.isExcludedNumber(value) && this.isGenericValue(value)) {
-          // Additional check: only flag if it's truly suspicious in context
-          if (!this.isLegitimateNumberForContext(value, context)) {
-            indicators.push({
-              field: key,
-              type: "generic_value",
-              value,
-              confidence: 0.5,
-              reason: `Number appears to be a common test value in ${context} context`,
-            });
-          }
-        }
+        this.validateNumberField(key, value, indicators);
       }
     }
 
     return indicators;
+  }
+
+  private validateStringField(key: string, value: string, indicators: MockDataIndicator[]): void {
+    if (this.isExcludedValue(value)) {
+      return;
+    }
+
+    const context = this.getFieldContext(key);
+
+    if (this.isStrictPlaceholderText(value) && !this.isLegitimateValueForContext(value, context)) {
+      indicators.push({
+        field: key,
+        type: "placeholder_text",
+        value,
+        confidence: 0.8,
+        reason: `Text matches strict placeholder pattern in ${context} context`,
+      });
+    } else if (this.isGenericValue(value) && !this.isLegitimateValueForContext(value, context)) {
+      indicators.push({
+        field: key,
+        type: "generic_value",
+        value,
+        confidence: 0.7,
+        reason: `Value matches common test data pattern in ${context} context`,
+      });
+    }
+  }
+
+  private validateNumberField(key: string, value: number, indicators: MockDataIndicator[]): void {
+    // Don't flag if it's an excluded number (0, 1, 2, 3, 5, 10, 20, 50, 100, etc.)
+    if (this.isExcludedNumber(value)) {
+      return;
+    }
+
+    // Don't flag if it's not in the generic values list
+    if (!this.isGenericValue(value)) {
+      return;
+    }
+
+    const context = this.getFieldContext(key);
+
+    // Check if it's legitimate for the context
+    if (!this.isLegitimateNumberForContext(value, context)) {
+      indicators.push({
+        field: key,
+        type: "generic_value",
+        value,
+        confidence: 0.5,
+        reason: `Number appears to be a common test value in ${context} context`,
+      });
+    }
   }
 
   /**
@@ -2601,59 +3494,67 @@ export class DataValidationService {
   /**
    * Check if a string value is legitimate for its context
    * Prevents false positives by considering what values are normal for each field type
+   *
+   * IMPORTANT: Common names like "John Smith" are legitimate and should NOT be flagged
    */
   private isLegitimateValueForContext(value: string, context: string): boolean {
-    // Empty strings are legitimate
     if (!value || value.trim() === "") {
       return true;
     }
 
-    switch (context) {
-      case "name": {
-        // Common names are legitimate, even if they seem generic
-        // Only flag obvious placeholders
-        const placeholderPattern = /^(test|placeholder|example|sample|mock|dummy|fake)\s*\d*$/i;
-        return !placeholderPattern.test(value);
-      }
-
-      case "email": {
-        // Only flag obvious test domains
-        const testDomains = ["example.com", "test.com", "example.org", "test.org"];
-        return !testDomains.some(domain => value.toLowerCase().endsWith(`@${domain}`));
-      }
-
-      case "id":
-        // IDs can be any format, don't flag based on content
-        return true;
-
-      case "text":
-        // Text fields can contain anything, only flag exact placeholder matches
-        return true;
-
-      case "date":
-        // Dates are legitimate regardless of value
-        return true;
-
-      default:
-        // For unknown contexts, be conservative and allow the value
-        return true;
+    if (context === "name") {
+      return this.isLegitimateNameValue(value);
     }
+
+    if (context === "email") {
+      return this.isLegitimateEmailValue(value);
+    }
+
+    // IDs, text, dates, and unknown contexts are always legitimate
+    return true;
+  }
+
+  /**
+   * Check if a name value is legitimate
+   * Only flags obvious placeholder patterns like "test123", "placeholder_456"
+   * Does NOT flag common real names
+   */
+  private isLegitimateNameValue(value: string): boolean {
+    // Pattern for obvious test names with numbers: test123, placeholder_456, etc.
+    const placeholderPattern = /^(test|placeholder|example|sample|mock|dummy|fake)(_|\s)?\d+$/i;
+    return !placeholderPattern.test(value);
+  }
+
+  /**
+   * Check if an email value is legitimate
+   * Only flags obvious test domains: example.com, test.com, etc.
+   * Does NOT flag real email providers
+   */
+  private isLegitimateEmailValue(value: string): boolean {
+    const testDomains = ["example.com", "test.com", "example.org", "test.org"];
+    return !testDomains.some(domain => value.toLowerCase().endsWith(`@${domain}`));
   }
 
   /**
    * Check if a number value is legitimate for its context
    * Prevents false positives by considering what numbers are normal for each field type
+   *
+   * IMPORTANT: Zero values are legitimate for new users
+   * Round numbers (10, 20, 50, 100) are legitimate
+   * Common small numbers (1, 2, 3, 5) are legitimate
    */
   private isLegitimateNumberForContext(value: number, context: string): boolean {
     switch (context) {
       case "count":
         // Zero and small numbers are completely legitimate for counts
         // New users will have zero counts
+        // Round numbers are normal (10, 20, 50, 100)
         return true;
 
       case "price":
         // Common price points are legitimate (0, 10, 20, 50, 100, etc.)
         // Round numbers are normal for prices
+        // Zero is legitimate for free items
         return true;
 
       case "id":
@@ -2662,8 +3563,8 @@ export class DataValidationService {
 
       default:
         // For unknown contexts, be conservative
-        // Only flag very specific test values like 999999999
-        return value !== 999999999 && value !== 123456789;
+        // Only flag very specific test values like 999999999 or 123456789
+        return value !== 999999999 && value !== 123456789 && value !== -1;
     }
   }
 
@@ -2729,54 +3630,78 @@ export class DataValidationService {
       const warnings: FreshnessWarning[] = [];
       const now = Date.now();
 
-      // Check stats freshness
-      const consistentStats = data.stats as ConsistentUserStats;
-      if (consistentStats.calculatedAt) {
-        const statsAge = now - new Date(consistentStats.calculatedAt).getTime();
-        if (statsAge > this.config.freshnessThresholds.stats) {
-          warnings.push({
-            field: "stats",
-            type: "stale_data",
-            age: statsAge,
-            maxAge: this.config.freshnessThresholds.stats,
-            severity: statsAge > this.config.freshnessThresholds.stats * 2 ? "high" : "medium",
-          });
-        }
-      }
-
-      // Check activity freshness
-      if (data.activity.length > 0) {
-        const latestActivity = data.activity[0];
-        if (latestActivity.timestamp) {
-          const activityAge = now - new Date(latestActivity.timestamp).getTime();
-          if (activityAge > this.config.freshnessThresholds.activity) {
-            warnings.push({
-              field: "activity",
-              type: "stale_data",
-              age: activityAge,
-              maxAge: this.config.freshnessThresholds.activity,
-              severity:
-                activityAge > this.config.freshnessThresholds.activity * 3 ? "critical" : "medium",
-            });
-          }
-        }
-      }
+      this.checkStatsFreshness(data, now, warnings);
+      this.checkActivityFreshness(data, now, warnings);
 
       return warnings;
     } catch (error) {
-      // Log error but don't fail - return empty warnings
-      if (this.behaviorConfig.enableDetailedLogging) {
-        this.logger.logSystemEvent(
-          `Data freshness check failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-          "warn",
-          {
-            component: "DataValidationService",
-            action: "checkDataFreshness",
-          }
-        );
-      }
+      this.logFreshnessCheckError(error);
       return [];
     }
+  }
+
+  private checkStatsFreshness(
+    data: DashboardData,
+    now: number,
+    warnings: FreshnessWarning[]
+  ): void {
+    const consistentStats = data.stats as ConsistentUserStats;
+    if (!consistentStats.calculatedAt) {
+      return;
+    }
+
+    const statsAge = now - new Date(consistentStats.calculatedAt).getTime();
+    if (statsAge > this.config.freshnessThresholds.stats) {
+      warnings.push({
+        field: "stats",
+        type: "stale_data",
+        age: statsAge,
+        maxAge: this.config.freshnessThresholds.stats,
+        severity: statsAge > this.config.freshnessThresholds.stats * 2 ? "high" : "medium",
+      });
+    }
+  }
+
+  private checkActivityFreshness(
+    data: DashboardData,
+    now: number,
+    warnings: FreshnessWarning[]
+  ): void {
+    if (data.activity.length === 0) {
+      return;
+    }
+
+    const latestActivity = data.activity[0];
+    if (!latestActivity.timestamp) {
+      return;
+    }
+
+    const activityAge = now - new Date(latestActivity.timestamp).getTime();
+    if (activityAge > this.config.freshnessThresholds.activity) {
+      warnings.push({
+        field: "activity",
+        type: "stale_data",
+        age: activityAge,
+        maxAge: this.config.freshnessThresholds.activity,
+        severity:
+          activityAge > this.config.freshnessThresholds.activity * 3 ? "critical" : "medium",
+      });
+    }
+  }
+
+  private logFreshnessCheckError(error: unknown): void {
+    if (!this.behaviorConfig.enableDetailedLogging) {
+      return;
+    }
+
+    this.logger.logSystemEvent(
+      `Data freshness check failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      "warn",
+      {
+        component: "DataValidationService",
+        action: "checkDataFreshness",
+      }
+    );
   }
 
   private determineDataSource(
@@ -3184,16 +4109,87 @@ export class DataValidationService {
     return `integrity_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   }
 
+  /**
+   * Generate cache key that includes source validation metadata
+   * Enhanced to include source type and authentication status for better cache granularity
+   */
   private generateCacheKey(data: DashboardData): string {
-    return generateDataHash(data);
+    const baseHash = generateDataHash(data);
+
+    // Include source metadata in cache key
+    const stats = data.stats as ConsistentUserStats;
+    const sourceType = stats.source || "unknown";
+
+    // Include ID count for better cache differentiation
+    const idCount = this.countDataIds(data);
+
+    // Include timestamp count
+    const timestampCount = this.sourceValidator.countTimestamps(data);
+
+    // Combine into cache key
+    return `${baseHash}_${sourceType}_${idCount}_${timestampCount}`;
   }
 
-  private cleanupValidationCache(): void {
-    const cutoffTime = Date.now() - 5 * 60 * 1000; // 5 minutes
+  /**
+   * Count total IDs in dashboard data for cache key generation
+   */
+  private countDataIds(data: DashboardData): number {
+    let count = 0;
+
+    if (data.user.id) count++;
+    count += data.favorites.filter(f => f.id).length;
+    count += data.orders.filter(o => o.id).length;
+    count += data.downloads.filter(d => d.id).length;
+    count += data.reservations.filter(r => r.id).length;
+    count += data.activity.filter(a => a.id).length;
+
+    return count;
+  }
+
+  /**
+   * Get cache TTL based on validation confidence
+   * Higher confidence = longer cache duration
+   * Lower confidence = shorter cache duration for more frequent revalidation
+   */
+  private getCacheTTL(confidence: number): number {
+    // Base TTL values in milliseconds
+    const HIGH_CONFIDENCE_TTL = 5 * 60 * 1000; // 5 minutes
+    const MEDIUM_CONFIDENCE_TTL = 2 * 60 * 1000; // 2 minutes
+    const LOW_CONFIDENCE_TTL = 30 * 1000; // 30 seconds
+    const UNCERTAIN_TTL = 10 * 1000; // 10 seconds
+
+    if (confidence >= 0.9) {
+      return HIGH_CONFIDENCE_TTL;
+    } else if (confidence >= 0.7) {
+      return MEDIUM_CONFIDENCE_TTL;
+    } else if (confidence >= 0.5) {
+      return LOW_CONFIDENCE_TTL;
+    } else {
+      return UNCERTAIN_TTL;
+    }
+  }
+
+  /**
+   * Check if cached report is still valid based on confidence-adjusted TTL
+   */
+  private isCacheValid(report: DataIntegrityReport): boolean {
+    const confidence = report.sourceValidation.isRealData ? 0.9 : 0.5;
+    const ttl = this.getCacheTTL(confidence);
+    const age = Date.now() - report.generatedAt;
+
+    return age < ttl;
+  }
+
+  /**
+   * Invalidate cache entries when data source changes
+   * This ensures fresh validation when data is updated
+   */
+  public invalidateCacheForSource(sourceType: "database" | "cache" | "unknown"): void {
     const keysToDelete: string[] = [];
 
     for (const [key, report] of this.validationCache.entries()) {
-      if (report.generatedAt < cutoffTime) {
+      // Invalidate if source matches
+      if (report.sourceValidation.source === sourceType) {
         keysToDelete.push(key);
       }
     }
@@ -3201,6 +4197,95 @@ export class DataValidationService {
     for (const key of keysToDelete) {
       this.validationCache.delete(key);
     }
+
+    if (this.behaviorConfig.enableDetailedLogging && keysToDelete.length > 0) {
+      this.logger.logSystemEvent(
+        `Invalidated ${keysToDelete.length} cache entries for source: ${sourceType}`,
+        "info",
+        { component: "DataValidationService" }
+      );
+    }
+  }
+
+  /**
+   * Invalidate all cache entries (force revalidation)
+   */
+  public invalidateAllCache(): void {
+    const count = this.validationCache.size;
+    this.validationCache.clear();
+
+    if (this.behaviorConfig.enableDetailedLogging && count > 0) {
+      this.logger.logSystemEvent(`Cleared all ${count} validation cache entries`, "info", {
+        component: "DataValidationService",
+      });
+    }
+  }
+
+  /**
+   * Cleanup old validation cache entries
+   * Enhanced to use confidence-based TTL and remove stale entries more aggressively
+   */
+  private cleanupValidationCache(): void {
+    const keysToDelete: string[] = [];
+    const now = Date.now();
+
+    for (const [key, report] of this.validationCache.entries()) {
+      // Use confidence-based TTL for cleanup
+      if (!this.isCacheValid(report)) {
+        keysToDelete.push(key);
+      }
+    }
+
+    // Also remove entries older than absolute maximum age (10 minutes)
+    const absoluteMaxAge = 10 * 60 * 1000;
+    for (const [key, report] of this.validationCache.entries()) {
+      if (now - report.generatedAt > absoluteMaxAge) {
+        if (!keysToDelete.includes(key)) {
+          keysToDelete.push(key);
+        }
+      }
+    }
+
+    for (const key of keysToDelete) {
+      this.validationCache.delete(key);
+    }
+
+    // Log cleanup in development mode
+    if (this.behaviorConfig.enableDetailedLogging && keysToDelete.length > 0) {
+      this.logger.logSystemEvent(
+        `Cleaned up ${keysToDelete.length} stale validation cache entries (remaining: ${this.validationCache.size})`,
+        "info",
+        { component: "DataValidationService" }
+      );
+    }
+  }
+
+  /**
+   * Get cache statistics for monitoring
+   */
+  public getCacheStats(): {
+    size: number;
+    entries: Array<{
+      key: string;
+      age: number;
+      confidence: number;
+      source: string;
+      isValid: boolean;
+    }>;
+  } {
+    const now = Date.now();
+    const entries = Array.from(this.validationCache.entries()).map(([key, report]) => ({
+      key,
+      age: now - report.generatedAt,
+      confidence: report.sourceValidation.isRealData ? 0.9 : 0.5,
+      source: report.sourceValidation.source,
+      isValid: this.isCacheValid(report),
+    }));
+
+    return {
+      size: this.validationCache.size,
+      entries,
+    };
   }
 
   /**

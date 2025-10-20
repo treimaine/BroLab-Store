@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePerformanceAlerts, useSyncMetrics, useSyncMonitoring } from "@/hooks/useSyncMonitoring";
 import { SyncErrorType } from "@/services";
-import { useDashboardStore } from "@/store/useDashboardStore";
+import { useDashboardStore } from "@/stores/useDashboardStore";
 import { AlertTriangle, BarChart3, Bug, CheckCircle, Play, Settings } from "lucide-react";
 import React, { useState } from "react";
 

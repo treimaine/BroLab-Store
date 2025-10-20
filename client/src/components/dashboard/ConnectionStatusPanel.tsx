@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useConnectionManager, useConnectionMetrics } from "@/hooks/useConnectionManager";
 import { cn } from "@/lib/utils";
-import { useSyncStatus } from "@/store/useDashboardStore";
+import { useSyncStatus } from "@/stores/useDashboardStore";
 import {
   Activity,
   AlertCircle,
