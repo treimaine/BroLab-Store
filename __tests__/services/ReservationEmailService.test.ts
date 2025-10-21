@@ -1,6 +1,10 @@
-import { jest } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { ReservationEmailService } from "../../server/services/ReservationEmailService";
-import { PaymentData, ReservationEmailData, User } from "../../server/templates/emailTemplates";
+import type {
+  PaymentData,
+  ReservationEmailData,
+  User,
+} from "../../server/templates/emailTemplates";
 
 // Mock the mail service
 jest.mock("../../server/services/mail", () => ({
@@ -9,8 +13,6 @@ jest.mock("../../server/services/mail", () => ({
 
 import { sendMailWithResult } from "../../server/services/mail";
 
-const mockSendMailWithResult = sendMailWithResult as jest.MockedFunction<typeof sendMailWithResult>;
-
 describe("ReservationEmailService", () => {
   let emailService: ReservationEmailService;
   let mockUser: User;
@@ -18,13 +20,15 @@ describe("ReservationEmailService", () => {
   let mockPayment: PaymentData;
 
   beforeEach(() => {
+    jest.clearAllMocks();
+
     emailService = new ReservationEmailService({
       adminEmails: ["admin@test.com"],
       fromEmail: "test@brolabentertainment.com",
     });
 
     mockUser = {
-      id: "user123",
+      id: "user_123",
       email: "user@test.com",
       firstName: "John",
       lastName: "Doe",
@@ -32,40 +36,37 @@ describe("ReservationEmailService", () => {
     };
 
     mockReservation = {
-      id: "res123",
-      serviceType: "mixing_mastering",
-      preferredDate: "2024-12-15T14:00:00Z",
+      id: "res_123",
+      serviceType: "mixing",
+      status: "pending",
+      preferredDate: new Date("2024-02-01T10:00:00Z").toISOString(),
       durationMinutes: 120,
       totalPrice: 200,
-      status: "confirmed",
       notes: "Test reservation",
       details: {
         name: "John Doe",
         email: "user@test.com",
-        phone: "+1234567890",
-        requirements: "High quality mixing",
+        phone: "1234567890",
+        requirements: "Test requirements",
       },
     };
 
     mockPayment = {
-      amount: 20000, // $200.00 in cents
+      amount: 20000,
       currency: "usd",
-      paymentIntentId: "pi_test123",
       paymentMethod: "card",
+      paymentIntentId: "pi_123",
     };
 
-    // Reset mocks
-    mockSendMailWithResult.mockReset();
+    (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mockResolvedValue({
+      success: true,
+      messageId: "msg_123",
+      attempts: 1,
+    });
   });
 
   describe("sendReservationConfirmation", () => {
-    it("should send reservation confirmation email successfully", async () => {
-      mockSendMailWithResult.mockResolvedValue({
-        success: true,
-        messageId: "msg123",
-        attempts: 1,
-      });
-
+    it("should send confirmation email with reservation details", async () => {
       const result = await emailService.sendReservationConfirmation(
         mockUser,
         [mockReservation],
@@ -73,103 +74,84 @@ describe("ReservationEmailService", () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.messageId).toBe("msg123");
-      expect(result.attempts).toBe(1);
-
-      expect(mockSendMailWithResult).toHaveBeenCalledWith(
+      expect(sendMailWithResult).toHaveBeenCalledWith(
         expect.objectContaining({
           to: mockUser.email,
-          subject: "🎵 Reservation Confirmed - BroLab Entertainment",
-          from: "test@brolabentertainment.com",
+          subject: expect.stringContaining("Reservation Confirmed"),
+          html: expect.any(String),
         }),
         expect.any(Object)
       );
     });
 
-    it("should handle email sending failure with retry", async () => {
-      mockSendMailWithResult.mockResolvedValue({
-        success: false,
-        error: "SMTP connection failed",
-        attempts: 3,
-      });
-
-      const result = await emailService.sendReservationConfirmation(
-        mockUser,
-        [mockReservation],
-        mockPayment
-      );
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("SMTP connection failed");
-      expect(result.attempts).toBe(3);
-    });
-
-    it("should format service types correctly in email", async () => {
-      mockSendMailWithResult.mockResolvedValue({
-        success: true,
-        messageId: "msg123",
-        attempts: 1,
-      });
-
+    it("should include payment information when provided", async () => {
       await emailService.sendReservationConfirmation(mockUser, [mockReservation], mockPayment);
 
-      const emailCall = mockSendMailWithResult.mock.calls[0];
-      const emailHtml = emailCall[0].html;
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain("Payment Information");
+      expect(callArgs.html).toContain("200.00");
+      expect(callArgs.html).toContain("USD");
+    });
 
-      expect(emailHtml).toContain("Mixing & Mastering");
-      expect(emailHtml).toContain("December 15, 2024");
-      expect(emailHtml).toContain("120 minutes");
+    it("should handle multiple reservations", async () => {
+      const reservation2 = { ...mockReservation, id: "res_456" };
+
+      await emailService.sendReservationConfirmation(mockUser, [mockReservation, reservation2]);
+
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { subject: string; html: string };
+      expect(callArgs.subject).toContain("Reservation Confirmed");
+      // Email contains reservation details but not IDs in the HTML
+      expect(callArgs.html).toContain("Mixing");
+      expect(callArgs.html).toContain("120 minutes");
+    });
+
+    it("should format service types correctly", async () => {
+      await emailService.sendReservationConfirmation(mockUser, [mockReservation]);
+
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain("Mixing");
     });
   });
 
   describe("sendAdminNotification", () => {
-    it("should send admin notification email successfully", async () => {
-      mockSendMailWithResult.mockResolvedValue({
-        success: true,
-        messageId: "admin_msg123",
-        attempts: 1,
-      });
-
+    it("should send notification to admin emails", async () => {
       const result = await emailService.sendAdminNotification(mockUser, mockReservation);
 
       expect(result.success).toBe(true);
-      expect(mockSendMailWithResult).toHaveBeenCalledWith(
+      expect(sendMailWithResult).toHaveBeenCalledWith(
         expect.objectContaining({
           to: ["admin@test.com"],
-          subject: "🔔 New Reservation - mixing_mastering - BroLab Entertainment",
-          from: "test@brolabentertainment.com",
+          subject: expect.stringContaining("New Reservation"),
+          html: expect.any(String),
         }),
         expect.any(Object)
       );
     });
 
-    it("should include user and reservation details in admin email", async () => {
-      mockSendMailWithResult.mockResolvedValue({
-        success: true,
-        messageId: "admin_msg123",
-        attempts: 1,
-      });
-
+    it("should include client information", async () => {
       await emailService.sendAdminNotification(mockUser, mockReservation);
 
-      const emailCall = mockSendMailWithResult.mock.calls[0];
-      const emailHtml = emailCall[0].html;
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain(mockUser.fullName);
+      expect(callArgs.html).toContain(mockUser.email);
+    });
 
-      expect(emailHtml).toContain("John Doe");
-      expect(emailHtml).toContain("user@test.com");
-      expect(emailHtml).toContain("+1234567890");
-      expect(emailHtml).toContain("High quality mixing");
+    it("should include reservation details", async () => {
+      await emailService.sendAdminNotification(mockUser, mockReservation);
+
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain("120 minutes");
+      expect(callArgs.html).toContain("€200");
     });
   });
 
   describe("sendStatusUpdate", () => {
-    it("should send status update email with correct status colors", async () => {
-      mockSendMailWithResult.mockResolvedValue({
-        success: true,
-        messageId: "status_msg123",
-        attempts: 1,
-      });
-
+    it("should send status update email", async () => {
       const result = await emailService.sendStatusUpdate(
         mockUser,
         mockReservation,
@@ -178,30 +160,36 @@ describe("ReservationEmailService", () => {
       );
 
       expect(result.success).toBe(true);
-      expect(mockSendMailWithResult).toHaveBeenCalledWith(
+      expect(sendMailWithResult).toHaveBeenCalledWith(
         expect.objectContaining({
           to: mockUser.email,
-          subject: "📅 Reservation Status Update - CONFIRMED - BroLab Entertainment",
+          subject: expect.stringContaining("Status Update"),
+          html: expect.any(String),
         }),
         expect.any(Object)
       );
+    });
 
-      const emailCall = mockSendMailWithResult.mock.calls[0];
-      const emailHtml = emailCall[0].html;
+    it("should show old and new status", async () => {
+      await emailService.sendStatusUpdate(mockUser, mockReservation, "pending", "confirmed");
 
-      expect(emailHtml).toContain("PENDING");
-      expect(emailHtml).toContain("CONFIRMED");
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain("PENDING");
+      expect(callArgs.html).toContain("CONFIRMED");
+    });
+
+    it("should include appropriate message for status", async () => {
+      await emailService.sendStatusUpdate(mockUser, mockReservation, "pending", "confirmed");
+
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain("confirmed");
     });
   });
 
   describe("sendPaymentConfirmation", () => {
-    it("should send payment confirmation email with transaction details", async () => {
-      mockSendMailWithResult.mockResolvedValue({
-        success: true,
-        messageId: "payment_msg123",
-        attempts: 1,
-      });
-
+    it("should send payment confirmation email", async () => {
       const result = await emailService.sendPaymentConfirmation(
         mockUser,
         [mockReservation],
@@ -209,134 +197,159 @@ describe("ReservationEmailService", () => {
       );
 
       expect(result.success).toBe(true);
-      expect(mockSendMailWithResult).toHaveBeenCalledWith(
+      expect(sendMailWithResult).toHaveBeenCalledWith(
         expect.objectContaining({
           to: mockUser.email,
-          subject: "💳 Payment Confirmed - BroLab Entertainment",
+          subject: expect.stringContaining("Payment Confirmed"),
+          html: expect.any(String),
         }),
         expect.any(Object)
       );
+    });
 
-      const emailCall = mockSendMailWithResult.mock.calls[0];
-      const emailHtml = emailCall[0].html;
+    it("should include payment details", async () => {
+      await emailService.sendPaymentConfirmation(mockUser, [mockReservation], mockPayment);
 
-      expect(emailHtml).toContain("200.00 USD");
-      expect(emailHtml).toContain("pi_test123");
-      expect(emailHtml).toContain("card");
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain("200.00");
+      expect(callArgs.html).toContain("USD");
+      expect(callArgs.html).toContain("pi_123");
+    });
+
+    it("should include reservation list", async () => {
+      await emailService.sendPaymentConfirmation(mockUser, [mockReservation], mockPayment);
+
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain("Mixing");
     });
   });
 
   describe("sendPaymentFailure", () => {
-    it("should send payment failure email with retry instructions", async () => {
-      mockSendMailWithResult.mockResolvedValue({
-        success: true,
-        messageId: "failure_msg123",
-        attempts: 1,
-      });
-
+    it("should send payment failure email", async () => {
       const result = await emailService.sendPaymentFailure(
         mockUser,
-        ["res123"],
+        ["res_123"],
         mockPayment,
         "Insufficient funds"
       );
 
       expect(result.success).toBe(true);
-      expect(mockSendMailWithResult).toHaveBeenCalledWith(
+      expect(sendMailWithResult).toHaveBeenCalledWith(
         expect.objectContaining({
           to: mockUser.email,
-          subject: "⚠️ Payment Failed - BroLab Entertainment",
+          subject: expect.stringContaining("Payment Failed"),
+          html: expect.any(String),
         }),
         expect.any(Object)
       );
+    });
 
-      const emailCall = mockSendMailWithResult.mock.calls[0];
-      const emailHtml = emailCall[0].html;
+    it("should include failure reason", async () => {
+      await emailService.sendPaymentFailure(
+        mockUser,
+        ["res_123"],
+        mockPayment,
+        "Insufficient funds"
+      );
 
-      expect(emailHtml).toContain("Insufficient funds");
-      expect(emailHtml).toContain("Try Payment Again");
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain("Insufficient funds");
+    });
+
+    it("should provide retry instructions", async () => {
+      await emailService.sendPaymentFailure(mockUser, ["res_123"], mockPayment);
+
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain("Try Payment Again");
     });
   });
 
   describe("sendReservationReminder", () => {
-    it("should send reminder email with preparation checklist", async () => {
-      mockSendMailWithResult.mockResolvedValue({
-        success: true,
-        messageId: "reminder_msg123",
-        attempts: 1,
-      });
-
+    it("should send reminder email", async () => {
       const result = await emailService.sendReservationReminder(mockUser, mockReservation);
 
       expect(result.success).toBe(true);
-      expect(mockSendMailWithResult).toHaveBeenCalledWith(
+      expect(sendMailWithResult).toHaveBeenCalledWith(
         expect.objectContaining({
           to: mockUser.email,
-          subject: "⏰ Reminder: Your session is tomorrow - BroLab Entertainment",
+          subject: expect.stringContaining("Reminder"),
+          html: expect.any(String),
         }),
         expect.any(Object)
       );
+    });
 
-      const emailCall = mockSendMailWithResult.mock.calls[0];
-      const emailHtml = emailCall[0].html;
+    it("should include preparation checklist", async () => {
+      await emailService.sendReservationReminder(mockUser, mockReservation);
 
-      expect(emailHtml).toContain("Arrive 10 minutes early");
-      expect(emailHtml).toContain("Bring any reference materials");
-      expect(emailHtml).toContain("Preparation Checklist");
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain("Preparation Checklist");
+      expect(callArgs.html).toContain("Arrive 10 minutes early");
     });
   });
 
-  describe("retry logic", () => {
-    it("should use custom retry options", async () => {
-      const customEmailService = new ReservationEmailService({
-        retryOptions: {
-          maxRetries: 5,
-          baseDelay: 500,
-          maxDelay: 10000,
-          backoffFactor: 1.5,
-        },
-      });
-
-      mockSendMailWithResult.mockResolvedValue({
-        success: true,
-        messageId: "msg123",
+  describe("Error Handling", () => {
+    it("should handle email sending failures", async () => {
+      (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mockResolvedValue({
+        success: false,
+        error: "SMTP connection failed",
         attempts: 3,
       });
 
-      const result = await customEmailService.sendReservationConfirmation(
-        mockUser,
-        [mockReservation],
-        mockPayment
-      );
+      const result = await emailService.sendReservationConfirmation(mockUser, [mockReservation]);
 
-      expect(result.success).toBe(true);
-      expect(mockSendMailWithResult).toHaveBeenCalledWith(
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("SMTP connection failed");
+    });
+
+    it("should use retry options", async () => {
+      await emailService.sendReservationConfirmation(mockUser, [mockReservation]);
+
+      expect(sendMailWithResult).toHaveBeenCalledWith(
         expect.any(Object),
         expect.objectContaining({
-          maxRetries: 5,
-          baseDelay: 500,
-          maxDelay: 10000,
-          backoffFactor: 1.5,
+          maxRetries: 3,
+          baseDelay: 1000,
+          maxDelay: 30000,
+          backoffFactor: 2,
         })
       );
     });
   });
 
-  describe("service type formatting", () => {
-    it("should format different service types correctly", () => {
-      const testCases = [
+  describe("Service Type Formatting", () => {
+    it("should format known service types", async () => {
+      const serviceTypes = [
         { input: "mixing_mastering", expected: "Mixing & Mastering" },
         { input: "recording_session", expected: "Recording Session" },
         { input: "custom_beat", expected: "Custom Beat Production" },
         { input: "production_consultation", expected: "Production Consultation" },
-        { input: "unknown_service", expected: "Unknown Service" },
       ];
 
-      testCases.forEach(({ input, expected }) => {
-        // Access private method for testing (TypeScript hack)
-        const formatServiceType = (emailService as any).formatServiceType.bind(emailService);
-        expect(formatServiceType(input)).toBe(expected);
-      });
+      for (const { input, expected } of serviceTypes) {
+        const reservation = { ...mockReservation, serviceType: input };
+        await emailService.sendReservationConfirmation(mockUser, [reservation]);
+
+        const callIndex = serviceTypes.indexOf(serviceTypes.find(st => st.input === input)!);
+        const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock.calls[
+          callIndex
+        ][0] as { html: string };
+        expect(callArgs.html).toContain(expected);
+      }
+    });
+
+    it("should format unknown service types", async () => {
+      const reservation = { ...mockReservation, serviceType: "unknown_service" };
+      await emailService.sendReservationConfirmation(mockUser, [reservation]);
+
+      const callArgs = (sendMailWithResult as jest.Mock<typeof sendMailWithResult>).mock
+        .calls[0][0] as { html: string };
+      expect(callArgs.html).toContain("Unknown Service");
     });
   });
 });

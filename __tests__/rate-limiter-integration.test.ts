@@ -113,7 +113,7 @@ describe("RateLimiter Integration Tests", () => {
 
     it("should create rate limit config with custom options", () => {
       const onLimitReached = jest.fn();
-      const keyGenerator = (_id: string) => `custom:${id}`;
+      const keyGenerator = (_id: string) => `custom:${_id}`;
 
       const config = RateLimiterImpl.createConfig(60000, 100, {
         skipSuccessfulRequests: true,

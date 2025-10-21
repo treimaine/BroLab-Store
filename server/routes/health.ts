@@ -1,5 +1,4 @@
 import express from "express";
-import { Router } from "express";
 
 const router = express.Router();
 
@@ -11,8 +10,8 @@ router.get("/", (req, res) => {
     status: "OK",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODEENV || "development",
-    version: process.env.npmpackage_version || "1.0.0",
+    environment: process.env.NODE_ENV || "development",
+    version: process.env.npm_package_version || "1.0.0",
     services: {
       database: "connected", // Would check actual DB connection
       convex: "connected",
@@ -46,7 +45,7 @@ router.get("/detailed", (req, res) => {
     memory: process.memoryUsage(),
     cpu: process.cpuUsage(),
     environment: {
-      nodeEnv: process.env.NODEENV,
+      nodeEnv: process.env.NODE_ENV,
       port: process.env.PORT,
       hasConvexUrl: !!process.env.VITE_CONVEX_URL,
       hasStripeKey: !!process.env.STRIPE_SECRET_KEY,
@@ -61,7 +60,7 @@ router.get("/detailed", (req, res) => {
         status: process.env.STRIPE_SECRET_KEY ? "configured" : "notconfigured",
       },
       clerk: {
-        status: process.env.CLERKSECRET_KEY ? "configured" : "notconfigured",
+        status: process.env.CLERK_SECRET_KEY ? "configured" : "notconfigured",
       },
     },
   };
