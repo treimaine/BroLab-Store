@@ -30,53 +30,70 @@ export function createChartLazyComponent<T extends ComponentType<Record<string, 
     if (retryWithBackoff) {
       return importFn().catch(error => {
         console.warn("Failed to load chart component, retrying with backoff...", error);
-
-        // Exponential backoff retry
-        return new Promise<{ default: T }>((resolve, reject) => {
-          const retryDelays = [1000, 2000, 4000]; // 1s, 2s, 4s
-          let retryCount = 0;
-
-          const attemptRetry = () => {
-            if (retryCount >= retryDelays.length) {
-              reject(new Error("Failed to load chart component after multiple retries"));
-              return;
-            }
-
-            setTimeout(() => {
-              importFn()
-                .then(resolve)
-                .catch(() => {
-                  retryCount++;
-                  attemptRetry();
-                });
-            }, retryDelays[retryCount]);
-          };
-
-          attemptRetry();
-        });
+        return retryImportWithBackoff(importFn);
       });
     }
     return importFn();
   });
 
   // Setup hover preloading for chart components
-  if (preloadOnHover && typeof window !== "undefined") {
-    const preloadOnChartHover = () => {
-      importFn().catch(() => {
-        // Silently fail preloading
-      });
-    };
-
-    // Add event listeners for chart containers
-    setTimeout(() => {
-      const chartContainers = document.querySelectorAll("[data-chart-container]");
-      chartContainers.forEach(container => {
-        container.addEventListener("mouseenter", preloadOnChartHover, { once: true });
-      });
-    }, 1000);
+  if (preloadOnHover && globalThis.window !== undefined) {
+    setupHoverPreloading(importFn);
   }
 
   return LazyChartComponent;
+}
+
+/**
+ * Retry import with exponential backoff
+ */
+function retryImportWithBackoff<T>(
+  importFn: () => Promise<{ default: T }>
+): Promise<{ default: T }> {
+  const retryDelays = [1000, 2000, 4000]; // 1s, 2s, 4s
+
+  return new Promise<{ default: T }>((resolve, reject) => {
+    let retryCount = 0;
+
+    const attemptRetry = (): void => {
+      if (retryCount >= retryDelays.length) {
+        reject(new Error("Failed to load chart component after multiple retries"));
+        return;
+      }
+
+      const currentDelay = retryDelays[retryCount];
+      retryCount++;
+
+      setTimeout(() => {
+        importFn().then(resolve).catch(attemptRetry);
+      }, currentDelay);
+    };
+
+    attemptRetry();
+  });
+}
+
+/**
+ * Setup hover preloading for chart containers
+ */
+function setupHoverPreloading<T>(importFn: () => Promise<{ default: T }>): void {
+  if (globalThis.document === undefined) {
+    return;
+  }
+
+  const preloadOnChartHover = () => {
+    importFn().catch(() => {
+      // Silently fail preloading
+    });
+  };
+
+  // Add event listeners for chart containers
+  setTimeout(() => {
+    const chartContainers = document.querySelectorAll("[data-chart-container]");
+    for (const container of chartContainers) {
+      container.addEventListener("mouseenter", preloadOnChartHover, { once: true });
+    }
+  }, 1000);
 }
 
 /**
@@ -94,14 +111,14 @@ export function preloadChartLibraries() {
     });
 
     // Remove listeners after first interaction
-    events.forEach(event => {
+    for (const event of events) {
       document.removeEventListener(event, preload);
-    });
+    }
   };
 
-  events.forEach(event => {
+  for (const event of events) {
     document.addEventListener(event, preload, { once: true, passive: true });
-  });
+  }
 }
 
 /**
@@ -139,11 +156,15 @@ export const chartBundleOptimization = {
 
     // Track in analytics if available
     if (
-      typeof window !== "undefined" &&
-      "gtag" in window &&
-      typeof (window as any).gtag === "function"
+      globalThis.window !== undefined &&
+      "gtag" in globalThis.window &&
+      typeof (globalThis.window as Window & { gtag?: (...args: unknown[]) => void }).gtag ===
+        "function"
     ) {
-      (window as any).gtag("event", "chart_render", {
+      const windowWithGtag = globalThis.window as Window & {
+        gtag: (...args: unknown[]) => void;
+      };
+      windowWithGtag.gtag("event", "chart_render", {
         event_category: "performance",
         event_label: chartName,
         value: Math.round(renderTime),
@@ -156,21 +177,21 @@ export const chartBundleOptimization = {
  * Intersection Observer for chart lazy loading
  */
 export function setupChartIntersectionObserver() {
-  if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+  if (globalThis.window === undefined || !("IntersectionObserver" in globalThis.window)) {
     return;
   }
 
   const observer = new IntersectionObserver(
     entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const chartType = entry.target.getAttribute("data-chart-type");
+      for (const entry of entries) {
+        if (entry.isIntersecting && entry.target instanceof HTMLElement) {
+          const chartType = entry.target.dataset.chartType;
           if (chartType) {
             // Preload chart component when it comes into view
             chartBundleOptimization.preloadOnTabChange(chartType);
           }
         }
-      });
+      }
     },
     {
       rootMargin: "50px", // Start loading 50px before chart is visible
@@ -181,9 +202,9 @@ export function setupChartIntersectionObserver() {
   // Observe all chart containers
   setTimeout(() => {
     const chartContainers = document.querySelectorAll("[data-chart-container]");
-    chartContainers.forEach(container => {
+    for (const container of chartContainers) {
       observer.observe(container);
-    });
+    }
   }, 1000);
 
   return observer;

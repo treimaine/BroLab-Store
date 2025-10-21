@@ -3,18 +3,16 @@
  * Provides all types of loading indicators and skeleton loaders
  */
 
-import { BeatCardSkeleton, BeatGridSkeleton } from "@/components/beats/BeatCardSkeleton";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { LoadingSpinner } from "./LoadingSpinner";
 
 // Enhanced loading spinner with different variants
 interface EnhancedLoadingSpinnerProps {
-  size?: "xs" | "sm" | "md" | "lg" | "xl";
-  variant?: "spinner" | "dots" | "pulse" | "bars";
-  className?: string;
-  text?: string;
-  color?: "primary" | "secondary" | "accent" | "white";
+  readonly size?: "xs" | "sm" | "md" | "lg" | "xl";
+  readonly variant?: "spinner" | "dots" | "pulse" | "bars";
+  readonly className?: string;
+  readonly text?: string;
+  readonly color?: "primary" | "secondary" | "accent" | "white";
 }
 
 export function EnhancedLoadingSpinner({
@@ -39,6 +37,14 @@ export function EnhancedLoadingSpinner({
     white: "border-white",
   };
 
+  const getBarSizeClass = (currentSize: typeof size): string => {
+    if (currentSize === "xs") return "w-1 h-3";
+    if (currentSize === "sm") return "w-1 h-4";
+    if (currentSize === "md") return "w-2 h-8";
+    if (currentSize === "lg") return "w-3 h-12";
+    return "w-4 h-16";
+  };
+
   const renderSpinner = () => {
     switch (variant) {
       case "dots":
@@ -46,7 +52,7 @@ export function EnhancedLoadingSpinner({
           <div className={cn("flex space-x-1", className)}>
             {[0, 1, 2].map(i => (
               <div
-                key={i}
+                key={`dot-${i}`}
                 className={cn("rounded-full bg-current animate-pulse", sizeClasses[size])}
                 style={{ animationDelay: `${i * 0.2}s` }}
               />
@@ -66,19 +72,8 @@ export function EnhancedLoadingSpinner({
           <div className={cn("flex space-x-1", className)}>
             {[0, 1, 2, 3].map(i => (
               <div
-                key={i}
-                className={cn(
-                  "bg-current animate-pulse",
-                  size === "xs"
-                    ? "w-1 h-3"
-                    : size === "sm"
-                      ? "w-1 h-4"
-                      : size === "md"
-                        ? "w-2 h-8"
-                        : size === "lg"
-                          ? "w-3 h-12"
-                          : "w-4 h-16"
-                )}
+                key={`bar-${i}`}
+                className={cn("bg-current animate-pulse", getBarSizeClass(size))}
                 style={{
                   animationDelay: `${i * 0.1}s`,
                   animationDuration: "0.8s",
@@ -122,10 +117,10 @@ export function EnhancedLoadingSpinner({
 
 // Page-level loading overlay
 interface PageLoadingOverlayProps {
-  isLoading: boolean;
-  message?: string;
-  progress?: number;
-  className?: string;
+  readonly isLoading: boolean;
+  readonly message?: string;
+  readonly progress?: number;
+  readonly className?: string;
 }
 
 export function PageLoadingOverlay({
@@ -164,11 +159,11 @@ export function PageLoadingOverlay({
 
 // Inline loading state for buttons
 interface ButtonLoadingStateProps {
-  isLoading: boolean;
-  children: React.ReactNode;
-  loadingText?: string;
-  disabled?: boolean;
-  className?: string;
+  readonly isLoading: boolean;
+  readonly children: React.ReactNode;
+  readonly loadingText?: string;
+  readonly disabled?: boolean;
+  readonly className?: string;
 }
 
 export function ButtonLoadingState({
@@ -200,10 +195,10 @@ export function ButtonLoadingState({
 
 // Content loading placeholder
 interface ContentLoadingPlaceholderProps {
-  lines?: number;
-  className?: string;
-  showAvatar?: boolean;
-  showImage?: boolean;
+  readonly lines?: number;
+  readonly className?: string;
+  readonly showAvatar?: boolean;
+  readonly showImage?: boolean;
 }
 
 export function ContentLoadingPlaceholder({
@@ -227,9 +222,9 @@ export function ContentLoadingPlaceholder({
       {showImage && <div className="w-full h-48 bg-muted rounded-lg" />}
 
       <div className="space-y-3">
-        {Array.from({ length: lines }).map((_, i) => (
+        {Array.from({ length: lines }, (_, i) => (
           <div
-            key={i}
+            key={`line-${i}`}
             className={cn("h-4 bg-muted rounded", i === lines - 1 ? "w-3/4" : "w-full")}
           />
         ))}
@@ -240,9 +235,9 @@ export function ContentLoadingPlaceholder({
 
 // Table loading skeleton
 interface TableLoadingSkeletonProps {
-  rows?: number;
-  columns?: number;
-  className?: string;
+  readonly rows?: number;
+  readonly columns?: number;
+  readonly className?: string;
 }
 
 export function TableLoadingSkeleton({
@@ -254,22 +249,22 @@ export function TableLoadingSkeleton({
     <div className={cn("animate-pulse", className)}>
       {/* Header */}
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
-        {Array.from({ length: columns }).map((_, i) => (
-          <div key={i} className="h-6 bg-muted rounded" />
+        {Array.from({ length: columns }, (_, i) => (
+          <div key={`header-${i}`} className="h-6 bg-muted rounded" />
         ))}
       </div>
 
       {/* Rows */}
       <div className="space-y-3">
-        {Array.from({ length: rows }).map((_, rowIndex) => (
+        {Array.from({ length: rows }, (_, rowIndex) => (
           <div
-            key={rowIndex}
+            key={`row-${rowIndex}`}
             className="grid gap-4"
             style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
           >
-            {Array.from({ length: columns }).map((_, colIndex) => (
+            {Array.from({ length: columns }, (_, colIndex) => (
               <div
-                key={colIndex}
+                key={`cell-${rowIndex}-${colIndex}`}
                 className={cn("h-4 bg-muted rounded", colIndex === 0 ? "w-3/4" : "w-full")}
               />
             ))}
@@ -282,9 +277,9 @@ export function TableLoadingSkeleton({
 
 // Loading state for forms
 interface FormLoadingStateProps {
-  isLoading: boolean;
-  children: React.ReactNode;
-  loadingMessage?: string;
+  readonly isLoading: boolean;
+  readonly children: React.ReactNode;
+  readonly loadingMessage?: string;
 }
 
 export function FormLoadingState({
@@ -308,34 +303,6 @@ export function FormLoadingState({
 }
 
 // Export all loading components
+export { BeatCardSkeleton, BeatGridSkeleton } from "@/components/beats/BeatCardSkeleton";
 export { DashboardSkeleton as DashboardContentSkeleton } from "@/components/dashboard/DashboardSkeletons";
-export { BeatCardSkeleton, BeatGridSkeleton, LoadingSpinner };
-
-// Loading state hook for components
-export function useComponentLoading(initialState = false) {
-  const [isLoading, setIsLoading] = React.useState(initialState);
-  const [error, setError] = React.useState<Error | null>(null);
-
-  const withLoading = React.useCallback(async <T,>(operation: () => Promise<T>): Promise<T> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const result = await operation();
-      return result;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      setError(error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  return {
-    isLoading,
-    error,
-    setIsLoading,
-    setError,
-    withLoading,
-  };
-}
+export { LoadingSpinner } from "./LoadingSpinner";

@@ -1,21 +1,21 @@
-import { BeatCard } from "@/components/beats/beat-card";
 import { TableBeatView } from "@/components/beats/TableBeatView";
+import { BeatCard } from "@/components/beats/beat-card";
+import { UnifiedFilterPanel } from "@/components/filters/UnifiedFilterPanel";
+import { StandardHero } from "@/components/ui/StandardHero";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { StandardHero } from "@/components/ui/StandardHero";
-import { UnifiedFilterPanel } from "@/components/filters/UnifiedFilterPanel";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { useUnifiedFilters } from "@/hooks/useUnifiedFilters";
 import { UnifiedFilters } from "@/lib/unifiedFilters";
 import type { BeatProduct } from "@shared/schema";
-import { Filter, Grid3X3, List, RotateCcw, Search } from "lucide-react";
+import { Grid3X3, List, RotateCcw } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useLocation } from "wouter";
 
 type WooCategory = { id: number; name: string };
-type WooMeta = { key: string; value: any };
+type WooMeta = { key: string; value: unknown };
 type WooAttribute = { name: string; options?: string[] };
 type BeatProductWithWoo = BeatProduct & {
   categories?: WooCategory[];
@@ -122,11 +122,10 @@ export default function Shop() {
           {/* Search */}
           <div className="flex-1">
             <form onSubmit={handleSearch} className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
               <Input
                 type="search"
                 placeholder="Search beats by title, genre, BPM..."
-                className="pl-10 pr-4 py-2 sm:py-3 form-input w-full"
+                className="px-4 py-2 sm:py-3 form-input w-full"
                 value={filters.search || ""}
                 onChange={e => updateFilter("search", e.target.value)}
               />
@@ -162,7 +161,6 @@ export default function Shop() {
             onClick={handleToggleFilters}
             className="flex items-center gap-2"
           >
-            <Filter className="w-4 h-4" />
             <span className="hidden sm:inline">Filters</span>
           </Button>
         </div>
@@ -285,11 +283,11 @@ export default function Shop() {
                   </div>
                 ))
               : products.map(product => (
-                <BeatCard
-                  key={product.id}
-                  id={product.id}
-                  title={product.name || "Untitled"}
-                  genre={
+                  <BeatCard
+                    key={product.id}
+                    id={product.id}
+                    title={product.name || "Untitled"}
+                    genre={
                       (product as BeatProductWithWoo).categories?.[0]?.name ||
                       (product as BeatProductWithWoo).categories?.find(cat => cat.name)?.name ||
                       String(
@@ -315,7 +313,7 @@ export default function Shop() {
                       )?.options?.[0] ||
                       ""
                     }
-                  bpm={(() => {
+                    bpm={(() => {
                       if (typeof product.bpm === "number") return product.bpm;
                       const md = (product as BeatProductWithWoo).meta_data || [];
                       const bpmMeta =
@@ -327,10 +325,10 @@ export default function Shop() {
                       const parsed = Number(bpmMeta ?? attrVal);
                       return Number.isFinite(parsed) ? parsed : undefined;
                     })()}
-                  price={product.price}
-                  imageUrl={product.images?.[0]?.src || ""}
-                  audioUrl={product.audio_url || ""}
-                  tags={(() => {
+                    price={product.price}
+                    imageUrl={product.images?.[0]?.src || ""}
+                    audioUrl={product.audio_url || ""}
+                    tags={(() => {
                       const tags = [];
                       if (product.tags && Array.isArray(product.tags)) {
                         tags.push(...product.tags.map(t => (typeof t === "string" ? t : t.name)));
@@ -347,10 +345,10 @@ export default function Shop() {
                       }
                       return tags.filter(Boolean);
                     })()}
-                  featured={product.featured}
-                  downloads={product.downloads || 0}
-                  duration={product.duration}
-                  isFree={
+                    featured={product.featured}
+                    downloads={product.downloads || 0}
+                    duration={product.duration}
+                    isFree={
                       product.is_free ||
                       product.tags?.some(
                         tag => (typeof tag === "string" ? tag : tag.name)?.toLowerCase() === "free"
@@ -359,8 +357,8 @@ export default function Shop() {
                         (product.price === "0" || parseFloat(product.price) === 0)) ||
                       (typeof product.price === "number" && product.price === 0)
                     }
-                  onViewDetails={() => handleProductView(product.id)}
-                />
+                    onViewDetails={() => handleProductView(product.id)}
+                  />
                 ))}
           </div>
         ) : (

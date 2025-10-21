@@ -67,7 +67,7 @@ export function UnifiedFilterPanel({
     K extends keyof Pick<
       UnifiedFilters,
       "keys" | "moods" | "instruments" | "producers" | "tags" | "timeSignature"
-    >
+    >,
   >(
     key: K,
     item: string
@@ -118,7 +118,6 @@ export function UnifiedFilterPanel({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-white flex items-center gap-2">
-            <Filter className="w-5 h-5" />
             Unified Filters
             {getActiveFilterCount() > 0 && (
               <Badge className="bg-[var(--accent-purple)] text-white ml-2">

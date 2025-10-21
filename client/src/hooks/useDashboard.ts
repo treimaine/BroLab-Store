@@ -17,16 +17,9 @@
 import { api } from "@/lib/convex-api";
 import { useUser } from "@clerk/clerk-react";
 import type {
-  Activity,
-  ChartDataPoint,
   DashboardData,
   DashboardError,
   DashboardUser,
-  Download,
-  Favorite,
-  Order,
-  Reservation,
-  TrendData,
   UserStats,
 } from "@shared/types/dashboard";
 import { useQueryClient } from "@tanstack/react-query";
@@ -82,7 +75,7 @@ const DEFAULT_OPTIONS: Required<DashboardOptions> = {
 // Error recovery strategies
 class DashboardErrorHandler {
   private retryCount = 0;
-  private maxRetries = 3;
+  private readonly maxRetries = 3;
 
   canRetry(error: DashboardError): boolean {
     return error.retryable && this.retryCount < this.maxRetries;
@@ -407,4 +400,4 @@ export type {
   Reservation,
   TrendData,
   UserStats,
-};
+} from "@shared/types/dashboard";
