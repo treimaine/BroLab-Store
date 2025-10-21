@@ -55,7 +55,7 @@ const checkRateLimit = (email: string): boolean => {
   return true;
 };
 
-// POST /api/email/verify-email - Verify email with token
+// GET /api/email/verify-email - Verify email with token
 router.get(
   "/verify-email",
   validateRequest(verifyEmailSchema),

@@ -96,7 +96,7 @@ router.post("/clerk", async (req, res) => {
   const svix_signature = headerPayload["svix-signature"];
 
   if (!svix_id || !svix_timestamp || !svix_signature) {
-    return new Response("Error occured -- no svix headers", {
+    return new Response("Error occurred -- no svix headers", {
       status: 400,
     });
   }
@@ -155,7 +155,6 @@ Le composant `ClerkPaymentForm` utilise maintenant les vraies APIs de Clerk.
 Dans Clerk Dashboard > **"Billing"** > **"Products"** :
 
 1. **Créer un Produit** :
-
    - Nom: "BroLab Beats"
    - Description: "Premium beats and music production services"
 

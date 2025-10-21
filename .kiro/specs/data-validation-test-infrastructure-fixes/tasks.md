@@ -1,0 +1,103 @@
+# Implementation Plan
+
+- [ ] 1. Enhance ConsistencyChecker with environment-aware validation
+  - Add ConsistencyCheckOptions interface with skipTimeBasedValidations, skipHashValidation, environment, and allowTestHashes properties
+  - Modify validate() method to accept optional ConsistencyCheckOptions parameter
+  - Implement environment detection logic that checks NODE_ENV or explicit environment option
+  - Add conditional logic to skip monthly statistics validation when skipTimeBasedValidations is true
+  - Add conditional logic to accept test hash values (e.g., "test-hash") when allowTestHashes is true
+  - Create factory method createTestChecker() that returns pre-configured instance for test environments
+  - Update ConsistencyCheckResult interface to include checksPerformed and checksSkipped arrays
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
+
+- [ ] 2. Extend DataValidationService public API
+  - Add public validateConvexId(id: string) method that delegates to SourceValidator
+  - Add public validateAllIds(data: Record<string, any>) method that delegates to SourceValidator
+  - Add public validateDataIds(data: any) method that delegates to SourceValidator
+  - Add JSDoc documentation for all new public methods with parameter descriptions and return types
+  - Ensure SourceValidator instance is accessible to new public methods
+  - Maintain existing internal validation logic without breaking changes
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+
+- [ ] 3. Implement lazy Convex client initialization
+  - [ ] 3.1 Create lazy initialization infrastructure
+    - Replace immediate ConvexHttpClient instantiation with lazy getter function
+    - Create getConvexClient() function that initializes client on first call
+    - Add convexClient and initializationError module-level variables for caching
+    - Implement Proxy wrapper for backward compatibility with existing imports
+    - _Requirements: 3.1, 3.4_
+  - [ ] 3.2 Add environment-specific initialization logic
+    - Add NODE_ENV check to detect test environment
+    - Create createMockConvexClient() function that returns mock with query/mutation/action methods
+    - Return mock client when NODE_ENV is 'test'
+    - Validate VITE_CONVEX_URL exists before initializing production client
+    - Throw descriptive error with setup instructions when URL is missing
+    - _Requirements: 3.2, 3.3, 3.5_
+  - [ ] 3.3 Update exports for lazy initialization
+    - Export getConvex getter function as primary export
+    - Maintain convex export using Proxy for backward compatibility
+    - Update JSDoc to document lazy initialization behavior
+    - _Requirements: 3.1, 3.5_
+
+- [ ] 4. Create import path compatibility layer
+  - [ ] 4.1 Create re-export files for reorganized components
+    - Create client/src/components/ReservationErrorBoundary.tsx that re-exports from ./reservations/ReservationErrorBoundary
+    - Create client/src/components/kokonutui/file-upload.tsx that re-exports from ../ui/file-upload
+    - Create client/src/store/useDashboardStore.ts that re-exports from ../stores/useDashboardStore
+    - Use both default and named exports in re-export files
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - [ ] 4.2 Update Jest configuration for import path mapping
+    - Add moduleNameMapper entry for @/components/ReservationErrorBoundary
+    - Add moduleNameMapper entry for @/components/kokonutui/\* pattern
+    - Add moduleNameMapper entry for @/store/\* pattern
+    - Verify mappings resolve to correct file paths
+    - _Requirements: 4.5_
+
+- [ ] 5. Strengthen PollingConnection error handling
+  - Add isActive boolean property to track connection state
+  - Initialize isActive to false in constructor
+  - Set isActive to true in connect() method
+  - Add connection state check at start of send() method that throws error if not active
+  - Wrap fetch() call in try-catch to handle network errors
+  - Add null/undefined check for response object before accessing properties
+  - Add response.ok check with descriptive error message including status code
+  - Extract error text from failed responses using response.text()
+  - Update disconnect() method to set isActive to false
+  - Improve all error messages to include context and suggested actions
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+
+- [ ] 6. Update test files to use new infrastructure
+  - [ ] 6.1 Update ConsistencyChecker tests
+    - Import createTestChecker factory or pass environment: 'test' option
+    - Update test expectations to expect zero anomalies on valid test data
+    - Add tests verifying time-based validations are skipped in test mode
+    - Add tests verifying test hash values are accepted
+    - _Requirements: 1.5_
+  - [ ] 6.2 Update DataValidationService tests
+    - Add tests for validateConvexId with valid and invalid IDs
+    - Add tests for validateAllIds with data structures containing multiple IDs
+    - Add tests for validateDataIds with various data shapes
+    - Verify methods return proper ValidationResult structures
+    - _Requirements: 2.3, 2.4_
+  - [ ]\* 6.3 Add PollingConnection error handling tests
+    - Test send() throws error when connection is inactive
+    - Mock fetch to return undefined and verify error handling
+    - Mock fetch to return null and verify error handling
+    - Test error messages include descriptive context
+    - _Requirements: 5.1, 5.2, 5.3_
+
+- [ ] 7. Create test fixtures and utilities
+  - Create testDashboardData fixture with static monthly values and test-hash
+  - Create testConsistencyChecker factory with test-friendly options
+  - Export test utilities from **tests**/test-utils.tsx
+  - Document usage of test fixtures in test files
+  - _Requirements: 1.1, 1.2, 1.3_
+
+- [ ] 8. Verify and validate all changes
+  - Run npm run type-check to verify no TypeScript errors
+  - Run npm test to verify all tests pass
+  - Run npm run lint:fix to ensure code quality
+  - Verify server modules can be imported in test environment without Convex URL
+  - Verify legacy import paths resolve correctly in tests
+  - Test ConsistencyChecker with production-like data to ensure validation still works
+  - _Requirements: 1.5, 2.3, 2.4, 3.5, 4.2, 4.3, 4.4, 5.1, 5.2, 5.3_
