@@ -418,7 +418,20 @@ export function validateConfig(config: Partial<EnvironmentValidationConfig>): {
 } {
   const errors: string[] = [];
 
-  // Validate environment
+  validateEnvironment(config, errors);
+  validateConfidenceWeights(config, errors);
+  validateConfidenceThresholds(config, errors);
+  validateSourceValidation(config, errors);
+  validateContentValidation(config, errors);
+  validateIntegrityCheck(config, errors);
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
+
+function validateEnvironment(config: Partial<EnvironmentValidationConfig>, errors: string[]): void {
   if (config.environment) {
     if (!["development", "staging", "production"].includes(config.environment)) {
       errors.push(
@@ -426,103 +439,118 @@ export function validateConfig(config: Partial<EnvironmentValidationConfig>): {
       );
     }
   }
+}
 
-  // Validate confidence weights (should sum to ~1.0)
-  if (config.confidenceWeights) {
-    const weights = config.confidenceWeights;
-    const sum =
-      (weights.sourceWeight || 0) +
-      (weights.idWeight || 0) +
-      (weights.timestampWeight || 0) +
-      (weights.contentWeight || 0);
+function validateConfidenceWeights(
+  config: Partial<EnvironmentValidationConfig>,
+  errors: string[]
+): void {
+  if (!config.confidenceWeights) return;
 
-    if (Math.abs(sum - 1.0) > 0.01) {
-      errors.push(`Confidence weights should sum to 1.0, got ${sum.toFixed(2)}`);
-    }
+  const weights = config.confidenceWeights;
+  const sum =
+    (weights.sourceWeight || 0) +
+    (weights.idWeight || 0) +
+    (weights.timestampWeight || 0) +
+    (weights.contentWeight || 0);
 
-    // Validate individual weights are between 0 and 1
-    Object.entries(weights).forEach(([key, value]) => {
-      if (value < 0 || value > 1) {
-        errors.push(`${key} must be between 0 and 1, got ${value}`);
-      }
-    });
+  if (Math.abs(sum - 1) > 0.01) {
+    errors.push(`Confidence weights should sum to 1.0, got ${sum.toFixed(2)}`);
   }
 
-  // Validate confidence thresholds
-  if (config.confidenceThresholds) {
-    const thresholds = config.confidenceThresholds;
-
-    if (
-      thresholds.realDataThreshold !== undefined &&
-      (thresholds.realDataThreshold < 0 || thresholds.realDataThreshold > 1)
-    ) {
-      errors.push(`realDataThreshold must be between 0 and 1, got ${thresholds.realDataThreshold}`);
-    }
-
-    if (
-      thresholds.mockDataThreshold !== undefined &&
-      (thresholds.mockDataThreshold < 0 || thresholds.mockDataThreshold > 1)
-    ) {
-      errors.push(`mockDataThreshold must be between 0 and 1, got ${thresholds.mockDataThreshold}`);
-    }
-
-    if (
-      thresholds.uncertaintyThreshold !== undefined &&
-      (thresholds.uncertaintyThreshold < 0 || thresholds.uncertaintyThreshold > 1)
-    ) {
-      errors.push(
-        `uncertaintyThreshold must be between 0 and 1, got ${thresholds.uncertaintyThreshold}`
-      );
-    }
-
-    // Validate threshold ordering
-    if (
-      thresholds.realDataThreshold !== undefined &&
-      thresholds.mockDataThreshold !== undefined &&
-      thresholds.realDataThreshold >= thresholds.mockDataThreshold
-    ) {
-      errors.push(
-        `realDataThreshold (${thresholds.realDataThreshold}) must be less than mockDataThreshold (${thresholds.mockDataThreshold})`
-      );
+  // Validate individual weights are between 0 and 1
+  for (const [key, value] of Object.entries(weights)) {
+    if (value < 0 || value > 1) {
+      errors.push(`${key} must be between 0 and 1, got ${value}`);
     }
   }
+}
 
-  // Validate source validation config
-  if (config.sourceValidation) {
-    const sourceConfig = config.sourceValidation;
+function validateConfidenceThresholds(
+  config: Partial<EnvironmentValidationConfig>,
+  errors: string[]
+): void {
+  if (!config.confidenceThresholds) return;
 
-    if (
-      sourceConfig.minConfidenceThreshold !== undefined &&
-      (sourceConfig.minConfidenceThreshold < 0 || sourceConfig.minConfidenceThreshold > 1)
-    ) {
-      errors.push(
-        `minConfidenceThreshold must be between 0 and 1, got ${sourceConfig.minConfidenceThreshold}`
-      );
-    }
+  const thresholds = config.confidenceThresholds;
+
+  if (
+    thresholds.realDataThreshold !== undefined &&
+    (thresholds.realDataThreshold < 0 || thresholds.realDataThreshold > 1)
+  ) {
+    errors.push(`realDataThreshold must be between 0 and 1, got ${thresholds.realDataThreshold}`);
   }
 
-  // Validate content validation config
-  if (config.contentValidation) {
-    const contentConfig = config.contentValidation;
-
-    if (contentConfig.minPatternMatches !== undefined && contentConfig.minPatternMatches < 0) {
-      errors.push(`minPatternMatches must be >= 0, got ${contentConfig.minPatternMatches}`);
-    }
+  if (
+    thresholds.mockDataThreshold !== undefined &&
+    (thresholds.mockDataThreshold < 0 || thresholds.mockDataThreshold > 1)
+  ) {
+    errors.push(`mockDataThreshold must be between 0 and 1, got ${thresholds.mockDataThreshold}`);
   }
 
-  // Validate integrity check config
-  if (config.integrityCheck) {
-    const integrityConfig = config.integrityCheck;
-
-    if (integrityConfig.maxDataAge !== undefined && integrityConfig.maxDataAge < 0) {
-      errors.push(`maxDataAge must be >= 0, got ${integrityConfig.maxDataAge}`);
-    }
+  if (
+    thresholds.uncertaintyThreshold !== undefined &&
+    (thresholds.uncertaintyThreshold < 0 || thresholds.uncertaintyThreshold > 1)
+  ) {
+    errors.push(
+      `uncertaintyThreshold must be between 0 and 1, got ${thresholds.uncertaintyThreshold}`
+    );
   }
 
-  return {
-    isValid: errors.length === 0,
-    errors,
-  };
+  // Validate threshold ordering
+  if (
+    thresholds.realDataThreshold !== undefined &&
+    thresholds.mockDataThreshold !== undefined &&
+    thresholds.realDataThreshold >= thresholds.mockDataThreshold
+  ) {
+    errors.push(
+      `realDataThreshold (${thresholds.realDataThreshold}) must be less than mockDataThreshold (${thresholds.mockDataThreshold})`
+    );
+  }
+}
+
+function validateSourceValidation(
+  config: Partial<EnvironmentValidationConfig>,
+  errors: string[]
+): void {
+  if (!config.sourceValidation) return;
+
+  const sourceConfig = config.sourceValidation;
+
+  if (
+    sourceConfig.minConfidenceThreshold !== undefined &&
+    (sourceConfig.minConfidenceThreshold < 0 || sourceConfig.minConfidenceThreshold > 1)
+  ) {
+    errors.push(
+      `minConfidenceThreshold must be between 0 and 1, got ${sourceConfig.minConfidenceThreshold}`
+    );
+  }
+}
+
+function validateContentValidation(
+  config: Partial<EnvironmentValidationConfig>,
+  errors: string[]
+): void {
+  if (!config.contentValidation) return;
+
+  const contentConfig = config.contentValidation;
+
+  if (contentConfig.minPatternMatches !== undefined && contentConfig.minPatternMatches < 0) {
+    errors.push(`minPatternMatches must be >= 0, got ${contentConfig.minPatternMatches}`);
+  }
+}
+
+function validateIntegrityCheck(
+  config: Partial<EnvironmentValidationConfig>,
+  errors: string[]
+): void {
+  if (!config.integrityCheck) return;
+
+  const integrityConfig = config.integrityCheck;
+
+  if (integrityConfig.maxDataAge !== undefined && integrityConfig.maxDataAge < 0) {
+    errors.push(`maxDataAge must be >= 0, got ${integrityConfig.maxDataAge}`);
+  }
 }
 
 /**
@@ -580,7 +608,7 @@ function deepClone<T>(obj: T): T {
  * Deep merge two objects
  */
 function deepMerge<T>(target: T, source: Partial<T>): T {
-  const result = { ...target } as T;
+  const result = { ...target };
 
   for (const key in source) {
     if (Object.hasOwn(source, key)) {
@@ -588,18 +616,16 @@ function deepMerge<T>(target: T, source: Partial<T>): T {
       const targetValue = result[key];
 
       if (
-        sourceValue &&
+        sourceValue !== undefined &&
         typeof sourceValue === "object" &&
         !Array.isArray(sourceValue) &&
-        targetValue &&
+        targetValue !== undefined &&
         typeof targetValue === "object" &&
         !Array.isArray(targetValue)
       ) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        result[key] = deepMerge(targetValue, sourceValue) as any;
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        result[key] = sourceValue as any;
+        result[key] = deepMerge(targetValue, sourceValue as Partial<typeof targetValue>);
+      } else if (sourceValue !== undefined) {
+        result[key] = sourceValue as T[Extract<keyof T, string>];
       }
     }
   }

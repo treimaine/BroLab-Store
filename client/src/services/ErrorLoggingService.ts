@@ -13,6 +13,16 @@ import type {
 } from "@/services/ErrorHandlingManager";
 
 // ================================
+// TYPE ALIASES
+// ================================
+
+/** Log level type */
+export type LogLevel = "debug" | "info" | "warn" | "error" | "critical";
+
+/** Log category type */
+export type LogCategory = "error" | "recovery" | "performance" | "user_action" | "system";
+
+// ================================
 // LOGGING INTERFACES
 // ================================
 
@@ -23,13 +33,13 @@ export interface LogEntry {
   /** Unique log entry ID */
   id: string;
   /** Log level */
-  level: "debug" | "info" | "warn" | "error" | "critical";
+  level: LogLevel;
   /** Log message */
   message: string;
   /** Timestamp */
   timestamp: number;
   /** Log category */
-  category: "error" | "recovery" | "performance" | "user_action" | "system";
+  category: LogCategory;
   /** Component that generated the log */
   component: string;
   /** User ID if available */
@@ -124,6 +134,9 @@ export interface RemoteLoggingConfig {
   headers?: Record<string, string>;
 }
 
+/** Console log level type */
+export type ConsoleLogLevel = "debug" | "info" | "warn" | "error";
+
 /**
  * Error logging configuration
  */
@@ -131,7 +144,7 @@ export interface ErrorLoggingConfig {
   /** Whether to log to console */
   console: boolean;
   /** Console log level threshold */
-  consoleLevel: "debug" | "info" | "warn" | "error";
+  consoleLevel: ConsoleLogLevel;
   /** Whether to store logs locally */
   localStorage: boolean;
   /** Maximum local log entries */
@@ -157,9 +170,9 @@ export interface ErrorLoggingConfig {
 // ================================
 
 export class ErrorLoggingService {
-  private config: ErrorLoggingConfig;
+  private readonly config: ErrorLoggingConfig;
   private logEntries: LogEntry[] = [];
-  private sessionId: string;
+  private readonly sessionId: string;
   private userId?: string;
   private remoteQueue: LogEntry[] = [];
   private flushTimer?: NodeJS.Timeout;
@@ -221,9 +234,12 @@ export class ErrorLoggingService {
     error: EnhancedSyncError,
     context: Partial<ErrorContext> = {}
   ): void {
+    const attemptInfo = `attempt ${recoveryAttempt.attemptNumber}`;
+    const message = `Recovery Attempt: ${recoveryAttempt.strategy} for ${error.type} (${attemptInfo})`;
+
     const logEntry = this.createLogEntry({
       level: "info",
-      message: `Recovery Attempt: ${recoveryAttempt.strategy} for ${error.type} (attempt ${recoveryAttempt.attemptNumber})`,
+      message,
       category: "recovery",
       component: context.component || "recovery_manager",
       error,
@@ -272,9 +288,12 @@ export class ErrorLoggingService {
     errorId?: string,
     context: Partial<ErrorContext> = {}
   ): void {
+    const errorSuffix = errorId ? ` for error ${errorId}` : "";
+    const message = `User Action: ${action}${errorSuffix}`;
+
     const logEntry = this.createLogEntry({
       level: "info",
-      message: `User Action: ${action}${errorId ? ` for error ${errorId}` : ""}`,
+      message,
       category: "user_action",
       component: context.component || "user_interface",
       context: {
@@ -293,7 +312,7 @@ export class ErrorLoggingService {
    */
   public logSystemEvent(
     event: string,
-    level: "debug" | "info" | "warn" | "error" = "info",
+    level: LogLevel = "info",
     context: Partial<ErrorContext> = {}
   ): void {
     const logEntry = this.createLogEntry({
@@ -319,8 +338,8 @@ export class ErrorLoggingService {
    * Get log entries with optional filtering
    */
   public getLogs(filter?: {
-    level?: "debug" | "info" | "warn" | "error" | "critical";
-    category?: "error" | "recovery" | "performance" | "user_action" | "system";
+    level?: LogLevel;
+    category?: LogCategory;
     component?: string;
     since?: number;
     limit?: number;
@@ -351,7 +370,9 @@ export class ErrorLoggingService {
       }
     }
 
-    return filteredLogs.sort((a, b) => b.timestamp - a.timestamp);
+    const sortedLogs = [...filteredLogs];
+    sortedLogs.sort((a, b) => b.timestamp - a.timestamp);
+    return sortedLogs;
   }
 
   /**
@@ -424,9 +445,9 @@ export class ErrorLoggingService {
         ? operationDurations.reduce((sum, op) => sum + op.duration, 0) / operationDurations.length
         : 0;
 
-    const slowestOperations = operationDurations
-      .sort((a, b) => b.duration - a.duration)
-      .slice(0, 10);
+    const sortedOperations = [...operationDurations];
+    sortedOperations.sort((a, b) => b.duration - a.duration);
+    const slowestOperations = sortedOperations.slice(0, 10);
 
     return {
       totalErrors: errorLogs.length,
@@ -464,7 +485,7 @@ export class ErrorLoggingService {
               log.level,
               log.category,
               log.component,
-              `"${log.message.replace(/"/g, '""')}"`,
+              `"${log.message.replaceAll('"', '""')}"`,
             ].join(",")
           ),
         ];
@@ -565,9 +586,9 @@ export class ErrorLoggingService {
   }
 
   private createLogEntry(params: {
-    level: "debug" | "info" | "warn" | "error" | "critical";
+    level: LogLevel;
     message: string;
-    category: "error" | "recovery" | "performance" | "user_action" | "system";
+    category: LogCategory;
     component: string;
     error?: EnhancedSyncError;
     recoveryAttempt?: RecoveryAttempt;
@@ -632,7 +653,7 @@ export class ErrorLoggingService {
     }
   }
 
-  private shouldLogToConsole(level: "debug" | "info" | "warn" | "error" | "critical"): boolean {
+  private shouldLogToConsole(level: LogLevel): boolean {
     const levelPriority = { debug: 0, info: 1, warn: 2, error: 3, critical: 4 };
     const consolePriority = levelPriority[this.config.consoleLevel];
     const entryPriority = levelPriority[level];
@@ -690,8 +711,8 @@ export class ErrorLoggingService {
   }
 
   private collectPerformanceMetrics(): PerformanceMetrics {
-    const performance = window.performance;
-    const memory = (performance as any).memory;
+    const performance = globalThis.window.performance;
+    const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
 
     return {
       memoryUsage: memory ? memory.usedJSHeapSize : 0,
@@ -702,14 +723,22 @@ export class ErrorLoggingService {
   }
 
   private collectEnvironmentInfo(): EnvironmentInfo {
-    const connection = (navigator as any).connection;
+    const connection = (
+      navigator as Navigator & {
+        connection?: {
+          effectiveType: string;
+          downlink: number;
+          rtt: number;
+        };
+      }
+    ).connection;
 
     return {
       userAgent: navigator.userAgent,
-      url: window.location.href,
+      url: globalThis.window.location.href,
       viewport: {
-        width: window.innerWidth,
-        height: window.innerHeight,
+        width: globalThis.window.innerWidth,
+        height: globalThis.window.innerHeight,
       },
       screen: {
         width: screen.width,
@@ -823,9 +852,7 @@ let errorLoggingServiceInstance: ErrorLoggingService | null = null;
 export const getErrorLoggingService = (
   config?: Partial<ErrorLoggingConfig>
 ): ErrorLoggingService => {
-  if (!errorLoggingServiceInstance) {
-    errorLoggingServiceInstance = new ErrorLoggingService(config);
-  }
+  errorLoggingServiceInstance ??= new ErrorLoggingService(config);
   return errorLoggingServiceInstance;
 };
 

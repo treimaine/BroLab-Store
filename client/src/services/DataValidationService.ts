@@ -30,6 +30,9 @@ import {
 /** Data source type */
 export type DataSource = "database" | "cache" | "mock" | "placeholder" | "unknown";
 
+/** Final data source type */
+export type FinalDataSource = "database" | "cache" | "mock" | "placeholder" | "unknown";
+
 /** Severity level */
 export type SeverityLevel = "low" | "medium" | "high" | "critical";
 
@@ -38,6 +41,12 @@ export type Environment = "development" | "staging" | "production";
 
 /** Integrity status */
 export type IntegrityStatus = "valid" | "warning" | "error" | "critical";
+
+/** Source type for validation */
+export type SourceType = "database" | "cache" | "unknown";
+
+/** Validation decision type */
+export type ValidationDecision = "real_data" | "mock_data" | "uncertain";
 
 // ================================
 // VALIDATION INTERFACES
@@ -64,7 +73,7 @@ export interface SourceValidationConfig {
  */
 export interface SourceValidationResult {
   /** Data source type */
-  source: "database" | "cache" | "unknown";
+  source: SourceType;
   /** Whether source is authenticated */
   isAuthenticated: boolean;
   /** Source confidence score (0-1) */
@@ -277,7 +286,7 @@ export interface MockIndicatorAnalysis {
  */
 export interface ValidationReasoning {
   /** Final decision (real data vs mock data) */
-  decision: "real_data" | "mock_data" | "uncertain";
+  decision: ValidationDecision;
   /** Overall confidence in decision (0-1) */
   confidence: number;
   /** Key factors that influenced the decision */
@@ -607,7 +616,7 @@ export class SourceValidator {
   }
 
   private determineSourceType(confidence: number): {
-    source: "database" | "cache" | "unknown";
+    source: SourceType;
     isAuthenticated: boolean;
   } {
     const HIGH_CONFIDENCE_THRESHOLD = 0.8;
@@ -868,17 +877,17 @@ export class SourceValidator {
       };
     }
 
-    if (timestampMs < YEAR_2000_TIMESTAMP) {
-      return {
-        isValid: false,
-        isFresh: false,
-        age,
-        confidence: 0,
-        reason: "Timestamp is before year 2000, likely invalid",
-      };
+    if (timestampMs >= YEAR_2000_TIMESTAMP) {
+      return { isValid: true, isFresh: false, age, confidence: 0, reason: "" };
     }
 
-    return { isValid: true, isFresh: false, age, confidence: 0, reason: "" };
+    return {
+      isValid: false,
+      isFresh: false,
+      age,
+      confidence: 0,
+      reason: "Timestamp is before year 2000, likely invalid",
+    };
   }
 
   private createValidTimestampResult(age: number): TimestampValidation {
@@ -900,9 +909,18 @@ export class SourceValidator {
 
   private calculateTimestampConfidenceByAge(age: number): number {
     const DAY = 24 * 60 * 60 * 1000;
-    if (age > 30 * DAY) return 0.7;
-    if (age > 7 * DAY) return 0.8;
-    if (age > DAY) return 0.85;
+    const THIRTY_DAYS = 30 * DAY;
+    const SEVEN_DAYS = 7 * DAY;
+
+    if (age > THIRTY_DAYS) {
+      return 0.7;
+    }
+    if (age > SEVEN_DAYS) {
+      return 0.8;
+    }
+    if (age > DAY) {
+      return 0.85;
+    }
     return 0.9;
   }
 
@@ -2059,13 +2077,14 @@ export class DataValidationService {
     };
 
     // Create a source result for breakdown calculation
+    const getSourceType = (source: DataSource): SourceType => {
+      if (source === "database") return "database";
+      if (source === "cache") return "cache";
+      return "unknown";
+    };
+
     const sourceResult: SourceValidationResult = {
-      source:
-        sourceValidation.source === "database"
-          ? "database"
-          : sourceValidation.source === "cache"
-            ? "cache"
-            : "unknown",
+      source: getSourceType(sourceValidation.source),
       isAuthenticated: sourceValidation.isRealData,
       confidence: sourceValidation.idValidations?.confidence || 0.5,
       details: {
@@ -2245,7 +2264,7 @@ export class DataValidationService {
   private determineValidationDecision(
     sourceValidation: DataSourceValidation,
     confidenceScore: ConfidenceScore
-  ): "real_data" | "mock_data" | "uncertain" {
+  ): ValidationDecision {
     const thresholds = this.confidenceCalculator.getThresholds();
 
     if (sourceValidation.isRealData && confidenceScore.overall >= thresholds.realDataThreshold) {
@@ -2322,20 +2341,22 @@ export class DataValidationService {
    * Generate human-readable rationale for the decision
    */
   private generateRationale(
-    decision: "real_data" | "mock_data" | "uncertain",
+    decision: ValidationDecision,
     confidenceScore: ConfidenceScore,
     keyFactors: ValidationFactor[]
   ): string {
     const confidencePercent = (confidenceScore.overall * 100).toFixed(1);
     const positiveCount = keyFactors.filter(f => f.type === "positive").length;
     const negativeCount = keyFactors.filter(f => f.type === "negative").length;
+    const positivePlural = positiveCount === 1 ? "" : "s";
+    const negativePlural = negativeCount === 1 ? "" : "s";
 
     if (decision === "real_data") {
-      return `Data is determined to be real with ${confidencePercent}% confidence. Found ${positiveCount} positive indicator${positiveCount !== 1 ? "s" : ""} supporting authenticity.`;
+      return `Data is determined to be real with ${confidencePercent}% confidence. Found ${positiveCount} positive indicator${positivePlural} supporting authenticity.`;
     }
 
     if (decision === "mock_data") {
-      return `Data appears to be mock or placeholder with ${confidencePercent}% confidence. Found ${negativeCount} negative indicator${negativeCount !== 1 ? "s" : ""} suggesting test data.`;
+      return `Data appears to be mock or placeholder with ${confidencePercent}% confidence. Found ${negativeCount} negative indicator${negativePlural} suggesting test data.`;
     }
 
     return `Data authenticity is uncertain (${confidencePercent}% confidence). Found ${positiveCount} positive and ${negativeCount} negative indicators. Additional validation recommended.`;
@@ -2373,27 +2394,33 @@ export class DataValidationService {
       });
     }
 
-    steps.push({
+    const freshnessWarningCount = sourceValidation.freshnessWarnings.length;
+    const freshnessPlural = freshnessWarningCount === 1 ? "" : "s";
+    const timestampStep: ValidationStep = {
       name: "Timestamp Validation",
       order: 3,
-      result: sourceValidation.freshnessWarnings.length === 0 ? "passed" : "warning",
+      result: freshnessWarningCount === 0 ? "passed" : "warning",
       duration: 0,
-      details: `Checked data freshness, found ${sourceValidation.freshnessWarnings.length} warning${sourceValidation.freshnessWarnings.length !== 1 ? "s" : ""}`,
+      details: `Checked data freshness, found ${freshnessWarningCount} warning${freshnessPlural}`,
       data: {
-        warnings: sourceValidation.freshnessWarnings.length,
+        warnings: freshnessWarningCount,
       },
-    });
+    };
+    steps.push(timestampStep);
 
-    steps.push({
+    const mockIndicatorCount = sourceValidation.mockIndicators.length;
+    const indicatorPlural = mockIndicatorCount === 1 ? "" : "s";
+    const contentStep: ValidationStep = {
       name: "Content Validation",
       order: 4,
-      result: sourceValidation.mockIndicators.length === 0 ? "passed" : "warning",
+      result: mockIndicatorCount === 0 ? "passed" : "warning",
       duration: 0,
-      details: `Checked for mock data patterns, found ${sourceValidation.mockIndicators.length} indicator${sourceValidation.mockIndicators.length !== 1 ? "s" : ""}`,
+      details: `Checked for mock data patterns, found ${mockIndicatorCount} indicator${indicatorPlural}`,
       data: {
-        indicators: sourceValidation.mockIndicators.length,
+        indicators: mockIndicatorCount,
       },
-    });
+    };
+    steps.push(contentStep);
 
     return steps;
   }
@@ -2952,7 +2979,7 @@ export class DataValidationService {
     confidenceScore: ConfidenceScore,
     shouldFlagAsMock: boolean,
     mockIndicators: MockDataIndicator[]
-  ): "database" | "cache" | "mock" | "placeholder" | "unknown" {
+  ): FinalDataSource {
     if (!shouldFlagAsMock || confidenceScore.overall >= 0.5) {
       return sourceResult.source;
     }
@@ -3179,15 +3206,13 @@ export class DataValidationService {
 
   private createOutdatedIndicator(ageMinutes: number) {
     const hours = Math.floor(ageMinutes / 60);
-    let lastUpdated: string;
+    const isMoreThanHour = ageMinutes > 60;
+    const hourPlural = hours > 1 ? "s" : "";
+    const minutePlural = ageMinutes > 1 ? "s" : "";
 
-    if (ageMinutes > 60) {
-      const hourPlural = hours > 1 ? "s" : "";
-      lastUpdated = `${hours} hour${hourPlural} ago`;
-    } else {
-      const minutePlural = ageMinutes > 1 ? "s" : "";
-      lastUpdated = `${ageMinutes} minute${minutePlural} ago`;
-    }
+    const lastUpdated = isMoreThanHour
+      ? `${hours} hour${hourPlural} ago`
+      : `${ageMinutes} minute${minutePlural} ago`;
 
     return {
       status: "outdated" as const,
@@ -3235,7 +3260,7 @@ export class DataValidationService {
 
   private checkUserEmail(user: DashboardData["user"], indicators: MockDataIndicator[]): void {
     // Only flag emails with obvious test domains
-    if (!user.email) {
+    if (user.email === undefined || user.email === "") {
       return;
     }
 
@@ -3260,7 +3285,7 @@ export class DataValidationService {
     const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
 
     // Don't check if empty
-    if (!fullName) {
+    if (fullName === "") {
       return;
     }
 
@@ -3269,7 +3294,7 @@ export class DataValidationService {
       return;
     }
 
-    // Only flag if it's an EXACT placeholder text match (e.g., "PLACEHOLDER", "TODO")
+    // Only flag if it's an EXACT placeholder text match (e.g., "PLACEHOLDER", "TEST_USER")
     // NOT partial matches or common names
     if (this.isStrictPlaceholderText(fullName)) {
       indicators.push({
@@ -3353,27 +3378,20 @@ export class DataValidationService {
     for (const [itemIndex, item] of array.entries()) {
       if (typeof item === "object" && item !== null) {
         const itemIndicators = this.checkObjectMockData(item as Record<string, unknown>);
-        this.addHighConfidenceIndicators(indicators, itemIndicators, arrayName, itemIndex);
+        const highConfidenceIndicators = itemIndicators.filter(
+          indicator => indicator.confidence >= 0.7
+        );
+
+        for (const indicator of highConfidenceIndicators) {
+          indicators.push({
+            ...indicator,
+            field: `${arrayName}[${itemIndex}].${indicator.field}`,
+          });
+        }
       }
     }
 
     return indicators;
-  }
-
-  private addHighConfidenceIndicators(
-    indicators: MockDataIndicator[],
-    itemIndicators: MockDataIndicator[],
-    arrayName: string,
-    itemIndex: number
-  ): void {
-    for (const indicator of itemIndicators) {
-      if (indicator.confidence >= 0.7) {
-        indicators.push({
-          ...indicator,
-          field: `${arrayName}[${itemIndex}].${indicator.field}`,
-        });
-      }
-    }
   }
 
   /**
@@ -3401,22 +3419,33 @@ export class DataValidationService {
 
     const context = this.getFieldContext(key);
 
-    if (this.isStrictPlaceholderText(value) && !this.isLegitimateValueForContext(value, context)) {
-      indicators.push({
+    if (this.isStrictPlaceholderText(value)) {
+      if (this.isLegitimateValueForContext(value, context)) {
+        return;
+      }
+      const placeholderIndicator: MockDataIndicator = {
         field: key,
         type: "placeholder_text",
         value,
         confidence: 0.8,
         reason: `Text matches strict placeholder pattern in ${context} context`,
-      });
-    } else if (this.isGenericValue(value) && !this.isLegitimateValueForContext(value, context)) {
-      indicators.push({
+      };
+      indicators.push(placeholderIndicator);
+      return;
+    }
+
+    if (this.isGenericValue(value)) {
+      if (this.isLegitimateValueForContext(value, context)) {
+        return;
+      }
+      const genericIndicator: MockDataIndicator = {
         field: key,
         type: "generic_value",
         value,
         confidence: 0.7,
         reason: `Value matches common test data pattern in ${context} context`,
-      });
+      };
+      indicators.push(genericIndicator);
     }
   }
 
@@ -3427,22 +3456,25 @@ export class DataValidationService {
     }
 
     // Don't flag if it's not in the generic values list
-    if (!this.isGenericValue(value)) {
+    if (this.isGenericValue(value) === false) {
       return;
     }
 
     const context = this.getFieldContext(key);
 
     // Check if it's legitimate for the context
-    if (!this.isLegitimateNumberForContext(value, context)) {
-      indicators.push({
-        field: key,
-        type: "generic_value",
-        value,
-        confidence: 0.5,
-        reason: `Number appears to be a common test value in ${context} context`,
-      });
+    if (this.isLegitimateNumberForContext(value, context)) {
+      return;
     }
+
+    const numberIndicator: MockDataIndicator = {
+      field: key,
+      type: "generic_value",
+      value,
+      confidence: 0.5,
+      reason: `Number appears to be a common test value in ${context} context`,
+    };
+    indicators.push(numberIndicator);
   }
 
   /**
@@ -3496,9 +3528,14 @@ export class DataValidationService {
    * Prevents false positives by considering what values are normal for each field type
    *
    * IMPORTANT: Common names like "John Smith" are legitimate and should NOT be flagged
+   *
+   * Future improvements could include:
+   * - Machine learning-based pattern detection
+   * - Domain-specific validation rules
+   * - Integration with external validation services
    */
   private isLegitimateValueForContext(value: string, context: string): boolean {
-    if (!value || value.trim() === "") {
+    if (value === "" || value.trim() === "") {
       return true;
     }
 
@@ -3708,7 +3745,7 @@ export class DataValidationService {
     data: DashboardData,
     mockIndicators: MockDataIndicator[],
     sourceResult?: SourceValidationResult
-  ): "database" | "cache" | "mock" | "placeholder" | "unknown" {
+  ): FinalDataSource {
     // Priority 1: Use source validation result if available (highest priority)
     if (sourceResult) {
       if (sourceResult.isAuthenticated && sourceResult.confidence > 0.7) {
