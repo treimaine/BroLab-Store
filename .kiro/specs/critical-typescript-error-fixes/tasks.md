@@ -203,33 +203,40 @@
   - Fix handler function return types in error management services
   - _Requirements: 2.1, 2.2, 2.3_
 
-## Phase 8: Type System Consolidation (Current: 6 errors across 4 files)
+## Phase 8: Type System Consolidation (Current: 38 errors across 9 files)
 
 - [x] 8. Fix type conflicts and consolidate type definitions
 
-- [x] 8.1 Resolve SyncError type conflicts
-  - Consolidate multiple SyncError interfaces from `shared/types/sync.ts`, `shared/types/system-optimization.ts`, and `shared/types/core.ts`
-  - Use `shared/types/sync.ts` as the canonical SyncError definition with all required properties
-  - Update imports in `client/src/hooks/useOptimisticUpdates.ts` to use the correct SyncError type
-  - Remove duplicate SyncError definitions from other files
+- [x] 8.1 Export ConflictResolution and DataConflict from sync types
+  - Add `ConflictResolution` and `DataConflict` exports to `shared/types/sync.ts`
+  - These types currently exist in `shared/types/core.ts` and `shared/types/system-optimization.ts`
+  - Import and re-export from the canonical location to maintain consistency
+  - Update `client/src/services/OptimisticUpdateManager.ts` imports to resolve missing exports
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [x] 8.2 Fix OptimisticUpdateData type requirements
-  - Update `client/src/components/examples/CrossTabSyncExample.tsx` to include `id` property in optimistic update data
-  - Ensure all optimistic update data objects extend OptimisticUpdateData interface
-  - Fix lines 48 and 51 where `id` property is missing
+- [x] 8.2 Extend ErrorContext interface with additional properties
+  - Add `action` property to ErrorContext interface in `shared/types/sync.ts`
+  - Add `reportId` property to ErrorContext interface
+  - Add `originalError` property to ErrorContext interface
+  - These properties are used across multiple services for error tracking and debugging
+  - Affects: `useDashboardData.ts`, `DataFreshnessMonitor.ts`, `DataValidationService.ts`, `SyncErrorIntegration.ts`
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [x] 8.3 Fix SyncError fingerprint property
-  - Add `fingerprint` property to SyncError objects in `client/src/components/examples/SyncMonitoringExample.tsx`
-  - Generate unique fingerprints for error tracking (lines 150, 151)
-  - Ensure all SyncError objects include required properties: type, retryable, maxRetries, fingerprint
+- [x] 8.3 Extend RecoveryAction interface with additional properties
+  - Add `delay` property (optional number) to RecoveryAction interface in `shared/types/sync.ts`
+  - Add `strategy` property (optional ConnectionType) to RecoveryAction interface
+  - Add `sections` property (optional string array) to RecoveryAction interface
+  - Add `full` property (optional boolean) to RecoveryAction interface
+  - Add `message` property (optional string) to RecoveryAction interface
+  - Add new action types: `"fallback"`, `"force_sync"`, `"notify_user"` to the type union
+  - Affects: `useConnectionManager.ts`, `ConnectionManagerProvider.tsx`, `ConnectionManager.ts`
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [x] 8.4 Fix unknown type handling in ConnectionManagerExample
-  - Add proper type guard for `action` parameter in `getActionLabel` function
-  - Fix property access on unknown type (line 83)
-  - Ensure type safety for action.type, action.delay, and action.strategy
+- [x] 8.4 Fix SyncError context property in example components
+  - Update `client/src/components/examples/SyncMonitoringExample.tsx` to use proper ErrorContext structure
+  - The `context` property must match the ErrorContext interface (not just `{ simulation: boolean }`)
+  - Add required ErrorContext properties: `source`, `operation`, `component`
+  - Affects lines 152 and 153
   - _Requirements: 2.1, 2.2, 2.3_
 
 ## Phase 9: Validation and Testing
@@ -284,37 +291,42 @@
 4. **Phase 5 Completion**: ✅ Component import and server-side type errors resolved
 5. **Phase 6 Completion**: ✅ Dashboard modernization errors resolved
 6. **Phase 7 Completion**: ✅ Type system enhancement completed
-7. **Phase 8 Completion**: 🔄 Type system consolidation needed (6 errors across 4 files)
+7. **Phase 8 Completion**: 🔄 Type system consolidation needed (38 errors across 9 files)
 8. **Phase 9 Completion**: 🔄 Validation and testing pending
 9. **Phase 10 Completion**: 🔄 Documentation and cleanup pending
 
 ### Quality Metrics
 
-- **Error Reduction**: 114 errors reduced to 6 (95% improvement from original baseline)
-- **Compilation Success**: `npx tsc --noEmit` currently shows 6 remaining errors across 4 files
+- **Error Reduction**: 114 errors reduced to 38 (67% improvement from original baseline)
+- **Compilation Success**: `npx tsc --noEmit` currently shows 38 remaining errors across 9 files
 - **Application Startup**: ✅ `npm run dev` starts without errors
 - **Frontend Access**: ✅ Application loads in browser without console errors
 - **Error Distribution**:
-  - 1 error in `client/src/components/examples/ConnectionManagerExample.tsx` (unknown type handling on line 83)
-  - 2 errors in `client/src/components/examples/CrossTabSyncExample.tsx` (missing `id` property on lines 48, 51)
-  - 2 errors in `client/src/components/examples/SyncMonitoringExample.tsx` (missing `fingerprint` property on lines 150, 151)
-  - 1 error in `client/src/hooks/useOptimisticUpdates.ts` (SyncError type conflict on line 226)
+  - 2 errors in `client/src/components/examples/SyncMonitoringExample.tsx` (ErrorContext structure mismatch)
+  - 5 errors in `client/src/hooks/useConnectionManager.ts` (RecoveryAction missing properties)
+  - 3 errors in `client/src/hooks/useDashboardData.ts` (ErrorContext missing `action` property)
+  - 8 errors in `client/src/providers/ConnectionManagerProvider.tsx` (RecoveryAction type mismatches)
+  - 3 errors in `client/src/services/ConnectionManager.ts` (RecoveryAction type mismatches)
+  - 4 errors in `client/src/services/DataFreshnessMonitor.ts` (ErrorContext missing `action` property)
+  - 7 errors in `client/src/services/DataValidationService.ts` (ErrorContext missing properties)
+  - 2 errors in `client/src/services/OptimisticUpdateManager.ts` (missing ConflictResolution/DataConflict exports)
+  - 4 errors in `client/src/services/SyncErrorIntegration.ts` (ErrorContext missing properties)
 
 ### Current Status
 
-**🎯 NEAR COMPLETION**: The original critical syntax errors were successfully resolved, and dashboard modernization errors have been fixed. Only 6 type consolidation errors remain. Current state:
+**🔄 IN PROGRESS**: The original critical syntax errors were successfully resolved, and dashboard modernization errors have been fixed. Type system consolidation is needed to resolve remaining interface mismatches. Current state:
 
-- **Original Issues**: ✅ All malformed function names and basic syntax errors resolved (114 → 6 errors)
+- **Original Issues**: ✅ All malformed function names and basic syntax errors resolved (114 → 38 errors)
 - **Legacy Compatibility**: ✅ Application starts and runs successfully
 - **Dashboard Modernization**: ✅ All dashboard component errors resolved
-- **Remaining Issues**: 🔄 6 TypeScript errors from type definition conflicts
+- **Remaining Issues**: 🔄 38 TypeScript errors from type interface extensions needed
 
-**🔄 CURRENT WORK NEEDED**: 6 TypeScript errors across 4 files:
+**🔄 CURRENT WORK NEEDED**: 38 TypeScript errors across 9 files:
 
-- **Type Conflicts**: Multiple SyncError interface definitions causing import conflicts
-- **Missing Properties**: OptimisticUpdateData requires `id` property in example components
-- **Error Tracking**: SyncError objects missing `fingerprint` property for deduplication
-- **Type Guards**: Unknown type handling needs proper type guards in example components
+- **Missing Exports**: ConflictResolution and DataConflict need to be exported from `shared/types/sync.ts`
+- **ErrorContext Extensions**: Need to add `action`, `reportId`, and `originalError` properties
+- **RecoveryAction Extensions**: Need to add `delay`, `strategy`, `sections`, `full`, `message` properties and new action types
+- **Example Component Fixes**: SyncMonitoringExample needs proper ErrorContext structure
 
 ### Rollback Triggers
 
@@ -345,9 +357,9 @@
 
 ## Current State Summary
 
-This implementation plan has **successfully resolved 95% of the original critical TypeScript errors**. Only 6 type consolidation errors remain. Current status:
+This implementation plan has **successfully resolved 67% of the original critical TypeScript errors**. Type system consolidation is needed to resolve remaining interface mismatches. Current status:
 
-### ✅ **Massive Success** (114 → 6 errors, 95% reduction)
+### ✅ **Major Progress** (114 → 38 errors, 67% reduction)
 
 The original critical syntax errors and dashboard modernization errors have been completely resolved:
 
@@ -358,32 +370,37 @@ The original critical syntax errors and dashboard modernization errors have been
 - Service interface compatibility resolved
 - Application starts and runs successfully
 
-### 🔄 **Final Cleanup** (6 remaining errors)
+### 🔄 **Type System Extensions Needed** (38 remaining errors)
 
-Only type definition consolidation errors remain:
+Type interfaces need to be extended to support additional properties used across services:
 
-1. **SyncError Type Conflicts**: Multiple definitions of SyncError interface across different files
-2. **OptimisticUpdateData Requirements**: Example components missing required `id` property
-3. **Error Fingerprinting**: SyncError objects missing `fingerprint` property for tracking
-4. **Type Guards**: Unknown type handling in example components needs proper guards
+1. **Missing Type Exports**: ConflictResolution and DataConflict need to be exported from sync types
+2. **ErrorContext Extensions**: Services use additional properties (`action`, `reportId`, `originalError`) not in interface
+3. **RecoveryAction Extensions**: Recovery actions use additional properties (`delay`, `strategy`, `sections`, `full`, `message`) and action types
+4. **Example Component Fixes**: SyncMonitoringExample needs proper ErrorContext structure
 
 ### **Implementation Strategy**
 
-The remaining tasks are minimal and focused:
+The remaining tasks focus on extending type interfaces:
 
-1. **Phase 8**: Consolidate type definitions and fix conflicts (4 sub-tasks)
+1. **Phase 8**: Extend type interfaces to match actual usage (4 sub-tasks)
+   - Export missing types from sync.ts
+   - Add properties to ErrorContext interface
+   - Add properties to RecoveryAction interface
+   - Fix example component to use proper ErrorContext
 2. **Phase 9**: Validate fixes and ensure no regressions
 3. **Phase 10**: Document changes and optimize build configuration
 
-These are minor type system cleanup tasks. The application runs successfully, and resolving these will achieve 100% TypeScript compilation success.
+These are type interface extensions to match how the types are actually being used in the codebase. The application runs successfully, and resolving these will achieve 100% TypeScript compilation success.
 
 ### **Next Steps**
 
-The remaining work is straightforward:
+The remaining work is focused on type system alignment:
 
-1. **Consolidate SyncError Types**: Use `shared/types/sync.ts` as canonical definition
-2. **Fix Example Components**: Add missing properties to optimistic update data
-3. **Add Type Guards**: Proper type checking for unknown types
-4. **Final Validation**: Ensure zero TypeScript errors
+1. **Export Missing Types**: Add ConflictResolution and DataConflict to sync.ts exports
+2. **Extend ErrorContext**: Add `action`, `reportId`, `originalError` properties
+3. **Extend RecoveryAction**: Add `delay`, `strategy`, `sections`, `full`, `message` properties and new action types
+4. **Fix Example Component**: Update SyncMonitoringExample to use proper ErrorContext structure
+5. **Final Validation**: Ensure zero TypeScript errors
 
-These errors are in example/demo components and don't affect core functionality. Resolving them will achieve complete type safety across the entire codebase.
+These changes align the type definitions with how they're actually being used across the dashboard modernization features. All errors are in real-time sync and error handling services that are actively used in production.

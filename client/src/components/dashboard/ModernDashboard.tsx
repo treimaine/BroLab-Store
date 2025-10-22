@@ -17,13 +17,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile, useIsTablet } from "@/hooks/useBreakpoint";
 import { useDashboardConfig } from "@/hooks/useDashboardConfig";
-import {
-  useDashboardError,
-  useDashboardLoading,
-  useDashboardSection,
-  useDashboardStore,
-  useSyncStatus,
-} from "@/stores/useDashboardStore";
+import { useDashboardStore, useSyncStatus } from "@/stores/useDashboardStore";
 import { useClerk, useUser } from "@clerk/clerk-react";
 import type { Download, Favorite } from "@shared/types/dashboard";
 import { motion } from "framer-motion";
@@ -53,10 +47,12 @@ import { StatsCards } from "./StatsCards";
 import StatusIndicator from "./StatusIndicator";
 import { ValidatedDashboard } from "./ValidatedDashboard";
 
+// Import unified dashboard hook
+import { useDashboard } from "@/hooks/useDashboard";
+
 // Import other dashboard tabs (removed lazy loading)
-import { useDashboardData } from "../../hooks/useDashboardData";
-import DownloadsTable from "@/components/dashboard/DownloadsTable";
 import UserProfile from "@/components/auth/UserProfile";
+import DownloadsTable from "@/components/dashboard/DownloadsTable";
 import AnalyticsFixInfo from "./AnalyticsFixInfo";
 import EnhancedAnalytics from "./EnhancedAnalytics";
 import OrdersTab from "./OrdersTab";
@@ -155,12 +151,24 @@ export const ModernDashboard = memo(() => {
   const [showConsistencyInfo, setShowConsistencyInfo] = useState(true);
   const [showAnalyticsFixInfo, setShowAnalyticsFixInfo] = useState(true);
 
-  // Initialize real data fetching from Convex
+  // Use unified dashboard hook - single source of truth for all dashboard data
   const {
-    isLoading: dataLoading,
-    hasError: dataError,
-    isInitialized,
-  } = useDashboardData({
+    user,
+    stats,
+    favorites,
+    orders,
+    downloads,
+    reservations,
+    activity,
+    chartData,
+    trends,
+    isLoading,
+    error,
+    isAuthenticated,
+    refetch,
+    retry,
+    clearError: clearDashboardError,
+  } = useDashboard({
     includeChartData: true,
     includeTrends: true,
     activityLimit: (() => {
@@ -172,31 +180,14 @@ export const ModernDashboard = memo(() => {
     downloadsLimit: 50,
     favoritesLimit: 50,
     reservationsLimit: 20,
-    enableRealTimeSync: true,
+    enableRealtime: true,
   });
 
-  // Unified store data - single source of truth for all dashboard data
-  const isLoading = useDashboardLoading() || dataLoading;
-  const error = useDashboardError();
+  // Get sync status from store for connection indicators
   const syncStatus = useSyncStatus();
 
-  // Individual sections from unified store (now populated with real data)
-  const user = useDashboardSection("user");
-  const stats = useDashboardSection("stats");
-  const favorites = useDashboardSection("favorites");
-  const orders = useDashboardSection("orders");
-  const downloads = useDashboardSection("downloads");
-  const reservations = useDashboardSection("reservations");
-  const activity = useDashboardSection("activity");
-  const chartData = useDashboardSection("chartData");
-  const trends = useDashboardSection("trends");
-
-  // Store actions
-  const { forceSync, clearError, initializeCrossTabSync, destroyCrossTabSync } =
-    useDashboardStore();
-
-  // Authentication state - use clerkUser as primary source since we're already wrapped in SignedIn
-  const isAuthenticated = Boolean(clerkUser);
+  // Store actions for cross-tab sync
+  const { initializeCrossTabSync, destroyCrossTabSync } = useDashboardStore();
 
   // Initialize cross-tab synchronization when user is authenticated
   useEffect(() => {
@@ -209,21 +200,13 @@ export const ModernDashboard = memo(() => {
     };
   }, [clerkUser?.id, initializeCrossTabSync, destroyCrossTabSync]);
 
-  // Handle data errors from Convex
-  useEffect(() => {
-    if (dataError && !error) {
-      // Set error in store if Convex data fetch failed
-      console.error("Convex data fetch error detected");
-    }
-  }, [dataError, error]);
-
-  // Use real stats from unified store - no fallbacks or recalculation needed
+  // Use real stats from unified hook - no fallbacks or recalculation needed
   const consistentStats = useMemo(() => {
-    if (!stats || !isInitialized) {
+    if (!stats) {
       return null;
     }
 
-    // The unified store provides real, validated stats from Convex
+    // The unified hook provides real, validated stats from Convex
     console.log("Real Dashboard Stats:", {
       totalFavorites: stats.totalFavorites,
       totalDownloads: stats.totalDownloads,
@@ -237,35 +220,35 @@ export const ModernDashboard = memo(() => {
     });
 
     return stats;
-  }, [stats, isInitialized, favorites?.length, orders?.length, downloads?.length]);
+  }, [stats, favorites?.length, orders?.length, downloads?.length]);
 
   // Handle tab changes
   const handleTabChange = useCallback((tab: string) => {
     setActiveTab(tab);
   }, []);
 
-  // Handle refresh using unified store
+  // Handle refresh using unified hook
   const handleRefresh = useCallback(async () => {
     try {
-      await forceSync();
-      clearError();
+      await refetch();
+      clearDashboardError();
     } catch (err) {
       console.error("Failed to refresh dashboard:", err);
     }
-  }, [forceSync, clearError]);
+  }, [refetch, clearDashboardError]);
 
-  // Handle retry using unified store
-  const handleRetry = useCallback(async () => {
+  // Handle retry using unified hook
+  const handleRetry = useCallback(() => {
     try {
-      await forceSync();
+      retry();
     } catch (err) {
       console.error("Failed to retry dashboard sync:", err);
     }
-  }, [forceSync]);
+  }, [retry]);
 
   // Memoized components for performance
   const statsComponent = useMemo(() => {
-    const shouldShowSkeleton = (isLoading && !isInitialized) || !consistentStats;
+    const shouldShowSkeleton = isLoading || !consistentStats;
 
     if (shouldShowSkeleton) {
       return <StatsCardsSkeleton />;
@@ -280,7 +263,7 @@ export const ModernDashboard = memo(() => {
         <StatsCards stats={consistentStats} isLoading={isLoading} className="mb-6 sm:mb-8" />
       </motion.div>
     );
-  }, [consistentStats, isLoading, isInitialized, config.ui.animationDuration]);
+  }, [consistentStats, isLoading, config.ui.animationDuration]);
 
   // Error handling
   const shouldShowAuthError = !isAuthenticated && !isLoading;
@@ -378,7 +361,7 @@ export const ModernDashboard = memo(() => {
                 <TabContentWrapper value="overview">
                   <DashboardGrid>
                     <ContentSection span="2">
-                      {isLoading && !isInitialized ? (
+                      {isLoading ? (
                         <ActivityFeedSkeleton />
                       ) : (
                         <ActivityFeed
@@ -393,10 +376,7 @@ export const ModernDashboard = memo(() => {
                       )}
                     </ContentSection>
                     <ContentSection>
-                      <RecommendationsPanel
-                        favorites={favorites || []}
-                        isLoading={isLoading && !isInitialized}
-                      />
+                      <RecommendationsPanel favorites={favorites || []} isLoading={isLoading} />
                     </ContentSection>
                   </DashboardGrid>
                 </TabContentWrapper>
@@ -404,8 +384,7 @@ export const ModernDashboard = memo(() => {
                 {/* Analytics Tab */}
                 <TabContentWrapper value="analytics">
                   {(() => {
-                    const hasAnalyticsData =
-                      config.features.analyticsCharts && isInitialized && trends;
+                    const hasAnalyticsData = config.features.analyticsCharts && trends;
 
                     if (hasAnalyticsData) {
                       return (
@@ -446,7 +425,7 @@ export const ModernDashboard = memo(() => {
 
                 {/* Activity Tab */}
                 <TabContentWrapper value="activity">
-                  {isLoading && !isInitialized ? (
+                  {isLoading ? (
                     <ActivityFeedSkeleton />
                   ) : (
                     <ActivityFeed
@@ -636,7 +615,7 @@ export const ModernDashboard = memo(() => {
                           </button>
                         )}
                         <button
-                          onClick={clearError}
+                          onClick={clearDashboardError}
                           className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
                         >
                           Dismiss
