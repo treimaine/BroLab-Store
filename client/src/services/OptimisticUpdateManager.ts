@@ -64,10 +64,10 @@ export interface FeedbackAction {
  * Optimistic Update Manager for immediate UI feedback with rollback
  */
 export class OptimisticUpdateManager extends BrowserEventEmitter {
-  private config: OptimisticUpdateConfig;
+  private readonly config: OptimisticUpdateConfig;
   private updateQueue: UpdateQueue;
-  private timeouts = new Map<string, NodeJS.Timeout>();
-  private retryCounters = new Map<string, number>();
+  private readonly timeouts = new Map<string, NodeJS.Timeout>();
+  private readonly retryCounters = new Map<string, number>();
   private isDestroyed = false;
 
   constructor(config: Partial<OptimisticUpdateConfig> = {}) {
@@ -97,8 +97,8 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
   public applyOptimisticUpdate(
     section: keyof DashboardData,
     operation: "add" | "update" | "delete",
-    data: any,
-    rollbackData?: any,
+    data: unknown,
+    rollbackData?: unknown,
     userId?: string
   ): OptimisticUpdate {
     if (this.isDestroyed) {
@@ -146,7 +146,7 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
   /**
    * Confirm an optimistic update (called when server operation succeeds)
    */
-  public confirmOptimisticUpdate(updateId: string, serverData?: any): void {
+  public confirmOptimisticUpdate(updateId: string, serverData?: unknown): void {
     const update = this.findUpdate(updateId);
     if (!update) {
       this.log("Update not found for confirmation", { updateId });
@@ -242,7 +242,7 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
           {
             label: "Reload Page",
             type: "reload",
-            handler: () => window.location.reload(),
+            handler: () => globalThis.location.reload(),
           },
         ],
       });
@@ -295,7 +295,9 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
    */
   public clearAllUpdates(): void {
     // Clear all timeouts
-    this.timeouts.forEach(timeout => clearTimeout(timeout));
+    for (const timeout of this.timeouts.values()) {
+      clearTimeout(timeout);
+    }
     this.timeouts.clear();
     this.retryCounters.clear();
 
@@ -319,15 +321,16 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
     const sectionGroups = new Map<string, OptimisticUpdate[]>();
 
     // Group updates by section
-    [...this.updateQueue.pending, ...this.updateQueue.processing].forEach(update => {
+    const allUpdates = [...this.updateQueue.pending, ...this.updateQueue.processing];
+    for (const update of allUpdates) {
       if (!sectionGroups.has(update.section)) {
         sectionGroups.set(update.section, []);
       }
       sectionGroups.get(update.section)!.push(update);
-    });
+    }
 
     // Check for conflicts within each section
-    sectionGroups.forEach((updates, section) => {
+    for (const [section, updates] of sectionGroups) {
       if (updates.length > 1) {
         // Check for concurrent updates to the same data
         const concurrentUpdates = updates.filter(
@@ -337,34 +340,23 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
         if (concurrentUpdates.length > 1) {
           conflicts.push({
             id: this.generateConflictId(),
-            updates: concurrentUpdates,
-            type: "concurrent_update",
-            description: `Multiple concurrent updates detected in ${section}`,
-            resolutionStrategies: [
-              {
-                type: "server_wins",
-                description: "Use server data as authoritative",
-                automatic: true,
-                confidence: 0.9,
-                priority: 1,
-              },
-              {
-                type: "merge",
-                description: "Attempt to merge changes",
-                automatic: false,
-                confidence: 0.6,
-                priority: 2,
-              },
-            ],
-            detectedAt: Date.now(),
             resourceType: "dashboard_data",
             resourceId: section,
-            severity: "medium",
-            autoResolvable: true,
+            localValue: concurrentUpdates[0].data,
+            remoteValue: concurrentUpdates.at(-1)!.data,
+            timestamp: Date.now(),
+            status: "pending",
+            metadata: {
+              updates: concurrentUpdates,
+              type: "concurrent_update",
+              description: `Multiple concurrent updates detected in ${section}`,
+              severity: "medium",
+              autoResolvable: true,
+            },
           });
         }
       }
-    });
+    }
 
     return conflicts;
   }
@@ -374,21 +366,13 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
    */
   public resolveConflict(
     conflictId: string,
-    strategy: "server_wins" | "client_wins" | "merge" | "manual"
+    strategy: "last_write_wins" | "merge" | "user_choice" | "custom"
   ): ConflictResolution | null {
     // This would implement actual conflict resolution logic
     // For now, return a basic resolution
     return {
-      strategy: {
-        type: strategy,
-        description: `Resolved using ${strategy} strategy`,
-        automatic: strategy === "server_wins",
-        confidence: strategy === "server_wins" ? 0.9 : 0.7,
-        priority: strategy === "server_wins" ? 1 : 2,
-      },
-      resolvedData: null,
-      success: true,
-      resolvedAt: Date.now(),
+      strategy,
+      priority: strategy === "last_write_wins" ? "remote" : "manual",
     };
   }
 
@@ -416,13 +400,13 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
 
   private moveUpdate(update: OptimisticUpdate, toQueue: keyof UpdateQueue): void {
     // Remove from all queues
-    Object.keys(this.updateQueue).forEach(queueName => {
+    for (const queueName of Object.keys(this.updateQueue)) {
       const queue = this.updateQueue[queueName as keyof UpdateQueue];
       const index = queue.findIndex(u => u.id === update.id);
       if (index !== -1) {
         queue.splice(index, 1);
       }
-    });
+    }
 
     // Add to target queue
     this.updateQueue[toQueue].push(update);
@@ -552,11 +536,11 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
         );
 
         // Clean up old retry counters
-        this.retryCounters.forEach((count, updateId) => {
+        for (const [updateId] of this.retryCounters) {
           if (!this.findUpdate(updateId)) {
             this.retryCounters.delete(updateId);
           }
-        });
+        }
       },
       5 * 60 * 1000
     );
@@ -589,9 +573,7 @@ let optimisticUpdateManagerInstance: OptimisticUpdateManager | null = null;
 export const getOptimisticUpdateManager = (
   config?: Partial<OptimisticUpdateConfig>
 ): OptimisticUpdateManager => {
-  if (!optimisticUpdateManagerInstance) {
-    optimisticUpdateManagerInstance = new OptimisticUpdateManager(config);
-  }
+  optimisticUpdateManagerInstance ??= new OptimisticUpdateManager(config);
   return optimisticUpdateManagerInstance;
 };
 

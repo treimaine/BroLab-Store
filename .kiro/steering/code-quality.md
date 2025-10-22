@@ -24,6 +24,47 @@ inclusion: always
 - Avoids broken builds and failed deployments
 - Reduces technical debt accumulation
 
+## Mandatory File Organization Rule
+
+**All documentation and example files MUST be placed in the `docs/` directory.**
+
+### File Placement Requirements
+
+- **`.example.tsx`** - Example usage files must always be created in the `docs/` directory
+- **`.IMPLEMENTATION.md`** - Implementation documentation must always be created in the `docs/` directory
+- **`.README.md`** - Component-specific README files must always be created in the `docs/` directory
+
+### Correct Placement Examples
+
+```
+✅ CORRECT:
+client/src/components/dashboard/OfflineBanner.tsx
+docs/OfflineBanner.example.tsx
+docs/OfflineBanner.IMPLEMENTATION.md
+docs/OfflineBanner.README.md
+
+❌ INCORRECT:
+client/src/components/dashboard/OfflineBanner.tsx
+client/src/components/dashboard/OfflineBanner.example.tsx       # Wrong - should be in docs/
+client/src/components/dashboard/OfflineBanner.IMPLEMENTATION.md # Wrong - should be in docs/
+client/src/components/dashboard/OfflineBanner.README.md         # Wrong - should be in docs/
+```
+
+### Workflow
+
+1. **Create** - When creating documentation or example files, always place them in the `docs/` directory
+2. **Verify** - Check that all `.example.tsx`, `.IMPLEMENTATION.md`, and `.README.md` files are in `docs/`
+3. **Move** - If files are in the wrong location, move them immediately to the `docs/` directory
+4. **Update** - Update any references or imports after moving files
+
+### Why This Matters
+
+- Centralizes all documentation in one location
+- Makes documentation easy to find and maintain
+- Follows project documentation conventions
+- Prevents scattered documentation across the codebase
+- Keeps component directories clean and focused on implementation
+
 ## Technology-Specific Best Practices
 
 ### Convex Best Practices

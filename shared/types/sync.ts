@@ -38,14 +38,18 @@ export interface ErrorContext {
   connectionType?: ConnectionType;
   /** Source of the error */
   source?: string;
-  /** Error object */
-  error?: unknown;
   /** Additional metadata */
   metadata?: Record<string, unknown>;
   /** Stack trace */
   stackTrace?: string;
   /** Session ID */
   sessionId?: string;
+  /** Action being performed when error occurred */
+  action?: string;
+  /** Report ID for error tracking */
+  reportId?: string;
+  /** Original error object */
+  originalError?: Error;
 }
 
 /**
@@ -294,6 +298,42 @@ export interface ValidationResult {
   validatedAt: number;
 }
 
+/**
+ * Data inconsistency
+ */
+export interface Inconsistency {
+  /** Inconsistency type */
+  type: "calculation" | "timing" | "missing_data" | "duplicate_data";
+  /** Affected sections */
+  sections: string[];
+  /** Description of the inconsistency */
+  description: string;
+  /** Severity level */
+  severity: "low" | "medium" | "high" | "critical";
+  /** Whether it can be auto-resolved */
+  autoResolvable: boolean;
+  /** When it was detected */
+  detectedAt: number;
+  /** Expected value (optional) */
+  expectedValue?: unknown;
+  /** Actual value (optional) */
+  actualValue?: unknown;
+}
+
+/**
+ * Cross-validation result
+ */
+export interface CrossValidationResult {
+  /** Whether data is consistent */
+  consistent: boolean;
+  /** List of inconsistencies found */
+  inconsistencies: Inconsistency[];
+  /** Sections affected by inconsistencies */
+  affectedSections: string[];
+  /** Recommended action to resolve */
+  recommendedAction: "sync" | "reload" | "ignore";
+}
+
 // ================================
 // EVENT TYPES
 // ================================
@@ -466,17 +506,76 @@ export interface ConsistentUserStats {
  */
 export interface RecoveryAction {
   /** Action ID */
-  id: string;
+  id?: string;
   /** Action label */
-  label: string;
+  label?: string;
   /** Action description */
-  description: string;
+  description?: string;
   /** Action type */
-  type: "retry" | "refresh" | "reload" | "contact_support" | "dismiss" | "custom";
+  type:
+    | "retry"
+    | "refresh"
+    | "reload"
+    | "contact_support"
+    | "dismiss"
+    | "custom"
+    | "fallback"
+    | "force_sync"
+    | "notify_user";
   /** Whether this is the primary action */
-  primary: boolean;
+  primary?: boolean;
   /** Whether action is available */
-  available: boolean;
+  available?: boolean;
   /** Action handler */
   handler?: () => void | Promise<void>;
+  /** Delay before action (optional) */
+  delay?: number;
+  /** Connection strategy (optional) */
+  strategy?: ConnectionType;
+  /** Sections to sync (optional) */
+  sections?: string[];
+  /** Full sync flag (optional) */
+  full?: boolean;
+  /** Action message (optional) */
+  message?: string;
+}
+
+// ================================
+// DATA CONSISTENCY TYPES
+// ================================
+
+/**
+ * Conflict resolution strategy
+ */
+export interface ConflictResolution {
+  /** Resolution strategy */
+  strategy: "last_write_wins" | "merge" | "user_choice" | "custom";
+  /** Custom resolver function */
+  resolver?: (local: unknown, remote: unknown) => unknown;
+  /** Priority for resolution */
+  priority?: "local" | "remote" | "newest" | "manual";
+}
+
+/**
+ * Data conflict between local and remote state
+ */
+export interface DataConflict {
+  /** Conflict ID */
+  id: string;
+  /** Resource type */
+  resourceType: string;
+  /** Resource ID */
+  resourceId: string;
+  /** Local value */
+  localValue: unknown;
+  /** Remote value */
+  remoteValue: unknown;
+  /** Conflict timestamp */
+  timestamp: number;
+  /** Resolution strategy */
+  resolution?: ConflictResolution;
+  /** Conflict status */
+  status: "pending" | "resolved" | "ignored";
+  /** Additional metadata */
+  metadata?: Record<string, unknown>;
 }

@@ -21,10 +21,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useConnectionManager, useConnectionMetrics } from "@/hooks/useConnectionManager";
 import { cn } from "@/lib/utils";
-import { useSyncStatus } from "@/stores/useDashboardStore";
-import type { ConnectionStatus } from "@shared/types/sync";
+import { useDashboardStore } from "@/stores/useDashboardStore";
+import type { SyncStatus } from "@shared/types/sync";
 import {
   AlertCircle,
   CheckCircle,
@@ -35,7 +34,6 @@ import {
   SignalHigh,
   SignalLow,
   SignalMedium,
-  Wifi,
   WifiOff,
   XCircle,
   Zap,
@@ -77,27 +75,46 @@ export const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps>
   onRefresh,
   showQualityBar = true,
 }) => {
-  const {
-    status,
-    isConnected,
-    isReconnecting,
-    connect,
-    disconnect,
-    reconnect,
-    getCurrentStrategy,
-    enableFallback,
-    error,
-    clearError,
-    recoveryActions,
-  } = useConnectionManager();
+  // Get sync status from dashboard store
+  const syncStatus = useDashboardStore(state => state.syncStatus);
+  const error = useDashboardStore(state => state.error);
+  const forceSync = useDashboardStore(state => state.forceSync);
+  const clearError = useDashboardStore(state => state.clearError);
 
-  const { current: metrics, qualityScore, isHealthy } = useConnectionMetrics();
-  const syncStatus = useSyncStatus();
+  // Derive connection state from sync status
+  const isConnected = syncStatus.connected;
+  const isReconnecting = syncStatus.syncInProgress;
+  const connectionType = syncStatus.connectionType;
+
+  // Calculate quality score from metrics
+  const qualityScore = useMemo(() => {
+    const { successRate, averageLatency } = syncStatus.metrics;
+    // Quality based on success rate and latency
+    const latencyScore = Math.max(0, 1 - averageLatency / 5000); // 0-5s latency range
+    const successScore = successRate / 100;
+    return latencyScore * 0.4 + successScore * 0.6;
+  }, [syncStatus.metrics]);
+
+  const isHealthy = qualityScore >= 0.7;
+
+  // Calculate last sync time if not provided
+  const calculatedLastSyncTime = useMemo(() => {
+    if (lastSyncTime) return lastSyncTime;
+    if (syncStatus.lastSync === 0) return "Never";
+
+    const now = Date.now();
+    const diff = now - syncStatus.lastSync;
+
+    if (diff < 60000) return "Just now";
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    return `${Math.floor(diff / 86400000)}d ago`;
+  }, [lastSyncTime, syncStatus.lastSync]);
 
   // Get enhanced status info with data freshness
   const statusInfo = useMemo(
-    () => getEnhancedStatusInfo(status, isHealthy, error, syncStatus, lastSyncTime),
-    [status, isHealthy, error, syncStatus, lastSyncTime]
+    () => getEnhancedStatusInfo(syncStatus, isHealthy, error, calculatedLastSyncTime),
+    [syncStatus, isHealthy, error, calculatedLastSyncTime]
   );
 
   // Handle manual refresh with custom handler support
@@ -106,25 +123,13 @@ export const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps>
       if (onRefresh) {
         await onRefresh();
       } else {
-        if (isConnected) {
-          await reconnect();
-        } else {
-          await connect();
-        }
+        await forceSync();
       }
       clearError();
     } catch (err) {
       console.error("Manual refresh failed:", err);
     }
-  }, [isConnected, reconnect, connect, clearError, onRefresh]);
-
-  // Handle fallback strategy change
-  const handleFallbackChange = useCallback(
-    (strategy: "immediate" | "gradual" | "quality_based" | "manual") => {
-      enableFallback(strategy);
-    },
-    [enableFallback]
-  );
+  }, [onRefresh, forceSync, clearError]);
 
   // Handle recovery action
   const handleRecoveryAction = useCallback(
@@ -133,17 +138,14 @@ export const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps>
         case "retry":
           handleRefresh();
           break;
-        case "fallback":
-          handleFallbackChange("immediate");
-          break;
-        case "disconnect":
-          disconnect();
+        case "clear_error":
+          clearError();
           break;
         default:
           console.warn("Unknown recovery action:", action);
       }
     },
-    [handleRefresh, handleFallbackChange, disconnect]
+    [handleRefresh, clearError]
   );
 
   if (compact) {
@@ -168,11 +170,7 @@ export const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps>
                 <div
                   className={cn(
                     "absolute -top-1 -right-1 h-2 w-2 rounded-full",
-                    statusInfo.dataAge === "fresh"
-                      ? "bg-green-400"
-                      : statusInfo.dataAge === "stale"
-                        ? "bg-yellow-400"
-                        : "bg-red-400"
+                    getDataAgeBadgeColor(statusInfo.dataAge)
                   )}
                 />
               )}
@@ -214,11 +212,7 @@ export const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps>
             <div
               className={cn(
                 "absolute -top-1 -right-1 h-2 w-2 rounded-full",
-                statusInfo.dataAge === "fresh"
-                  ? "bg-green-400"
-                  : statusInfo.dataAge === "stale"
-                    ? "bg-yellow-400"
-                    : "bg-red-400"
+                getDataAgeBadgeColor(statusInfo.dataAge)
               )}
             />
           )}
@@ -250,10 +244,10 @@ export const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps>
             <div>
               <span className="text-muted-foreground">Connection:</span>
               <div className="font-medium capitalize flex items-center gap-1">
-                {getCurrentStrategy() === "websocket" && <Zap className="h-3 w-3" />}
-                {getCurrentStrategy() === "polling" && <Clock className="h-3 w-3" />}
-                {getCurrentStrategy() === "offline" && <WifiOff className="h-3 w-3" />}
-                {getCurrentStrategy()}
+                {connectionType === "websocket" && <Zap className="h-3 w-3" />}
+                {connectionType === "polling" && <Clock className="h-3 w-3" />}
+                {connectionType === "offline" && <WifiOff className="h-3 w-3" />}
+                {connectionType}
               </div>
             </div>
 
@@ -262,11 +256,7 @@ export const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps>
                 <span className="text-muted-foreground">Data:</span>
                 <div className="font-medium flex items-center gap-1">
                   <Database className="h-3 w-3" />
-                  {statusInfo.dataAge === "fresh"
-                    ? "Fresh"
-                    : statusInfo.dataAge === "stale"
-                      ? "Stale"
-                      : "Old"}
+                  {getDataAgeLabel(statusInfo.dataAge)}
                 </div>
               </div>
             )}
@@ -286,31 +276,22 @@ export const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps>
 
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Latency:</span>
-                <span className="font-medium">{Math.round(metrics.stats.averageLatency)}ms</span>
+                <span className="font-medium">
+                  {Math.round(syncStatus.metrics.averageLatency)}ms
+                </span>
               </div>
 
-              {lastSyncTime && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Last sync:</span>
-                  <span className="font-medium">{lastSyncTime}</span>
-                </div>
-              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Last sync:</span>
+                <span className="font-medium">{calculatedLastSyncTime}</span>
+              </div>
             </>
           )}
 
-          {status.reconnectAttempts > 0 && (
+          {syncStatus.metrics.reconnectCount > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Attempts:</span>
-              <span className="font-medium">
-                {status.reconnectAttempts}/{status.maxReconnectAttempts}
-              </span>
-            </div>
-          )}
-
-          {status.nextReconnectIn && (
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Next retry:</span>
-              <span className="font-medium">{Math.round(status.nextReconnectIn / 1000)}s</span>
+              <span className="text-muted-foreground">Reconnects:</span>
+              <span className="font-medium">{syncStatus.metrics.reconnectCount}</span>
             </div>
           )}
         </div>
@@ -320,23 +301,23 @@ export const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps>
           <>
             <DropdownMenuSeparator />
             <div className="px-3 py-2 space-y-2">
-              <div className="text-sm font-medium">Metrics</div>
+              <div className="text-sm font-medium">Sync Metrics</div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <div className="text-muted-foreground">Sent</div>
-                  <div className="font-medium">{metrics.stats.messagesSent}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">Received</div>
-                  <div className="font-medium">{metrics.stats.messagesReceived}</div>
+                  <div className="text-muted-foreground">Success Rate</div>
+                  <div className="font-medium">{syncStatus.metrics.successRate.toFixed(1)}%</div>
                 </div>
                 <div>
                   <div className="text-muted-foreground">Errors</div>
-                  <div className="font-medium">{metrics.stats.errorCount}</div>
+                  <div className="font-medium">{syncStatus.metrics.errorCount}</div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground">Uptime</div>
-                  <div className="font-medium">{formatUptime(metrics.stats.uptime)}</div>
+                  <div className="text-muted-foreground">Reconnects</div>
+                  <div className="font-medium">{syncStatus.metrics.reconnectCount}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Inconsistencies</div>
+                  <div className="font-medium">{syncStatus.metrics.dataInconsistencies}</div>
                 </div>
               </div>
             </div>
@@ -372,31 +353,18 @@ export const ConnectionStatusIndicator: React.FC<ConnectionStatusIndicatorProps>
             {isReconnecting || syncStatus.syncInProgress ? "Syncing..." : "Force Refresh"}
           </DropdownMenuItem>
 
-          {recoveryActions.length > 0 && (
+          {error && (
             <>
               <DropdownMenuSeparator />
-              <div className="px-2 py-1 text-xs text-muted-foreground">Recovery Options</div>
-              {recoveryActions.map((action, index) => (
-                <DropdownMenuItem key={index} onClick={() => handleRecoveryAction(action.type)}>
-                  {getActionIcon(action.type)}
-                  {getActionLabel(action)}
-                </DropdownMenuItem>
-              ))}
+              <DropdownMenuItem onClick={() => handleRecoveryAction("retry")}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry Connection
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleRecoveryAction("clear_error")}>
+                <XCircle className="h-4 w-4 mr-2" />
+                Clear Error
+              </DropdownMenuItem>
             </>
-          )}
-
-          <DropdownMenuSeparator />
-
-          {isConnected ? (
-            <DropdownMenuItem onClick={() => disconnect()} className="text-muted-foreground">
-              <WifiOff className="h-4 w-4 mr-2" />
-              Disconnect
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onClick={() => connect()} className="text-muted-foreground">
-              <Wifi className="h-4 w-4 mr-2" />
-              Connect
-            </DropdownMenuItem>
           )}
         </div>
       </DropdownMenuContent>
@@ -444,7 +412,9 @@ export const ConnectionQualityBar: React.FC<{ score: number }> = ({ score }) => 
 export const ConnectionStatusBadge: React.FC<{
   className?: string;
 }> = ({ className = "" }) => {
-  const { isConnected, isReconnecting, status } = useConnectionManager();
+  const syncStatus = useDashboardStore(state => state.syncStatus);
+  const isConnected = syncStatus.connected;
+  const isReconnecting = syncStatus.syncInProgress;
 
   const getBadgeColor = () => {
     if (isReconnecting) return "bg-yellow-500";
@@ -473,7 +443,15 @@ export const ConnectionQualityProgressBar: React.FC<{
   className?: string;
   showLabel?: boolean;
 }> = ({ className = "", showLabel = true }) => {
-  const { qualityScore } = useConnectionMetrics();
+  const syncStatus = useDashboardStore(state => state.syncStatus);
+
+  // Calculate quality score from metrics
+  const qualityScore = useMemo(() => {
+    const { successRate, averageLatency } = syncStatus.metrics;
+    const latencyScore = Math.max(0, 1 - averageLatency / 5000);
+    const successScore = successRate / 100;
+    return latencyScore * 0.4 + successScore * 0.6;
+  }, [syncStatus.metrics]);
 
   return (
     <div className={cn("space-y-1", className)}>
@@ -490,84 +468,99 @@ export const ConnectionQualityProgressBar: React.FC<{
 
 // Helper functions
 
-function getEnhancedStatusInfo(
-  status: ConnectionStatus,
-  isHealthy: boolean,
-  error: any,
-  syncStatus: any,
-  lastSyncTime?: string
-) {
+function getDataAgeLabel(dataAge: "fresh" | "stale" | "old" | null): string {
+  if (dataAge === "fresh") return "Fresh";
+  if (dataAge === "stale") return "Stale";
+  return "Old";
+}
+
+function getDataAgeBadgeColor(dataAge: "fresh" | "stale" | "old" | null): string {
+  if (dataAge === "fresh") return "bg-green-400";
+  if (dataAge === "stale") return "bg-yellow-400";
+  return "bg-red-400";
+}
+
+type DataFreshness = {
+  dataAge: "fresh" | "stale" | "old" | null;
+  dataFreshnessText: string;
+};
+
+function calculateDataFreshness(lastSync: number): DataFreshness {
+  if (lastSync === 0) {
+    return { dataAge: null, dataFreshnessText: "" };
+  }
+
   const now = Date.now();
-  const lastSync = syncStatus?.lastSync || 0;
   const timeSinceSync = now - lastSync;
 
-  // Determine data freshness
-  let dataAge: "fresh" | "stale" | "old" | null = null;
-  let dataFreshnessText = "";
-
-  if (lastSync > 0) {
-    if (timeSinceSync < 30000) {
-      // Less than 30 seconds
-      dataAge = "fresh";
-      dataFreshnessText = "Data is up to date";
-    } else if (timeSinceSync < 300000) {
-      // Less than 5 minutes
-      dataAge = "stale";
-      dataFreshnessText = "Data may be slightly outdated";
-    } else {
-      dataAge = "old";
-      dataFreshnessText = "Data needs refresh";
-    }
-  }
-
-  if (status.reconnecting || syncStatus?.syncInProgress) {
+  if (timeSinceSync < 30000) {
+    // Less than 30 seconds
     return {
-      icon: RefreshCw,
-      color: "text-yellow-500",
-      label: "Syncing",
-      description: "Updating dashboard data...",
-      userFriendlyMessage: "Your dashboard is being updated with the latest information.",
-      dataAge,
-      dataFreshnessText,
+      dataAge: "fresh",
+      dataFreshnessText: "Data is up to date",
     };
   }
 
-  if (status.connected) {
-    if (isHealthy) {
-      return {
-        icon: CheckCircle,
-        color: "text-green-500",
-        label: "Online",
-        description: `Real-time sync active via ${status.type}`,
-        userFriendlyMessage: "Your dashboard shows live data and updates automatically.",
-        dataAge,
-        dataFreshnessText,
-      };
-    } else {
-      return {
-        icon: AlertCircle,
-        color: "text-yellow-500",
-        label: "Connected",
-        description: "Connection quality is degraded",
-        userFriendlyMessage: "Connection is slower than usual. Data updates may be delayed.",
-        dataAge,
-        dataFreshnessText,
-      };
-    }
-  }
-
-  if (error) {
+  if (timeSinceSync < 300000) {
+    // Less than 5 minutes
     return {
-      icon: XCircle,
-      color: "text-red-500",
-      label: "Error",
-      description: "Connection failed - using cached data",
-      userFriendlyMessage: "Connection failed. Data may be outdated. Click refresh to reconnect.",
-      dataAge: "old",
-      dataFreshnessText: "Using cached data - may be outdated",
+      dataAge: "stale",
+      dataFreshnessText: "Data may be slightly outdated",
     };
   }
 
+  return {
+    dataAge: "old",
+    dataFreshnessText: "Data needs refresh",
+  };
+}
+
+function getStatusForSyncing(freshness: DataFreshness) {
+  return {
+    icon: RefreshCw,
+    color: "text-yellow-500",
+    label: "Syncing",
+    description: "Updating dashboard data...",
+    userFriendlyMessage: "Your dashboard is being updated with the latest information.",
+    ...freshness,
+  };
+}
+
+function getStatusForHealthyConnection(connectionType: string, freshness: DataFreshness) {
+  return {
+    icon: CheckCircle,
+    color: "text-green-500",
+    label: "Online",
+    description: `Real-time sync active via ${connectionType}`,
+    userFriendlyMessage: "Your dashboard shows live data and updates automatically.",
+    ...freshness,
+  };
+}
+
+function getStatusForDegradedConnection(freshness: DataFreshness) {
+  return {
+    icon: AlertCircle,
+    color: "text-yellow-500",
+    label: "Connected",
+    description: "Connection quality is degraded",
+    userFriendlyMessage: "Connection is slower than usual. Data updates may be delayed.",
+    ...freshness,
+  };
+}
+
+function getStatusForError() {
+  return {
+    icon: XCircle,
+    color: "text-red-500",
+    label: "Error",
+    description: "Connection failed - using cached data",
+    userFriendlyMessage: "Connection failed. Data may be outdated. Click refresh to reconnect.",
+    dataAge: "old" as const,
+    dataFreshnessText: "Using cached data - may be outdated",
+  };
+}
+
+function getStatusForOffline() {
   return {
     icon: WifiOff,
     color: "text-gray-500",
@@ -575,47 +568,33 @@ function getEnhancedStatusInfo(
     description: "No real-time updates available",
     userFriendlyMessage:
       "Dashboard is offline. Data shown may not be current. Check your internet connection.",
-    dataAge: "old",
+    dataAge: "old" as const,
     dataFreshnessText: "Offline - data may be outdated",
   };
 }
 
-function getActionIcon(actionType: string) {
-  switch (actionType) {
-    case "retry":
-      return <RefreshCw className="h-4 w-4 mr-2" />;
-    case "fallback":
-      return <Wifi className="h-4 w-4 mr-2" />;
-    case "force_sync":
-      return <Clock className="h-4 w-4 mr-2" />;
-    default:
-      return <AlertCircle className="h-4 w-4 mr-2" />;
-  }
-}
+function getEnhancedStatusInfo(
+  syncStatus: SyncStatus,
+  isHealthy: boolean,
+  error: unknown,
+  _lastSyncTime: string
+) {
+  const freshness = calculateDataFreshness(syncStatus.lastSync || 0);
 
-function getActionLabel(action: any) {
-  switch (action.type) {
-    case "retry":
-      return `Retry (${Math.round(action.delay / 1000)}s delay)`;
-    case "fallback":
-      return `Switch to ${action.strategy}`;
-    case "force_sync":
-      return "Force sync all data";
-    default:
-      return "Unknown action";
+  if (syncStatus.syncInProgress) {
+    return getStatusForSyncing(freshness);
   }
-}
 
-function formatUptime(uptime: number): string {
-  const seconds = Math.floor(uptime / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
+  if (syncStatus.connected) {
+    if (isHealthy) {
+      return getStatusForHealthyConnection(syncStatus.connectionType, freshness);
+    }
+    return getStatusForDegradedConnection(freshness);
+  }
 
-  if (hours > 0) {
-    return `${hours}h ${minutes % 60}m`;
+  if (error) {
+    return getStatusForError();
   }
-  if (minutes > 0) {
-    return `${minutes}m ${seconds % 60}s`;
-  }
-  return `${seconds}s`;
+
+  return getStatusForOffline();
 }

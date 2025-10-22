@@ -141,7 +141,12 @@ const SyncOperationSimulator: React.FC = () => {
         type: SyncErrorType.NETWORK_ERROR,
         message: "Simulated network error",
         timestamp,
-        context: { simulation: true },
+        context: {
+          source: "simulation",
+          operation: "network_test",
+          component: "SyncMonitoringExample",
+          metadata: { simulation: true },
+        },
         retryable: true,
         retryCount: 0,
         maxRetries: 3,

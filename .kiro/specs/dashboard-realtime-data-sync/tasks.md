@@ -217,21 +217,21 @@ The remaining tasks focus on:
   - _Requirements: 1.3, 3.1, 3.4, 4.3, 6.1_
 
 - [ ] 22. Migrate Dashboard to Unified Hook and Add Sync UI Components
-- [ ] 22.1 Migrate ModernDashboard to use unified useDashboard hook
+- [x] 22.1 Migrate ModernDashboard to use unified useDashboard hook
   - Replace `useDashboardData` with `useDashboard` in `client/src/components/dashboard/ModernDashboard.tsx`
   - Remove redundant data fetching hooks and consolidate to single unified hook
   - Update all dashboard sections to use data from unified hook
   - Ensure proper error handling and loading states from unified hook
   - _Requirements: 1.1, 1.2, 2.3_
 
-- [ ] 22.2 Create connection status indicator component
+- [x] 22.2 Create connection status indicator component
   - Create `client/src/components/dashboard/ConnectionStatusIndicator.tsx` with visual status (green/yellow/red)
   - Show connection type (WebSocket, Polling, Offline) and last sync time
   - Add tooltip with detailed connection information
   - Integrate with useDashboardStore to display real-time sync status
   - _Requirements: 6.1, 6.2, 6.4, 10.5_
 
-- [ ] 22.3 Create offline mode banner
+- [x] 22.3 Create offline mode banner
   - Create `client/src/components/dashboard/OfflineBanner.tsx` to show when connection is lost
   - Display "Offline - Showing cached data" message with data age
   - Add "Reconnecting..." animation when attempting to restore connection
