@@ -41,6 +41,13 @@ module.exports = {
     "^.*/routes/openGraph$": "<rootDir>/__tests__/mocks/openGraph-router.mock.js",
     "^.*/lib/openGraphGenerator$": "<rootDir>/__tests__/mocks/openGraph-generator.mock.js",
     "^../lib/schemaMarkup$": "<rootDir>/__tests__/mocks/schema-markup.mock.js",
+    // Import path compatibility mappings for reorganized components
+    "^@/components/ReservationErrorBoundary$":
+      "<rootDir>/client/src/components/reservations/ReservationErrorBoundary",
+    "^@/components/kokonutui/(.*)$": "<rootDir>/client/src/components/ui/$1",
+    "^@/store/(.*)$": "<rootDir>/client/src/stores/$1",
+    // Relative path compatibility mappings
+    "^\\.\\./\\.\\./components/kokonutui/(.*)$": "<rootDir>/client/src/components/ui/$1",
   },
   // Enhanced jsdom configuration for client-side testing
   testEnvironmentOptions: {
@@ -51,7 +58,6 @@ module.exports = {
   },
   // Improved error handling and timeout settings
   testTimeout: 30000,
-  setupFilesAfterEnv: ["<rootDir>/__tests__/jest.setup.ts"],
   // Better handling of async operations
   maxWorkers: 1,
   // Force exit after tests complete to avoid hanging

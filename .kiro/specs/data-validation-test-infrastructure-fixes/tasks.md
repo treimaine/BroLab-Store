@@ -10,7 +10,7 @@
   - Update ConsistencyCheckResult interface to include checksPerformed and checksSkipped arrays
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 2. Extend DataValidationService public API
+- [x] 2. Extend DataValidationService public API
   - Add public validateConvexId(id: string) method that delegates to SourceValidator
   - Add public validateAllIds(data: Record<string, any>) method that delegates to SourceValidator
   - Add public validateDataIds(data: any) method that delegates to SourceValidator
@@ -19,41 +19,41 @@
   - Maintain existing internal validation logic without breaking changes
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 3. Implement lazy Convex client initialization
-  - [ ] 3.1 Create lazy initialization infrastructure
+- [x] 3. Implement lazy Convex client initialization
+  - [x] 3.1 Create lazy initialization infrastructure
     - Replace immediate ConvexHttpClient instantiation with lazy getter function
     - Create getConvexClient() function that initializes client on first call
     - Add convexClient and initializationError module-level variables for caching
     - Implement Proxy wrapper for backward compatibility with existing imports
     - _Requirements: 3.1, 3.4_
-  - [ ] 3.2 Add environment-specific initialization logic
+  - [x] 3.2 Add environment-specific initialization logic
     - Add NODE_ENV check to detect test environment
     - Create createMockConvexClient() function that returns mock with query/mutation/action methods
     - Return mock client when NODE_ENV is 'test'
     - Validate VITE_CONVEX_URL exists before initializing production client
     - Throw descriptive error with setup instructions when URL is missing
     - _Requirements: 3.2, 3.3, 3.5_
-  - [ ] 3.3 Update exports for lazy initialization
+  - [x] 3.3 Update exports for lazy initialization
     - Export getConvex getter function as primary export
     - Maintain convex export using Proxy for backward compatibility
     - Update JSDoc to document lazy initialization behavior
     - _Requirements: 3.1, 3.5_
 
-- [ ] 4. Create import path compatibility layer
-  - [ ] 4.1 Create re-export files for reorganized components
+- [x] 4. Create import path compatibility layer
+  - [x] 4.1 Create re-export files for reorganized components
     - Create client/src/components/ReservationErrorBoundary.tsx that re-exports from ./reservations/ReservationErrorBoundary
     - Create client/src/components/kokonutui/file-upload.tsx that re-exports from ../ui/file-upload
     - Create client/src/store/useDashboardStore.ts that re-exports from ../stores/useDashboardStore
     - Use both default and named exports in re-export files
     - _Requirements: 4.1, 4.2, 4.3, 4.4_
-  - [ ] 4.2 Update Jest configuration for import path mapping
+  - [x] 4.2 Update Jest configuration for import path mapping
     - Add moduleNameMapper entry for @/components/ReservationErrorBoundary
     - Add moduleNameMapper entry for @/components/kokonutui/\* pattern
     - Add moduleNameMapper entry for @/store/\* pattern
     - Verify mappings resolve to correct file paths
     - _Requirements: 4.5_
 
-- [ ] 5. Strengthen PollingConnection error handling
+- [x] 5. Strengthen PollingConnection error handling
   - Add isActive boolean property to track connection state
   - Initialize isActive to false in constructor
   - Set isActive to true in connect() method
@@ -66,27 +66,27 @@
   - Improve all error messages to include context and suggested actions
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 6. Update test files to use new infrastructure
-  - [ ] 6.1 Update ConsistencyChecker tests
+- [x] 6. Update test files to use new infrastructure
+  - [x] 6.1 Update ConsistencyChecker tests
     - Import createTestChecker factory or pass environment: 'test' option
     - Update test expectations to expect zero anomalies on valid test data
     - Add tests verifying time-based validations are skipped in test mode
     - Add tests verifying test hash values are accepted
     - _Requirements: 1.5_
-  - [ ] 6.2 Update DataValidationService tests
+  - [x] 6.2 Update DataValidationService tests
     - Add tests for validateConvexId with valid and invalid IDs
     - Add tests for validateAllIds with data structures containing multiple IDs
     - Add tests for validateDataIds with various data shapes
     - Verify methods return proper ValidationResult structures
     - _Requirements: 2.3, 2.4_
-  - [ ]\* 6.3 Add PollingConnection error handling tests
+  - [x] 6.3 Add PollingConnection error handling tests
     - Test send() throws error when connection is inactive
     - Mock fetch to return undefined and verify error handling
     - Mock fetch to return null and verify error handling
     - Test error messages include descriptive context
     - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 7. Create test fixtures and utilities
+- [x] 7. Create test fixtures and utilities
   - Create testDashboardData fixture with static monthly values and test-hash
   - Create testConsistencyChecker factory with test-friendly options
   - Export test utilities from **tests**/test-utils.tsx

@@ -201,3 +201,49 @@ export { customRender as render };
 
 // Export utilities for tests
 export { act, createWrapper, mockClerk, mockConvexClient, testUtils };
+
+// ================================
+// DATA VALIDATION TEST UTILITIES
+// ================================
+
+/**
+ * Export test fixtures for dashboard data validation
+ * These fixtures provide static test data that doesn't depend on current date/time
+ */
+export {
+  createDuplicateDashboardData,
+  createInconsistentDashboardData,
+  createMinimalDashboardData,
+  createTestConsistencyOptions,
+  createTestDashboardData,
+  testActivity,
+  testChartData,
+  testConsistencyCheckOptions,
+  testDashboardData,
+  testDownloads,
+  testFavorites,
+  testOrders,
+  testReservations,
+  testStats,
+  testTrends,
+  testUser,
+} from "./fixtures/dashboardData";
+
+/**
+ * Create a test-friendly ConsistencyChecker instance
+ * Pre-configured to skip time-based validations and allow test hashes
+ *
+ * @example
+ * ```typescript
+ * import { createTestConsistencyChecker } from '@/__tests__/test-utils';
+ *
+ * const checker = createTestConsistencyChecker();
+ * const result = checker.validate(testData);
+ * expect(result.inconsistencies).toHaveLength(0);
+ * ```
+ */
+export function createTestConsistencyChecker() {
+  // Import ConsistencyChecker dynamically to avoid circular dependencies
+  const { ConsistencyChecker } = require("../client/src/utils/dataConsistency");
+  return ConsistencyChecker.createTestChecker();
+}

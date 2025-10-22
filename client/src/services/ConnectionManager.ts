@@ -135,17 +135,17 @@ export type FallbackStrategy = "immediate" | "gradual" | "quality_based" | "manu
 class WebSocketConnection implements Connection {
   public readonly type = "websocket" as const;
   private ws: WebSocket | null = null;
-  private messageHandlers = new Set<(message: ConnectionMessage) => void>();
-  private errorHandlers = new Set<(error: Error) => void>();
-  private closeHandlers = new Set<() => void>();
-  private stats: ConnectionStats;
-  private startTime: number;
-  private latencyMeasurements: number[] = [];
+  private readonly messageHandlers = new Set<(message: ConnectionMessage) => void>();
+  private readonly errorHandlers = new Set<(error: Error) => void>();
+  private readonly closeHandlers = new Set<() => void>();
+  private readonly stats: ConnectionStats;
+  private readonly startTime: number;
+  private readonly latencyMeasurements: number[] = [];
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
   constructor(
-    private url: string,
-    private config: ConnectionConfig
+    private readonly url: string,
+    private readonly config: ConnectionConfig
   ) {
     this.startTime = Date.now();
     this.stats = {
@@ -179,7 +179,9 @@ class WebSocketConnection implements Connection {
             const message: ConnectionMessage = JSON.parse(event.data);
             this.stats.messagesReceived++;
             this.updateLatency(message);
-            this.messageHandlers.forEach(handler => handler(message));
+            for (const handler of this.messageHandlers) {
+              handler(message);
+            }
           } catch (error) {
             this.handleError(new Error(`Failed to parse WebSocket message: ${error}`));
           }
@@ -194,10 +196,12 @@ class WebSocketConnection implements Connection {
         this.ws.onclose = () => {
           clearTimeout(timeout);
           this.stopHeartbeat();
-          this.closeHandlers.forEach(handler => handler());
+          for (const handler of this.closeHandlers) {
+            handler();
+          }
         };
       } catch (error) {
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }
@@ -241,6 +245,16 @@ class WebSocketConnection implements Connection {
     this.stats.averageLatency = this.calculateAverageLatency();
     this.stats.qualityScore = this.calculateQualityScore();
     return { ...this.stats };
+  }
+
+  private notifyErrorHandlers(error: Error): void {
+    for (const handler of this.errorHandlers) {
+      try {
+        handler(error);
+      } catch (handlerError) {
+        console.error("WebSocket error handler failed:", handlerError);
+      }
+    }
   }
 
   private startHeartbeat(): void {
@@ -301,7 +315,10 @@ class WebSocketConnection implements Connection {
   private handleError(error: Error): void {
     this.stats.errorCount++;
     this.stats.lastError = Date.now();
-    this.errorHandlers.forEach(handler => handler(error));
+    if (this.config.debugMode) {
+      console.error("[WebSocketConnection] Error:", error.message);
+    }
+    this.notifyErrorHandlers(error);
   }
 }
 
@@ -311,17 +328,17 @@ class WebSocketConnection implements Connection {
 class PollingConnection implements Connection {
   public readonly type = "polling" as const;
   private pollingInterval: NodeJS.Timeout | null = null;
-  private messageHandlers = new Set<(message: ConnectionMessage) => void>();
-  private errorHandlers = new Set<(error: Error) => void>();
-  private closeHandlers = new Set<() => void>();
-  private stats: ConnectionStats;
-  private startTime: number;
+  private readonly messageHandlers = new Set<(message: ConnectionMessage) => void>();
+  private readonly errorHandlers = new Set<(error: Error) => void>();
+  private readonly closeHandlers = new Set<() => void>();
+  private readonly stats: ConnectionStats;
+  private readonly startTime: number;
   private isActive = false;
   private lastPollTime = 0;
 
   constructor(
-    private url: string,
-    private config: ConnectionConfig
+    private readonly url: string,
+    private readonly config: ConnectionConfig
   ) {
     this.startTime = Date.now();
     this.stats = {
@@ -340,24 +357,65 @@ class PollingConnection implements Connection {
   }
 
   public async send(message: ConnectionMessage): Promise<void> {
+    // Validate connection state before attempting to send
+    if (!this.isActive) {
+      const error = new Error(
+        "PollingConnection: Cannot send message on inactive connection. " +
+          "Call connect() first to establish a connection."
+      );
+      this.handleError(error);
+      throw error;
+    }
+
+    let response: Response | undefined;
+
     try {
-      const response = await fetch(`${this.url}/send`, {
+      response = await fetch(`${this.url}/send`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(message),
       });
+    } catch (error) {
+      // Network error or request abortion
+      const networkError = new Error(
+        `PollingConnection: Network request failed - ${
+          error instanceof Error ? error.message : "Unknown network error"
+        }. Check your internet connection and try again.`
+      );
+      this.handleError(networkError);
+      throw networkError;
+    }
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    // Validate response exists and is a valid object
+    if (!response || typeof response !== "object") {
+      const invalidResponseError = new Error(
+        "PollingConnection: Invalid or missing response received from server. " +
+          "The server may be unavailable or returned an unexpected response format."
+      );
+      this.handleError(invalidResponseError);
+      throw invalidResponseError;
+    }
+
+    // Check response status
+    if (!response.ok) {
+      let errorText = "Unknown error";
+      try {
+        errorText = await response.text();
+      } catch {
+        // If we can't read the error text, use the default
       }
 
-      this.stats.messagesSent++;
-    } catch (error) {
-      this.handleError(error as Error);
-      throw error;
+      const statusError = new Error(
+        `PollingConnection: Request failed with status ${response.status} (${response.statusText}) - ${errorText}. ` +
+          "Please check the server logs for more details."
+      );
+      this.handleError(statusError);
+      throw statusError;
     }
+
+    this.stats.messagesSent++;
   }
 
   public close(): void {
@@ -366,7 +424,9 @@ class PollingConnection implements Connection {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
     }
-    this.closeHandlers.forEach(handler => handler());
+    for (const handler of this.closeHandlers) {
+      handler();
+    }
   }
 
   public onMessage(handler: (message: ConnectionMessage) => void): void {
@@ -386,21 +446,49 @@ class PollingConnection implements Connection {
     return { ...this.stats };
   }
 
+  private notifyErrorHandlers(error: Error): void {
+    for (const handler of this.errorHandlers) {
+      try {
+        handler(error);
+      } catch (handlerError) {
+        console.error("Polling error handler failed:", handlerError);
+      }
+    }
+  }
+
   private startPolling(): void {
     this.pollingInterval = setInterval(async () => {
       if (!this.isActive) return;
 
+      let response: Response | undefined;
+
       try {
         const pollStart = Date.now();
-        const response = await fetch(`${this.url}/poll?since=${this.lastPollTime}`, {
+        response = await fetch(`${this.url}/poll?since=${this.lastPollTime}`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
           },
         });
 
+        // Validate response exists and is a valid object
+        if (!response || typeof response !== "object") {
+          throw new Error(
+            "PollingConnection: Invalid or missing response during polling. " +
+              "The server may be unavailable."
+          );
+        }
+
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          let errorText = "Unknown error";
+          try {
+            errorText = await response.text();
+          } catch {
+            // If we can't read the error text, use the default
+          }
+          throw new Error(
+            `PollingConnection: Polling failed with status ${response.status} (${response.statusText}) - ${errorText}`
+          );
         }
 
         const data = await response.json();
@@ -410,15 +498,23 @@ class PollingConnection implements Connection {
         this.stats.averageLatency = (this.stats.averageLatency + latency) / 2;
 
         if (data.messages && Array.isArray(data.messages)) {
-          data.messages.forEach((message: ConnectionMessage) => {
+          for (const message of data.messages as ConnectionMessage[]) {
             this.stats.messagesReceived++;
-            this.messageHandlers.forEach(handler => handler(message));
-          });
+            for (const handler of this.messageHandlers) {
+              handler(message);
+            }
+          }
         }
 
         this.lastPollTime = Date.now();
       } catch (error) {
-        this.handleError(error as Error);
+        const pollingError =
+          error instanceof Error
+            ? error
+            : new Error(
+                `PollingConnection: Polling error - ${String(error)}. Connection quality may be degraded.`
+              );
+        this.handleError(pollingError);
       }
     }, this.config.pollingInterval);
   }
@@ -426,7 +522,10 @@ class PollingConnection implements Connection {
   private handleError(error: Error): void {
     this.stats.errorCount++;
     this.stats.lastError = Date.now();
-    this.errorHandlers.forEach(handler => handler(error));
+    if (this.config.debugMode) {
+      console.error("[PollingConnection] Error:", error.message);
+    }
+    this.notifyErrorHandlers(error);
   }
 }
 
@@ -438,10 +537,10 @@ class PollingConnection implements Connection {
  * Connection Manager with WebSocket-first, HTTP-polling fallback strategy
  */
 export class ConnectionManager extends BrowserEventEmitter {
-  private config: ConnectionConfig;
+  private readonly config: ConnectionConfig;
   private currentConnection: Connection | null = null;
   private connectionStatus: ConnectionStatus;
-  private metrics: ConnectionMetrics;
+  private readonly metrics: ConnectionMetrics;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private qualityCheckInterval: NodeJS.Timeout | null = null;
   private fallbackStrategy: FallbackStrategy = "quality_based";
@@ -538,7 +637,7 @@ export class ConnectionManager extends BrowserEventEmitter {
       try {
         await this.connect();
         this.connectionStatus.reconnectAttempts = 0; // Reset on success
-      } catch (error) {
+      } catch {
         this.connectionStatus.reconnectAttempts++;
 
         if (this.connectionStatus.reconnectAttempts < this.config.maxReconnectAttempts) {
@@ -868,6 +967,7 @@ export class ConnectionManager extends BrowserEventEmitter {
         totalUptime: 0,
         lastUsed: Date.now(),
       };
+      this.metrics.strategyPerformance.set(strategy, metrics);
     }
 
     metrics.connectionAttempts++;
@@ -876,14 +976,12 @@ export class ConnectionManager extends BrowserEventEmitter {
     }
     metrics.successRate = metrics.successfulConnections / metrics.connectionAttempts;
     metrics.lastUsed = Date.now();
-
-    this.metrics.strategyPerformance.set(strategy, metrics);
   }
 
   private initializeStrategyMetrics(): void {
     const strategies: ConnectionStrategy[] = ["websocket", "polling"];
 
-    strategies.forEach(strategy => {
+    for (const strategy of strategies) {
       this.metrics.strategyPerformance.set(strategy, {
         name: strategy,
         successRate: 1, // Start optimistic
@@ -893,7 +991,7 @@ export class ConnectionManager extends BrowserEventEmitter {
         totalUptime: 0,
         lastUsed: 0,
       });
-    });
+    }
   }
 
   private log(message: string, ...args: unknown[]): void {
@@ -959,9 +1057,7 @@ let connectionManagerInstance: ConnectionManager | null = null;
  * Get the singleton ConnectionManager instance
  */
 export const getConnectionManager = (config?: Partial<ConnectionConfig>): ConnectionManager => {
-  if (!connectionManagerInstance) {
-    connectionManagerInstance = new ConnectionManager(config);
-  }
+  connectionManagerInstance ??= new ConnectionManager(config);
   return connectionManagerInstance;
 };
 

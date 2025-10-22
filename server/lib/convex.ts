@@ -7,18 +7,128 @@ import {
 } from "../../shared/types/ConvexIntegration";
 import type { ConvexUser, ConvexUserInput } from "../../shared/types/ConvexUser";
 
-// Initialize Convex client for server-side operations
-const convexUrl = process.env.VITE_CONVEX_URL;
-if (!convexUrl) {
-  throw new Error("VITE_CONVEX_URL environment variable is required");
+// Module-level variables for lazy initialization
+let convexClient: ConvexHttpClient | null = null;
+let initializationError: Error | null = null;
+
+/**
+ * Creates a mock Convex client for test environments
+ * Returns a mock object with query, mutation, and action methods
+ * @returns Mock ConvexHttpClient for testing
+ */
+function createMockConvexClient(): ConvexHttpClient {
+  const mockClient = {
+    query: async () => null,
+    mutation: async () => null,
+    action: async () => null,
+  } as unknown as ConvexHttpClient;
+
+  return mockClient;
 }
 
-const convex = new ConvexHttpClient(convexUrl);
+/**
+ * Lazy initialization function for Convex client
+ * Initializes the client on first call and caches the result
+ * Provides mock client in test environment
+ * @returns ConvexHttpClient instance or mock client in test mode
+ * @throws Error if VITE_CONVEX_URL is not configured in non-test environments
+ */
+function getConvexClient(): ConvexHttpClient {
+  // Return existing client if already initialized
+  if (convexClient) {
+    return convexClient;
+  }
 
-// Create type-safe wrapper for Convex operations
+  // Throw cached error if initialization previously failed
+  if (initializationError) {
+    throw initializationError;
+  }
+
+  // Test environment: return mock client
+  if (process.env.NODE_ENV === "test") {
+    convexClient = createMockConvexClient();
+    return convexClient;
+  }
+
+  // Validate configuration and initialize for non-test environments
+  const convexUrl = process.env.VITE_CONVEX_URL;
+  if (!convexUrl) {
+    initializationError = new Error(
+      "VITE_CONVEX_URL environment variable is required. " +
+        "Add it to your .env file:\nVITE_CONVEX_URL=https://your-deployment.convex.cloud"
+    );
+    throw initializationError;
+  }
+
+  try {
+    convexClient = new ConvexHttpClient(convexUrl);
+    return convexClient;
+  } catch (error) {
+    initializationError =
+      error instanceof Error ? error : new Error("Failed to initialize Convex client");
+    throw initializationError;
+  }
+}
+
+/**
+ * Proxy wrapper for backward compatibility with existing imports
+ * Allows existing code to use `convex` directly while using lazy initialization
+ *
+ * This proxy intercepts all property access and delegates to the lazily-initialized client.
+ * The client is only created when first accessed, allowing modules to be imported
+ * without requiring VITE_CONVEX_URL to be set (useful in test environments).
+ *
+ * @example
+ * // Legacy usage (still works)
+ * import { convex } from './convex';
+ * const result = await convex.query(api.users.get, { id: '123' });
+ */
+const convex = new Proxy({} as ConvexHttpClient, {
+  get(_target, prop) {
+    const client = getConvexClient();
+    const value = client[prop as keyof ConvexHttpClient];
+    // Bind methods to the client instance to preserve 'this' context
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
+
+// Create type-safe wrapper for Convex operations (uses lazy initialization via proxy)
 const convexWrapper = new ConvexOperationWrapper(convex as ConvexFunctionCaller);
 
-export { convex, convexWrapper };
+/**
+ * Primary export: Lazy initialization getter function
+ *
+ * Use this function when you need explicit control over client initialization timing.
+ * The client is created on first call and cached for subsequent calls.
+ *
+ * @returns ConvexHttpClient instance (or mock in test environment)
+ * @throws Error if VITE_CONVEX_URL is not configured in non-test environments
+ *
+ * @example
+ * // Recommended usage for new code
+ * import { getConvex } from './convex';
+ * const client = getConvex();
+ * const result = await client.query(api.users.get, { id: '123' });
+ */
+export const getConvex = getConvexClient;
+
+/**
+ * Backward-compatible export using Proxy for lazy initialization
+ *
+ * This export maintains compatibility with existing code that imports `convex` directly.
+ * The underlying client is lazily initialized on first property access.
+ *
+ * @deprecated Prefer using `getConvex()` for new code to make lazy initialization explicit
+ */
+export { convex };
+
+/**
+ * Type-safe wrapper for Convex operations
+ *
+ * Provides a higher-level API with automatic error handling and type safety.
+ * Uses the lazy-initialized convex client internally.
+ */
+export { convexWrapper };
 
 // Type definitions that match Convex schema exactly - these are the corrected interface definitions
 
