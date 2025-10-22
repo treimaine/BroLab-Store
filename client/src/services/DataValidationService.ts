@@ -1928,6 +1928,149 @@ export class DataValidationService {
   }
 
   /**
+   * Validates a single Convex ID format
+   *
+   * Delegates to SourceValidator to check if the provided ID matches the expected
+   * Convex document ID format (16-32 character alphanumeric string).
+   *
+   * @param id - The ID string to validate
+   * @returns ConvexIdValidation result with format validity, pattern type, confidence score, and reason
+   *
+   * @example
+   * ```typescript
+   * const result = service.validateConvexId("jx7abc123def456789");
+   * if (result.isValidFormat) {
+   *   console.log("Valid Convex ID with confidence:", result.confidence);
+   * }
+   * ```
+   */
+  public validateConvexId(id: string): ConvexIdValidation {
+    return this.sourceValidator.validateConvexId(id);
+  }
+
+  /**
+   * Validates all Convex IDs in a data structure
+   *
+   * Recursively searches through the provided data object and validates any fields
+   * that appear to be Convex IDs. Returns aggregated validation results including
+   * the count of valid IDs and overall confidence score.
+   *
+   * @param data - Object containing ID fields to validate
+   * @returns Validation result with hasValidIds flag, valid ID count, confidence score, and individual results
+   *
+   * @example
+   * ```typescript
+   * const data = {
+   *   userId: "jx7abc123def456789",
+   *   items: [
+   *     { id: "jx7def456ghi789012" },
+   *     { id: "invalid-id" }
+   *   ]
+   * };
+   * const result = service.validateAllIds(data);
+   * console.log(`Found ${result.validIdCount} valid IDs with ${result.confidence} confidence`);
+   * ```
+   */
+  public validateAllIds(data: Record<string, unknown>): {
+    hasValidIds: boolean;
+    validIdCount: number;
+    confidence: number;
+    results: ConvexIdValidation[];
+  } {
+    // Extract all potential ID fields from the data structure
+    const ids: string[] = [];
+    this.extractIds(data, ids);
+
+    // Validate each ID
+    const results = ids.map(id => this.sourceValidator.validateConvexId(id));
+
+    // Calculate aggregated metrics
+    const validIdCount = results.filter(r => r.isValidFormat).length;
+    const hasValidIds = validIdCount > 0;
+    const confidence = results.length > 0 ? validIdCount / results.length : 0;
+
+    return {
+      hasValidIds,
+      validIdCount,
+      confidence,
+      results,
+    };
+  }
+
+  /**
+   * Validates data structure integrity including all IDs
+   *
+   * Performs comprehensive validation of a data object, checking for valid Convex IDs
+   * across all nested fields. This is useful for validating entire dashboard data
+   * structures or API responses.
+   *
+   * @param data - Data object to validate (typically DashboardData or similar structure)
+   * @returns Validation result with hasValidIds flag, valid ID count, confidence score, and individual results
+   *
+   * @example
+   * ```typescript
+   * const dashboardData = await fetchDashboardData();
+   * const validation = service.validateDataIds(dashboardData);
+   *
+   * if (!validation.hasValidIds) {
+   *   console.warn("No valid Convex IDs found - data may be mock or invalid");
+   * }
+   * ```
+   */
+  public validateDataIds(data: unknown): {
+    hasValidIds: boolean;
+    validIdCount: number;
+    confidence: number;
+    results: ConvexIdValidation[];
+  } {
+    // Type guard: ensure data is an object
+    if (!data || typeof data !== "object") {
+      return {
+        hasValidIds: false,
+        validIdCount: 0,
+        confidence: 0,
+        results: [],
+      };
+    }
+
+    // Reuse validateAllIds implementation
+    return this.validateAllIds(data as Record<string, unknown>);
+  }
+
+  /**
+   * Helper method to recursively extract ID fields from a data structure
+   * @private
+   */
+  private extractIds(obj: unknown, ids: string[]): void {
+    if (!obj || typeof obj !== "object") {
+      return;
+    }
+
+    // Handle arrays
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        this.extractIds(item, ids);
+      }
+      return;
+    }
+
+    // Handle objects
+    for (const [key, value] of Object.entries(obj)) {
+      // Check if this field looks like an ID field
+      if (key === "id" || key.endsWith("Id") || key.endsWith("_id")) {
+        if (typeof value === "string" && value.length > 0) {
+          ids.push(value);
+        }
+      }
+
+      // Recursively check nested objects and arrays
+      if (typeof value === "object" && value !== null) {
+        this.extractIds(value, ids);
+      }
+    }
+  }
+
+  /**
    * Check validation cache with confidence-based TTL
    * Enhanced to use dynamic TTL based on validation confidence
    */

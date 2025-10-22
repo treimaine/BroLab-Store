@@ -85,6 +85,50 @@ export interface RecoveryAttempt {
   nextAttemptAt?: number;
 }
 
+/**
+ * Retry queue item for managing multiple failed operations
+ */
+export interface RetryQueueItem {
+  /** Unique identifier for the queued operation */
+  id: string;
+  /** Error that triggered the retry */
+  error: EnhancedSyncError;
+  /** Recovery strategy to use */
+  strategy: RecoveryStrategy;
+  /** Current attempt number */
+  attemptNumber: number;
+  /** Scheduled retry time */
+  scheduledAt: number;
+  /** Operation to retry */
+  operation: () => Promise<boolean>;
+  /** Timeout handle for cancellation */
+  timeoutHandle?: ReturnType<typeof setTimeout>;
+  /** Priority level (higher = more urgent) */
+  priority: number;
+}
+
+/**
+ * Retry configuration for fine-grained control
+ */
+export interface RetryConfig {
+  /** Enable/disable automatic retries */
+  enabled: boolean;
+  /** Maximum number of retry attempts */
+  maxAttempts: number;
+  /** Initial delay in milliseconds (1s) */
+  initialDelay: number;
+  /** Maximum delay in milliseconds (30s) */
+  maxDelay: number;
+  /** Backoff multiplier (2 for exponential) */
+  backoffMultiplier: number;
+  /** Add random jitter to prevent thundering herd */
+  jitterEnabled: boolean;
+  /** Maximum jitter percentage (0-1) */
+  jitterFactor: number;
+  /** Retry only specific error types */
+  retryableErrorTypes?: SyncErrorType[];
+}
+
 // ================================
 // ERROR LOGGING AND CONTEXT
 // ================================
@@ -131,6 +175,10 @@ export interface ErrorHandlingConfig {
   baseRetryDelay: number;
   /** Maximum retry delay (ms) */
   maxRetryDelay: number;
+  /** Retry configuration */
+  retry: RetryConfig;
+  /** Maximum size of retry queue */
+  maxRetryQueueSize: number;
   /** Logging configuration */
   logging: ErrorLoggingConfig;
   /** User notification preferences */
@@ -154,6 +202,8 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
   private readonly recoveryStrategies = new Map<RecoveryStrategyType, RecoveryStrategy>();
   private readonly activeRecoveries = new Set<string>();
   private readonly errorFingerprints = new Map<string, number>();
+  private readonly retryQueue: RetryQueueItem[] = [];
+  private retryQueueProcessing = false;
   private readonly sessionId: string;
   private isDestroyed = false;
 
@@ -169,6 +219,17 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
       maxAutoRetries: config.maxAutoRetries || 3,
       baseRetryDelay: config.baseRetryDelay || 1000,
       maxRetryDelay: config.maxRetryDelay || 30000,
+      maxRetryQueueSize: config.maxRetryQueueSize || 50,
+      retry: {
+        enabled: true,
+        maxAttempts: 3,
+        initialDelay: 1000, // 1s
+        maxDelay: 30000, // 30s
+        backoffMultiplier: 2, // Exponential: 1s, 2s, 4s, 8s, 16s, 30s (capped)
+        jitterEnabled: true,
+        jitterFactor: 0.1, // 10% jitter
+        ...config.retry,
+      },
       logging: {
         console: true,
         remote: false,
@@ -299,6 +360,167 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
   }
 
   // ================================
+  // RETRY QUEUE MANAGEMENT
+  // ================================
+
+  /**
+   * Add an operation to the retry queue
+   */
+  public queueRetry(
+    error: EnhancedSyncError,
+    operation: () => Promise<boolean>,
+    priority = 0
+  ): string {
+    if (this.retryQueue.length >= this.config.maxRetryQueueSize) {
+      this.log("Retry queue is full, removing lowest priority item", {
+        queueSize: this.retryQueue.length,
+      });
+      this.removeLowestPriorityItem();
+    }
+
+    const strategy = this.recoveryStrategies.get(error.recoveryStrategy);
+    if (!strategy) {
+      this.log("No recovery strategy found for error", { errorId: error.fingerprint });
+      throw new Error(`No recovery strategy found: ${error.recoveryStrategy}`);
+    }
+
+    const attempts = this.recoveryAttempts.get(error.fingerprint) || [];
+    const attemptNumber = attempts.length + 1;
+
+    if (attemptNumber > this.config.retry.maxAttempts) {
+      this.log("Max retry attempts exceeded, not queuing", {
+        errorId: error.fingerprint,
+        attemptNumber,
+      });
+      throw new Error(`Max retry attempts (${this.config.retry.maxAttempts}) exceeded`);
+    }
+
+    const delay = this.calculateExponentialBackoff(attemptNumber - 1);
+    const scheduledAt = Date.now() + delay;
+
+    const queueItem: RetryQueueItem = {
+      id: this.generateAttemptId(),
+      error,
+      strategy,
+      attemptNumber,
+      scheduledAt,
+      operation,
+      priority,
+    };
+
+    this.retryQueue.push(queueItem);
+    this.sortRetryQueue();
+
+    this.log("Operation queued for retry", {
+      queueItemId: queueItem.id,
+      errorId: error.fingerprint,
+      attemptNumber,
+      delay,
+      scheduledAt: new Date(scheduledAt).toISOString(),
+      queueSize: this.retryQueue.length,
+    });
+
+    this.emit("retry_queued", {
+      queueItem,
+      queueSize: this.retryQueue.length,
+    });
+
+    // Start processing queue if not already running
+    if (!this.retryQueueProcessing) {
+      void this.processRetryQueue();
+    }
+
+    return queueItem.id;
+  }
+
+  /**
+   * Remove an item from the retry queue
+   */
+  public cancelRetry(queueItemId: string): boolean {
+    const index = this.retryQueue.findIndex(item => item.id === queueItemId);
+    if (index === -1) return false;
+
+    const item = this.retryQueue[index];
+    if (item.timeoutHandle) {
+      clearTimeout(item.timeoutHandle);
+    }
+
+    this.retryQueue.splice(index, 1);
+
+    this.log("Retry cancelled", { queueItemId, errorId: item.error.fingerprint });
+    this.emit("retry_cancelled", { queueItemId, errorId: item.error.fingerprint });
+
+    return true;
+  }
+
+  /**
+   * Get current retry queue status
+   */
+  public getRetryQueueStatus(): {
+    size: number;
+    items: Array<{
+      id: string;
+      errorId: string;
+      attemptNumber: number;
+      scheduledAt: number;
+      priority: number;
+    }>;
+    processing: boolean;
+  } {
+    return {
+      size: this.retryQueue.length,
+      items: this.retryQueue.map(item => ({
+        id: item.id,
+        errorId: item.error.fingerprint,
+        attemptNumber: item.attemptNumber,
+        scheduledAt: item.scheduledAt,
+        priority: item.priority,
+      })),
+      processing: this.retryQueueProcessing,
+    };
+  }
+
+  /**
+   * Clear the entire retry queue
+   */
+  public clearRetryQueue(): void {
+    for (const item of this.retryQueue) {
+      if (item.timeoutHandle) {
+        clearTimeout(item.timeoutHandle);
+      }
+    }
+
+    const clearedCount = this.retryQueue.length;
+    this.retryQueue.length = 0;
+
+    this.log("Retry queue cleared", { clearedCount });
+    this.emit("retry_queue_cleared", { clearedCount });
+  }
+
+  /**
+   * Calculate exponential backoff delay with jitter
+   * Implements: 1s, 2s, 4s, 8s, 16s, 30s (capped at maxDelay)
+   */
+  public calculateExponentialBackoff(attemptNumber: number): number {
+    const { initialDelay, maxDelay, backoffMultiplier, jitterEnabled, jitterFactor } =
+      this.config.retry;
+
+    // Calculate base delay: initialDelay * (backoffMultiplier ^ attemptNumber)
+    const baseDelay = initialDelay * Math.pow(backoffMultiplier, attemptNumber);
+
+    // Cap at maximum delay
+    const cappedDelay = Math.min(baseDelay, maxDelay);
+
+    // Add jitter if enabled to prevent thundering herd
+    if (jitterEnabled) {
+      const jitter = cappedDelay * jitterFactor * (Math.random() * 2 - 1); // ±jitterFactor
+      return Math.floor(cappedDelay + jitter);
+    }
+
+    return Math.floor(cappedDelay);
+  }
+
+  // ================================
   // ERROR ANALYTICS
   // ================================
 
@@ -413,6 +635,7 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
     this.recoveryAttempts.clear();
     this.errorFingerprints.clear();
     this.activeRecoveries.clear();
+    this.clearRetryQueue();
     this.emit("error_history_cleared");
   }
 
@@ -961,16 +1184,16 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
       },
     });
 
-    // Exponential backoff strategy
+    // Exponential backoff strategy (1s, 2s, 4s, 8s, 16s, 30s max)
     this.recoveryStrategies.set("exponential_backoff", {
       type: "exponential_backoff",
       name: "Exponential Backoff",
-      description: "Retry with increasing delays",
+      description: "Retry with exponentially increasing delays (1s, 2s, 4s, 8s, max 30s)",
       automatic: true,
-      maxAttempts: this.config.maxAutoRetries,
-      baseDelay: this.config.baseRetryDelay,
-      maxDelay: this.config.maxRetryDelay,
-      backoffMultiplier: 2,
+      maxAttempts: this.config.retry.maxAttempts,
+      baseDelay: this.config.retry.initialDelay,
+      maxDelay: this.config.retry.maxDelay,
+      backoffMultiplier: this.config.retry.backoffMultiplier,
       conditions: error =>
         error.retryable && ["network_error", "timeout_error"].includes(error.type),
       execute: async () => {
@@ -1031,6 +1254,148 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
     });
   }
 
+  private async processRetryQueue(): Promise<void> {
+    if (this.retryQueueProcessing || this.isDestroyed) return;
+
+    this.retryQueueProcessing = true;
+
+    try {
+      while (this.retryQueue.length > 0 && !this.isDestroyed) {
+        const nextItem = this.retryQueue[0];
+        if (!nextItem) break;
+
+        await this.waitForScheduledTime(nextItem);
+        this.retryQueue.shift();
+        await this.executeQueuedRetry(nextItem);
+      }
+    } finally {
+      this.retryQueueProcessing = false;
+    }
+  }
+
+  private async waitForScheduledTime(item: RetryQueueItem): Promise<void> {
+    const now = Date.now();
+    if (item.scheduledAt > now) {
+      const delay = item.scheduledAt - now;
+      await new Promise(resolve => {
+        item.timeoutHandle = setTimeout(resolve, delay);
+      });
+    }
+  }
+
+  private async executeQueuedRetry(item: RetryQueueItem): Promise<void> {
+    try {
+      this.logRetryExecution(item);
+      const success = await item.operation();
+
+      if (success) {
+        this.handleRetrySuccess(item);
+      } else {
+        this.handleRetryFailure(item);
+      }
+    } catch (error) {
+      this.handleRetryError(item, error);
+    }
+  }
+
+  private logRetryExecution(item: RetryQueueItem): void {
+    this.log("Executing queued retry", {
+      queueItemId: item.id,
+      errorId: item.error.fingerprint,
+      attemptNumber: item.attemptNumber,
+    });
+
+    this.emit("retry_executing", {
+      queueItemId: item.id,
+      errorId: item.error.fingerprint,
+      attemptNumber: item.attemptNumber,
+    });
+  }
+
+  private handleRetrySuccess(item: RetryQueueItem): void {
+    this.log("Queued retry succeeded", {
+      queueItemId: item.id,
+      errorId: item.error.fingerprint,
+    });
+
+    this.emit("retry_success", {
+      queueItemId: item.id,
+      errorId: item.error.fingerprint,
+      attemptNumber: item.attemptNumber,
+    });
+  }
+
+  private handleRetryFailure(item: RetryQueueItem): void {
+    this.log("Queued retry failed", {
+      queueItemId: item.id,
+      errorId: item.error.fingerprint,
+    });
+
+    this.emit("retry_failed", {
+      queueItemId: item.id,
+      errorId: item.error.fingerprint,
+      attemptNumber: item.attemptNumber,
+    });
+
+    if (item.attemptNumber < this.config.retry.maxAttempts) {
+      this.queueRetry(item.error, item.operation, item.priority);
+    } else {
+      this.emit("retry_exhausted", {
+        errorId: item.error.fingerprint,
+        totalAttempts: item.attemptNumber,
+      });
+    }
+  }
+
+  private handleRetryError(item: RetryQueueItem, error: unknown): void {
+    this.log("Error executing queued retry", {
+      queueItemId: item.id,
+      errorId: item.error.fingerprint,
+      error,
+    });
+
+    this.emit("retry_error", {
+      queueItemId: item.id,
+      errorId: item.error.fingerprint,
+      error,
+    });
+  }
+
+  private sortRetryQueue(): void {
+    // Sort by priority (descending) then by scheduled time (ascending)
+    this.retryQueue.sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return b.priority - a.priority; // Higher priority first
+      }
+      return a.scheduledAt - b.scheduledAt; // Earlier scheduled time first
+    });
+  }
+
+  private removeLowestPriorityItem(): void {
+    if (this.retryQueue.length === 0) return;
+
+    // Find item with lowest priority
+    let lowestPriorityIndex = 0;
+    let lowestPriority = this.retryQueue[0].priority;
+
+    for (let i = 1; i < this.retryQueue.length; i++) {
+      if (this.retryQueue[i].priority < lowestPriority) {
+        lowestPriority = this.retryQueue[i].priority;
+        lowestPriorityIndex = i;
+      }
+    }
+
+    const removed = this.retryQueue.splice(lowestPriorityIndex, 1)[0];
+    if (removed.timeoutHandle) {
+      clearTimeout(removed.timeoutHandle);
+    }
+
+    this.log("Removed lowest priority item from queue", {
+      queueItemId: removed.id,
+      priority: removed.priority,
+    });
+  }
+
   private setupCleanupInterval(): void {
     // Clean up old errors and recovery attempts every 10 minutes
     setInterval(
@@ -1057,6 +1422,15 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
           if (timestamp < cutoffTime) {
             this.errorFingerprints.delete(fingerprint);
           }
+        }
+
+        // Clean up stale retry queue items
+        const now = Date.now();
+        const staleThreshold = 5 * 60 * 1000; // 5 minutes
+        const staleItems = this.retryQueue.filter(item => now - item.scheduledAt > staleThreshold);
+
+        for (const item of staleItems) {
+          this.cancelRetry(item.id);
         }
       },
       10 * 60 * 1000

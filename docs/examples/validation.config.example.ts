@@ -7,7 +7,10 @@
  * Copy this file and modify as needed for your environment.
  */
 
-import { createCustomConfig, type EnvironmentValidationConfig } from "./ValidationConfig";
+import {
+  createCustomConfig,
+  type EnvironmentValidationConfig,
+} from "../../client/src/services/config/ValidationConfig";
 
 // ================================
 // EXAMPLE 1: Ultra-Conservative Production Config
@@ -178,7 +181,7 @@ export const SOURCE_ONLY_CONFIG: EnvironmentValidationConfig = createCustomConfi
     sourceWeight: 0.8, // Very high source weight
     idWeight: 0.15,
     timestampWeight: 0.05,
-    contentWeight: 0.0, // No content validation
+    contentWeight: 0, // No content validation
   },
   sourceValidation: {
     trustDatabaseSource: true,
