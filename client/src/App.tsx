@@ -1,19 +1,23 @@
+import { CartProvider } from "@/components/cart/cart-provider";
 import { ErrorBoundary } from "@/components/errors/ErrorBoundary";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
-import { CartProvider } from "@/components/cart/cart-provider";
+import {
+  GlobalLoadingIndicator,
+  LoadingStateProvider,
+} from "@/components/providers/LoadingStateProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import React, { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Route, Switch } from "wouter";
-import { GlobalLoadingIndicator, LoadingStateProvider } from "@/components/providers/LoadingStateProvider";
 import { queryClient, warmCache } from "./lib/queryClient";
 
 // Critical components - loaded immediately for core UX
 import { Navbar } from "@/components/layout/navbar";
 
-import { ComponentPreloader, useInteractionPreloader } from "@/components/loading/ComponentPreloader";
+import { ComponentPreloader } from "@/components/loading/ComponentPreloader";
+import { useInteractionPreloader } from "@/hooks/useInteractionPreloader";
 import {
   bundleOptimization,
   createLazyComponent,
@@ -25,13 +29,19 @@ const Footer = createLazyComponent(() =>
   import("@/components/layout/footer").then(module => ({ default: module.Footer }))
 );
 const MobileBottomNav = createLazyComponent(() =>
-  import("@/components/layout/MobileBottomNav").then(module => ({ default: module.MobileBottomNav }))
+  import("@/components/layout/MobileBottomNav").then(module => ({
+    default: module.MobileBottomNav,
+  }))
 );
 const OfflineIndicator = createLazyComponent(() =>
-  import("@/components/loading/OfflineIndicator").then(module => ({ default: module.OfflineIndicator }))
+  import("@/components/loading/OfflineIndicator").then(module => ({
+    default: module.OfflineIndicator,
+  }))
 );
 const NewsletterModal = createLazyComponent(() =>
-  import("@/components/newsletter/NewsletterModal").then(module => ({ default: module.NewsletterModal }))
+  import("@/components/newsletter/NewsletterModal").then(module => ({
+    default: module.NewsletterModal,
+  }))
 );
 
 // Audio player - lazy loaded as it's heavy and not immediately needed
@@ -81,13 +91,13 @@ const Checkout = lazy(() => import("@/pages/checkout"));
 const OrderConfirmation = lazy(() => import("@/pages/order-confirmation"));
 
 // PaymentTestComponent removed - using Clerk native interface
-import NotFound from "@/pages/not-found";
 import {
   MinimalLoadingFallback,
   OptimizedLoadingFallback,
   RouteLoadingFallback,
 } from "@/components/loading/OptimizedLoadingFallback";
 import { BundleSizeAnalyzer, PerformanceMonitor } from "@/components/monitoring/PerformanceMonitor";
+import NotFound from "@/pages/not-found";
 import { CacheProvider } from "./providers/CacheProvider";
 
 function Router() {
@@ -152,7 +162,7 @@ function App() {
   useInteractionPreloader();
 
   // Initialize performance optimizations
-  React.useEffect(() => {
+  useEffect(() => {
     // Preload critical components after initial render
     bundleOptimization.preloadCriticalComponents();
 

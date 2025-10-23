@@ -1,5 +1,5 @@
 import { preloadComponent } from "@/utils/lazyLoading";
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 
 /**
@@ -51,74 +51,5 @@ export function ComponentPreloader() {
   return null;
 }
 
-/**
- * Hook to preload components on user interaction
- */
-export function useInteractionPreloader() {
-  useEffect(() => {
-    let hasPreloaded = false;
-
-    const preloadOnInteraction = () => {
-      if (hasPreloaded) return;
-      hasPreloaded = true;
-
-      // Preload heavy components on first user interaction
-      preloadComponent(() =>
-        import("@/components/audio/EnhancedGlobalAudioPlayer").then(module => ({
-          default: module.EnhancedGlobalAudioPlayer,
-        }))
-      );
-      preloadComponent(() => import("@/pages/dashboard"));
-
-      // Remove event listeners
-      document.removeEventListener("mousedown", preloadOnInteraction);
-      document.removeEventListener("touchstart", preloadOnInteraction);
-      document.removeEventListener("keydown", preloadOnInteraction);
-    };
-
-    // Add event listeners for user interaction
-    document.addEventListener("mousedown", preloadOnInteraction, { passive: true });
-    document.addEventListener("touchstart", preloadOnInteraction, { passive: true });
-    document.addEventListener("keydown", preloadOnInteraction, { passive: true });
-
-    return () => {
-      document.removeEventListener("mousedown", preloadOnInteraction);
-      document.removeEventListener("touchstart", preloadOnInteraction);
-      document.removeEventListener("keydown", preloadOnInteraction);
-    };
-  }, []);
-}
-
-/**
- * Intersection Observer based preloader for components
- */
-export function useIntersectionPreloader(
-  ref: React.RefObject<HTMLElement>,
-  importFn: () => Promise<unknown>
-) {
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-
-    const observer = new IntersectionObserver(
-      entries => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            // Preload component when element comes into view
-            importFn().catch(() => {
-              // Silently handle preload failures
-            });
-            observer.unobserve(element);
-          }
-        });
-      },
-      { rootMargin: "100px" } // Start loading 100px before element is visible
-    );
-
-    observer.observe(element);
-
-    return () => {
-      observer.unobserve(element);
-    };
-  }, [ref, importFn]);
-}
+// This component doesn't export hooks to avoid Fast Refresh warnings
+// Hooks are exported from separate files in client/src/hooks/

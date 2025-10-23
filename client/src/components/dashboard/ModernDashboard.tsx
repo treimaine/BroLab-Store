@@ -148,8 +148,13 @@ export const ModernDashboard = memo(() => {
 
   // State management
   const [activeTab, setActiveTab] = useState("overview");
-  const [showConsistencyInfo, setShowConsistencyInfo] = useState(true);
-  const [showAnalyticsFixInfo, setShowAnalyticsFixInfo] = useState(true);
+  // Only show debug panels in development mode
+  const [showConsistencyInfo, setShowConsistencyInfo] = useState(
+    process.env.NODE_ENV === "development"
+  );
+  const [showAnalyticsFixInfo, setShowAnalyticsFixInfo] = useState(
+    process.env.NODE_ENV === "development"
+  );
 
   // Use unified dashboard hook - single source of truth for all dashboard data
   const {
@@ -293,8 +298,8 @@ export const ModernDashboard = memo(() => {
   return (
     <DashboardErrorBoundary onError={error => console.error("Dashboard error:", error)}>
       <ValidatedDashboard
-        showValidationStatus={true}
-        showFreshnessIndicators={true}
+        showValidationStatus={process.env.NODE_ENV === "development"}
+        showFreshnessIndicators={process.env.NODE_ENV === "development"}
         enableAutoRefresh={false}
         showDetailedValidation={process.env.NODE_ENV === "development"}
         onValidationChange={(isValid, hasMockData) => {
@@ -336,14 +341,16 @@ export const ModernDashboard = memo(() => {
               onDismiss={() => setShowConsistencyInfo(false)}
             />
 
-            {/* Status Indicator - Visible status bar */}
-            <StatusIndicator
-              showConnection={true}
-              showValidation={true}
-              showMockData={true}
-              variant="horizontal"
-              className="mb-4"
-            />
+            {/* Status Indicator - Only visible in development mode */}
+            {process.env.NODE_ENV === "development" && (
+              <StatusIndicator
+                showConnection={true}
+                showValidation={true}
+                showMockData={true}
+                variant="horizontal"
+                className="mb-4"
+              />
+            )}
 
             {/* Debug Data Panel removed - no mock data in production */}
 
@@ -572,21 +579,23 @@ export const ModernDashboard = memo(() => {
                     </Card>
                   </DashboardGrid>
 
-                  {/* Connection Status Panel */}
-                  <div className="mt-6">
-                    <ConnectionStatusPanel
-                      showMetrics={true}
-                      showQuality={true}
-                      showDataFreshness={true}
-                      onRefresh={handleRefresh}
-                      lastSyncTime={
-                        syncStatus?.lastSync
-                          ? new Date(syncStatus.lastSync).toISOString()
-                          : undefined
-                      }
-                      className="bg-gray-900/50 border-gray-700/50 backdrop-blur-sm"
-                    />
-                  </div>
+                  {/* Connection Status Panel - Only visible in development mode */}
+                  {process.env.NODE_ENV === "development" && (
+                    <div className="mt-6">
+                      <ConnectionStatusPanel
+                        showMetrics={true}
+                        showQuality={true}
+                        showDataFreshness={true}
+                        onRefresh={handleRefresh}
+                        lastSyncTime={
+                          syncStatus?.lastSync
+                            ? new Date(syncStatus.lastSync).toISOString()
+                            : undefined
+                        }
+                        className="bg-gray-900/50 border-gray-700/50 backdrop-blur-sm"
+                      />
+                    </div>
+                  )}
                 </TabContentWrapper>
               </motion.div>
             </DashboardLayout>
