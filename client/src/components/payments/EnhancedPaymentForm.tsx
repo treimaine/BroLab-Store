@@ -316,7 +316,7 @@ export function EnhancedPaymentForm({
 
       // Redirect to Stripe checkout
       console.log("🔄 Redirecting to Stripe checkout:", url);
-      window.location.href = url;
+      globalThis.location.href = url;
     } catch (error) {
       console.error("Checkout session error:", error);
 
@@ -345,7 +345,7 @@ export function EnhancedPaymentForm({
       }
 
       const RETRY_DELAYS = [1000, 2000, 4000]; // Progressive delays in ms
-      const delay = RETRY_DELAYS[attemptNumber] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+      const delay = RETRY_DELAYS[attemptNumber] || RETRY_DELAYS.at(-1)!;
 
       setPaymentStatus("retrying");
       setRetryCount(attemptNumber + 1);
@@ -377,7 +377,7 @@ export function EnhancedPaymentForm({
 
             toast({
               title: "Payment Failed",
-              description: `${classifiedError.message} ${!classifiedError.retryable ? "(Not retryable)" : ""}`,
+              description: `${classifiedError.message} ${classifiedError.retryable ? "" : "(Not retryable)"}`,
               variant: "destructive",
             });
           }
@@ -488,7 +488,7 @@ export function EnhancedPaymentForm({
         <AlertCircle className="w-16 h-16 text-orange-500 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-white mb-2">Authentication Required</h3>
         <p className="text-gray-300 mb-4">Please sign in to complete your purchase.</p>
-        <Button onClick={() => (window.location.href = "/sign-in")} className="btn-primary">
+        <Button onClick={() => (globalThis.location.href = "/sign-in")} className="btn-primary">
           Sign In
         </Button>
       </div>
@@ -501,7 +501,7 @@ export function EnhancedPaymentForm({
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
         <h3 className="text-2xl font-bold text-white mb-2">Payment Successful!</h3>
         <p className="text-gray-300 mb-6">Your order has been processed successfully.</p>
-        <Button onClick={() => (window.location.href = "/dashboard")} className="btn-primary">
+        <Button onClick={() => (globalThis.location.href = "/dashboard")} className="btn-primary">
           Go to Dashboard
         </Button>
       </div>
@@ -568,9 +568,9 @@ export function EnhancedPaymentForm({
         <div className="bg-[var(--card-bg)] p-4 rounded-lg">
           <h4 className="text-white font-medium mb-3">Services Included</h4>
           <div className="space-y-2">
-            {pendingServices.map(service => (
+            {pendingServices.map((service, index) => (
               <div
-                key={service.reservationId}
+                key={`${service.reservationId}-${index}`}
                 className="flex justify-between items-center text-sm"
               >
                 <span className="text-gray-300">{service.serviceName}</span>

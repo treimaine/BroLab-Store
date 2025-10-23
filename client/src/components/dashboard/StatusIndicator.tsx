@@ -148,7 +148,7 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
           )}
 
           {/* Additional Info */}
-          {syncStatus.lastSync && (
+          {Boolean(syncStatus.lastSync) && (
             <Badge variant="outline" className="text-xs text-gray-600">
               Updated: {new Date(syncStatus.lastSync).toLocaleTimeString()}
             </Badge>

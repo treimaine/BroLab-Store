@@ -23,15 +23,45 @@ export interface EmailDeliveryResult {
   attempts: number;
 }
 
-// Configuration du transporteur SMTP
+// Configuration du transporteur SMTP avec support Resend et Gmail
 const createTransporter = (): Transporter => {
+  // Use Resend if API key is provided (recommended for production)
+  if (process.env.RESEND_API_KEY) {
+    return nodemailer.createTransport({
+      host: "smtp.resend.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: "resend",
+        pass: process.env.RESEND_API_KEY,
+      },
+    });
+  }
+
+  // Fallback to Gmail SMTP
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+
+  // Validate Gmail credentials
+  if (
+    !smtpUser ||
+    !smtpPass ||
+    smtpUser === "your_email@gmail.com" ||
+    smtpPass === "your_app_password_here"
+  ) {
+    console.error(
+      "❌ SMTP credentials not configured. Please set SMTP_USER and SMTP_PASS in .env or use RESEND_API_KEY"
+    );
+    throw new Error("Email service not configured. Please contact administrator.");
+  }
+
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT || 465),
-    secure: process.env.SMTP_SECURE === "true",
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_PORT === "465",
     auth: {
-      user: process.env.SMTP_USER!,
-      pass: process.env.SMTP_PASS!,
+      user: smtpUser,
+      pass: smtpPass,
     },
     pool: true,
     maxConnections: 3,
@@ -45,7 +75,12 @@ let transporter: Transporter | null = null;
 // Initialize transporter (lazy loading)
 const getTransporter = (): Transporter => {
   if (!transporter) {
-    transporter = createTransporter();
+    try {
+      transporter = createTransporter();
+    } catch (error) {
+      console.error("❌ Failed to create email transporter:", error);
+      throw error;
+    }
   }
   return transporter;
 };
@@ -66,12 +101,12 @@ const calculateDelay = (attempt: number, options: EmailRetryOptions): number => 
 // Strip HTML to create text fallback
 const stripHTML = (html: string): string => {
   return html
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
+    .replaceAll(/<[^>]*>/g, "")
+    .replaceAll("&nbsp;", " ")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
     .trim();
 };
 

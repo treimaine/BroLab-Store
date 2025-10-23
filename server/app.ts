@@ -4,13 +4,7 @@ import { env } from "./lib/env";
 import { logger } from "./lib/logger";
 import activityRouter from "./routes/activity";
 import avatarRouter from "./routes/avatar";
-
-// Extended request interface for test endpoints
-interface ExtendedRequest extends Omit<Request, "session"> {
-  requestId?: string;
-  session?: { userId?: number };
-}
-// Clerk router removed - using native components
+import categoriesRouter from "./routes/categories";
 import clerkRouter from "./routes/clerk";
 import downloadsRouter from "./routes/downloads";
 import emailRouter from "./routes/email";
@@ -19,21 +13,18 @@ import openGraphRouter from "./routes/openGraph";
 import ordersRouter from "./routes/orders";
 import paymentsRouter from "./routes/payments";
 import paypalRouter from "./routes/paypal";
+import reservationsRouter from "./routes/reservations";
 import schemaRouter from "./routes/schema";
 import securityRouter from "./routes/security";
 import serviceOrdersRouter from "./routes/serviceOrders";
 import sitemapRouter from "./routes/sitemap";
 import storageRouter from "./routes/storage";
 import stripeRouter from "./routes/stripe";
-// import stripeWebhookRouter from "./routes/stripeWebhook"; // Removed - using Clerk for billing
-// import subscriptionRouter from "./routes/subscription"; // Removed - using Clerk for billing
 import syncRouter from "./routes/sync";
 import uploadsRouter from "./routes/uploads";
 import wishlistRouter from "./routes/wishlist";
 import wooRouter from "./routes/woo";
 import wpRouter from "./routes/wp";
-import reservationsRouter from "./routes/reservations";
-import categoriesRouter from "./routes/categories";
 
 const app = express();
 app.use(express.json());
@@ -57,18 +48,9 @@ setupAuth(app); // Middleware Clerk réactivé
 registerAuthRoutes(app);
 
 // Cache monitoring middleware
-app.use((req, res, next) => {
-  const startTime = Date.now();
-
+app.use((_req, res, next) => {
   res.on("finish", () => {
-    const responseTime = Date.now() - startTime;
-
-    // Record cache metrics for monitoring
-    if (res.getHeader("X-Cache") === "HIT") {
-      // monitoringUtils.recordHit(req.originalUrl, responseTime);
-    } else if (res.getHeader("X-Cache") === "MISS") {
-      // monitoringUtils.recordMiss(req.originalUrl, responseTime);
-    }
+    // Cache metrics monitoring can be added here if needed
   });
 
   next();
@@ -77,7 +59,6 @@ app.use((req, res, next) => {
 // API Routes
 app.use("/api/activity", activityRouter);
 app.use("/api/avatar", avatarRouter);
-// app.use("/api/clerk", clerkRouter); // Removed - using native Clerk components
 app.use("/api/downloads", downloadsRouter);
 app.use("/api/email", emailRouter);
 app.use("/api/monitoring", monitoringRouter);
@@ -92,8 +73,6 @@ app.use("/api/schema", schemaRouter);
 app.use("/api/security", securityRouter);
 app.use("/api/service-orders", serviceOrdersRouter);
 app.use("/api/storage", storageRouter);
-// app.use("/api/stripe/webhook", stripeWebhookRouter); // Removed - using Clerk for billing
-// app.use("/api/subscription", subscriptionRouter); // Removed - using Clerk for billing
 app.use("/api/uploads", uploadsRouter);
 app.use("/api/wishlist", wishlistRouter);
 app.use("/api/woo", wooRouter);
@@ -126,22 +105,16 @@ app.post("/api/auth/signin", (_req, res) => {
   res.json({ accessToken: process.env.TEST_USER_TOKEN || "mock-test-token" });
 });
 
-app.post(
-  "/api/auth/login",
-  (
-    req: Request & { session?: { userId?: number }; body?: { username?: string; email?: string } },
-    res
-  ) => {
-    const token = process.env.TEST_USER_TOKEN || "mock-test-token";
-    // If credentials are provided, also establish a session for server-side routes
-    if (req.body && (req.body.username || req.body.email)) {
-      // Use a stable test user id
-      req.session = req.session || {};
-      req.session.userId = 123;
-    }
-    res.json({ token, access_token: token });
+app.post("/api/auth/login", (req: Request & { session?: { userId?: number } }, res) => {
+  const token = process.env.TEST_USER_TOKEN || "mock-test-token";
+  // If credentials are provided, also establish a session for server-side routes
+  if (req.body && (req.body.username || req.body.email)) {
+    // Use a stable test user id
+    req.session = req.session || {};
+    req.session.userId = 123;
   }
-);
+  res.json({ token, access_token: token });
+});
 
 // Minimal register endpoint used by some tests to create a session
 app.post("/api/auth/register", (req: Request & { session?: { userId?: number } }, res) => {
@@ -176,18 +149,28 @@ app.get("/api/beats", async (req, res) => {
     const limit = req.query.limit ? Number(req.query.limit) : undefined;
     const wooUrl = new URL(base + "/api/woocommerce/products");
     if (limit) wooUrl.searchParams.set("per_page", String(limit));
-    const genre = req.query.genre as string | undefined;
-    const search = req.query.search as string | undefined;
+    const genre = typeof req.query.genre === "string" ? req.query.genre : undefined;
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
     if (search) wooUrl.searchParams.set("search", search);
     const r = await fetch(wooUrl.toString());
     if (!r.ok) return res.status(r.status).send(await r.text());
-    const products = await r.json();
-    const mapped = (products || []).map((p: any) => ({
+    const products = (await r.json()) as Array<{
+      id: number;
+      name: string;
+      short_description?: string;
+      description?: string;
+      categories?: Array<{ name: string }>;
+      meta_data?: Array<{ key: string; value: unknown }>;
+      price?: string;
+      prices?: { price?: string };
+      images?: Array<{ src: string }>;
+    }>;
+    const mapped = (products || []).map(p => ({
       id: p.id,
       title: p.name,
       description: p.short_description || p.description || null,
-      genre: (p.categories?.[0]?.name as string) || "",
-      bpm: Number(p.meta_data?.find((m: any) => m.key === "bpm")?.value || 0) || 120,
+      genre: p.categories?.[0]?.name || "",
+      bpm: Number(p.meta_data?.find(m => m.key === "bpm")?.value || 0) || 120,
       price: Number(p.price || p.prices?.price || 0),
       image: p.images?.[0]?.src,
     }));
@@ -195,15 +178,14 @@ app.get("/api/beats", async (req, res) => {
       return res.json(mapped.slice(0, limit));
     }
     const filtered = genre
-      ? mapped.filter((b: any) => (b.genre || "").toLowerCase().includes(genre.toLowerCase()))
+      ? mapped.filter(b => (b.genre || "").toLowerCase().includes(genre.toLowerCase()))
       : mapped;
     return res.json({ beats: filtered });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("/api/beats adapter error:", e);
     return res.status(500).json({ error: "Failed to fetch beats" });
   }
 });
-
 
 // Featured beats endpoint
 app.get("/api/beats/featured", async (req, res) => {
@@ -214,19 +196,29 @@ app.get("/api/beats/featured", async (req, res) => {
     wooUrl.searchParams.set("per_page", "10");
     const r = await fetch(wooUrl.toString());
     if (!r.ok) return res.status(r.status).send(await r.text());
-    const products = await r.json();
-    const mapped = (products || []).map((p: any) => ({
+    const products = (await r.json()) as Array<{
+      id: number;
+      name: string;
+      short_description?: string;
+      description?: string;
+      categories?: Array<{ name: string }>;
+      meta_data?: Array<{ key: string; value: unknown }>;
+      price?: string;
+      prices?: { price?: string };
+      images?: Array<{ src: string }>;
+    }>;
+    const mapped = (products || []).map(p => ({
       id: p.id,
       title: p.name,
       description: p.short_description || p.description || null,
-      genre: (p.categories?.[0]?.name as string) || "",
-      bpm: Number(p.meta_data?.find((m: any) => m.key === "bpm")?.value || 0) || 120,
+      genre: p.categories?.[0]?.name || "",
+      bpm: Number(p.meta_data?.find(m => m.key === "bpm")?.value || 0) || 120,
       price: Number(p.price || p.prices?.price || 0),
       image: p.images?.[0]?.src,
       featured: true,
     }));
     return res.json(mapped);
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("/api/beats/featured adapter error:", e);
     return res.status(500).json({ error: "Failed to fetch featured beats" });
   }
@@ -238,7 +230,7 @@ app.post("/api/beats", async (_req, res) => {
 
 // Fetch a single beat (stub)
 app.get("/api/beats/:id", (req, res) => {
-  const id = Number((req as any).params?.id);
+  const id = Number(req.params?.id);
   if (!Number.isFinite(id)) {
     return res.status(404).json({ error: "Beat not found" });
   }
@@ -255,7 +247,7 @@ app.get("/api/v1/dashboard", async (_req, res) => {
       downloads: [{ beatId: 1, downloadDate: new Date(now).toISOString() }],
       subscription: { planName: "Basic", status: "active" },
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("/api/v1/dashboard error:", e);
     res.status(500).json({ error: "Failed to load dashboard" });
   }
@@ -271,13 +263,13 @@ let currentPlayerState: {
 } = { volume: 1, position: 0, duration: 180 };
 
 app.post("/api/audio/player/play", (req, res) => {
-  const beatId = Number((req as any).body?.beatId) || 1;
+  const beatId = Number(req.body?.beatId) || 1;
   currentPlayerState = { ...currentPlayerState, beatId, status: "playing" };
   res.json({ status: "playing", beatId });
 });
 
 app.post("/api/audio/player/volume", (req, res) => {
-  const level = typeof (req as any).body?.level === "number" ? (req as any).body.level : 1;
+  const level = typeof req.body?.level === "number" ? req.body.level : 1;
   currentPlayerState = { ...currentPlayerState, volume: level };
   res.json({ level });
 });
@@ -287,7 +279,7 @@ app.get("/api/audio/player/duration", (_req, res) => {
 });
 
 app.post("/api/audio/player/seek", (req, res) => {
-  const position = typeof (req as any).body?.position === "number" ? (req as any).body.position : 0;
+  const position = typeof req.body?.position === "number" ? req.body.position : 0;
   currentPlayerState = { ...currentPlayerState, position };
   res.json({ position });
 });
@@ -316,7 +308,9 @@ app.get("/api/audio/waveform/:beatId", (_req, res) => {
 // Simple in-memory stores (dev/test only)
 const cartItems: Array<{ id: string; beat_id: number; quantity: number }> = [];
 let favorites: number[] = [];
+let wishlist: number[] = [];
 const recentlyPlayed: number[] = [];
+
 const bookings: Array<{ id: string; serviceType: string }> = [];
 
 // Auth alias endpoints used by tests
@@ -353,7 +347,7 @@ app.get("/api/user/dashboard", async (_req, res) => {
 
 // Cart endpoints expected by tests
 app.post("/api/cart/add", (req, res): void => {
-  const beatId = Number((req as any).body?.beatId || (req as any).body?.beat_id);
+  const beatId = Number(req.body?.beatId || req.body?.beat_id);
   if (!beatId) {
     res.status(400).json({ error: "beatId required" });
     return;
@@ -366,7 +360,7 @@ app.post("/api/cart/add", (req, res): void => {
 
 // Cart aliases used by tests
 app.post("/api/cart/guest", (req, res): void => {
-  const beatId = Number((req as any).body?.beatId || (req as any).body?.beat_id);
+  const beatId = Number(req.body?.beatId || req.body?.beat_id);
   if (!beatId) {
     res.status(400).json({ error: "beatId required" });
     return;
@@ -378,7 +372,7 @@ app.post("/api/cart/guest", (req, res): void => {
 });
 
 app.post("/api/cart", (req, res): void => {
-  const beatId = Number((req as any).body?.beatId || (req as any).body?.beat_id);
+  const beatId = Number(req.body?.beatId || req.body?.beat_id);
   if (!beatId) {
     res.status(400).json({ error: "beatId required" });
     return;
@@ -394,8 +388,8 @@ app.get("/api/cart", (_req, res) => {
 });
 
 app.put("/api/cart/items/:id", (req, res): void => {
-  const { id } = (req as any).params;
-  const qty = Number((req as any).body?.quantity || 1);
+  const { id } = req.params;
+  const qty = Number(req.body?.quantity || 1);
   const item = cartItems.find(i => i.id === id);
   if (!item) {
     res.status(404).json({ error: "Item not found" });
@@ -416,8 +410,12 @@ app.post("/api/checkout/process", (_req, res) => {
 });
 
 // Services booking endpoint used by tests
+app.get("/api/services/bookings", (_req, res) => {
+  res.json(bookings);
+});
+
 app.post("/api/services/bookings", (req, res) => {
-  const serviceType = (req as any).body?.serviceType || "mixing";
+  const serviceType = req.body?.serviceType || "mixing";
   const id = "booking_" + Date.now();
   bookings.push({ id, serviceType });
   res.json({ id, serviceType });
@@ -425,7 +423,7 @@ app.post("/api/services/bookings", (req, res) => {
 
 // Single booking alias
 app.post("/api/services/booking", (req, res) => {
-  const serviceType = (req as any).body?.serviceType || "mixing";
+  const serviceType = req.body?.serviceType || "mixing";
   const id = "booking_" + Date.now();
   bookings.push({ id, serviceType });
   res.json({ id, serviceType });
@@ -433,7 +431,7 @@ app.post("/api/services/booking", (req, res) => {
 
 // Favorites and wishlist endpoints
 app.post("/api/user/favorites", (req, res): void => {
-  const beatId = Number((req as any).body?.beatId);
+  const beatId = Number(req.body?.beatId);
   if (!beatId) {
     res.status(400).json({ error: "beatId required" });
     return;
@@ -447,15 +445,14 @@ app.get("/api/user/favorites", (_req, res) => {
 });
 
 app.delete("/api/user/favorites/:beatId", (req, res) => {
-  const beatId = Number((req as any).params?.beatId);
+  const beatId = Number(req.params?.beatId);
   favorites = favorites.filter(b => b !== beatId);
   res.status(204).end();
 });
 
 // Wishlist endpoints (stubs)
-let wishlist: number[] = [];
 app.post("/api/user/wishlist", (req, res): void => {
-  const beatId = Number((req as any).body?.beatId);
+  const beatId = Number(req.body?.beatId);
   if (!beatId) {
     res.status(400).json({ error: "beatId required" });
     return;
@@ -469,13 +466,13 @@ app.get("/api/user/wishlist", (_req, res) => {
 });
 
 app.delete("/api/user/wishlist/:beatId", (req, res) => {
-  const beatId = Number((req as any).params?.beatId);
+  const beatId = Number(req.params?.beatId);
   wishlist = wishlist.filter(b => b !== beatId);
   res.status(204).end();
 });
 
 app.post("/api/user/recently-played", (req, res): void => {
-  const beatId = Number((req as any).body?.beatId);
+  const beatId = Number(req.body?.beatId);
   if (!beatId) {
     res.status(400).json({ error: "beatId required" });
     return;
@@ -490,8 +487,8 @@ app.get("/api/user/recently-played", (_req, res) => {
 
 // i18n endpoints expected by tests
 app.get("/api/i18n/translate", (req, res) => {
-  const lang = ((req as any).query?.lang as string) || "en";
-  const key = ((req as any).query?.key as string) || "welcomeMessage";
+  const lang = typeof req.query?.lang === "string" ? req.query.lang : "en";
+  const key = typeof req.query?.key === "string" ? req.query.key : "welcomeMessage";
   const map: Record<string, Record<string, string>> = {
     welcomeMessage: { en: "Welcome", es: "Bienvenido", fr: "Bienvenue", de: "Willkommen" },
   };
@@ -501,8 +498,8 @@ app.get("/api/i18n/translate", (req, res) => {
 
 // Alternate translations endpoint used by tests
 app.get("/api/i18n/translations", (req, res) => {
-  const lang = ((req as any).query?.lang as string) || "en";
-  const key = ((req as any).query?.key as string) || "welcomeMessage";
+  const lang = typeof req.query?.lang === "string" ? req.query.lang : "en";
+  const key = typeof req.query?.key === "string" ? req.query.key : "welcomeMessage";
   const map: Record<string, Record<string, string>> = {
     welcomeMessage: { en: "Welcome", es: "Bienvenido", fr: "Bienvenue", de: "Willkommen" },
   };
@@ -515,8 +512,8 @@ app.put("/api/user/profile/update", (_req, res) => {
   res.json({ success: true });
 });
 app.get("/api/i18n/currency-format", (req, res) => {
-  const currency = ((req as any).query?.currency as string) || "USD";
-  const amount = Number((req as any).query?.amount || 0);
+  const currency = typeof req.query?.currency === "string" ? req.query.currency : "USD";
+  const amount = Number(req.query?.amount || 0);
   try {
     const localized = new Intl.NumberFormat(undefined, { style: "currency", currency }).format(
       amount
@@ -528,7 +525,7 @@ app.get("/api/i18n/currency-format", (req, res) => {
 });
 
 // Test endpoint pour diagnostiquer l'authentification
-app.get("/api/test-auth", (req: any, res) => {
+app.get("/api/test-auth", (req: Request & { auth?: unknown; user?: unknown }, res) => {
   console.log("🔍 Test auth endpoint called");
   console.log("🔍 req.auth:", req.auth);
   console.log("🔍 req.user:", req.user);
@@ -546,7 +543,7 @@ app.get("/api/test-auth", (req: any, res) => {
 });
 
 // Test endpoint PayPal direct sans middleware
-app.post("/api/paypal-test/create-order", (req: any, res): void => {
+app.post("/api/paypal-test/create-order", (req, res): void => {
   try {
     console.log("🧪 PayPal test endpoint called directly");
     console.log("🧪 Request body:", req.body);
@@ -584,7 +581,7 @@ app.post("/api/paypal-test/create-order", (req: any, res): void => {
 });
 
 // 🚀 NOUVEAU: Endpoint PayPal de test complètement séparé
-app.post("/api/paypal-direct/create-order", (req: any, res): void => {
+app.post("/api/paypal-direct/create-order", (req, res): void => {
   try {
     console.log("🚀 PayPal direct endpoint called - NO MIDDLEWARE");
     console.log("📦 Request body:", req.body);
@@ -610,7 +607,7 @@ app.post("/api/paypal-direct/create-order", (req: any, res): void => {
       success: true,
       paymentUrl,
       orderId,
-      amount: parseFloat(amount),
+      amount: Number.parseFloat(amount),
       currency: currency.toUpperCase(),
       serviceType,
       reservationId,
@@ -635,7 +632,7 @@ app.post("/api/paypal-direct/create-order", (req: any, res): void => {
 // --- Additional aliases for automated tests (appended) ---
 // Service booking alias
 app.post("/api/services/book", (req, res) => {
-  const serviceType = (req as any).body?.serviceType || "mixing";
+  const serviceType = req.body?.serviceType || "mixing";
   const id = "booking_" + Date.now();
   bookings.push({ id, serviceType });
   res.json({ id, serviceType });
@@ -643,7 +640,7 @@ app.post("/api/services/book", (req, res) => {
 
 // Cart item aliases
 app.post("/api/cart/item", (req, res): void => {
-  const beatId = Number((req as any).body?.beatId || (req as any).body?.beat_id);
+  const beatId = Number(req.body?.beatId || req.body?.beat_id);
   if (!beatId) {
     res.status(400).json({ error: "beatId required" });
     return;
@@ -655,7 +652,7 @@ app.post("/api/cart/item", (req, res): void => {
 });
 
 app.post("/api/cart/items", (req, res): void => {
-  const beatId = Number((req as any).body?.beatId || (req as any).body?.beat_id);
+  const beatId = Number(req.body?.beatId || req.body?.beat_id);
   if (!beatId) {
     res.status(400).json({ error: "beatId required" });
     return;
@@ -685,6 +682,5 @@ app.get("/api/subscription/plans", (_req, res) => {
     { id: "ultimate", name: "Ultimate", price: 4999 },
   ]);
 });
-
 
 export { app };
