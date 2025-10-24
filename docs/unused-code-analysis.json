@@ -1,0 +1,103 @@
+{
+  "examples": {
+    "used": [],
+    "unused": [
+      {
+        "file": "client\\src\\components\\examples\\AnalyticsExample.tsx",
+        "componentName": "AnalyticsExample"
+      },
+      {
+        "file": "client\\src\\components\\examples\\CachingStrategyExample.tsx",
+        "componentName": "CachingStrategyExample"
+      },
+      {
+        "file": "client\\src\\components\\examples\\ConnectionManagerExample.tsx",
+        "componentName": "ConnectionManagerExample"
+      },
+      {
+        "file": "client\\src\\components\\examples\\CrossTabSyncExample.tsx",
+        "componentName": "CrossTabSyncExample"
+      },
+      {
+        "file": "client\\src\\components\\examples\\OfflineExample.tsx",
+        "componentName": "OfflineExample"
+      },
+      {
+        "file": "client\\src\\components\\examples\\OptimisticDashboardExample.tsx",
+        "componentName": "OptimisticDashboardExample"
+      },
+      {
+        "file": "client\\src\\components\\examples\\OptimisticDownloadButton.tsx",
+        "componentName": "OptimisticDownloadButton"
+      },
+      {
+        "file": "client\\src\\components\\examples\\OptimisticFavoriteButton.tsx",
+        "componentName": "OptimisticFavoriteButton"
+      },
+      {
+        "file": "client\\src\\components\\examples\\PerformanceOptimizationExample.tsx",
+        "componentName": "PerformanceOptimizationExample"
+      },
+      {
+        "file": "client\\src\\components\\examples\\SyncMonitoringExample.tsx",
+        "componentName": "SyncMonitoringExample"
+      }
+    ]
+  },
+  "debug": {
+    "used": [],
+    "unused": [
+      {
+        "file": "client\\src\\components\\debug\\DebugPanel.tsx",
+        "componentName": "DebugPanel"
+      },
+      {
+        "file": "client\\src\\components\\debug\\ResponsiveTest.tsx",
+        "componentName": "ResponsiveTest"
+      },
+      {
+        "file": "client\\src\\components\\debug\\SyncDebugPanel.tsx",
+        "componentName": "SyncDebugPanel"
+      }
+    ]
+  },
+  "diagnostics": {
+    "used": [],
+    "unused": [
+      {
+        "file": "client\\src\\components\\dashboard\\ActivitySyncDiagnostic.tsx",
+        "componentName": "ActivitySyncDiagnostic"
+      },
+      {
+        "file": "client\\src\\components\\dashboard\\SimpleActivityDiagnostic.tsx",
+        "componentName": "SimpleActivityDiagnostic"
+      }
+    ]
+  },
+  "monitoring": {
+    "used": [
+      {
+        "file": "client\\src\\components\\monitoring\\PerformanceMonitor.tsx",
+        "componentName": "PerformanceMonitor"
+      }
+    ],
+    "unused": [
+      {
+        "file": "client\\src\\components\\monitoring\\CodeSplittingMonitor.tsx",
+        "componentName": "CodeSplittingMonitor"
+      },
+      {
+        "file": "client\\src\\components\\monitoring\\ConversionFunnelTracker.tsx",
+        "componentName": "ConversionFunnelTracker"
+      },
+      {
+        "file": "client\\src\\components\\monitoring\\PerformanceMonitoringDashboard.tsx",
+        "componentName": "PerformanceMonitoringDashboard"
+      },
+      {
+        "file": "client\\src\\components\\monitoring\\PerformanceOptimizations.tsx",
+        "componentName": "PerformanceOptimizations"
+      }
+    ]
+  }
+}
