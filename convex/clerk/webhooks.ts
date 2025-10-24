@@ -56,6 +56,7 @@ export const clerkWebhook = httpAction(async (ctx, request) => {
   try {
     switch (eventType) {
       case "user.created":
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await ctx.runMutation("users/clerkSync:syncClerkUser" as any, {
           clerkId: evt.data.id,
           email: evt.data.email_addresses?.[0]?.email_address || "",
@@ -67,6 +68,8 @@ export const clerkWebhook = httpAction(async (ctx, request) => {
         break;
 
       case "user.updated":
+        console.log(`Updating user ${evt.data.id}`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await ctx.runMutation("users/clerkSync:syncClerkUser" as any, {
           clerkId: evt.data.id,
           email: evt.data.email_addresses?.[0]?.email_address || "",
@@ -78,16 +81,23 @@ export const clerkWebhook = httpAction(async (ctx, request) => {
         break;
 
       case "user.deleted":
+        console.log(`User deletion requested for ${evt.data.id}`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await ctx.runMutation("users/clerkSync:deleteClerkUser" as any, {
           clerkId: evt.data.id,
         });
         break;
 
       case "session.created":
+        // Pour les sessions, on a besoin de récupérer les données utilisateur depuis Clerk
         if (evt.data.user_id) {
+          console.log(`Session created for user ${evt.data.user_id}`);
+          // On va déclencher une synchronisation avec les données minimales
+          // La fonction clerkSync va récupérer les données complètes si nécessaire
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await ctx.runMutation("users/clerkSync:syncClerkUser" as any, {
             clerkId: evt.data.user_id,
-            email: "", // We don't have email in session event, will be handled by the sync function
+            email: "temp@example.com", // Temporaire, sera mis à jour par la sync
           });
         }
         break;

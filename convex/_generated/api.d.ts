@@ -21,6 +21,7 @@ import type * as alerts from "../alerts.js";
 import type * as audit from "../audit.js";
 import type * as auth_roles from "../auth/roles.js";
 import type * as backup from "../backup.js";
+import type * as clerk_simpleWebhook from "../clerk/simpleWebhook.js";
 import type * as clerk_webhooks from "../clerk/webhooks.js";
 import type * as consistency from "../consistency.js";
 import type * as dashboard from "../dashboard.js";
@@ -43,7 +44,11 @@ import type * as lib_statisticsCalculator from "../lib/statisticsCalculator.js";
 import type * as lib_validation from "../lib/validation.js";
 import type * as messages from "../messages.js";
 import type * as migrations_cleanOrders from "../migrations/cleanOrders.js";
+import type * as migrations_cleanupGenericDownloads from "../migrations/cleanupGenericDownloads.js";
 import type * as migrations_cleanupSupabase from "../migrations/cleanupSupabase.js";
+import type * as migrations_fixOrderPrices from "../migrations/fixOrderPrices.js";
+import type * as migrations_fixReservationPrices from "../migrations/fixReservationPrices.js";
+import type * as migrations_markSpecificFreeBeats from "../migrations/markSpecificFreeBeats.js";
 import type * as orders_createOrder from "../orders/createOrder.js";
 import type * as orders_updateOrder from "../orders/updateOrder.js";
 import type * as orders from "../orders.js";
@@ -73,9 +78,13 @@ import type * as subscriptions_updateSubscription from "../subscriptions/updateS
 import type * as sync_internal from "../sync/internal.js";
 import type * as sync_woocommerce from "../sync/woocommerce.js";
 import type * as sync_wordpress from "../sync/wordpress.js";
+import type * as test_checkOrderPrices from "../test/checkOrderPrices.js";
+import type * as test_checkReservationPrices from "../test/checkReservationPrices.js";
+import type * as test_checkReservationTransform from "../test/checkReservationTransform.js";
 import type * as users_clerkSync from "../users/clerkSync.js";
 import type * as users_getUserStats from "../users/getUserStats.js";
 import type * as users from "../users.js";
+import type * as utils_priceCorrection from "../utils/priceCorrection.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -94,6 +103,7 @@ declare const fullApi: ApiFromModules<{
   audit: typeof audit;
   "auth/roles": typeof auth_roles;
   backup: typeof backup;
+  "clerk/simpleWebhook": typeof clerk_simpleWebhook;
   "clerk/webhooks": typeof clerk_webhooks;
   consistency: typeof consistency;
   dashboard: typeof dashboard;
@@ -116,7 +126,11 @@ declare const fullApi: ApiFromModules<{
   "lib/validation": typeof lib_validation;
   messages: typeof messages;
   "migrations/cleanOrders": typeof migrations_cleanOrders;
+  "migrations/cleanupGenericDownloads": typeof migrations_cleanupGenericDownloads;
   "migrations/cleanupSupabase": typeof migrations_cleanupSupabase;
+  "migrations/fixOrderPrices": typeof migrations_fixOrderPrices;
+  "migrations/fixReservationPrices": typeof migrations_fixReservationPrices;
+  "migrations/markSpecificFreeBeats": typeof migrations_markSpecificFreeBeats;
   "orders/createOrder": typeof orders_createOrder;
   "orders/updateOrder": typeof orders_updateOrder;
   orders: typeof orders;
@@ -146,9 +160,13 @@ declare const fullApi: ApiFromModules<{
   "sync/internal": typeof sync_internal;
   "sync/woocommerce": typeof sync_woocommerce;
   "sync/wordpress": typeof sync_wordpress;
+  "test/checkOrderPrices": typeof test_checkOrderPrices;
+  "test/checkReservationPrices": typeof test_checkReservationPrices;
+  "test/checkReservationTransform": typeof test_checkReservationTransform;
   "users/clerkSync": typeof users_clerkSync;
   "users/getUserStats": typeof users_getUserStats;
   users: typeof users;
+  "utils/priceCorrection": typeof utils_priceCorrection;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

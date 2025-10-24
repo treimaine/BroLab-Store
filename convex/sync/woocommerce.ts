@@ -18,6 +18,7 @@ export const syncWooCommerceOrders = mutation({
             name: v.string(),
             quantity: v.number(),
             total: v.string(),
+            price: v.optional(v.number()), // Prix unitaire du produit
             license: v.optional(v.string()),
           })
         ),
@@ -47,7 +48,7 @@ export const syncWooCommerceOrders = mutation({
             items: order.items.map(item => ({
               productId: item.productId,
               title: item.name,
-              price: (parseFloat(item.total) * 100) / item.quantity,
+              price: item.price ? item.price * 100 : 0, // Utiliser le prix unitaire et convertir en centimes
               quantity: item.quantity,
               license: item.license || "basic",
               type: "beat",
@@ -75,7 +76,7 @@ export const syncWooCommerceOrders = mutation({
             items: order.items.map(item => ({
               productId: item.productId,
               title: item.name,
-              price: (parseFloat(item.total) * 100) / item.quantity,
+              price: item.price ? item.price * 100 : 0, // Utiliser le prix unitaire et convertir en centimes
               quantity: item.quantity,
               license: item.license || "basic",
               type: "beat",

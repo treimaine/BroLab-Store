@@ -220,6 +220,7 @@ export async function syncWooCommerceToConvex(): Promise<SyncResult> {
           name: item.name,
           quantity: item.quantity,
           total: item.total,
+          price: item.price, // Ajouter le prix unitaire
           license: item.meta_data?.find(meta => meta.key === "license")?.value,
         })) || [],
       createdAt: order.date_created,

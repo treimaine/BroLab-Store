@@ -52,6 +52,7 @@ import { useDashboard } from "@/hooks/useDashboard";
 
 // Import other dashboard tabs (removed lazy loading)
 import UserProfile from "@/components/auth/UserProfile";
+import DownloadsRegenerator from "@/components/dashboard/DownloadsRegenerator";
 import DownloadsTable from "@/components/dashboard/DownloadsTable";
 import AnalyticsFixInfo from "./AnalyticsFixInfo";
 import EnhancedAnalytics from "./EnhancedAnalytics";
@@ -309,55 +310,54 @@ export const ModernDashboard = memo(() => {
         }}
       >
         <div className="pt-16 sm:pt-20 min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
-            {/* Dashboard Header with Enhanced Connection Status */}
-            <div className="flex items-center justify-between mb-4">
-              <DashboardHeader user={user || clerkUser || null} className="space-y-2 flex-1" />
-
-              {/* Enhanced Data Sync Status with Connection Indicators */}
-              <DataSyncIndicator
-                isLoading={isLoading}
-                onRefresh={handleRefresh}
-                lastSyncTime={
-                  syncStatus?.lastSync
-                    ? new Date(syncStatus.lastSync).toLocaleTimeString()
-                    : undefined
-                }
-                showConnectionStatus={true}
-                showDataFreshness={true}
-                className="flex-shrink-0"
-              />
-            </div>
-
-            {/* Analytics Fix Information */}
-            <AnalyticsFixInfo
-              isVisible={showAnalyticsFixInfo}
-              onDismiss={() => setShowAnalyticsFixInfo(false)}
-            />
-
-            {/* Data Consistency Information */}
-            <DataConsistencyInfo
-              isVisible={showConsistencyInfo}
-              onDismiss={() => setShowConsistencyInfo(false)}
-            />
-
-            {/* Status Indicator - Only visible in development mode */}
-            {process.env.NODE_ENV === "development" && (
-              <StatusIndicator
-                showConnection={true}
-                showValidation={true}
-                showMockData={true}
-                variant="horizontal"
-                className="mb-4"
-              />
-            )}
-
-            {/* Debug Data Panel removed - no mock data in production */}
-
-            {/* Statistics Cards */}
-            {statsComponent}
-
+          <div className="space-y-4 sm:space-y-6">
             <DashboardLayout activeTab={activeTab} onTabChange={handleTabChange}>
+              {/* Dashboard Header with Enhanced Connection Status */}
+              <div className="flex items-center justify-between mb-4">
+                <DashboardHeader user={user || clerkUser || null} className="space-y-2 flex-1" />
+
+                {/* Enhanced Data Sync Status with Connection Indicators */}
+                <DataSyncIndicator
+                  isLoading={isLoading}
+                  onRefresh={handleRefresh}
+                  lastSyncTime={
+                    syncStatus?.lastSync
+                      ? new Date(syncStatus.lastSync).toLocaleTimeString()
+                      : undefined
+                  }
+                  showConnectionStatus={true}
+                  showDataFreshness={true}
+                  className="flex-shrink-0"
+                />
+              </div>
+
+              {/* Analytics Fix Information */}
+              <AnalyticsFixInfo
+                isVisible={showAnalyticsFixInfo}
+                onDismiss={() => setShowAnalyticsFixInfo(false)}
+              />
+
+              {/* Data Consistency Information */}
+              <DataConsistencyInfo
+                isVisible={showConsistencyInfo}
+                onDismiss={() => setShowConsistencyInfo(false)}
+              />
+
+              {/* Status Indicator - Only visible in development mode */}
+              {process.env.NODE_ENV === "development" && (
+                <StatusIndicator
+                  showConnection={true}
+                  showValidation={true}
+                  showMockData={true}
+                  variant="horizontal"
+                  className="mb-4"
+                />
+              )}
+
+              {/* Debug Data Panel removed - no mock data in production */}
+
+              {/* Statistics Cards */}
+              {statsComponent}
               {/* Tab Content */}
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
@@ -462,25 +462,32 @@ export const ModernDashboard = memo(() => {
 
                 {/* Downloads Tab */}
                 <TabContentWrapper value="downloads">
-                  <DownloadsTable
-                    downloads={
-                      downloads?.map((d: Download) => ({
-                        id: d.id,
-                        beatTitle: d.beatTitle,
-                        artist: d.beatArtist,
-                        fileSize: d.fileSize || 0,
-                        format: d.format,
-                        quality: d.quality || "",
-                        downloadedAt: d.downloadedAt,
-                        downloadCount: d.downloadCount,
-                        maxDownloads: d.maxDownloads,
-                        licenseType: d.licenseType,
-                        downloadUrl: d.downloadUrl || "",
-                      })) || []
-                    }
-                    isLoading={isLoading}
-                    onRefresh={handleRefresh}
-                  />
+                  <div className="space-y-6">
+                    {/* Downloads Regenerator - Only show if user has few or no downloads but has orders */}
+                    {(!downloads || downloads.length === 0) && orders && orders.length > 0 && (
+                      <DownloadsRegenerator onRegenerateComplete={handleRefresh} className="mb-6" />
+                    )}
+
+                    <DownloadsTable
+                      downloads={
+                        downloads?.map((d: Download) => ({
+                          id: d.id,
+                          beatTitle: d.beatTitle,
+                          artist: d.beatArtist,
+                          fileSize: d.fileSize || 0,
+                          format: d.format,
+                          quality: d.quality || "",
+                          downloadedAt: d.downloadedAt,
+                          downloadCount: d.downloadCount,
+                          maxDownloads: d.maxDownloads,
+                          licenseType: d.licenseType,
+                          downloadUrl: d.downloadUrl || "",
+                        })) || []
+                      }
+                      isLoading={isLoading}
+                      onRefresh={handleRefresh}
+                    />
+                  </div>
                 </TabContentWrapper>
 
                 {/* Reservations Tab */}
@@ -598,43 +605,43 @@ export const ModernDashboard = memo(() => {
                   )}
                 </TabContentWrapper>
               </motion.div>
-            </DashboardLayout>
 
-            {/* Error Display */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-4"
-              >
-                <Card className="border-red-200 bg-red-50/10 border-red-500/20">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-red-500 rounded-full" />
-                        <p className="text-red-400 text-xs sm:text-sm">{error.message}</p>
-                      </div>
-                      <div className="flex space-x-2">
-                        {error.retryable && (
+              {/* Error Display */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4"
+                >
+                  <Card className="border-red-200 bg-red-50/10 border-red-500/20">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-red-500 rounded-full" />
+                          <p className="text-red-400 text-xs sm:text-sm">{error.message}</p>
+                        </div>
+                        <div className="flex space-x-2">
+                          {error.retryable && (
+                            <button
+                              onClick={handleRetry}
+                              className="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                            >
+                              Retry
+                            </button>
+                          )}
                           <button
-                            onClick={handleRetry}
-                            className="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                            onClick={clearDashboardError}
+                            className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
                           >
-                            Retry
+                            Dismiss
                           </button>
-                        )}
-                        <button
-                          onClick={clearDashboardError}
-                          className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
-                        >
-                          Dismiss
-                        </button>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </DashboardLayout>
           </div>
         </div>
       </ValidatedDashboard>
