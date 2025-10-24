@@ -46,6 +46,33 @@ export async function registerRoutes(app: Express) {
   app.use("/api/woo", wooRouter);
   app.use("/api/wp", wpRouter);
 
+  // Webhook Clerk - Solution directe
+  app.post("/api/webhooks/clerk", async (req, res) => {
+    console.log("🔔 Webhook Clerk reçu !");
+    console.log("📦 Body:", req.body);
+
+    try {
+      const evt = req.body;
+      const eventType = evt.type;
+
+      console.log(`📋 Événement: ${eventType}`);
+
+      if (eventType === "session.created" && evt.data?.user_id) {
+        console.log(`🔐 Session créée pour: ${evt.data.user_id}`);
+        // TODO: Appeler Convex pour enregistrer l'activité
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Webhook processed",
+        eventType,
+      });
+    } catch (error) {
+      console.error("❌ Erreur webhook:", error);
+      res.status(500).json({ error: "Webhook failed" });
+    }
+  });
+
   // WordPress and WooCommerce routes
   app.use("/api/products", wooRouter);
   app.use("/api/woocommerce", wooRouter);

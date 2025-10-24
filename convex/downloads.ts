@@ -35,7 +35,8 @@ export const logDownload = mutation({
 
       if (!user) {
         // Créer l'utilisateur s'il n'existe pas
-        const email = (identity.emailAddresses as any)?.[0]?.emailAddress || "";
+        const email =
+          (identity.emailAddresses as Array<{ emailAddress: string }>)?.[0]?.emailAddress || "";
         const username =
           (identity.username as string) ||
           email.split("@")[0] ||
@@ -63,10 +64,12 @@ export const logDownload = mutation({
         throw new Error("Failed to create or find user");
       }
 
+      const userId = user._id;
+
       // Check if download already exists
       const existingDownload = await ctx.db
         .query("downloads")
-        .withIndex("by_user", q => q.eq("userId", user._id))
+        .withIndex("by_user", q => q.eq("userId", userId))
         .filter(q => q.eq(q.field("beatId"), args.productId))
         .filter(q => q.eq(q.field("licenseType"), args.license))
         .first();
@@ -80,7 +83,7 @@ export const logDownload = mutation({
       } else {
         // Create new download record
         const downloadId = await ctx.db.insert("downloads", {
-          userId: user._id,
+          userId,
           beatId: args.productId,
           licenseType: args.license,
           timestamp: Date.now(),
@@ -152,8 +155,8 @@ export const checkDownloadQuota = query({
       return { canDownload: false, reason: "User not found" };
     }
 
-    // Get user's subscription status
-    const subscription = await ctx.db
+    // Get user's subscription status (for future quota implementation)
+    const _subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", q => q.eq("userId", user._id))
       .first();

@@ -1,7 +1,22 @@
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import { ValidationError, validateAndSanitizeOrder } from "./lib/validation";
+
+// Type definitions
+type OrderItem = {
+  productId?: number;
+  name?: string;
+  title?: string;
+  price?: number;
+  license?: string;
+  quantity?: number;
+  wordpressId?: number;
+  beatId?: number;
+};
+
+type Order = Doc<"orders">;
 
 export const createOrder = mutation({
   args: {
@@ -82,7 +97,7 @@ export const createOrder = mutation({
         itemsCount: (validatedOrder.items || []).length,
         createdAt: now,
         updatedAt: now,
-      } as any);
+      });
 
       // Log de l'activité
       await ctx.db.insert("activityLog", {
@@ -160,12 +175,29 @@ export const createOrderIdempotent = mutation({
         type: v.string(), // 'beat'|'subscription'|'service'
         qty: v.number(),
         unitPrice: v.number(), // cents
-        metadata: v.optional(v.any()),
+        metadata: v.optional(
+          v.object({
+            beatGenre: v.optional(v.string()),
+            beatBpm: v.optional(v.number()),
+            beatKey: v.optional(v.string()),
+            downloadFormat: v.optional(v.string()),
+            licenseTerms: v.optional(v.string()),
+          })
+        ),
       })
     ),
     currency: v.string(),
     email: v.string(),
-    metadata: v.optional(v.any()),
+    metadata: v.optional(
+      v.object({
+        source: v.union(v.literal("web"), v.literal("mobile"), v.literal("api")),
+        campaign: v.optional(v.string()),
+        referrer: v.optional(v.string()),
+        discountCode: v.optional(v.string()),
+        giftMessage: v.optional(v.string()),
+        deliveryInstructions: v.optional(v.string()),
+      })
+    ),
     idempotencyKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -178,7 +210,7 @@ export const createOrderIdempotent = mutation({
     if (args.idempotencyKey) {
       const existing = await ctx.db
         .query("orders")
-        .withIndex("by_idempotency", q => q.eq("idempotencyKey", args.idempotencyKey!))
+        .withIndex("by_idempotency", q => q.eq("idempotencyKey", args.idempotencyKey))
         .first();
       if (existing) return { orderId: existing._id, order: existing, idempotent: true } as const;
     }
@@ -230,7 +262,7 @@ export const createOrderIdempotent = mutation({
         qty: it.qty,
         unitPrice: it.unitPrice,
         totalPrice: it.unitPrice * it.qty,
-        metadata: it.metadata || {},
+        metadata: it.metadata,
       })),
       paymentProvider: undefined,
       checkoutSessionId: undefined,
@@ -239,7 +271,7 @@ export const createOrderIdempotent = mutation({
       invoiceUrl: undefined,
       invoiceNumber: undefined,
       idempotencyKey: args.idempotencyKey,
-      metadata: args.metadata || {},
+      metadata: args.metadata,
       sessionId: undefined,
       notes: undefined,
       createdAt: now,
@@ -257,7 +289,7 @@ export const createOrderIdempotent = mutation({
         qty: it.qty,
         unitPrice: it.unitPrice,
         totalPrice: it.unitPrice * it.qty,
-        metadata: it.metadata || {},
+        metadata: it.metadata,
       });
     }
 
@@ -300,7 +332,7 @@ export const getOrderWithRelations = query({
       .withIndex("by_order", q => q.eq("orderId", orderId))
       .order("desc")
       .collect();
-    const invoice = order.invoiceId ? await ctx.db.get(order.invoiceId as any) : null;
+    const invoice = order.invoiceId ? await ctx.db.get(order.invoiceId) : null;
     return { order, items, payments, invoice } as const;
   },
 });
@@ -317,12 +349,18 @@ export const listOrdersAdmin = query({
   handler: async (ctx, args) => {
     // Authorization should be enforced by the caller (Express) using Clerk roles
     let qBase = ctx.db.query("orders");
-    if (args.status) qBase = qBase.filter(qq => qq.eq(qq.field("status"), args.status!));
+    if (args.status) qBase = qBase.filter(qq => qq.eq(qq.field("status"), args.status));
     let results = await qBase.order("desc").take(Math.max(1, Math.min(args.limit || 50, 200)));
-    if (args.email) results = results.filter(o => (o.email as string) === args.email);
-    if (args.from) results = results.filter(o => (o.createdAt as number) >= args.from!);
-    if (args.to) results = results.filter(o => (o.createdAt as number) <= args.to!);
-    return results as any;
+    if (args.email) results = results.filter(o => String(o.email) === args.email);
+    if (args.from !== undefined) {
+      const fromValue = args.from;
+      results = results.filter(o => Number(o.createdAt) >= fromValue);
+    }
+    if (args.to !== undefined) {
+      const toValue = args.to;
+      results = results.filter(o => Number(o.createdAt) <= toValue);
+    }
+    return results;
   },
 });
 
@@ -337,11 +375,11 @@ export const incrementCounter = mutation({
     if (!existing) {
       const id = await ctx.db.insert("counters", { name, value: 1 });
       const doc = await ctx.db.get(id);
-      return (doc?.value as number) || 1;
+      return Number(doc?.value) || 1;
     }
-    await ctx.db.patch(existing._id, { value: (existing.value as number) + 1 });
+    await ctx.db.patch(existing._id, { value: Number(existing.value) + 1 });
     const updated = await ctx.db.get(existing._id);
-    return (updated?.value as number) || (existing.value as number) + 1;
+    return Number(updated?.value) || Number(existing.value) + 1;
   },
 });
 
@@ -360,6 +398,7 @@ export const recordPayment = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
     await ctx.db.insert("payments", { ...args, createdAt: now });
+
     // Update order status if succeeded/failed
     const order = await ctx.db.get(args.orderId);
     if (order) {
@@ -370,10 +409,78 @@ export const recordPayment = mutation({
       };
       const newStatus = statusMap[args.status] || order.status;
       await ctx.db.patch(order._id, { status: newStatus, updatedAt: now });
+
+      // Create downloads for paid orders
+      if (args.status === "succeeded" && newStatus === "paid" && order.userId) {
+        await createDownloadsFromOrder(ctx, order);
+      }
     }
     return { success: true } as const;
   },
 });
+
+// Helper function to create downloads from a paid order
+async function createDownloadsFromOrder(ctx: MutationCtx, order: Order): Promise<void> {
+  try {
+    console.log(`🎵 Creating downloads for paid order: ${order._id}`);
+
+    if (!order.userId) {
+      console.warn(`⚠️ Order ${order._id} has no userId, skipping download creation`);
+      return;
+    }
+
+    // Process each item in the order
+    for (const item of order.items || []) {
+      if (item.productId && item.license) {
+        // Check if download already exists to avoid duplicates
+        const existingDownload = await ctx.db
+          .query("downloads")
+          .withIndex("by_user_beat", q =>
+            q.eq("userId", order.userId!).eq("beatId", item.productId!)
+          )
+          .filter(q => q.eq(q.field("licenseType"), item.license))
+          .first();
+
+        if (existingDownload) {
+          console.log(`ℹ️ Download already exists for beat ${item.productId} (${item.license})`);
+          continue;
+        }
+
+        // Create new download record
+        const downloadId = await ctx.db.insert("downloads", {
+          userId: order.userId,
+          beatId: item.productId,
+          licenseType: item.license,
+          downloadCount: 0, // Initialize to 0, will increment on actual download
+          timestamp: Date.now(),
+        });
+
+        console.log(
+          `✅ Created download record: ${downloadId} for beat ${item.productId} (${item.license})`
+        );
+
+        // Log activity
+        const beatTitle = item.title || item.name || `Beat ${item.productId}`;
+        await ctx.db.insert("activityLog", {
+          userId: order.userId,
+          action: "download_granted",
+          details: {
+            description: `Download access granted for "${beatTitle}"`,
+            beatId: item.productId,
+            beatTitle: item.title || item.name,
+            licenseType: item.license,
+            orderId: order._id,
+            severity: "info",
+          },
+          timestamp: Date.now(),
+        });
+      }
+    }
+  } catch (error) {
+    console.error("❌ Error creating downloads from order:", error);
+    // Don't throw error to avoid breaking payment processing
+  }
+}
 
 // Mark a Stripe event as processed (idempotency)
 export const markProcessedEvent = mutation({
@@ -397,7 +504,23 @@ export const setInvoiceForOrder = mutation({
     amount: v.number(),
     currency: v.string(),
     taxAmount: v.optional(v.number()),
-    billingInfo: v.optional(v.any()),
+    billingInfo: v.optional(
+      v.object({
+        email: v.string(),
+        name: v.string(),
+        address: v.object({
+          line1: v.string(),
+          line2: v.optional(v.string()),
+          city: v.string(),
+          state: v.optional(v.string()),
+          postalCode: v.string(),
+          country: v.string(),
+        }),
+        phone: v.optional(v.string()),
+        companyName: v.optional(v.string()),
+        taxId: v.optional(v.string()),
+      })
+    ),
   },
   handler: async (ctx, { orderId, storageId, amount, currency, taxAmount, billingInfo }) => {
     const order = await ctx.db.get(orderId);
@@ -411,20 +534,20 @@ export const setInvoiceForOrder = mutation({
       .withIndex("by_name", q => q.eq("name", "invoice_seq"))
       .first();
     let seq = 1;
-    if (!existing) {
+    if (existing) {
+      await ctx.db.patch(existing._id, { value: Number(existing.value) + 1 });
+      const updated = await ctx.db.get(existing._id);
+      seq = Number(updated?.value) || Number(existing.value) + 1;
+    } else {
       const id = await ctx.db.insert("counters", { name: "invoice_seq", value: 1 });
       const doc = await ctx.db.get(id);
-      seq = (doc?.value as number) || 1;
-    } else {
-      await ctx.db.patch(existing._id, { value: (existing.value as number) + 1 });
-      const updated = await ctx.db.get(existing._id);
-      seq = (updated?.value as number) || (existing.value as number) + 1;
+      seq = Number(doc?.value) || 1;
     }
     const padded = String(seq).padStart(4, "0");
     const number = `BRL-${year}-${padded}`;
 
     const issuedAt = Date.now();
-    const pdfUrl = await ctx.storage.getUrl(storageId as any);
+    const pdfUrl = await ctx.storage.getUrl(storageId as Id<"_storage">);
 
     const invoiceId = await ctx.db.insert("invoicesOrders", {
       orderId,
@@ -450,11 +573,77 @@ export const setInvoiceForOrder = mutation({
   },
 });
 
+// Helper: Normalize order status
+function normalizeOrderStatus(status: string): string {
+  const allowedStatuses = new Set([
+    "pending",
+    "processing",
+    "completed",
+    "cancelled",
+    "refunded",
+    "paid",
+    "failed",
+  ]);
+  return allowedStatuses.has(status) ? status : "pending";
+}
+
+// Helper: Extract product IDs from order items
+function extractProductIds(items: OrderItem[]): Set<number> {
+  const uniqueProductIds = new Set<number>();
+  for (const item of items) {
+    const idCandidates = [item.wordpressId, item.productId, item.beatId].filter(
+      (x): x is number => typeof x === "number"
+    );
+
+    for (const pid of idCandidates) {
+      if (!Number.isNaN(pid)) uniqueProductIds.add(pid);
+    }
+  }
+  return uniqueProductIds;
+}
+
+// Helper: Build price map from beats
+async function buildPriceMap(ctx: QueryCtx, productIds: Set<number>): Promise<Map<number, number>> {
+  const priceMap = new Map<number, number>();
+  for (const pid of Array.from(productIds)) {
+    const beat = await ctx.db
+      .query("beats")
+      .withIndex("by_wordpress_id", q => q.eq("wordpressId", pid))
+      .first();
+    if (beat && typeof beat.price === "number") {
+      priceMap.set(pid, Number(beat.price));
+    }
+  }
+  return priceMap;
+}
+
+// Helper: Calculate display total for an item
+function calculateItemDisplayTotal(item: OrderItem, priceMap: Map<number, number>): number {
+  const idCandidates = [item.wordpressId, item.productId, item.beatId].filter(
+    (x): x is number => typeof x === "number"
+  );
+
+  let priceCents = 0;
+  for (const pid of idCandidates) {
+    if (!Number.isNaN(pid) && priceMap.has(pid)) {
+      priceCents = priceMap.get(pid)!;
+      break;
+    }
+  }
+
+  if (priceCents === 0 && typeof item.price === "number") {
+    priceCents = item.price >= 100 ? Math.round(item.price) : Math.round(item.price * 100);
+  }
+
+  const qty = Number(item.quantity || 1);
+  return Math.max(0, priceCents) * Math.max(1, qty);
+}
+
 export const listOrders = query({
   args: {
     limit: v.optional(v.number()),
     status: v.optional(v.string()),
-    cursor: v.optional(v.number()), // manual cursor: createdAt of last item from previous page
+    cursor: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     try {
@@ -468,7 +657,6 @@ export const listOrders = query({
 
       console.log(`📋 Listing orders for user: ${clerkId}`);
 
-      // Récupérer l'utilisateur
       const user = await ctx.db
         .query("users")
         .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
@@ -476,112 +664,62 @@ export const listOrders = query({
 
       if (!user) {
         console.log(`⚠️ User not found for clerkId: ${clerkId}`);
-        return { items: [], cursor: undefined as number | undefined, hasMore: false } as const;
+        return { items: [], cursor: undefined, hasMore: false } as const;
       }
 
-      // Build base query
       let q = ctx.db.query("orders").withIndex("by_user", q => q.eq("userId", user._id));
 
-      // Cursor-based pagination: createdAt strictly less than previous page's last createdAt
       if (typeof args.cursor === "number") {
         q = q.filter(qq => qq.lt(qq.field("createdAt"), args.cursor!));
       }
 
-      // Status filter if provided
       if (args.status) {
         q = q.filter(qq => qq.eq(qq.field("status"), args.status!));
       }
 
       const results = await q.order("desc").take(limit + 1);
-
-      const allowedStatuses = new Set([
-        "pending",
-        "processing",
-        "completed",
-        "cancelled",
-        "refunded",
-        "paid", // tolerated inbound but normalized to completed for UI metrics
-        "failed", // tolerated inbound
-      ]);
-
       const hasMore = results.length > limit;
       const sliced = hasMore ? results.slice(0, limit) : results;
 
-      const items = sliced.map(o => {
-        const normalizedStatusRaw = allowedStatuses.has(String(o.status))
-          ? String(o.status)
-          : "pending";
-        const normalizedStatus = normalizedStatusRaw;
-        return {
-          id: o._id,
-          items: o.items,
-          total: Number(o.total || 0),
-          currency: o.currency || "USD",
-          status: normalizedStatus,
-          createdAt: Number(o.createdAt || Date.now()),
-          invoiceUrl: o.invoiceUrl,
-          email: o.email,
-        };
-      });
+      const items = sliced.map(o => ({
+        id: o._id,
+        items: o.items,
+        total: Number(o.total || 0),
+        currency: o.currency || "USD",
+        status: normalizeOrderStatus(String(o.status)),
+        createdAt: Number(o.createdAt || Date.now()),
+        invoiceUrl: o.invoiceUrl,
+        email: o.email,
+      }));
 
-      // Enrich pricing from Convex beats (synced from Woo/WordPress)
-      const uniqueProductIds = new Set<number>();
-      for (const order of items as any[]) {
-        for (const it of (order.items || []) as any[]) {
-          const idCandidates = [it.wordpressId, it.productId, it.beatId].map((x: any) =>
-            typeof x === "string" || typeof x === "number" ? Number(x) : NaN
-          );
-          for (const pid of idCandidates) {
-            if (!Number.isNaN(pid)) uniqueProductIds.add(pid);
-          }
+      // Collect all product IDs from all orders
+      const allProductIds = new Set<number>();
+      for (const order of items) {
+        const orderProductIds = extractProductIds(order.items);
+        for (const id of orderProductIds) {
+          allProductIds.add(id);
         }
       }
 
-      const priceMap = new Map<number, number>();
-      for (const pid of Array.from(uniqueProductIds)) {
-        const beat = await ctx.db
-          .query("beats")
-          .withIndex("by_wordpress_id", q => q.eq("wordpressId", pid))
-          .first();
-        if (beat && typeof beat.price === "number") {
-          // beat.price is stored in cents per schema
-          priceMap.set(pid, Number(beat.price));
-        }
-      }
+      const priceMap = await buildPriceMap(ctx, allProductIds);
 
-      const itemsEnriched = (items as any[]).map(o => {
+      const itemsEnriched = items.map(o => {
         let displayTotal = 0;
-        for (const it of (o.items || []) as any[]) {
-          const idCandidates = [it.wordpressId, it.productId, it.beatId].map((x: any) =>
-            typeof x === "string" || typeof x === "number" ? Number(x) : NaN
-          );
-          let priceCents = 0;
-          for (const pid of idCandidates) {
-            if (!Number.isNaN(pid) && priceMap.has(pid)) {
-              priceCents = priceMap.get(pid)!;
-              break;
-            }
-          }
-          if (priceCents === 0 && typeof it.price === "number") {
-            // Fallback: infer if price is dollars (<100) or cents (>=100)
-            priceCents = it.price >= 100 ? Math.round(it.price) : Math.round(it.price * 100);
-          }
-          const qty = Number(it.quantity || 1);
-          displayTotal += Math.max(0, priceCents) * Math.max(1, qty);
+        for (const item of o.items) {
+          displayTotal += calculateItemDisplayTotal(item, priceMap);
         }
-        // Fallback to stored total if enrichment missing
-        if (displayTotal === 0 && (o.total || 0) > 0) displayTotal = Number(o.total || 0);
+        if (displayTotal === 0 && o.total > 0) {
+          displayTotal = o.total;
+        }
         return { ...o, displayTotal };
       });
 
-      const nextCursor =
-        itemsEnriched.length > 0 ? itemsEnriched[itemsEnriched.length - 1].createdAt : undefined;
+      const nextCursor = itemsEnriched.length > 0 ? itemsEnriched.at(-1)?.createdAt : undefined;
 
       console.log(`✅ Found ${itemsEnriched.length} orders${hasMore ? ", has more" : ""}`);
       return { items: itemsEnriched, cursor: nextCursor, hasMore } as const;
     } catch (error) {
       console.error(`❌ Error listing orders:`, error);
-
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to list orders: ${errorMessage}`);
     }
@@ -680,7 +818,12 @@ export const updateOrderStatus = mutation({
       const previousStatus = order.status;
 
       // Mettre à jour la commande
-      const updateData: any = {
+      const updateData: {
+        status: string;
+        updatedAt: number;
+        paymentStatus?: string;
+        notes?: string;
+      } = {
         status: args.status,
         updatedAt: now,
       };
@@ -888,7 +1031,13 @@ export const saveInvoiceUrl = mutation({
 export const restore = mutation({
   args: {
     orderId: v.string(),
-    state: v.any(),
+    state: v.object({
+      items: v.optional(v.array(v.object({}))),
+      total: v.optional(v.number()),
+      status: v.optional(v.string()),
+      email: v.optional(v.string()),
+      currency: v.optional(v.string()),
+    }),
   },
   handler: async (ctx, { orderId, state }) => {
     try {
@@ -901,14 +1050,122 @@ export const restore = mutation({
       // Restore order data
       await ctx.db.patch(orderId as Id<"orders">, {
         ...state,
-        _restoredAt: Date.now(),
-        _restoredFrom: "order_restore",
+        updatedAt: Date.now(),
       });
 
       console.log("Order data restored successfully:", { orderId });
       return { success: true, orderId, timestamp: Date.now() };
     } catch (error) {
       console.error("Error restoring order data:", error);
+      throw error;
+    }
+  },
+});
+
+// Regenerate downloads from existing paid orders (for migration/cleanup)
+export const regenerateDownloadsFromOrders = mutation({
+  args: {
+    userId: v.optional(v.id("users")), // If provided, only process this user
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    console.log("🔄 Regenerating downloads from paid orders...");
+
+    try {
+      let ordersToProcess;
+
+      if (args.userId) {
+        // Process specific user
+        ordersToProcess = await ctx.db
+          .query("orders")
+          .withIndex("by_user", q => q.eq("userId", args.userId))
+          .filter(q => q.eq(q.field("status"), "paid"))
+          .collect();
+      } else {
+        // Process current user only
+        const user = await ctx.db
+          .query("users")
+          .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
+          .first();
+
+        if (!user) {
+          throw new Error("User not found");
+        }
+
+        ordersToProcess = await ctx.db
+          .query("orders")
+          .withIndex("by_user", q => q.eq("userId", user._id))
+          .filter(q => q.eq(q.field("status"), "paid"))
+          .collect();
+      }
+
+      let created = 0;
+      let skipped = 0;
+
+      for (const order of ordersToProcess) {
+        for (const item of order.items || []) {
+          // Check if all required fields are present
+          if (!order.userId || !item.productId || !item.license) continue;
+
+          const userId = order.userId;
+          const beatId = item.productId;
+          const licenseType = item.license;
+
+          // Check if download already exists
+          const existingDownload = await ctx.db
+            .query("downloads")
+            .withIndex("by_user_beat", q => q.eq("userId", userId).eq("beatId", beatId))
+            .filter(q => q.eq(q.field("licenseType"), licenseType))
+            .first();
+
+          if (existingDownload) {
+            skipped++;
+            continue;
+          }
+
+          // Create new download record
+          await ctx.db.insert("downloads", {
+            userId,
+            beatId,
+            licenseType,
+            downloadCount: 0,
+            timestamp: order.createdAt,
+          });
+
+          created++;
+
+          // Log activity
+          const beatTitle = item.title || item.name || `Beat ${beatId}`;
+          await ctx.db.insert("activityLog", {
+            userId,
+            action: "download_granted",
+            details: {
+              description: `Download access granted for "${beatTitle}"`,
+              beatId,
+              beatTitle: item.title || item.name,
+              licenseType,
+              orderId: order._id,
+              severity: "info",
+            },
+            timestamp: order.createdAt,
+          });
+        }
+      }
+
+      console.log(`✅ Regeneration completed: ${created} created, ${skipped} skipped`);
+
+      return {
+        success: true,
+        created,
+        skipped,
+        ordersProcessed: ordersToProcess.length,
+      };
+    } catch (error) {
+      console.error("❌ Error regenerating downloads:", error);
       throw error;
     }
   },

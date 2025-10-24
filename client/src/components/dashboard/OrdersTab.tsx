@@ -1,4 +1,4 @@
-import { formatCurrencyUSD } from "@/utils/currency";
+import { formatCurrency } from "@/utils/currency";
 import type { Order } from "@shared/types/dashboard";
 import { Package } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
@@ -115,7 +115,7 @@ const OrdersTab = memo<OrdersTabProps>(
                     </div>
                     <div className="text-left sm:text-right flex-shrink-0">
                       <p className="text-white font-bold text-sm sm:text-base">
-                        {Number(order.total || 0) <= 0 ? "FREE" : formatCurrencyUSD(order.total)}
+                        {Number(order.total || 0) <= 0 ? "FREE" : formatCurrency(order.total)}
                       </p>
                       <div className="flex items-center gap-2">
                         <span

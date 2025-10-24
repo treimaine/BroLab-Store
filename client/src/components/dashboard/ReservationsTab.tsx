@@ -108,7 +108,7 @@ export default function ReservationsTab({
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
       currency: "EUR",
-    }).format(price / 100);
+    }).format(price); // Prix déjà converti en euros depuis dashboard.ts
   };
 
   const formatDate = (dateString: string) => {

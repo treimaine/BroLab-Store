@@ -28,4 +28,7 @@ export const api = {
     getDashboardStats: "dashboard:getDashboardStats" as any,
     getAnalyticsData: "dashboard:getAnalyticsData" as any,
   },
+  orders: {
+    regenerateDownloadsFromOrders: "orders:regenerateDownloadsFromOrders" as any,
+  },
 };

@@ -8,21 +8,24 @@
  * - 2.4: Consistent patterns across all components
  */
 
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useIsMobile, useIsTablet } from "@/hooks/useBreakpoint";
+import { useIsMobile } from "@/hooks/useBreakpoint";
 import { useDashboardConfig } from "@/hooks/useDashboardConfig";
 import { motion } from "framer-motion";
 import {
   Activity,
   BarChart3,
   Download,
+  Menu,
   Settings,
   ShoppingCart,
   Star,
   TrendingUp,
   User,
 } from "lucide-react";
-import React, { memo, useCallback, useMemo } from "react";
+import React, { memo, useCallback, useMemo, useState } from "react";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -85,24 +88,16 @@ const TAB_CONFIG = [
 
 // Memoized tab trigger component for performance
 const TabTrigger = memo(
-  ({
-    tab,
-    isMobile,
-    isActive,
-  }: {
-    tab: (typeof TAB_CONFIG)[number];
-    isMobile: boolean;
-    isActive: boolean;
-  }) => {
+  ({ tab, isMobile }: { tab: (typeof TAB_CONFIG)[number]; isMobile: boolean }) => {
     const Icon = tab.icon;
 
     return (
       <TabsTrigger
         value={tab.value}
-        className="px-2 sm:px-4 py-2 rounded-md whitespace-nowrap flex-shrink-0 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-xs sm:text-sm transition-all duration-200"
+        className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-gray-800/50 data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-600/20 text-gray-300 hover:text-white justify-start"
       >
-        <Icon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-        {isMobile ? tab.mobileLabel : tab.label}
+        <Icon className="w-5 h-5 flex-shrink-0" />
+        <span>{isMobile ? tab.mobileLabel : tab.label}</span>
       </TabsTrigger>
     );
   }
@@ -114,27 +109,23 @@ TabTrigger.displayName = "TabTrigger";
 export const DashboardLayout = memo<DashboardLayoutProps>(
   ({ children, activeTab, onTabChange, className }) => {
     const isMobile = useIsMobile();
-    const isTablet = useIsTablet();
     const { config } = useDashboardConfig();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     // Memoize tab triggers to prevent unnecessary re-renders
     const tabTriggers = useMemo(() => {
-      return TAB_CONFIG.map(tab => (
-        <TabTrigger
-          key={tab.value}
-          tab={tab}
-          isMobile={isMobile}
-          isActive={activeTab === tab.value}
-        />
-      ));
-    }, [isMobile, activeTab]);
+      return TAB_CONFIG.map(tab => <TabTrigger key={tab.value} tab={tab} isMobile={isMobile} />);
+    }, [isMobile]);
 
     // Handle tab change with animation duration from config
     const handleTabChange = useCallback(
       (value: string) => {
         onTabChange(value);
+        if (isMobile) {
+          setIsMobileMenuOpen(false);
+        }
       },
-      [onTabChange]
+      [onTabChange, isMobile]
     );
 
     return (
@@ -146,34 +137,64 @@ export const DashboardLayout = memo<DashboardLayoutProps>(
         }}
         className={className}
       >
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
-          <Tabs
-            value={activeTab}
-            onValueChange={handleTabChange}
-            className="space-y-4 sm:space-y-6"
-          >
-            {/* Tab Navigation */}
-            <div className="overflow-x-auto">
-              <TabsList
-                aria-label="User dashboard tabs"
-                className="flex w-full min-w-max bg-gray-900/50 border-gray-700/50 backdrop-blur-sm gap-2 sm:gap-4 px-2 sm:px-4 py-1 sm:py-2"
-              >
-                {tabTriggers}
-              </TabsList>
+        <div className="flex min-h-screen">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="flex w-full">
+            {/* Desktop Sidebar Navigation */}
+            <aside className="hidden md:flex fixed left-0 top-16 sm:top-20 h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] w-64 bg-gray-900/95 backdrop-blur-sm border-r border-gray-700/50 flex-col overflow-y-auto z-40">
+              <nav className="flex-1 px-3 py-6">
+                <TabsList
+                  aria-label="User dashboard tabs"
+                  className="flex flex-col w-full bg-transparent gap-1 p-0 h-auto"
+                >
+                  {tabTriggers}
+                </TabsList>
+              </nav>
+            </aside>
+
+            {/* Mobile Menu Button */}
+            <div className="md:hidden fixed top-20 left-4 z-50">
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="bg-gray-900/95 border-gray-700/50 text-white hover:bg-gray-800"
+                  >
+                    <Menu className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent
+                  side="left"
+                  className="w-64 bg-gray-900/95 border-r border-gray-700/50 p-0"
+                >
+                  <nav className="flex-1 px-3 py-6">
+                    <TabsList
+                      aria-label="User dashboard tabs"
+                      className="flex flex-col w-full bg-transparent gap-1 p-0 h-auto"
+                    >
+                      {tabTriggers}
+                    </TabsList>
+                  </nav>
+                </SheetContent>
+              </Sheet>
             </div>
 
-            {/* Tab Content */}
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: config.ui.animationDuration / 1000,
-                ease: "easeOut",
-              }}
-            >
-              {children}
-            </motion.div>
+            {/* Main Content Area */}
+            <main className="flex-1 md:ml-64">
+              <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: config.ui.animationDuration / 1000,
+                    ease: "easeOut",
+                  }}
+                >
+                  {children}
+                </motion.div>
+              </div>
+            </main>
           </Tabs>
         </div>
       </motion.div>

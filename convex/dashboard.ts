@@ -306,14 +306,14 @@ export const getDashboardData = query({
         items: (order.items || []).map(item => ({
           productId: item.productId,
           title: item.title || item.name || `Product ${item.productId || "Unknown"}`,
-          price: item.price ? CurrencyCalculator.centsToDollars(item.price) : undefined,
+          price: item.price || undefined, // Les prix sont déjà en dollars dans la DB
           quantity: item.quantity,
           license: item.license,
           type: item.type,
           sku: item.sku,
           metadata: item.metadata,
         })),
-        total: CurrencyCalculator.centsToDollars(order.total || 0),
+        total: order.total || 0, // Les totaux sont déjà en dollars dans la DB
         currency: order.currency || "USD",
         status: order.status as any,
         paymentMethod: order.paymentProvider,
