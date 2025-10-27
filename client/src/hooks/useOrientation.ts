@@ -1,25 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from "react";
 
-export type Orientation = 'portrait' | 'landscape';
+type Orientation = "portrait" | "landscape";
 
+/**
+ * Hook to detect device orientation
+ */
 export function useOrientation(): Orientation {
-  const [orientation, setOrientation] = useState<Orientation>('portrait');
+  const [orientation, setOrientation] = useState<Orientation>(
+    window.innerWidth > window.innerHeight ? "landscape" : "portrait"
+  );
 
   useEffect(() => {
-    const updateOrientation = () => {
-      setOrientation(window.innerHeight > window.innerWidth ? 'portrait' : 'landscape');
+    const handleResize = () => {
+      setOrientation(window.innerWidth > window.innerHeight ? "landscape" : "portrait");
     };
 
-    // Initial check
-    updateOrientation();
-
-    // Listen for orientation changes
-    window.addEventListener('resize', updateOrientation);
-    window.addEventListener('orientationchange', updateOrientation);
+    window.addEventListener("resize", handleResize);
 
     return () => {
-      window.removeEventListener('resize', updateOrientation);
-      window.removeEventListener('orientationchange', updateOrientation);
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 

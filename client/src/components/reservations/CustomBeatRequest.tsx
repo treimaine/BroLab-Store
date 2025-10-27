@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import FileUpload from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -12,19 +13,19 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useReservationErrorHandling } from "@/hooks/useReservationErrorHandling";
+import { useEnhancedFormSubmission } from "@/hooks/useEnhancedFormSubmission";
 import { AlertTriangle, CheckCircle, Clock, Loader2, Music, Send, Star } from "lucide-react";
 import { useState } from "react";
-import FileUpload from "@/components/ui/file-upload";
 import {
   FileUploadProgress,
   FormValidationLoading,
   RetryIndicator,
+  SubmissionProgress,
 } from "./ReservationLoadingStates";
 
 export interface CustomBeatRequestProps {
-  onSubmit: (request: BeatRequest) => void;
-  isSubmitting?: boolean;
+  readonly onSubmit: (request: BeatRequest) => void;
+  readonly isSubmitting?: boolean;
 }
 
 interface BeatRequest {
@@ -99,7 +100,6 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
     priority: "standard",
   });
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [isValidating, setIsValidating] = useState(false);
   const [fileUploadState, setFileUploadState] = useState<{
     isUploading: boolean;
     fileName?: string;
@@ -107,20 +107,45 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
     status?: "uploading" | "scanning" | "completed" | "error";
   }>({ isUploading: false });
 
-  // Enhanced error handling for the form
-  const { hasError, error, retryCount, canRetry, handleError, retry, clearError, getErrorDisplay } =
-    useReservationErrorHandling({
-      serviceName: "custom beat request",
-      maxRetries: 3,
-      showToastOnError: true,
-      autoRetryTransientErrors: false, // Manual retry for form submissions
-    });
+  // Enhanced form submission with multi-step process
+  const {
+    isSubmitting: isFormSubmitting,
+    isValidating,
+    currentStep,
+    totalSteps,
+    progress,
+    hasError,
+    retryCount,
+    isRecovering,
+    submitForm,
+    validateForm,
+    retry,
+    clearError,
+    getErrorDisplay,
+    createReservationSteps,
+  } = useEnhancedFormSubmission({
+    serviceName: "custom beat request",
+    maxRetries: 3,
+    showProgressToast: true,
+    autoRetryTransientErrors: false,
+    onStepComplete: (stepIndex: number, result: unknown) => {
+      // Log step completion for debugging
+      console.log(`Step ${stepIndex + 1} completed:`, result);
+    },
+    onSubmissionComplete: (result: unknown) => {
+      // Call the parent onSubmit callback with the result
+      onSubmit(result as BeatRequest);
+    },
+    onSubmissionError: (error: unknown) => {
+      console.error("Submission error:", error);
+    },
+  });
 
-  const validateForm = async (): Promise<boolean> => {
-    setIsValidating(true);
-    clearError(); // Clear any previous errors
+  // Use isFormSubmitting from the hook, but allow override from props
+  const submitting = isSubmitting || isFormSubmitting;
 
-    try {
+  const validateFormData = async (): Promise<boolean> => {
+    return validateForm(async () => {
       // Validate required fields
       if (!request.genre || !request.key || request.mood.length === 0) {
         throw new Error("Please fill in all required fields (Genre, Key, and at least one Mood)");
@@ -164,34 +189,52 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
       }
 
       return true;
-    } catch (error) {
-      handleError(error, "validation");
-      return false;
-    } finally {
-      setIsValidating(false);
-    }
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate form before submission
-    const isValid = await validateForm();
+    const isValid = await validateFormData();
     if (!isValid) {
       return;
     }
 
     try {
-      // Show submitting toast
-      toast({
-        title: "Submitting Request",
-        description: "Processing your custom beat request...",
-        variant: "default",
-      });
+      // Create submission steps
+      const steps = createReservationSteps(
+        {
+          ...request,
+          uploadedFiles: uploadedFiles.map(f => ({
+            name: f.name,
+            size: f.size,
+            type: f.type,
+          })),
+        },
+        {
+          createPaymentIntent: true,
+          uploadFiles: uploadedFiles,
+          customSteps: [
+            {
+              name: "finalize_request",
+              description: "Finalizing custom beat request",
+              action: async () => {
+                // This would be the final step to confirm the request
+                return { ...request, uploadedFiles };
+              },
+              retryable: false,
+              timeout: 10000,
+            },
+          ],
+        }
+      );
 
-      await onSubmit({ ...request, uploadedFiles });
-    } catch (error) {
-      handleError(error, "submission");
+      // Submit the form with all steps
+      await submitForm(steps);
+    } catch (err) {
+      // Error is already handled by useEnhancedFormSubmission
+      console.error("Form submission failed:", err);
     }
   };
 
@@ -221,6 +264,11 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
     return times[request.priority];
   };
 
+  const getPriorityFee = () => {
+    const fees = { standard: 0, priority: 50, express: 100 };
+    return fees[request.priority];
+  };
+
   return (
     <Card className="card-dark max-w-4xl mx-auto">
       <CardHeader>
@@ -238,32 +286,35 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
         {/* Form Validation Loading State */}
         <FormValidationLoading isVisible={isValidating} />
 
+        {/* Submission Progress */}
+        <SubmissionProgress
+          isVisible={submitting && !hasError}
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+          progress={progress}
+          stepName={
+            currentStep > 0 && currentStep <= totalSteps
+              ? [
+                  "Validating authentication",
+                  "Creating reservation",
+                  "Uploading files",
+                  "Setting up payment",
+                  "Finalizing request",
+                ][currentStep - 1]
+              : undefined
+          }
+        />
+
         {/* Error Display */}
-        {hasError && error && (
+        {hasError && (
           <div className="mb-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h4 className="font-medium text-red-300 mb-2">
-                  {getErrorDisplay()?.title || "Form Error"}
-                </h4>
+                <h4 className="font-medium text-red-300 mb-2">Submission Error</h4>
                 <p className="text-red-200 text-sm mb-3">
-                  {getErrorDisplay()?.message || error.userMessage}
+                  {getErrorDisplay()?.message || "An error occurred while processing your request"}
                 </p>
-
-                {getErrorDisplay()?.suggestions && getErrorDisplay()!.suggestions.length > 0 && (
-                  <div className="mb-3">
-                    <p className="text-red-300 font-medium text-sm mb-1">Suggestions:</p>
-                    <ul className="space-y-1">
-                      {getErrorDisplay()!.suggestions.map((suggestion, index) => (
-                        <li key={index} className="text-red-200 text-xs flex items-center gap-2">
-                          <div className="w-1 h-1 bg-red-400 rounded-full flex-shrink-0" />
-                          {suggestion}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
 
                 <div className="flex gap-2">
                   <Button
@@ -275,14 +326,22 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
                   >
                     Dismiss
                   </Button>
-                  {canRetry && (
+                  {getErrorDisplay()?.canRetry && (
                     <Button
                       type="button"
                       size="sm"
                       onClick={retry}
                       className="bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                      disabled={isRecovering}
                     >
-                      Try Again ({(getErrorDisplay()?.maxRetries || 3) - retryCount} left)
+                      {isRecovering ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          Retrying...
+                        </>
+                      ) : (
+                        `Try Again (${3 - retryCount} left)`
+                      )}
                     </Button>
                   )}
                 </div>
@@ -310,14 +369,16 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
           {/* Basic Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Genre *</label>
+              <label htmlFor="genre-select" className="form-label">
+                Genre *
+              </label>
               <Select
                 value={request.genre}
                 onValueChange={value =>
                   setRequest(prev => ({ ...prev, genre: value, subGenre: "" }))
                 }
               >
-                <SelectTrigger className="form-input">
+                <SelectTrigger id="genre-select" className="form-input">
                   <SelectValue placeholder="Select genre" />
                 </SelectTrigger>
                 <SelectContent>
@@ -332,12 +393,14 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
 
             {request.genre && subGenres[request.genre as keyof typeof subGenres] && (
               <div>
-                <label className="form-label">Sub-Genre</label>
+                <label htmlFor="subgenre-select" className="form-label">
+                  Sub-Genre
+                </label>
                 <Select
                   value={request.subGenre || ""}
                   onValueChange={value => setRequest(prev => ({ ...prev, subGenre: value }))}
                 >
-                  <SelectTrigger className="form-input">
+                  <SelectTrigger id="subgenre-select" className="form-input">
                     <SelectValue placeholder="Select sub-genre" />
                   </SelectTrigger>
                   <SelectContent>
@@ -355,8 +418,11 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
           {/* BPM and Key */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="form-label">BPM: {request.bpm}</label>
+              <label htmlFor="bpm-slider" className="form-label">
+                BPM: {request.bpm}
+              </label>
               <Slider
+                id="bpm-slider"
                 value={[request.bpm]}
                 onValueChange={value => setRequest(prev => ({ ...prev, bpm: value[0] }))}
                 min={60}
@@ -367,12 +433,14 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
             </div>
 
             <div>
-              <label className="form-label">Key *</label>
+              <label htmlFor="key-select" className="form-label">
+                Key *
+              </label>
               <Select
                 value={request.key}
                 onValueChange={value => setRequest(prev => ({ ...prev, key: value }))}
               >
-                <SelectTrigger className="form-input">
+                <SelectTrigger id="key-select" className="form-input">
                   <SelectValue placeholder="Select key" />
                 </SelectTrigger>
                 <SelectContent>
@@ -387,8 +455,8 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
           </div>
 
           {/* Mood Selection */}
-          <div>
-            <label className="form-label">Mood *</label>
+          <fieldset>
+            <legend className="form-label">Mood *</legend>
             <div className="flex flex-wrap gap-2 mt-2">
               {moods.map(mood => (
                 <Badge
@@ -405,11 +473,11 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
                 </Badge>
               ))}
             </div>
-          </div>
+          </fieldset>
 
           {/* Instruments */}
-          <div>
-            <label className="form-label">Preferred Instruments</label>
+          <fieldset>
+            <legend className="form-label">Preferred Instruments</legend>
             <div className="flex flex-wrap gap-2 mt-2">
               {instruments.map(instrument => (
                 <Badge
@@ -426,15 +494,16 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
                 </Badge>
               ))}
             </div>
-          </div>
+          </fieldset>
 
           {/* Duration */}
           <div>
-            <label className="form-label">
+            <label htmlFor="duration-slider" className="form-label">
               Duration: {Math.floor(request.duration / 60)}:
               {(request.duration % 60).toString().padStart(2, "0")}
             </label>
             <Slider
+              id="duration-slider"
               value={[request.duration]}
               onValueChange={value => setRequest(prev => ({ ...prev, duration: value[0] }))}
               min={60}
@@ -446,8 +515,11 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
 
           {/* Description */}
           <div>
-            <label className="form-label">Description & Reference</label>
+            <label htmlFor="description-textarea" className="form-label">
+              Description & Reference
+            </label>
             <Textarea
+              id="description-textarea"
               value={request.description}
               onChange={e => setRequest(prev => ({ ...prev, description: e.target.value }))}
               placeholder="Describe the vibe, energy, or specific elements you want in your beat. Include any reference tracks or artists that inspire the sound you're looking for..."
@@ -457,7 +529,7 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
 
           {/* Reference Track Upload */}
           <div>
-            <label className="form-label">Reference Tracks & Files (Optional)</label>
+            <span className="form-label">Reference Tracks & Files (Optional)</span>
             <div className="space-y-4">
               <FileUpload
                 onUploadStart={(file: File) => {
@@ -510,8 +582,12 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
                     status: "error",
                   });
 
-                  // Handle file upload error with enhanced error handling
-                  handleError(error, "file_upload");
+                  // Show error toast
+                  toast({
+                    title: "File Upload Failed",
+                    description: error.message,
+                    variant: "destructive",
+                  });
 
                   // Clear upload state after a delay
                   setTimeout(() => {
@@ -576,9 +652,9 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
               {uploadedFiles.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm text-gray-300 font-medium">Uploaded files:</p>
-                  {uploadedFiles.map((file, index) => (
+                  {uploadedFiles.map(file => (
                     <div
-                      key={index}
+                      key={`${file.name}-${file.size}`}
                       className="flex items-center justify-between bg-[var(--medium-gray)] p-3 rounded-lg"
                     >
                       <div className="flex items-center space-x-3">
@@ -590,9 +666,7 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
                       </div>
                       <button
                         type="button"
-                        onClick={() =>
-                          setUploadedFiles(files => files.filter((_, i) => i !== index))
-                        }
+                        onClick={() => setUploadedFiles(files => files.filter(f => f !== file))}
                         className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-red-400/10"
                       >
                         Remove
@@ -612,8 +686,11 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
           {/* Budget and Timeline */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="form-label">Budget: ${request.budget}</label>
+              <label htmlFor="budget-slider" className="form-label">
+                Budget: ${request.budget}
+              </label>
               <Slider
+                id="budget-slider"
                 value={[request.budget]}
                 onValueChange={value => setRequest(prev => ({ ...prev, budget: value[0] }))}
                 min={50}
@@ -624,8 +701,11 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
             </div>
 
             <div>
-              <label className="form-label">Deadline</label>
+              <label htmlFor="deadline-input" className="form-label">
+                Deadline
+              </label>
               <Input
+                id="deadline-input"
                 type="date"
                 value={request.deadline}
                 onChange={e => setRequest(prev => ({ ...prev, deadline: e.target.value }))}
@@ -636,42 +716,56 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
           </div>
 
           {/* Priority Selection */}
-          <div>
-            <label className="form-label">Priority Level</label>
+          <fieldset>
+            <legend className="form-label">Priority Level</legend>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
-              {(["standard", "priority", "express"] as const).map(priority => (
-                <Card
-                  key={priority}
-                  className={`cursor-pointer transition-all ${
-                    request.priority === priority
-                      ? "border-[var(--accent-purple)] bg-[var(--accent-purple)]/10"
-                      : "border-[var(--medium-gray)] hover:border-[var(--accent-purple)]/50"
-                  }`}
-                  onClick={() => setRequest(prev => ({ ...prev, priority }))}
-                >
-                  <CardContent className="p-4 text-center">
-                    <div className="flex items-center justify-center mb-2">
-                      {priority === "express" && <Star className="w-5 h-5 text-yellow-400" />}
-                      {priority === "priority" && (
-                        <Clock className="w-5 h-5 text-[var(--accent-cyan)]" />
-                      )}
-                      {priority === "standard" && <Music className="w-5 h-5 text-gray-400" />}
-                    </div>
-                    <h4 className="font-medium text-white capitalize">{priority}</h4>
-                    <p className="text-xs text-gray-400 mt-1">{getDeliveryTime()}</p>
-                    <p className="text-sm font-bold text-[var(--accent-purple)] mt-2">
-                      +${priority === "standard" ? 0 : priority === "priority" ? 50 : 100}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
+              {(["standard", "priority", "express"] as const).map(priority => {
+                const getPriorityIcon = () => {
+                  if (priority === "express") return <Star className="w-5 h-5 text-yellow-400" />;
+                  if (priority === "priority")
+                    return <Clock className="w-5 h-5 text-[var(--accent-cyan)]" />;
+                  return <Music className="w-5 h-5 text-gray-400" />;
+                };
+
+                const getPriorityFeeAmount = () => {
+                  if (priority === "standard") return 0;
+                  if (priority === "priority") return 50;
+                  return 100;
+                };
+
+                return (
+                  <Card
+                    key={priority}
+                    className={`cursor-pointer transition-all ${
+                      request.priority === priority
+                        ? "border-[var(--accent-purple)] bg-[var(--accent-purple)]/10"
+                        : "border-[var(--medium-gray)] hover:border-[var(--accent-purple)]/50"
+                    }`}
+                    onClick={() => setRequest(prev => ({ ...prev, priority }))}
+                  >
+                    <CardContent className="p-4 text-center">
+                      <div className="flex items-center justify-center mb-2">
+                        {getPriorityIcon()}
+                      </div>
+                      <h4 className="font-medium text-white capitalize">{priority}</h4>
+                      <p className="text-xs text-gray-400 mt-1">{getDeliveryTime()}</p>
+                      <p className="text-sm font-bold text-[var(--accent-purple)] mt-2">
+                        +${getPriorityFeeAmount()}
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
-          </div>
+          </fieldset>
 
           {/* Additional Notes */}
           <div>
-            <label className="form-label">Additional Notes</label>
+            <label htmlFor="additional-notes-textarea" className="form-label">
+              Additional Notes
+            </label>
             <Textarea
+              id="additional-notes-textarea"
               value={request.additionalNotes || ""}
               onChange={e => setRequest(prev => ({ ...prev, additionalNotes: e.target.value }))}
               placeholder="Any other specific requirements or preferences..."
@@ -690,14 +784,7 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Priority Fee:</span>
-                  <span className="text-white">
-                    +$
-                    {request.priority === "standard"
-                      ? 0
-                      : request.priority === "priority"
-                        ? 50
-                        : 100}
-                  </span>
+                  <span className="text-white">+${getPriorityFee()}</span>
                 </div>
                 <div className="flex justify-between border-t border-[var(--dark-gray)] pt-2">
                   <span className="font-medium text-white">Total:</span>
@@ -721,34 +808,50 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
           <Button
             type="submit"
             className="w-full btn-primary text-lg py-4"
-            disabled={isSubmitting || isValidating || fileUploadState.isUploading || hasError}
+            disabled={submitting || isValidating || fileUploadState.isUploading || hasError}
           >
-            {isSubmitting ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Submitting Request...
-              </div>
-            ) : isValidating ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Validating...
-              </div>
-            ) : fileUploadState.isUploading ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Uploading Files...
-              </div>
-            ) : hasError ? (
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" />
-                Please Fix Errors Above
-              </div>
-            ) : (
-              <>
-                <Send className="w-4 h-4 mr-2" />
-                Submit Custom Beat Request - ${getPriorityPrice()}
-              </>
-            )}
+            {(() => {
+              if (submitting) {
+                return (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {currentStep > 0 && totalSteps > 0
+                      ? `Processing (${currentStep}/${totalSteps})...`
+                      : "Submitting Request..."}
+                  </div>
+                );
+              }
+              if (isValidating) {
+                return (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Validating...
+                  </div>
+                );
+              }
+              if (fileUploadState.isUploading) {
+                return (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Uploading Files...
+                  </div>
+                );
+              }
+              if (hasError) {
+                return (
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Please Fix Errors Above
+                  </div>
+                );
+              }
+              return (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Submit Custom Beat Request - ${getPriorityPrice()}
+                </>
+              );
+            })()}
           </Button>
 
           {/* Form Status Indicators */}
@@ -763,11 +866,13 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
             </div>
 
             <div className="flex items-center gap-1">
-              {fileUploadState.isUploading ? (
+              {fileUploadState.isUploading && (
                 <Loader2 className="w-3 h-3 animate-spin text-blue-400" />
-              ) : uploadedFiles.length > 0 ? (
+              )}
+              {!fileUploadState.isUploading && uploadedFiles.length > 0 && (
                 <CheckCircle className="w-3 h-3 text-green-400" />
-              ) : (
+              )}
+              {!fileUploadState.isUploading && uploadedFiles.length === 0 && (
                 <div className="w-3 h-3 rounded-full border border-gray-500" />
               )}
               <span>File Uploads ({uploadedFiles.length})</span>

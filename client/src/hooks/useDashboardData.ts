@@ -177,7 +177,11 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
         retryCount: 0,
         maxRetries: 3,
         timestamp: Date.now(),
-        context: { source: "useDashboardData", action: "data_processing", error },
+        context: {
+          source: "useDashboardData",
+          action: "data_processing",
+          originalError: error instanceof Error ? error : undefined,
+        },
         fingerprint: `data_error_${errorMessage.slice(0, 20)}_${Date.now()}`,
       });
     }

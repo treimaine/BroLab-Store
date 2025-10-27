@@ -1,4 +1,5 @@
 import { HoverPlayButton } from "@/components/audio/HoverPlayButton";
+import { useCartContext } from "@/components/cart/cart-provider";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useFavorites } from "@/hooks/useFavorites";
@@ -6,7 +7,6 @@ import { useRecentlyViewedBeats } from "@/hooks/useRecentlyViewedBeats";
 import { useAudioStore } from "@/stores/useAudioStore";
 import { Download, Heart, Music, ShoppingCart } from "lucide-react";
 import React, { useState } from "react";
-import { useCartContext } from "@/components/cart/cart-provider";
 
 interface BeatCardProps {
   id: string | number;
@@ -94,18 +94,12 @@ export function BeatCard({
 
   const handleViewDetails = () => {
     // Ajouter le beat à l'historique des beats vus récemment
-    addBeat({
-      id: beatIdAsNumber,
+    addBeat(beatIdAsNumber, {
       title,
       genre,
-      bpm,
       price: typeof price === "string" ? parseFloat(price) || 0 : price,
       image_url: imageUrl,
       audio_url: audioUrl,
-      tags,
-      featured,
-      downloads,
-      duration,
     });
 
     // Naviguer vers la page du produit

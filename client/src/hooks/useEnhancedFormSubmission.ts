@@ -4,7 +4,6 @@ import { logger } from "@/lib/logger";
 import { performanceMonitor, startTimer } from "@/lib/performanceMonitor";
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useState } from "react";
-import { useReservationErrorHandling } from "./useReservationErrorHandling";
 
 export interface FormSubmissionState {
   isSubmitting: boolean;
@@ -42,7 +41,6 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
     serviceName,
     maxRetries = 3,
     showProgressToast = true,
-    autoRetryTransientErrors = true,
     onStepComplete,
     onSubmissionComplete,
     onSubmissionError,
@@ -59,31 +57,78 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
     progress: 0,
   });
 
-  // Use comprehensive error handling
-  const {
-    hasError,
-    error,
-    retryCount,
-    isRecovering,
-    handleError,
-    retry,
-    clearError,
-    getErrorDisplay,
-  } = useReservationErrorHandling({
-    serviceName,
-    maxRetries,
-    showToastOnError: true,
-    autoRetryTransientErrors,
-    onError: onSubmissionError,
-    onRecovery: () => {
-      // Reset submission state on recovery
-      setState(prev => ({
-        ...prev,
-        currentStep: 0,
-        progress: 0,
-      }));
+  // Inline error handling state
+  const [hasError, setHasError] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRecovering, setIsRecovering] = useState(false);
+
+  // Handle errors with toast notifications
+  const handleError = useCallback(
+    (err: unknown, context?: string) => {
+      setHasError(true);
+      setError(err);
+
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const contextSuffix = context ? ` (${context})` : "";
+      const logMessage = `Error in ${serviceName}${contextSuffix}`;
+      const errorForLog = err instanceof Error ? err : new Error(errorMessage);
+
+      logger.logError(logMessage, errorForLog, {
+        errorType: "api",
+        component: "enhanced_form_submission",
+        serviceName,
+        context,
+      });
+
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+
+      if (onSubmissionError) {
+        onSubmissionError(err);
+      }
+
+      return { retryable: true, message: errorMessage };
     },
-  });
+    [serviceName, toast, onSubmissionError]
+  );
+
+  // Retry function
+  const retry = useCallback(async () => {
+    setIsRecovering(true);
+    setRetryCount(prev => prev + 1);
+    setHasError(false);
+    setError(null);
+
+    // Reset submission state on recovery
+    setState(prev => ({
+      ...prev,
+      currentStep: 0,
+      progress: 0,
+    }));
+
+    setIsRecovering(false);
+  }, []);
+
+  // Clear error
+  const clearError = useCallback(() => {
+    setHasError(false);
+    setError(null);
+    setRetryCount(0);
+  }, []);
+
+  // Get error display message
+  const getErrorDisplay = useCallback(() => {
+    if (!error) return null;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return {
+      message: errorMessage,
+      canRetry: retryCount < maxRetries,
+    };
+  }, [error, retryCount, maxRetries]);
 
   /**
    * Execute a single submission step with error handling and timeout

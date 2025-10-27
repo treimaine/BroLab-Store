@@ -1,44 +1,32 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import {
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  CreditCard,
-  FileText,
-  Loader2,
-  Send,
-  Shield,
-  Upload,
-  User,
-} from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Loader2, Shield, Upload, User } from "lucide-react";
 import { ReactNode } from "react";
 
 interface LoadingStateProps {
-  isVisible: boolean;
-  children?: ReactNode;
+  readonly isVisible: boolean;
 }
 
 interface ProgressStepProps {
-  step: number;
-  totalSteps: number;
-  currentStep: number;
-  title: string;
-  description: string;
-  icon: ReactNode;
-  status: "pending" | "active" | "completed" | "error";
+  readonly step: number;
+  readonly totalSteps: number;
+  readonly currentStep: number;
+  readonly title: string;
+  readonly description: string;
+  readonly icon: ReactNode;
+  readonly status: "pending" | "active" | "completed" | "error";
 }
 
 interface FormSubmissionProgressProps {
-  currentStep: number;
-  totalSteps: number;
-  steps: Array<{
-    title: string;
-    description: string;
-    icon: ReactNode;
+  readonly currentStep: number;
+  readonly totalSteps: number;
+  readonly steps: ReadonlyArray<{
+    readonly title: string;
+    readonly description: string;
+    readonly icon: ReactNode;
   }>;
-  error?: string | null;
-  isComplete?: boolean;
+  readonly error?: string | null;
+  readonly isComplete?: boolean;
 }
 
 /**
@@ -101,45 +89,46 @@ export function FileUploadProgress({
   progress,
   status,
 }: LoadingStateProps & {
-  fileName?: string;
-  progress?: number;
-  status?: "uploading" | "scanning" | "completed" | "error";
+  readonly fileName?: string;
+  readonly progress?: number;
+  readonly status?: "uploading" | "scanning" | "completed" | "error";
 }) {
   if (!isVisible) return null;
 
   const getStatusInfo = () => {
-    switch (status) {
-      case "uploading":
-        return {
-          icon: <Upload className="w-4 h-4 text-blue-400" />,
-          text: "Uploading file...",
-          color: "blue",
-        };
-      case "scanning":
-        return {
-          icon: <Shield className="w-4 h-4 text-yellow-400" />,
-          text: "Scanning for security...",
-          color: "yellow",
-        };
-      case "completed":
-        return {
-          icon: <CheckCircle className="w-4 h-4 text-green-400" />,
-          text: "Upload completed",
-          color: "green",
-        };
-      case "error":
-        return {
-          icon: <AlertCircle className="w-4 h-4 text-red-400" />,
-          text: "Upload failed",
-          color: "red",
-        };
-      default:
-        return {
-          icon: <Loader2 className="animate-spin w-4 h-4 text-blue-400" />,
-          text: "Processing...",
-          color: "blue",
-        };
+    if (status === "uploading") {
+      return {
+        icon: <Upload className="w-4 h-4 text-blue-400" />,
+        text: "Uploading file...",
+        color: "blue",
+      };
     }
+    if (status === "scanning") {
+      return {
+        icon: <Shield className="w-4 h-4 text-yellow-400" />,
+        text: "Scanning for security...",
+        color: "yellow",
+      };
+    }
+    if (status === "completed") {
+      return {
+        icon: <CheckCircle className="w-4 h-4 text-green-400" />,
+        text: "Upload completed",
+        color: "green",
+      };
+    }
+    if (status === "error") {
+      return {
+        icon: <AlertCircle className="w-4 h-4 text-red-400" />,
+        text: "Upload failed",
+        color: "red",
+      };
+    }
+    return {
+      icon: <Loader2 className="animate-spin w-4 h-4 text-blue-400" />,
+      text: "Processing...",
+      color: "blue",
+    };
   };
 
   const statusInfo = getStatusInfo();
@@ -190,32 +179,32 @@ function ProgressStep({
   const stepStatus = getStepStatus();
 
   const getStatusStyles = () => {
-    switch (stepStatus) {
-      case "completed":
-        return {
-          circle: "bg-green-500 text-white",
-          text: "text-green-300",
-          line: "bg-green-500",
-        };
-      case "active":
-        return {
-          circle: "bg-[var(--accent-purple)] text-white animate-pulse",
-          text: "text-white",
-          line: "bg-gray-600",
-        };
-      case "error":
-        return {
-          circle: "bg-red-500 text-white",
-          text: "text-red-300",
-          line: "bg-gray-600",
-        };
-      default:
-        return {
-          circle: "bg-gray-600 text-gray-400",
-          text: "text-gray-400",
-          line: "bg-gray-600",
-        };
+    if (stepStatus === "completed") {
+      return {
+        circle: "bg-green-500 text-white",
+        text: "text-green-300",
+        line: "bg-green-500",
+      };
     }
+    if (stepStatus === "active") {
+      return {
+        circle: "bg-[var(--accent-purple)] text-white animate-pulse",
+        text: "text-white",
+        line: "bg-gray-600",
+      };
+    }
+    if (stepStatus === "error") {
+      return {
+        circle: "bg-red-500 text-white",
+        text: "text-red-300",
+        line: "bg-gray-600",
+      };
+    }
+    return {
+      circle: "bg-gray-600 text-gray-400",
+      text: "text-gray-400",
+      line: "bg-gray-600",
+    };
   };
 
   const styles = getStatusStyles();
@@ -224,15 +213,18 @@ function ProgressStep({
     <div className="flex items-start gap-4">
       <div className="flex flex-col items-center">
         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${styles.circle}`}>
-          {stepStatus === "completed" ? (
-            <CheckCircle className="w-5 h-5" />
-          ) : stepStatus === "error" ? (
-            <AlertCircle className="w-5 h-5" />
-          ) : stepStatus === "active" ? (
-            <Loader2 className="animate-spin w-5 h-5" />
-          ) : (
-            icon
-          )}
+          {(() => {
+            if (stepStatus === "completed") {
+              return <CheckCircle className="w-5 h-5" />;
+            }
+            if (stepStatus === "error") {
+              return <AlertCircle className="w-5 h-5" />;
+            }
+            if (stepStatus === "active") {
+              return <Loader2 className="animate-spin w-5 h-5" />;
+            }
+            return icon;
+          })()}
         </div>
         {step < totalSteps && <div className={`w-0.5 h-8 mt-2 ${styles.line}`} />}
       </div>
@@ -259,18 +251,20 @@ export function FormSubmissionProgress({
     <Card className="bg-zinc-900 border-zinc-800">
       <CardHeader>
         <CardTitle className="text-white flex items-center gap-2">
-          {isComplete ? (
-            <CheckCircle className="w-5 h-5 text-green-400" />
-          ) : error ? (
-            <AlertCircle className="w-5 h-5 text-red-400" />
-          ) : (
-            <Loader2 className="animate-spin w-5 h-5 text-[var(--accent-purple)]" />
-          )}
-          {isComplete
-            ? "Reservation Complete!"
-            : error
-              ? "Submission Error"
-              : "Processing Reservation"}
+          {(() => {
+            if (isComplete) {
+              return <CheckCircle className="w-5 h-5 text-green-400" />;
+            }
+            if (error) {
+              return <AlertCircle className="w-5 h-5 text-red-400" />;
+            }
+            return <Loader2 className="animate-spin w-5 h-5 text-[var(--accent-purple)]" />;
+          })()}
+          {(() => {
+            if (isComplete) return "Reservation Complete!";
+            if (error) return "Submission Error";
+            return "Processing Reservation";
+          })()}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -282,7 +276,7 @@ export function FormSubmissionProgress({
           <div className="space-y-0">
             {steps.map((step, index) => (
               <ProgressStep
-                key={index}
+                key={`step-${step.title}-${index}`}
                 step={index + 1}
                 totalSteps={totalSteps}
                 currentStep={currentStep}
@@ -308,9 +302,9 @@ export function RetryIndicator({
   maxAttempts,
   nextRetryIn,
 }: LoadingStateProps & {
-  attempt?: number;
-  maxAttempts?: number;
-  nextRetryIn?: number;
+  readonly attempt?: number;
+  readonly maxAttempts?: number;
+  readonly nextRetryIn?: number;
 }) {
   if (!isVisible) return null;
 
@@ -340,9 +334,9 @@ export function SuccessState({
   description,
   nextSteps,
 }: LoadingStateProps & {
-  title?: string;
-  description?: string;
-  nextSteps?: string[];
+  readonly title?: string;
+  readonly description?: string;
+  readonly nextSteps?: readonly string[];
 }) {
   if (!isVisible) return null;
 
@@ -360,8 +354,11 @@ export function SuccessState({
             <div className="mt-4">
               <p className="text-green-300 font-medium mb-2">What happens next:</p>
               <ul className="space-y-1">
-                {nextSteps.map((step, index) => (
-                  <li key={index} className="text-sm text-green-200 flex items-center gap-2">
+                {nextSteps.map(step => (
+                  <li
+                    key={`next-step-${step}`}
+                    className="text-sm text-green-200 flex items-center gap-2"
+                  >
                     <div className="w-1.5 h-1.5 bg-green-400 rounded-full flex-shrink-0" />
                     {step}
                   </li>
@@ -376,27 +373,46 @@ export function SuccessState({
 }
 
 /**
- * Default reservation form submission steps
+ * Submission progress indicator for multi-step forms
  */
-export const defaultReservationSteps = [
-  {
-    title: "Validating Information",
-    description: "Checking form data and user authentication",
-    icon: <FileText className="w-5 h-5" />,
-  },
-  {
-    title: "Creating Reservation",
-    description: "Setting up your service booking",
-    icon: <Send className="w-5 h-5" />,
-  },
-  {
-    title: "Preparing Payment",
-    description: "Setting up secure payment processing",
-    icon: <CreditCard className="w-5 h-5" />,
-  },
-  {
-    title: "Finalizing",
-    description: "Completing your reservation",
-    icon: <CheckCircle className="w-5 h-5" />,
-  },
-];
+export function SubmissionProgress({
+  isVisible,
+  currentStep,
+  totalSteps,
+  progress,
+  stepName,
+}: LoadingStateProps & {
+  readonly currentStep?: number;
+  readonly totalSteps?: number;
+  readonly progress?: number;
+  readonly stepName?: string;
+}) {
+  if (!isVisible) return null;
+
+  return (
+    <div className="mb-4 p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg">
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <Loader2 className="animate-spin w-5 h-5 text-purple-400" />
+          <div className="flex-1">
+            <p className="text-purple-300 font-medium">
+              {stepName || "Processing your request..."}
+            </p>
+            {currentStep !== undefined && totalSteps !== undefined && (
+              <p className="text-xs text-gray-400 mt-1">
+                Step {currentStep} of {totalSteps}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {progress !== undefined && (
+          <div className="space-y-1">
+            <Progress value={progress} className="h-2" />
+            <p className="text-xs text-gray-400 text-right">{progress}%</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

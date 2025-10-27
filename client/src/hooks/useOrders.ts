@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
 import {
   useConvexAuth,
   useMutation as useConvexMutation,
@@ -23,10 +22,11 @@ export interface CreateOrderData {
 
 export function useOrders() {
   const { isAuthenticated } = useConvexAuth();
-  const queryClient = useQueryClient();
 
   // Lister les commandes avec Convex
-  const orders = useConvexQuery(api.orders.listOrders as any, {});
+  // @ts-expect-error - Type instantiation depth issue with Convex API
+  const ordersResult = useConvexQuery(api.orders.listOrders, isAuthenticated ? {} : "skip");
+  const orders = ordersResult?.items || [];
 
   // Créer une commande avec Convex
   const createOrderMutation = useConvexMutation(api.orders.createOrder);
@@ -46,8 +46,8 @@ export function useOrders() {
   };
 
   return {
-    orders: orders || [],
-    isLoading: orders === undefined,
+    orders,
+    isLoading: ordersResult === undefined,
     createOrder,
     isAuthenticated,
   };
