@@ -4,7 +4,6 @@ import {
   AuthenticationLoading,
   FormSubmissionProgress,
   SuccessState,
-  defaultReservationSteps,
 } from "@/components/reservations/ReservationLoadingStates";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -240,7 +239,23 @@ Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadlin
               <FormSubmissionProgress
                 currentStep={currentStep}
                 totalSteps={totalSteps}
-                steps={defaultReservationSteps}
+                steps={[
+                  {
+                    title: "Validating Request",
+                    description: "Checking your custom beat specifications",
+                    icon: <Music className="w-5 h-5" />,
+                  },
+                  {
+                    title: "Processing Payment",
+                    description: "Preparing checkout information",
+                    icon: <Clock className="w-5 h-5" />,
+                  },
+                  {
+                    title: "Creating Reservation",
+                    description: "Setting up your custom beat order",
+                    icon: <CheckCircle className="w-5 h-5" />,
+                  },
+                ]}
                 error={hasError ? getErrorDisplay()?.message : null}
                 isComplete={submissionComplete}
               />
@@ -351,7 +366,7 @@ Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadlin
                       <CardContent className="space-y-3">
                         {submittedRequests.map((request, requestIndex) => (
                           <div
-                            key={requestIndex}
+                            key={`request-${request.genre}-${requestIndex}`}
                             className="p-3 bg-[var(--medium-gray)] rounded-lg"
                           >
                             <div className="font-medium text-white">{request.genre} Beat</div>
