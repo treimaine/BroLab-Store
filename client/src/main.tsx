@@ -5,16 +5,12 @@ import App from "./App";
 import "./index.css";
 import { initializePerformanceMonitoring } from "./lib/performanceMonitoring";
 import "./styles/z-index.css";
-import { optimizeImageLoading } from "./utils/clsOptimization";
 import { optimizeScrolling, preloadCriticalResources } from "./utils/performance";
-import { initPerformanceMonitoring } from "./utils/performanceMonitoring";
 
 // Initialize performance optimizations
 preloadCriticalResources();
 optimizeScrolling();
-initPerformanceMonitoring();
 initializePerformanceMonitoring(); // PHASE 4 advanced monitoring
-optimizeImageLoading();
 
 // Register service worker for offline functionality
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
