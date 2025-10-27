@@ -1,104 +1,103 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Beat } from '../../../shared/schema';
+import { useEffect, useState } from "react";
 
-// Constantes
-const LOCALSTORAGE_RECENT_BEATS = 'brl_recent_beats';
-const MAX_RECENT_BEATS = 12;
+const STORAGE_KEY = "recently_viewed_beats";
+const MAX_RECENT_BEATS = 10;
 
-// Types
-interface RecentBeat extends Pick<Beat, 'id' | 'title' | 'genre' | 'price' | 'image_url' | 'audio_url'> {
+interface RecentBeat {
+  id: number;
   viewedAt: number;
+  title: string;
+  genre: string;
+  price: number;
+  image_url: string;
+  audio_url: string;
 }
 
-interface UseRecentlyViewedBeatsReturn {
-  recentBeats: RecentBeat[];
-  addBeat: (beat: Beat) => void;
-  removeBeat: (beatId: number) => void;
-  clearHistory: () => void;
-  isLoading: boolean;
-}
-
-// Utilitaires
-const getStoredBeats = (): RecentBeat[] => {
-  try {
-    const stored = localStorage.getItem(LOCALSTORAGE_RECENT_BEATS);
-    return stored ? JSON.parse(stored) : [];
-  } catch (error) {
-    console.warn('Failed to parse recent beats from localStorage:', error);
-    return [];
-  }
-};
-
-const saveBeatsToStorage = (beats: RecentBeat[]): void => {
-  try {
-    localStorage.setItem(LOCALSTORAGE_RECENT_BEATS, JSON.stringify(beats));
-  } catch (error) {
-    console.warn('Failed to save recent beats to localStorage:', error);
-  }
-};
-
-// Hook principal
-export const useRecentlyViewedBeats = (): UseRecentlyViewedBeatsReturn => {
+/**
+ * Hook for tracking recently viewed beats in localStorage
+ */
+export function useRecentlyViewedBeats() {
   const [recentBeats, setRecentBeats] = useState<RecentBeat[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Initialisation depuis localStorage
+  // Load from localStorage on mount
   useEffect(() => {
-    const storedBeats = getStoredBeats();
-    setRecentBeats(storedBeats);
-    setIsLoading(false);
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setRecentBeats(parsed);
+      }
+    } catch (error) {
+      console.error("Failed to load recently viewed beats:", error);
+    }
   }, []);
 
-  // Ajouter un beat à l'historique
-  const addBeat = useCallback((beat: Beat) => {
-    const now = Date.now();
-    const newRecentBeat: RecentBeat = {
-      id: beat.id,
-      title: beat.title,
-      genre: beat.genre,
-      price: beat.price,
-      image_url: beat.image_url,
-      audio_url: beat.audio_url,
-      viewedAt: now,
-    };
+  // Add a beat to recently viewed
+  const addRecentBeat = (
+    beatId: number,
+    beatData?: {
+      title?: string;
+      genre?: string;
+      price?: number;
+      image_url?: string;
+      audio_url?: string;
+    }
+  ) => {
+    setRecentBeats(prev => {
+      // Remove if already exists
+      const filtered = prev.filter(b => b.id !== beatId);
 
-    setRecentBeats(prevBeats => {
-      // Supprimer si déjà présent (éviter les doublons)
-      const filteredBeats = prevBeats.filter(b => b.id !== beat.id);
-      
-      // Ajouter en tête de liste
-      const updatedBeats = [newRecentBeat, ...filteredBeats];
-      
-      // Limiter à MAX_RECENT_BEATS
-      const limitedBeats = updatedBeats.slice(0, MAX_RECENT_BEATS);
-      
-      // Sauvegarder
-      saveBeatsToStorage(limitedBeats);
-      
-      return limitedBeats;
+      // Add to front with beat data if provided, otherwise use defaults
+      const newBeat: RecentBeat = {
+        id: beatId,
+        viewedAt: Date.now(),
+        title: beatData?.title || `Beat ${beatId}`,
+        genre: beatData?.genre || "Unknown",
+        price: beatData?.price || 0,
+        image_url: beatData?.image_url || "",
+        audio_url: beatData?.audio_url || "",
+      };
+
+      const updated = [newBeat, ...filtered].slice(0, MAX_RECENT_BEATS);
+
+      // Save to localStorage
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch (error) {
+        console.error("Failed to save recently viewed beats:", error);
+      }
+
+      return updated;
     });
-  }, []);
+  };
 
-  // Supprimer un beat de l'historique
-  const removeBeat = useCallback((beatId: number) => {
-    setRecentBeats(prevBeats => {
-      const updatedBeats = prevBeats.filter(b => b.id !== beatId);
-      saveBeatsToStorage(updatedBeats);
-      return updatedBeats;
-    });
-  }, []);
-
-  // Vider l'historique
-  const clearHistory = useCallback(() => {
+  // Clear all recent beats
+  const clearRecentBeats = () => {
     setRecentBeats([]);
-    localStorage.removeItem(LOCALSTORAGE_RECENT_BEATS);
-  }, []);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+      console.error("Failed to clear recently viewed beats:", error);
+    }
+  };
 
   return {
     recentBeats,
-    addBeat,
-    removeBeat,
-    clearHistory,
-    isLoading,
+    addRecentBeat,
+    addBeat: addRecentBeat, // Alias for compatibility
+    clearRecentBeats,
+    removeBeat: (beatId: number) => {
+      setRecentBeats(prev => {
+        const updated = prev.filter(b => b.id !== beatId);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        } catch (error) {
+          console.error("Failed to remove beat:", error);
+        }
+        return updated;
+      });
+    },
+    clearHistory: clearRecentBeats, // Alias for compatibility
+    isLoading: false,
   };
-}; 
+}

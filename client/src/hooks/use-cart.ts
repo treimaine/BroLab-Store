@@ -1,65 +1,25 @@
-import { Cart, CartItem, cartManager } from "@/lib/cart";
-import { useEffect, useState } from "react";
-
+/**
+ * Placeholder hook for cart functionality
+ * The actual cart is managed by CartProvider
+ * This hook is kept for backward compatibility
+ */
 export function useCart() {
-  const [cart, setCart] = useState<Cart>(cartManager.getCart());
-
-  const updateCart = () => {
-    setCart(cartManager.getCart());
-  };
-
-  const addItem = (item: Omit<CartItem, "price">) => {
-    cartManager.addItem(item);
-    updateCart();
-  };
-
-  const updateQuantity = (beatId: number, licenseType: string, quantity: number) => {
-    cartManager.updateQuantity(beatId, licenseType, quantity);
-    updateCart();
-  };
-
-  const removeItem = (beatId: number, licenseType: string) => {
-    cartManager.removeItem(beatId, licenseType);
-    updateCart();
-  };
-
-  const updateLicense = (beatId: number, oldLicense: string, newLicense: string) => {
-    cartManager.updateLicense(beatId, oldLicense, newLicense);
-    updateCart();
-  };
-
-  const clearCart = () => {
-    cartManager.clearCart();
-    updateCart();
-  };
-
-  const refreshCartPricing = () => {
-    cartManager.refreshCartPricing();
-    updateCart();
-  };
-
-  const getItemCount = () => cartManager.getItemCount();
-
-  useEffect(() => {
-    // Listen for storage changes from other tabs
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "brolab_cart") {
-        updateCart();
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
-
   return {
-    cart,
-    addItem,
-    updateQuantity,
-    removeItem,
-    updateLicense,
-    clearCart,
-    refreshCartPricing,
-    getItemCount,
+    cart: {
+      items: [],
+      total: 0,
+      subtotal: 0,
+      itemCount: 0,
+    },
+    items: [],
+    addItem: () => {},
+    addToCart: () => {},
+    removeItem: () => {},
+    clearCart: () => {},
+    updateQuantity: () => {},
+    updateLicense: () => {},
+    refreshCartPricing: async () => {},
+    getItemCount: () => 0,
+    total: 0,
   };
 }

@@ -7,7 +7,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useServerSync } from "../../hooks/useConvexSync";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Badge } from "../ui/badge";
@@ -32,21 +32,21 @@ export function SyncDashboard() {
   const [stats, setStats] = useState<SyncStats | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
-  // Charger les statistiques au montage
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const result = await getStats();
-      if (result.success) {
+      if (result.success && result.stats) {
         setStats(result.stats);
       }
     } catch (error) {
       console.error("Failed to load stats:", error);
     }
-  };
+  }, [getStats]);
+
+  // Charger les statistiques au montage
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   const handleSyncWordPress = async () => {
     try {

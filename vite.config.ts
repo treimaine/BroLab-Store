@@ -59,61 +59,10 @@ export default defineConfig({
         return id.startsWith("node:") || ["fs", "path", "crypto"].includes(id);
       },
       output: {
-        // Enhanced manual chunking for better code splitting
-        manualChunks: id => {
-          // Vendor libraries
-          if (id.includes("node_modules")) {
-            // Chart libraries
-            if (id.includes("recharts") || id.includes("d3")) {
-              return "charts";
-            }
-            // Audio libraries
-            if (id.includes("wavesurfer") || id.includes("audio")) {
-              return "audio";
-            }
-            // UI libraries
-            if (id.includes("@radix-ui") || id.includes("lucide-react")) {
-              return "ui";
-            }
-            // React ecosystem
-            if (id.includes("react") || id.includes("react-dom")) {
-              return "react";
-            }
-            // Animation libraries
-            if (id.includes("framer-motion")) {
-              return "animation";
-            }
-            // Other vendor libraries
-            return "vendor";
-          }
-
-          // Application code splitting
-          // Dashboard components
-          if (id.includes("/dashboard/") || id.includes("Dashboard")) {
-            return "dashboard";
-          }
-          // Audio components
-          if (id.includes("Audio") || id.includes("Waveform") || id.includes("Player")) {
-            return "audio-components";
-          }
-          // Chart components
-          if (id.includes("Chart") || id.includes("Analytics")) {
-            return "chart-components";
-          }
-          // Page components
-          if (id.includes("/pages/")) {
-            return "pages";
-          }
-
-          // Default return for other modules
-          return undefined;
-        },
-        chunkFileNames: chunkInfo => {
-          const facadeModuleId = chunkInfo.facadeModuleId
-            ? chunkInfo.facadeModuleId.split("/").pop()?.replace(".tsx", "").replace(".ts", "")
-            : "chunk";
-          return `js/${facadeModuleId}-[hash].js`;
-        },
+        // Let Vite handle automatic code splitting
+        chunkFileNames: "js/[name]-[hash].js",
+        entryFileNames: "js/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash].[ext]",
       },
     },
   },

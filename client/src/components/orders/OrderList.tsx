@@ -13,9 +13,8 @@ interface OrderListProps {
 export function OrderList({ page = 1, limit = 10, onPageChange, onOrderClick }: OrderListProps) {
   const { orders, isLoading } = useOrders();
 
-  // Handle different return types from Convex (array or paginated object)
-  const ordersArray = Array.isArray(orders) ? orders : orders?.items || [];
-  const data = { orders: ordersArray, totalPages: 1 } as const;
+  // Orders is already an array from useOrders hook
+  const data = { orders, totalPages: 1 } as const;
   const error = null;
 
   if (isLoading) {

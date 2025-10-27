@@ -1,78 +1,59 @@
+import { api } from "@/lib/convex-api";
 import { useUser } from "@clerk/clerk-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMutation as useConvexMutation, useQuery } from "convex/react";
-import { api } from "../lib/convex-api";
+import { useMutation, useQuery } from "convex/react";
 
-// Type definitions for favorites
 interface Favorite {
-  _id: string;
-  beatId: number;
-  userId: string;
+  beat_id: number;
+  userId?: string;
+  createdAt?: string;
 }
 
-interface FavoriteWithBeat extends Favorite {
-  beat?: {
-    id: number;
-    title: string;
-    artist: string;
-    // Add other beat properties as needed
-  };
-}
+/**
+ * Hook for managing user favorites using Convex
+ */
+export function useFavorites() {
+  const { user } = useUser();
 
-export const useFavorites = () => {
-  const queryClient = useQueryClient();
-  const { user: clerkUser, isLoaded } = useUser();
+  // Query favorites - skip query if user is not authenticated
+  const favorites = useQuery(api.favorites.getFavorites.getFavorites, user ? {} : undefined) as
+    | Favorite[]
+    | undefined;
 
-  // Use Convex queries with proper error handling
-  const favorites = useQuery(
-    api.favorites.getFavorites.getFavorites,
-    clerkUser && isLoaded ? {} : "skip"
-  ) as Favorite[] | undefined;
+  // Mutations
+  const addToFavorites = useMutation(api.favorites.add.addToFavorites);
+  const removeFromFavorites = useMutation(api.favorites.remove.removeFromFavorites);
 
-  const favoritesWithBeats = useQuery(
-    api.favorites.getFavorites.getFavoritesWithBeats,
-    clerkUser && isLoaded ? {} : "skip"
-  ) as FavoriteWithBeat[] | undefined;
-
-  // Convex mutations
-  const addToFavoritesMutation = useConvexMutation(api.favorites.add.addToFavorites);
-  const removeFromFavoritesMutation = useConvexMutation(api.favorites.remove.removeFromFavorites);
-
-  const addToFavorites = useMutation({
-    mutationFn: async (beatId: number) => {
-      return await addToFavoritesMutation({ beatId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["favorites"] });
-      queryClient.invalidateQueries({ queryKey: ["favoritesWithBeats"] });
-      queryClient.invalidateQueries({ queryKey: ["forYouBeats"] });
-    },
-  });
-
-  const removeFromFavorites = useMutation({
-    mutationFn: async (beatId: number) => {
-      return await removeFromFavoritesMutation({ beatId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["favorites"] });
-      queryClient.invalidateQueries({ queryKey: ["favoritesWithBeats"] });
-      queryClient.invalidateQueries({ queryKey: ["forYouBeats"] });
-    },
-  });
-
+  // Helper to check if a beat is favorited
   const isFavorite = (beatId: number): boolean => {
-    return (favorites || []).some((fav: Favorite) => fav.beatId === beatId);
+    if (!favorites) return false;
+    return favorites.some((fav: Favorite) => fav.beat_id === beatId);
+  };
+
+  // Toggle favorite status
+  const toggleFavorite = async (beatId: number) => {
+    if (!user) {
+      throw new Error("User must be authenticated to manage favorites");
+    }
+
+    if (isFavorite(beatId)) {
+      await removeFromFavorites({ beatId });
+    } else {
+      await addToFavorites({ beatId });
+    }
   };
 
   return {
     favorites: favorites || [],
-    favoritesWithBeats: favoritesWithBeats || [],
-    isLoading:
-      !isLoaded || (clerkUser && (favorites === undefined || favoritesWithBeats === undefined)),
-    addToFavorites: addToFavorites.mutate,
-    removeFromFavorites: removeFromFavorites.mutate,
-    isAdding: addToFavorites.isPending,
-    isRemoving: removeFromFavorites.isPending,
+    isLoading: favorites === undefined,
     isFavorite,
+    addToFavorites: async (beatId: number) => {
+      if (!user) throw new Error("User must be authenticated");
+      await addToFavorites({ beatId });
+    },
+    removeFromFavorites: async (beatId: number) => {
+      if (!user) throw new Error("User must be authenticated");
+      await removeFromFavorites({ beatId });
+    },
+    toggleFavorite,
   };
-};
+}
