@@ -1,13 +1,8 @@
 import { EventBus, getEventBus } from "@/services/EventBus";
-import {
-  EventBusSyncIntegration,
-  getEventBusSyncIntegration,
-} from "@/services/EventBusSyncIntegration";
 import React, { createContext, useContext, useEffect, useMemo, useRef } from "react";
 
 interface EventBusContextValue {
   eventBus: EventBus;
-  integration: EventBusSyncIntegration;
   isReady: boolean;
 }
 
@@ -29,7 +24,6 @@ export const EventBusProvider: React.FC<EventBusProviderProps> = ({
   enableDebugMode = false,
 }) => {
   const eventBusRef = useRef<EventBus | null>(null);
-  const integrationRef = useRef<EventBusSyncIntegration | null>(null);
   const [isReady, setIsReady] = React.useState(false);
 
   useEffect(() => {
@@ -43,9 +37,6 @@ export const EventBusProvider: React.FC<EventBusProviderProps> = ({
     if (enableDebugMode) {
       eventBusRef.current.enableDebugMode(true);
     }
-
-    // Initialize EventBus-SyncManager integration
-    integrationRef.current ??= getEventBusSyncIntegration();
 
     // Mark as ready
     setIsReady(true);
@@ -116,7 +107,6 @@ export const EventBusProvider: React.FC<EventBusProviderProps> = ({
   const contextValue: EventBusContextValue = useMemo(
     () => ({
       eventBus: eventBusRef.current!,
-      integration: integrationRef.current!,
       isReady,
     }),
     [isReady]
