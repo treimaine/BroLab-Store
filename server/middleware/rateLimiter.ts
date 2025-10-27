@@ -1,5 +1,85 @@
 import { NextFunction, Request, Response } from "express";
-import { rateLimiter } from "../../shared/utils/rate-limiter";
+
+// In-memory rate limiter implementation
+class InMemoryRateLimiter {
+  private limits: Map<string, { count: number; resetTime: number; blocked: number }> = new Map();
+
+  async checkLimit(
+    key: string,
+    config: { windowMs: number; maxRequests: number }
+  ): Promise<{
+    allowed: boolean;
+    remaining: number;
+    resetTime: number;
+    totalRequests: number;
+    retryAfter?: number;
+  }> {
+    const now = Date.now();
+    const existing = this.limits.get(key);
+
+    if (!existing || now > existing.resetTime) {
+      // Create new window
+      this.limits.set(key, { count: 1, resetTime: now + config.windowMs, blocked: 0 });
+      return {
+        allowed: true,
+        remaining: config.maxRequests - 1,
+        resetTime: now + config.windowMs,
+        totalRequests: 1,
+      };
+    }
+
+    existing.count++;
+
+    if (existing.count > config.maxRequests) {
+      existing.blocked++;
+      return {
+        allowed: false,
+        remaining: 0,
+        resetTime: existing.resetTime,
+        totalRequests: existing.count,
+        retryAfter: Math.ceil((existing.resetTime - now) / 1000),
+      };
+    }
+
+    return {
+      allowed: true,
+      remaining: config.maxRequests - existing.count,
+      resetTime: existing.resetTime,
+      totalRequests: existing.count,
+    };
+  }
+
+  async resetLimit(key: string): Promise<void> {
+    this.limits.delete(key);
+  }
+
+  async getStats(key: string) {
+    const existing = this.limits.get(key);
+    const now = Date.now();
+
+    if (!existing || now > existing.resetTime) {
+      return {
+        key,
+        requests: 0,
+        remaining: 0,
+        resetTime: now,
+        windowStart: now,
+        blocked: 0,
+      };
+    }
+
+    return {
+      key,
+      requests: existing.count,
+      remaining: Math.max(0, existing.count),
+      resetTime: existing.resetTime,
+      windowStart: existing.resetTime - 60000,
+      blocked: existing.blocked,
+    };
+  }
+}
+
+const rateLimiter = new InMemoryRateLimiter();
 
 // Type for accessing socket properties safely
 interface SocketConnection {
@@ -67,9 +147,6 @@ export class RateLimiter {
       const result: RateLimitResult = await rateLimiter.checkLimit(key, {
         windowMs: this.config.windowMs,
         maxRequests: this.config.maxRequests,
-        skipSuccessfulRequests: this.config.skipSuccessfulRequests,
-        skipFailedRequests: this.config.skipFailedRequests,
-        message: this.config.message,
       });
 
       if (!result.allowed) {
