@@ -2,10 +2,20 @@
 
 ## BroLab Entertainment - Music Production Platform
 
-**Version:** 2.0  
-**Date:** January 26, 2025  
-**Status:** Ready for Implementation  
-**Platform:** Node.js + Express + Convex + Clerk + PayPal + WooCommerce
+**Version:** 4.0  
+**Date:** January 28, 2025  
+**Status:** Production Ready - Comprehensive API & Real-time Infrastructure  
+**Platform:** Node.js 20+ + Express 4.21+ + Convex + Clerk + PayPal + WooCommerce + WebSocket
+
+**Key Achievements:**
+
+- ✅ 20+ API endpoints with full authentication
+- ✅ Real-time sync infrastructure (WebSocket + HTTP polling)
+- ✅ Comprehensive payment integration (PayPal + Stripe)
+- ✅ WooCommerce catalog synchronization
+- ✅ Advanced reservation system with calendar integration
+- ✅ File upload/download with security scanning
+- ✅ Rate limiting and security middleware
 
 ---
 
@@ -32,34 +42,129 @@ This document outlines the comprehensive backend testing strategy for BroLab Ent
 
 - **Runtime**: Node.js 20+
 - **Framework**: Express.js 4.21+
-- **Database**: Convex (PostgreSQL compatible)
+- **Database**: Convex (real-time database)
 - **Authentication**: Clerk SDK + Express middleware
 - **Payments**: PayPal Server SDK + Clerk Billing
 - **External APIs**: WooCommerce REST API + WordPress
 - **File Storage**: Convex File Storage
+- **Real-time**: WebSocket server + HTTP polling fallback
 - **Testing**: Jest 30 + Supertest + MSW
 - **Monitoring**: Custom logging and metrics
+- **Session Management**: Express Session + Cookie Parser
 
 ### Core Components
 
 ```
 Backend Architecture:
 ├── Express Server (API Layer)
-│   ├── Routes (18+ endpoints)
-│   ├── Middleware (Auth, Rate Limiting, Validation)
-│   └── Services (Mail, PayPal, WooCommerce Sync)
+│   ├── Routes (20+ endpoints)
+│   │   ├── /api/woocommerce/* - Product catalog (GET /products, /products/:id, /categories)
+│   │   ├── /api/wishlist/* - User wishlist (GET, POST, DELETE)
+│   │   ├── /api/payment/paypal/* - PayPal integration (POST /create-order, /capture-order)
+│   │   ├── /api/payment/stripe/* - Stripe integration (POST /checkout, /webhook)
+│   │   ├── /api/downloads/* - Download management (GET, POST)
+│   │   ├── /api/email/* - Email notifications (POST /send)
+│   │   ├── /api/security/* - Security endpoints (GET /status, /user-info)
+│   │   ├── /api/uploads/* - File uploads (POST /upload)
+│   │   ├── /api/schema/* - Schema markup (GET /beat/:id, /beats-list, /organization)
+│   │   ├── /api/reservations/* - Booking system (GET /services, POST /, GET /me)
+│   │   ├── /api/storage/* - File storage (POST /upload, GET /signed-url/:fileId)
+│   │   ├── /api/activity/* - User activity tracking
+│   │   ├── /api/monitoring/* - Performance monitoring
+│   │   ├── /api/sync/* - Real-time sync (GET /poll, POST /send, POST /force)
+│   │   ├── /api/beats/* - Beat compatibility layer
+│   │   ├── /api/audio/player/* - Audio player state (POST /play, /pause, /seek)
+│   │   └── /api/health - Health check endpoint
+│   ├── Middleware
+│   │   ├── Authentication (Clerk + Express Session)
+│   │   ├── Rate Limiting (Express Rate Limit)
+│   │   ├── Request Validation (Zod schemas)
+│   │   ├── Error Handling (Custom error middleware)
+│   │   ├── CORS Configuration
+│   │   ├── Body Parser (JSON + URL-encoded)
+│   │   └── Cookie Parser
+│   ├── Services
+│   │   ├── Email Service (Nodemailer)
+│   │   ├── PayPal Service (PayPal Server SDK)
+│   │   ├── Stripe Service (Stripe SDK)
+│   │   ├── WooCommerce Sync (WooCommerce REST API)
+│   │   ├── WordPress Integration (WordPress REST API)
+│   │   ├── File Upload Service (Multer + Sharp)
+│   │   └── Monitoring Service (Custom metrics)
+│   └── WebSocket Server (Real-time sync)
+│       ├── Connection Management
+│       ├── Message Broadcasting
+│       ├── Heartbeat Mechanism
+│       └── Fallback to HTTP Polling
 ├── Convex Functions (Database Layer)
 │   ├── User Management
+│   │   ├── clerkSync.ts - Clerk user synchronization
+│   │   ├── getUser.ts - User retrieval
+│   │   ├── updateUser.ts - User updates
+│   │   └── deleteUser.ts - User deletion
 │   ├── Beat Catalog
+│   │   ├── products.ts - Product management
+│   │   ├── favorites.ts - User favorites
+│   │   └── sync.ts - WooCommerce sync
 │   ├── Order Processing
+│   │   ├── orders.ts - Order CRUD
+│   │   ├── orderStatus.ts - Status updates
+│   │   └── orderValidation.ts - Order validation
 │   ├── Download Tracking
+│   │   ├── downloads.ts - Download records
+│   │   ├── downloadQuotas.ts - Quota management
+│   │   └── downloadHistory.ts - Download history
 │   ├── Reservation System
+│   │   ├── reservations.ts - Booking CRUD
+│   │   ├── availability.ts - Availability checking
+│   │   └── calendar.ts - Calendar integration
 │   ├── Subscription Management
-│   └── Quota Enforcement
-├── Clerk Authentication (Auth Layer)
-├── PayPal Integration (Payment Layer)
-├── WooCommerce Sync (External API)
-└── File Storage (Convex File Storage)
+│   │   ├── subscriptions.ts - Subscription CRUD
+│   │   ├── plans.ts - Plan management
+│   │   └── billing.ts - Billing integration
+│   ├── Quota Enforcement
+│   │   ├── quotas.ts - Quota tracking
+│   │   ├── limits.ts - Limit enforcement
+│   │   └── usage.ts - Usage tracking
+│   ├── Audit & Logging
+│   │   ├── audit.ts - Audit logging
+│   │   ├── activity.ts - Activity tracking
+│   │   └── alerts.ts - Alert system
+│   └── Data Integrity
+│       ├── consistency.ts - Data consistency checks
+│       ├── validation.ts - Data validation
+│       └── backup.ts - Backup management
+├── Real-time Sync Layer
+│   ├── WebSocket Server (Native WebSocket)
+│   ├── HTTP Polling Endpoints (/api/sync/poll)
+│   ├── Connection Management (ConnectionManager)
+│   ├── Message Broadcasting (EventBus)
+│   ├── Heartbeat Mechanism (30s interval)
+│   └── Quality Monitoring (Latency tracking)
+├── Authentication Layer
+│   ├── Clerk SDK (@clerk/clerk-sdk-node)
+│   ├── Express Middleware (@clerk/express)
+│   ├── Session Management (Express Session)
+│   ├── Cookie Handling (Cookie Parser)
+│   └── Webhook Validation (Svix)
+├── Payment Layer
+│   ├── PayPal Server SDK (Primary)
+│   ├── Stripe SDK (Legacy support)
+│   ├── Clerk Billing (Subscriptions)
+│   ├── Payment Validation
+│   └── Webhook Processing
+├── External API Integration
+│   ├── WooCommerce REST API (Product catalog)
+│   ├── WordPress REST API (Content management)
+│   ├── OAuth 1.0a Authentication
+│   ├── Rate Limiting Handling
+│   └── Error Recovery
+└── File Storage & Processing
+    ├── Convex File Storage
+    ├── Multer (File upload)
+    ├── Sharp (Image processing)
+    ├── File Type Validation
+    └── Antivirus Scanning
 ```
 
 ---
@@ -448,9 +553,214 @@ describe("WooCommerce Sync", () => {
 - SEO metadata
 - Performance optimization
 
-### 6. Performance Testing
+### 6. Real-time Synchronization Testing
 
-#### 6.1 Load Testing
+#### 6.1 WebSocket Server Testing
+
+**Objective**: Test WebSocket server functionality
+
+**Coverage Areas**:
+
+- WebSocket connection establishment
+- Message broadcasting
+- Connection lifecycle management
+- Heartbeat mechanism
+- Error handling and recovery
+- Connection cleanup
+
+**Test Cases**:
+
+```typescript
+describe("WebSocket Server", () => {
+  it("should accept WebSocket connections", async () => {
+    // Test WebSocket connection
+  });
+
+  it("should broadcast messages to connected clients", async () => {
+    // Test message broadcasting
+  });
+
+  it("should handle client disconnections gracefully", async () => {
+    // Test disconnection handling
+  });
+
+  it("should implement heartbeat mechanism", async () => {
+    // Test heartbeat
+  });
+
+  it("should handle connection errors", async () => {
+    // Test error scenarios
+  });
+
+  it("should clean up resources on disconnect", async () => {
+    // Test cleanup
+  });
+});
+```
+
+#### 6.2 HTTP Polling Endpoints Testing
+
+**Objective**: Test HTTP polling fallback mechanism
+
+**Coverage Areas**:
+
+- Polling endpoint availability
+- Message queuing
+- Authentication for polling requests
+- Rate limiting for polling
+- Message delivery guarantees
+- Polling interval optimization
+
+**Test Cases**:
+
+```typescript
+describe("HTTP Polling", () => {
+  it("should return queued messages on poll", async () => {
+    // Test message retrieval
+  });
+
+  it("should authenticate polling requests", async () => {
+    // Test authentication
+  });
+
+  it("should rate limit polling requests", async () => {
+    // Test rate limiting
+  });
+
+  it("should handle concurrent polling requests", async () => {
+    // Test concurrency
+  });
+
+  it("should deliver messages reliably", async () => {
+    // Test message delivery
+  });
+});
+```
+
+#### 6.3 Connection Management Testing
+
+**Objective**: Test connection lifecycle and management
+
+**Coverage Areas**:
+
+- Connection tracking
+- Session management
+- Connection quality monitoring
+- Automatic reconnection
+- Fallback strategy execution
+- Connection metrics collection
+
+**Test Cases**:
+
+```typescript
+describe("Connection Management", () => {
+  it("should track active connections", async () => {
+    // Test connection tracking
+  });
+
+  it("should manage connection sessions", async () => {
+    // Test session management
+  });
+
+  it("should monitor connection quality", async () => {
+    // Test quality monitoring
+  });
+
+  it("should trigger fallback on connection failure", async () => {
+    // Test fallback mechanism
+  });
+
+  it("should collect connection metrics", async () => {
+    // Test metrics collection
+  });
+});
+```
+
+#### 6.4 Message Broadcasting Testing
+
+**Objective**: Test message distribution to clients
+
+**Coverage Areas**:
+
+- Broadcast to all clients
+- Targeted message delivery
+- Message filtering
+- Message priority handling
+- Delivery confirmation
+- Failed delivery handling
+
+**Test Cases**:
+
+```typescript
+describe("Message Broadcasting", () => {
+  it("should broadcast to all connected clients", async () => {
+    // Test broadcast
+  });
+
+  it("should deliver targeted messages", async () => {
+    // Test targeted delivery
+  });
+
+  it("should filter messages by client subscription", async () => {
+    // Test filtering
+  });
+
+  it("should handle message priority", async () => {
+    // Test priority handling
+  });
+
+  it("should confirm message delivery", async () => {
+    // Test delivery confirmation
+  });
+});
+```
+
+#### 6.5 Sync Endpoint Testing
+
+**Objective**: Test synchronization API endpoints
+
+**Coverage Areas**:
+
+- Force sync endpoint
+- Sync status endpoint
+- Sync configuration
+- Sync error handling
+- Sync performance
+- Sync data validation
+
+**Test Cases**:
+
+```typescript
+describe("Sync Endpoints", () => {
+  describe("POST /api/sync/force", () => {
+    it("should trigger force sync for authenticated user", async () => {
+      // Test force sync
+    });
+
+    it("should validate sync request", async () => {
+      // Test validation
+    });
+
+    it("should handle sync errors", async () => {
+      // Test error handling
+    });
+  });
+
+  describe("GET /api/sync/status", () => {
+    it("should return sync status", async () => {
+      // Test status retrieval
+    });
+
+    it("should include connection metrics", async () => {
+      // Test metrics inclusion
+    });
+  });
+});
+```
+
+### 7. Performance Testing
+
+#### 7.1 Load Testing
 
 **Objective**: Ensure system performance under load
 
@@ -462,6 +772,9 @@ describe("WooCommerce Sync", () => {
 - Database query performance
 - API response times
 - File upload performance
+- WebSocket connection load
+- Concurrent message broadcasting
+- Polling endpoint load
 
 **Performance Metrics**:
 
@@ -470,8 +783,11 @@ describe("WooCommerce Sync", () => {
 - Error rate < 1%
 - Database connection pool efficiency
 - Memory usage optimization
+- WebSocket connection capacity (1000+ concurrent)
+- Message delivery latency < 100ms
+- Polling endpoint response time < 200ms
 
-#### 6.2 Stress Testing
+#### 7.2 Stress Testing
 
 **Objective**: Test system limits and failure modes
 
@@ -483,6 +799,9 @@ describe("WooCommerce Sync", () => {
 - Network latency simulation
 - Service failure recovery
 - File storage limits
+- WebSocket connection limits
+- Message queue overflow
+- Concurrent polling requests
 
 ---
 
@@ -515,7 +834,14 @@ Test Coverage Matrix:
 │   ├── Reservations (80%)
 │   ├── Payments (90%)
 │   ├── File Management (85%)
-│   └── WooCommerce Sync (80%)
+│   ├── WooCommerce Sync (80%)
+│   └── Sync Endpoints (75%)
+├── Real-time Sync (80%)
+│   ├── WebSocket Server (85%)
+│   ├── HTTP Polling (80%)
+│   ├── Connection Management (85%)
+│   ├── Message Broadcasting (80%)
+│   └── Sync Endpoints (75%)
 ├── Database Operations (95%)
 │   ├── CRUD Operations (100%)
 │   ├── Relationships (90%)
@@ -533,7 +859,8 @@ Test Coverage Matrix:
     ├── Rate Limiting (95%)
     ├── File Security (90%)
     ├── Performance (85%)
-    └── Load Testing (90%)
+    ├── Load Testing (90%)
+    └── WebSocket Security (85%)
 ```
 
 ---
@@ -661,25 +988,36 @@ jest.mock("../storage", () => ({
 
 ## 📋 Test Implementation Plan
 
-### Phase 1: Foundation (Week 1-2)
+### Phase 1: Foundation (Week 1-2) ✅
 
 - [x] Set up test environment
 - [x] Configure Jest and testing tools
 - [x] Create test data factories
 - [x] Implement basic unit tests for core functions
-- [ ] Set up Convex testing environment
-- [ ] Configure test database isolation
+- [x] Set up Convex testing environment
+- [x] Configure test database isolation
 
-### Phase 2: Core Functionality (Week 3-4)
+### Phase 2: Core Functionality (Week 3-4) ✅
 
-- [ ] User management tests (Convex + Express)
-- [ ] Beat catalog tests
-- [ ] Order processing tests
-- [ ] Download tracking tests
-- [ ] Reservation system tests
-- [ ] Subscription management tests
+- [x] User management tests (Convex + Express)
+- [x] Beat catalog tests
+- [x] Order processing tests
+- [x] Download tracking tests
+- [x] Reservation system tests
+- [x] Subscription management tests
 
-### Phase 3: Integration (Week 5-6)
+### Phase 3: Real-time Infrastructure (Week 5-6) 🔧
+
+- [ ] WebSocket server tests
+- [ ] HTTP polling endpoint tests
+- [ ] Connection management tests
+- [ ] Message broadcasting tests
+- [ ] Sync endpoint tests
+- [ ] Connection quality monitoring tests
+- [ ] Fallback strategy tests
+- [ ] Real-time integration tests
+
+### Phase 4: Integration (Week 7-8)
 
 - [ ] API endpoint tests
 - [ ] Database integration tests
@@ -688,16 +1026,17 @@ jest.mock("../storage", () => ({
 - [ ] File management tests
 - [ ] WooCommerce sync tests
 
-### Phase 4: Advanced Testing (Week 7-8)
+### Phase 5: Advanced Testing (Week 9-10)
 
 - [ ] Performance testing
 - [ ] Security testing
-- [ ] Load testing
+- [ ] Load testing (including WebSocket)
 - [ ] External API testing
 - [ ] Error handling tests
 - [ ] Recovery testing
+- [ ] Stress testing for real-time features
 
-### Phase 5: Validation (Week 9-10)
+### Phase 6: Validation (Week 11-12)
 
 - [ ] Test coverage analysis
 - [ ] Performance optimization
@@ -705,6 +1044,7 @@ jest.mock("../storage", () => ({
 - [ ] Documentation completion
 - [ ] CI/CD integration
 - [ ] Production readiness
+- [ ] Real-time feature validation
 
 ---
 
@@ -889,6 +1229,19 @@ npm run test:coverage
 
 ## 🔄 Recent Updates
 
+### Version 3.0 Changes (January 28, 2025)
+
+- ✅ Added WebSocket server testing specifications
+- ✅ Added HTTP polling fallback testing
+- ✅ Added connection management testing
+- ✅ Added message broadcasting testing
+- ✅ Added sync endpoint testing
+- ✅ Updated technology stack with real-time infrastructure
+- ✅ Enhanced performance testing for WebSocket connections
+- ✅ Added real-time synchronization test coverage
+- ✅ Updated test implementation phases
+- ✅ Added connection quality monitoring tests
+
 ### Version 2.0 Changes (January 26, 2025)
 
 - ✅ Updated technology stack to reflect current implementation
@@ -904,8 +1257,8 @@ npm run test:coverage
 
 ---
 
-**Document Version**: 2.0  
-**Last Updated**: January 26, 2025  
-**Next Review**: February 26, 2025  
+**Document Version**: 3.0  
+**Last Updated**: January 28, 2025  
+**Next Review**: February 28, 2025  
 **Approved By**: Development Team Lead  
-**Status**: Ready for Implementation
+**Status**: In Progress - Real-time Sync Infrastructure Testing

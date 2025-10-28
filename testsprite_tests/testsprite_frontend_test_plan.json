@@ -1,0 +1,729 @@
+[
+  {
+    "id": "TC001",
+    "title": "User Registration and Login with Clerk Authentication",
+    "description": "Verify that users can register and login successfully using Clerk authentication including social login options and email verification.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the registration page."
+      },
+      {
+        "type": "action",
+        "description": "Complete the registration form with valid user details."
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that the email verification prompt is shown."
+      },
+      {
+        "type": "action",
+        "description": "Confirm the email verification using the link sent."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the login page."
+      },
+      {
+        "type": "action",
+        "description": "Login using the registered email and password."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure user is logged in successfully and session is established."
+      },
+      {
+        "type": "action",
+        "description": "Login via supported social login options."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify social login completes successfully with correct profile syncing."
+      },
+      {
+        "type": "action",
+        "description": "Logout from the application."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user session is cleared and logout is successful."
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Product Catalog Sync and Filtering",
+    "description": "Verify WooCommerce product catalog synchronization and filtering by genre, BPM, mood, and price.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Trigger a scheduled WooCommerce product catalog sync."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure product data is updated correctly in the platform database."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the product catalog page."
+      },
+      {
+        "type": "action",
+        "description": "Apply filter by genre."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the displayed products match the selected genre filter."
+      },
+      {
+        "type": "action",
+        "description": "Apply filter by BPM range."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify products displayed fit within the selected BPM range."
+      },
+      {
+        "type": "action",
+        "description": "Apply filter by mood."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm all products shown correspond to the selected mood filter."
+      },
+      {
+        "type": "action",
+        "description": "Apply filter by price range."
+      },
+      {
+        "type": "assertion",
+        "description": "Check the product prices are within the selected price range."
+      },
+      {
+        "type": "action",
+        "description": "Search product catalog with a keyword."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure search results include relevant products matching the keyword."
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Audio Playback and Waveform Visualization",
+    "description": "Verify audio player functionality including WaveSurfer.js waveform visualization, individual beat controls, and click-to-seek.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to a product detail page with an audio preview."
+      },
+      {
+        "type": "action",
+        "description": "Observe waveform visualization renders correctly."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm waveform shows correct beats and duration."
+      },
+      {
+        "type": "action",
+        "description": "Click the play button for the audio preview."
+      },
+      {
+        "type": "assertion",
+        "description": "Audio starts playing and the waveform progresses accordingly."
+      },
+      {
+        "type": "action",
+        "description": "Use individual beat controls such as mute, volume, and pause."
+      },
+      {
+        "type": "assertion",
+        "description": "Controls affect playback as expected."
+      },
+      {
+        "type": "action",
+        "description": "Click on the waveform area to seek to a different timestamp."
+      },
+      {
+        "type": "assertion",
+        "description": "Audio playback jumps to the selected location without error."
+      },
+      {
+        "type": "action",
+        "description": "Test audio player responsiveness on different device viewports."
+      },
+      {
+        "type": "assertion",
+        "description": "Player UI adapts correctly and remains functional across devices."
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Persistent Shopping Cart and Cross-Device Sync",
+    "description": "Verify shopping cart persists across sessions and devices for authenticated users including license selection.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login with a test user account."
+      },
+      {
+        "type": "action",
+        "description": "Add multiple beats with different license selections to the shopping cart."
+      },
+      {
+        "type": "action",
+        "description": "Logout then login again from the same device."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the shopping cart retains all selected beats and license options."
+      },
+      {
+        "type": "action",
+        "description": "Login with the same user on a different device."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify shopping cart content syncs correctly across devices."
+      },
+      {
+        "type": "action",
+        "description": "Simulate adding an item to the cart in one tab and check other open tabs."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm cart updates real-time on other tabs via cross-tab synchronization."
+      },
+      {
+        "type": "action",
+        "description": "Test shopping cart functionality for guest users using localStorage."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure cart persistence within the session and on page reload."
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Multi-Gateway Payment Processing and Webhook Handling",
+    "description": "Validate payment workflows via Stripe and PayPal including order creation, payment confirmation, and webhook response handling.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Proceed to checkout with items in the cart."
+      },
+      {
+        "type": "action",
+        "description": "Select Stripe as the payment gateway."
+      },
+      {
+        "type": "action",
+        "description": "Complete payment using valid Stripe test card details."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify order record is created and payment is confirmed."
+      },
+      {
+        "type": "action",
+        "description": "Simulate Stripe webhook postback for payment succeeded."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm webhook processing updates order status to paid."
+      },
+      {
+        "type": "action",
+        "description": "Repeat checkout selecting PayPal payment option."
+      },
+      {
+        "type": "action",
+        "description": "Complete payment flow successfully on PayPal sandbox."
+      },
+      {
+        "type": "assertion",
+        "description": "Order creation and payment confirmation occur as expected."
+      },
+      {
+        "type": "action",
+        "description": "Simulate PayPal webhook notification of payment success."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify order state updates properly from webhook event."
+      },
+      {
+        "type": "action",
+        "description": "Attempt payment with invalid or declined cards."
+      },
+      {
+        "type": "assertion",
+        "description": "Payment failure is handled gracefully with clear error messages."
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Studio Services Reservation Workflow",
+    "description": "End-to-end booking, status tracking, and email notification verification for studio service reservations (mixing, mastering, recording, consultation).",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the studio services reservation page."
+      },
+      {
+        "type": "action",
+        "description": "Select a service type and fill booking details."
+      },
+      {
+        "type": "action",
+        "description": "Submit the reservation request."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify booking is created with correct status."
+      },
+      {
+        "type": "action",
+        "description": "Check if a confirmation email is sent to the user."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the reservation confirmation email includes correct details."
+      },
+      {
+        "type": "action",
+        "description": "Change booking status as an admin (e.g., approved, completed)."
+      },
+      {
+        "type": "assertion",
+        "description": "User receives status update email notifications."
+      },
+      {
+        "type": "action",
+        "description": "Verify reminder emails are sent prior to reservation date."
+      },
+      {
+        "type": "assertion",
+        "description": "Reminders are triggered according to configured schedules."
+      },
+      {
+        "type": "action",
+        "description": "Test booking form validation by submitting invalid data."
+      },
+      {
+        "type": "assertion",
+        "description": "System prevents invalid reservations with appropriate error messages."
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Subscription Management and Billing",
+    "description": "Verify subscription plan selection, tier upgrades/downgrades, download quotas, and billing history display integrated with Clerk Billing.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as a user with an active subscription."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to the subscription management page."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure current subscription tier and download quotas are displayed accurately."
+      },
+      {
+        "type": "action",
+        "description": "Submit a request to upgrade subscription tier."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm subscription upgrade is processed and UI reflects new plan."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to downgrade subscription tier."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify downgrade is handled correctly with quota adjustments."
+      },
+      {
+        "type": "action",
+        "description": "View billing history and invoices."
+      },
+      {
+        "type": "assertion",
+        "description": "Billing information is loaded accurately and displays correct invoices."
+      },
+      {
+        "type": "action",
+        "description": "Exceed download quota and attempt another download."
+      },
+      {
+        "type": "assertion",
+        "description": "System prevents download and shows quota exceeded notification."
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Favorites and Wishlist Synchronization",
+    "description": "Verify user can add/remove beats to favorites and wishlist with real-time sync across sessions and devices.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login to the platform."
+      },
+      {
+        "type": "action",
+        "description": "Add multiple beats to the favorites list."
+      },
+      {
+        "type": "assertion",
+        "description": "Favorites list updates immediately and persistently."
+      },
+      {
+        "type": "action",
+        "description": "Add several beats to the wishlist."
+      },
+      {
+        "type": "assertion",
+        "description": "Wishlist updates and saves successfully."
+      },
+      {
+        "type": "action",
+        "description": "Open a new browser tab or different device, login with same account."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify favorites and wishlist data match across all active sessions."
+      },
+      {
+        "type": "action",
+        "description": "Remove an item from favorites in one tab."
+      },
+      {
+        "type": "assertion",
+        "description": "Removal is reflected in real-time across other tabs/devices."
+      },
+      {
+        "type": "action",
+        "description": "Test removal from wishlist and confirm synchronization."
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Secure File Upload with Validation and Antivirus Scanning",
+    "description": "Test secure uploading of files with MIME-type validation and antivirus scanning to prevent unsafe inputs.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Attempt to upload valid audio and image files."
+      },
+      {
+        "type": "assertion",
+        "description": "Uploads succeed without errors."
+      },
+      {
+        "type": "action",
+        "description": "Upload files with disallowed MIME types."
+      },
+      {
+        "type": "assertion",
+        "description": "System rejects files with invalid MIME types with proper error messages."
+      },
+      {
+        "type": "action",
+        "description": "Upload a file containing a virus or malware signature (simulate test malware)."
+      },
+      {
+        "type": "assertion",
+        "description": "Upload is blocked and user receives an alert about the file being rejected."
+      },
+      {
+        "type": "action",
+        "description": "Test uploading files when antivirus scanning service is temporarily unavailable."
+      },
+      {
+        "type": "assertion",
+        "description": "System handles the scanning failure gracefully and denies upload until scan completes."
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Offline Support and Graceful Degradation",
+    "description": "Verify offline detection, connection management, and graceful degradation behavior when network is lost or poor.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Disable network connection on the device."
+      },
+      {
+        "type": "assertion",
+        "description": "Offline banner or notification is shown to the user."
+      },
+      {
+        "type": "action",
+        "description": "Attempt actions requiring network such as adding an item to cart, syncing favorites, or browsing catalog."
+      },
+      {
+        "type": "assertion",
+        "description": "UI handles errors gracefully with appropriate messages and offline fallback if possible."
+      },
+      {
+        "type": "action",
+        "description": "Re-enable network connection."
+      },
+      {
+        "type": "assertion",
+        "description": "Application synchronizes any offline changes correctly and removes offline indicators."
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "SEO Optimization and Meta Tag Validation",
+    "description": "Verify dynamic Open Graph tags, schema markup, and sitemap generation for SEO optimization.",
+    "category": "functional",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Access various product and content pages."
+      },
+      {
+        "type": "assertion",
+        "description": "Page source and HTTP headers contain correct dynamic Open Graph meta tags."
+      },
+      {
+        "type": "action",
+        "description": "Retrieve schema markup JSON-LD from pages."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify schema data is complete and valid according to schema.org definitions."
+      },
+      {
+        "type": "action",
+        "description": "Request sitemap URL from the server."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm sitemap XML is well-formed and includes recent crawlable URLs."
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Admin Panel Functionalities",
+    "description": "Test the admin panel for managing subscriptions, orders, and system maintenance including audit logging and monitoring.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login to the admin panel with admin credentials."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify access granted only to authorized users."
+      },
+      {
+        "type": "action",
+        "description": "View subscription management interface."
+      },
+      {
+        "type": "assertion",
+        "description": "Subscriptions list loads correctly with filtering and sorting."
+      },
+      {
+        "type": "action",
+        "description": "Change subscription statuses or tiers for test users."
+      },
+      {
+        "type": "assertion",
+        "description": "Changes are saved and reflected in user accounts."
+      },
+      {
+        "type": "action",
+        "description": "Access order management interface and update order statuses."
+      },
+      {
+        "type": "assertion",
+        "description": "Order state changes trigger corresponding downstream updates such as payment or delivery status."
+      },
+      {
+        "type": "action",
+        "description": "Perform system maintenance tasks such as cache clearing."
+      },
+      {
+        "type": "assertion",
+        "description": "Operations execute successfully without errors."
+      },
+      {
+        "type": "action",
+        "description": "Review audit logs for recorded admin actions."
+      },
+      {
+        "type": "assertion",
+        "description": "Audit logs reflect all administrative activities accurately with timestamps."
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Real-time Dashboard Data Synchronization",
+    "description": "Verify real-time dashboard updates displaying user stats, orders, downloads, favorites, and subscription status using Convex real-time database.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as a user with active orders and subscription."
+      },
+      {
+        "type": "assertion",
+        "description": "Dashboard loads user statistics correctly on initial access."
+      },
+      {
+        "type": "action",
+        "description": "Perform an action such as placing a new order or downloading a beat."
+      },
+      {
+        "type": "assertion",
+        "description": "Dashboard updates reflect changes in real-time without page reload."
+      },
+      {
+        "type": "action",
+        "description": "Simulate update from another device or session."
+      },
+      {
+        "type": "assertion",
+        "description": "Real-time event bus and cross-tab sync propagate updates."
+      },
+      {
+        "type": "action",
+        "description": "Test dashboard behavior during WebSocket disconnection and fallback to polling."
+      },
+      {
+        "type": "assertion",
+        "description": "Dashboard continues to update with minimal latency."
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Error Handling and Logging",
+    "description": "Test global error tracking, logging, and user-friendly error boundaries throughout the application.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Force an error in a UI component (e.g. throw an exception during render)."
+      },
+      {
+        "type": "assertion",
+        "description": "Error boundary handles the error and shows fallback UI."
+      },
+      {
+        "type": "action",
+        "description": "Trigger a server API error (e.g. invalid request)."
+      },
+      {
+        "type": "assertion",
+        "description": "Error is logged on server side and proper error message is returned."
+      },
+      {
+        "type": "action",
+        "description": "Simulate invalid webhook payload."
+      },
+      {
+        "type": "assertion",
+        "description": "Webhook validation rejects the request and logs the error."
+      },
+      {
+        "type": "action",
+        "description": "Check error tracking reports for captured issues."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify all critical errors are logged with context and stack traces."
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Cross-browser and Accessibility Compliance",
+    "description": "Ensure UI renders correctly and is navigable on all supported browsers and meets WCAG 2.1 AA standards with screen reader support and keyboard navigation.",
+    "category": "ui",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open the application on major browsers (Chrome, Firefox, Safari, Edge) and multiple OS devices."
+      },
+      {
+        "type": "assertion",
+        "description": "UI layout renders consistently without visual defects."
+      },
+      {
+        "type": "action",
+        "description": "Use keyboard-only navigation throughout key user flows (login, product browse, cart, checkout)."
+      },
+      {
+        "type": "assertion",
+        "description": "All actions are accessible using a keyboard and focus order is logical."
+      },
+      {
+        "type": "action",
+        "description": "Use a screen reader to access UI elements."
+      },
+      {
+        "type": "assertion",
+        "description": "Screen reader reads content and controls correctly with meaningful labels."
+      },
+      {
+        "type": "action",
+        "description": "Check color contrast ratios on UI elements."
+      },
+      {
+        "type": "assertion",
+        "description": "Colors meet or exceed WCAG 2.1 AA contrast ratio requirements."
+      }
+    ]
+  }
+]

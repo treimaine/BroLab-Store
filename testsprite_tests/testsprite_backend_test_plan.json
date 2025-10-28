@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TC001",
+    "title": "create_order_with_idempotency_support",
+    "description": "Test creating a new order with valid data including idempotencyKey to ensure order is created only once and returns 201 status."
+  },
+  {
+    "id": "TC002",
+    "title": "get_current_user_orders_pagination",
+    "description": "Test retrieving the current authenticated user's orders with pagination parameters page and limit, expecting a 200 response with a list of orders."
+  },
+  {
+    "id": "TC003",
+    "title": "get_order_by_id_authorization_and_existence",
+    "description": "Test fetching an order by ID with authentication, verifying 200 for valid access, 403 for forbidden access, and 404 if order does not exist."
+  },
+  {
+    "id": "TC004",
+    "title": "get_order_invoice_url_availability",
+    "description": "Test retrieving the invoice URL for a given order ID, expecting 200 with URL if invoice is ready, or 404 if invoice is not available."
+  },
+  {
+    "id": "TC005",
+    "title": "get_available_reservation_services_public_access",
+    "description": "Test fetching the list of available reservation services without authentication, expecting a 200 response with service list."
+  },
+  {
+    "id": "TC006",
+    "title": "create_reservation_with_valid_and_invalid_data",
+    "description": "Test creating a new reservation with valid data and authentication, expecting 201. Also test invalid data returns 400 and unauthorized access returns 401."
+  },
+  {
+    "id": "TC007",
+    "title": "update_reservation_status_authorized_user",
+    "description": "Test updating the status of a reservation with valid status values by an authorized user, expecting 200 on success and 403 if unauthorized."
+  },
+  {
+    "id": "TC008",
+    "title": "log_download_with_authentication",
+    "description": "Test logging a beat download with valid product details and authentication, expecting 200 response confirming download logged."
+  },
+  {
+    "id": "TC009",
+    "title": "create_payment_session_with_required_fields",
+    "description": "Test creating a payment session with required amount and currency fields and optional reservationId and metadata, expecting 200 with checkoutUrl on success."
+  },
+  {
+    "id": "TC010",
+    "title": "handle_payment_webhook_signature_validation",
+    "description": "Test processing payment webhook events with valid and invalid webhook signatures, expecting 200 for valid and 400 for invalid signature."
+  }
+]
