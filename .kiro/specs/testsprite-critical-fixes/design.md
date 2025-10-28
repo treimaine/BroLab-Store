@@ -468,7 +468,7 @@ export const confirmPayment = mutation({
 
 - Complete reservation system exists in `convex/reservations/` directory
 - Email functions exist: `sendAdminNotification.ts`, `sendStatusUpdateEmail.ts`, `sendReminderEmail.ts`
-- Resend API key configured in .env (RESEND_API_KEY=re_6P4CuZhX_Ymtk9DvRdb3XSrk8Uwem4Ztv)
+- Resend API key configured in .env
 - Test execution timed out - need to identify if timeout is from form validation or email notification
 
 **Interface**:
