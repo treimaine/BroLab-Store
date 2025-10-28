@@ -1,6 +1,6 @@
 [
   {
-    "id": "TC001",
+    "id": "TC010",
     "title": "User Registration and Login with Clerk Authentication",
     "description": "Verify that users can register and login successfully using Clerk authentication including social login options and email verification.",
     "category": "functional",
@@ -57,7 +57,7 @@
     ]
   },
   {
-    "id": "TC002",
+    "id": "TC011",
     "title": "Product Catalog Sync and Filtering",
     "description": "Verify WooCommerce product catalog synchronization and filtering by genre, BPM, mood, and price.",
     "category": "functional",
@@ -118,7 +118,7 @@
     ]
   },
   {
-    "id": "TC003",
+    "id": "TC012",
     "title": "Audio Playback and Waveform Visualization",
     "description": "Verify audio player functionality including WaveSurfer.js waveform visualization, individual beat controls, and click-to-seek.",
     "category": "functional",
@@ -171,7 +171,7 @@
     ]
   },
   {
-    "id": "TC004",
+    "id": "TC013",
     "title": "Persistent Shopping Cart and Cross-Device Sync",
     "description": "Verify shopping cart persists across sessions and devices for authenticated users including license selection.",
     "category": "functional",
@@ -220,7 +220,7 @@
     ]
   },
   {
-    "id": "TC005",
+    "id": "TC014",
     "title": "Multi-Gateway Payment Processing and Webhook Handling",
     "description": "Validate payment workflows via Stripe and PayPal including order creation, payment confirmation, and webhook response handling.",
     "category": "functional",
@@ -281,7 +281,7 @@
     ]
   },
   {
-    "id": "TC006",
+    "id": "TC015",
     "title": "Studio Services Reservation Workflow",
     "description": "End-to-end booking, status tracking, and email notification verification for studio service reservations (mixing, mastering, recording, consultation).",
     "category": "functional",
@@ -338,7 +338,7 @@
     ]
   },
   {
-    "id": "TC007",
+    "id": "TC016",
     "title": "Subscription Management and Billing",
     "description": "Verify subscription plan selection, tier upgrades/downgrades, download quotas, and billing history display integrated with Clerk Billing.",
     "category": "functional",
@@ -391,7 +391,7 @@
     ]
   },
   {
-    "id": "TC008",
+    "id": "TC017",
     "title": "Favorites and Wishlist Synchronization",
     "description": "Verify user can add/remove beats to favorites and wishlist with real-time sync across sessions and devices.",
     "category": "functional",
@@ -440,7 +440,7 @@
     ]
   },
   {
-    "id": "TC009",
+    "id": "TC018",
     "title": "Secure File Upload with Validation and Antivirus Scanning",
     "description": "Test secure uploading of files with MIME-type validation and antivirus scanning to prevent unsafe inputs.",
     "category": "security",
@@ -481,7 +481,7 @@
     ]
   },
   {
-    "id": "TC010",
+    "id": "TC019",
     "title": "Offline Support and Graceful Degradation",
     "description": "Verify offline detection, connection management, and graceful degradation behavior when network is lost or poor.",
     "category": "error handling",
@@ -514,7 +514,7 @@
     ]
   },
   {
-    "id": "TC011",
+    "id": "TC020",
     "title": "SEO Optimization and Meta Tag Validation",
     "description": "Verify dynamic Open Graph tags, schema markup, and sitemap generation for SEO optimization.",
     "category": "functional",
@@ -547,7 +547,7 @@
     ]
   },
   {
-    "id": "TC012",
+    "id": "TC021",
     "title": "Admin Panel Functionalities",
     "description": "Test the admin panel for managing subscriptions, orders, and system maintenance including audit logging and monitoring.",
     "category": "functional",
@@ -604,7 +604,7 @@
     ]
   },
   {
-    "id": "TC013",
+    "id": "TC022",
     "title": "Real-time Dashboard Data Synchronization",
     "description": "Verify real-time dashboard updates displaying user stats, orders, downloads, favorites, and subscription status using Convex real-time database.",
     "category": "functional",
@@ -645,7 +645,7 @@
     ]
   },
   {
-    "id": "TC014",
+    "id": "TC023",
     "title": "Error Handling and Logging",
     "description": "Test global error tracking, logging, and user-friendly error boundaries throughout the application.",
     "category": "error handling",
@@ -686,7 +686,7 @@
     ]
   },
   {
-    "id": "TC015",
+    "id": "TC024",
     "title": "Cross-browser and Accessibility Compliance",
     "description": "Ensure UI renders correctly and is navigable on all supported browsers and meets WCAG 2.1 AA standards with screen reader support and keyboard navigation.",
     "category": "ui",

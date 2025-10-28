@@ -4,66 +4,56 @@
     "date": "2025-10-20",
     "prepared_by": "Development Team"
   },
-  "product_overview": "BroLab Entertainment is a modern music beats marketplace offering a comprehensive platform for beat producers and artists. The product integrates WooCommerce for product catalog management, Clerk for authentication, Convex real-time database for dynamic synchronization, and multiple payment gateways including Stripe and PayPal. It features advanced audio previews with waveform visualization, a persistent shopping cart, subscription management, and a full studio services reservation system, all wrapped in a responsive, internationalized, and SEO-optimized frontend.",
+  "product_overview": "BroLab Entertainment is a modern music beats marketplace platform providing users a seamless experience to browse, preview, and purchase music beats. The platform integrates WooCommerce for product catalog management, Clerk for secure user authentication, and Convex as a real-time database solution, delivering a dynamic and interactive user interface with real-time synchronization. It supports multi-tier subscription plans, comprehensive order and download management, and offers professional audio services like mixing, mastering, and recording session bookings.",
   "core_goals": [
-    "Provide an intuitive and responsive e-commerce platform for music beats with real-time synchronization.",
-    "Offer professional-grade audio preview and playback with interactive waveform visualization.",
-    "Support secure user authentication and comprehensive profile and subscription management.",
-    "Enable seamless shopping with persistent cart, flexible payment processing, and order management.",
-    "Implement a robust reservation and booking system for studio services including mixing, mastering, and consultation.",
-    "Maintain high performance, accessibility, and cross-browser compatibility standards.",
-    "Support multilingual users with automatic localization and currency conversion.",
-    "Ensure system reliability with comprehensive error handling, offline support, and real-time data consistency."
+    "Provide an intuitive and responsive user interface for music beat discovery and purchase.",
+    "Enable secure and seamless user authentication and subscription management via Clerk.",
+    "Offer a powerful real-time audio player with waveform visualization for beat previews.",
+    "Support a robust product catalog with filtering, search, and licensing options integrated from WooCommerce.",
+    "Implement a reliable and persistent shopping cart with multi-gateway payment processing (Stripe and PayPal).",
+    "Deliver real-time dashboard analytics, order tracking, and user download quota management.",
+    "Facilitate booking of audio production services such as mixing, mastering, recording, and consultations.",
+    "Ensure high performance, accessibility compliance (WCAG 2.1 AA), and cross-browser compatibility.",
+    "Maintain strong security practices for authentication, payment, and data handling.",
+    "Provide enhanced real-time features including EventBus messaging, WebSocket connection management, and offline support."
   ],
   "key_features": [
-    "Clerk-based secure user authentication with session management and profile syncing.",
-    "WooCommerce product catalog integration with scheduled sync and advanced filtering by genre, BPM, mood, and price.",
-    "Real-time dashboard displaying user stats, orders, downloads, and subscription status with live data updates.",
-    "Advanced audio player system powered by WaveSurfer.js featuring waveform visualization, individual beat controls, and click-to-seek functionality.",
-    "Persistent shopping cart supporting license selection and cross-device synchronization.",
-    "Multi-gateway payment processing via Stripe and PayPal with webhook handling and order confirmation.",
-    "Complete reservation system for studio services including booking workflow, status tracking, email notifications, and reminders.",
-    "Subscription management with tiered plans, download quotas, and billing integration through Clerk Billing.",
-    "Favorites and wishlist with real-time sync and persistent storage.",
-    "Secure file upload with antivirus scanning and MIME-type validation.",
-    "SEO optimization including dynamic Open Graph, schema markup, and sitemap generation.",
-    "Real-time sync infrastructure using EventBus, WebSocket with polling fallback, and cross-tab synchronization.",
-    "Comprehensive performance optimization with caching strategies and lazy loading.",
-    "Offline support with graceful degradation and connection management.",
-    "Admin panel for managing subscriptions, orders, and system maintenance."
+    "Clerk-based authentication system with session handling and protected routes.",
+    "Integration with WooCommerce and WordPress for product catalog with filtering, search, and licensing.",
+    "WaveSurfer.js-powered audio players with real-time waveform visualization and playback controls.",
+    "Persistent shopping cart synchronized via Convex with localStorage support.",
+    "Multi-gateway payment processing supporting Stripe and PayPal with complete order lifecycle.",
+    "Comprehensive order and subscription management including download quotas and billing.",
+    "Reservation system for audio services bookings with calendar workflow.",
+    "Real-time user dashboard displaying analytics, orders, downloads, and favorite beats.",
+    "EventBus and ConnectionManager for real-time event handling and network strategy management.",
+    "Responsive design with mobile-first approach using Tailwind CSS, shadcn/ui, and Radix UI."
   ],
   "user_flow_summary": [
-    "User registration and login via Clerk authentication with social login options and email verification.",
-    "Browsing the product catalog with dynamic filtering and search functionality, previewing beats with audio waveform players.",
-    "Adding beats to the shopping cart with license selection; cart persists across devices and sessions for logged-in users.",
-    "Checking out via multi-payment gateways (Stripe or PayPal) with order processing and confirmation pages.",
-    "Accessing a personalized dashboard presenting real-time statistics, order history, downloads, and subscription status.",
-    "Managing subscription plans with upgrade/downgrade capabilities and viewing billing histories.",
-    "Booking studio services through a reservation system offering mixing, mastering, recording, and consultation options with email notifications.",
-    "Managing user favorites and wishlists with real-time updates across sessions.",
-    "Uploading files securely with validation and scanning before storage.",
-    "Receiving email notifications related to orders, reservations, and reminders automatically.",
-    "Administering system and user data via the admin panel including audit logging and monitoring."
+    "Users can browse the product catalog, apply filters by genre, BPM, and price, preview beats with waveform audio players, and add products to their persistent shopping cart.",
+    "New users can register and authenticate using Clerk's social login and session management, with access to protected routes for dashboard and purchases.",
+    "Users select license tiers for beats and complete payments through Stripe or PayPal gateways with secure checkout flows.",
+    "Authenticated users access a real-time dashboard to view orders, downloads, subscription plans, and analytics, with options to manage profile and billing.",
+    "Users book professional audio services (mixing, mastering, recording, consultations) via an integrated reservation system with real-time availability.",
+    "The audio player maintains playback state globally across navigation, allowing seamless beat preview and control.",
+    "Real-time synchronization keeps the dashboard, cart, and relevant UI components updated through EventBus and WebSocket/Polling fallback strategies.",
+    "Subscription and download quotas are enforced dynamically, with billing handled via Clerk Billing integration."
   ],
   "validation_criteria": [
-    "Successful user authentication and session handling without errors across supported browsers.",
-    "Real-time synchronization responsiveness with consistent data updates and conflict resolution.",
-    "Audio playback stability and functionality including waveform visualization and control responsiveness.",
-    "Shopping cart persistence and accuracy across device sessions and user states.",
-    "Error-free payment processing with correct order creation and webhook handling for both Stripe and PayPal.",
-    "Reservation system workflow completion with valid booking statuses and email notifications.",
-    "Correct filtering and search results reflecting updated WooCommerce product data post synchronization.",
-    "Responsive UI rendering correctly on all primary device breakpoints and in all supported browsers.",
-    "Accessibility compliance meeting WCAG 2.1 AA standards with screen reader support and keyboard navigation.",
-    "Subscription management shows accurate quotas, billing info, and supports plan changes.",
-    "Secure file uploads with antivirus scanning preventing any unsafe inputs.",
-    "SEO elements verified with correct meta tags, Open Graph data, and sitemap access.",
-    "No critical security flaws including CSRF, XSS, and secure data validation.",
-    "Performance benchmarks met including sub-3-second initial load and 60fps interactions.",
-    "Comprehensive test coverage with 80%+ unit tests and integration tests executed in CI/CD pipeline.",
-    "Real-time event bus and connection manager tested for stable WebSocket and fallback strategies.",
-    "Offline modes handled gracefully without user experience degradation.",
-    "Admin panel functionalities operational with accurate management and audit logs."
+    "Product catalog displays correct beats with filtering and search functioning accurately.",
+    "Audio player renders waveforms smoothly and supports all playback controls on all devices.",
+    "Shopping cart persists across sessions and synchronizes correctly between local storage and Convex database.",
+    "User authentication flows enable secure login, signup, password reset, and email verification without errors.",
+    "Payment processing completes successfully via Stripe and PayPal with accurate order status updates.",
+    "Orders and downloads are tracked comprehensively with accurate quota enforcement and invoice generation.",
+    "Reservation bookings process correctly with real-time synchronization and conflict detection.",
+    "Dashboard analytics and user data update in real-time with minimal latency.",
+    "Responsive UI components maintain usability and accessibility standards across all supported devices and browsers.",
+    "EventBus and ConnectionManager implement robust error handling, fallback, and reconnection logic to ensure continuous real-time operation.",
+    "Unit and integration tests cover all critical components achieving 80%+ coverage with successful runs in CI/CD pipelines.",
+    "Performance metrics meet defined targets with First Contentful Paint under 2 seconds and Lighthouse scores above 90.",
+    "Accessibility audits confirm WCAG 2.1 AA compliance including keyboard navigation and screen reader compatibility.",
+    "Security audits confirm prevention of common vulnerabilities like XSS, CSRF, and secure session management."
   ],
   "code_summary": {
     "tech_stack": [
@@ -73,328 +63,106 @@
       "Express",
       "Vite 5.4+",
       "Convex (Real-time Database)",
-      "Supabase (PostgreSQL - Legacy)",
       "Clerk (Authentication)",
-      "Stripe (Payments)",
-      "PayPal (Payments)",
+      "Stripe (Payment Processing)",
+      "PayPal (Payment Processing)",
       "WooCommerce/WordPress (Product Catalog)",
-      "Tailwind CSS",
-      "shadcn/ui + Radix UI",
       "Zustand (State Management)",
       "TanStack Query (Server State)",
-      "WaveSurfer.js (Audio Visualization)",
       "Wouter (Routing)",
-      "Jest + React Testing Library",
-      "Zod (Validation)"
+      "Tailwind CSS",
+      "shadcn/ui",
+      "Radix UI",
+      "WaveSurfer.js (Audio Visualization)",
+      "Zod (Validation)",
+      "Jest (Testing)",
+      "React Testing Library"
     ],
     "features": [
       {
-        "name": "Authentication & User Management",
-        "description": "Clerk-based authentication with user profiles, session management, and webhook integration for user sync",
+        "name": "Authentication System",
+        "description": "Clerk-based authentication with user management, session handling, and protected routes",
         "files": [
-          "convex/auth.config.ts",
-          "convex/clerk/webhooks.ts",
-          "convex/users/clerkSync.ts",
-          "convex/users/getUser.ts",
-          "server/middleware/clerkAuth.ts",
           "server/routes/clerk.ts",
-          "client/src/lib/clerkConfig.ts",
-          "client/src/hooks/useClerkSync.ts"
+          "server/auth.ts",
+          "client/src/components/auth/ClerkSyncProvider.tsx"
         ]
       },
       {
-        "name": "Real-time Dashboard",
-        "description": "Modern dashboard with real-time data synchronization showing user stats, downloads, orders, favorites, and subscription status",
+        "name": "Product Catalog",
+        "description": "WooCommerce integration for beats catalog with filtering and search",
         "files": [
-          "convex/dashboard.ts",
-          "convex/lib/dashboardConfig.ts",
-          "convex/lib/dashboardValidation.ts",
-          "convex/lib/statisticsCalculator.ts",
-          "client/src/pages/dashboard.tsx",
-          "client/src/components/dashboard/",
-          "client/src/hooks/useDashboard.ts",
-          "client/src/hooks/useDashboardData.ts",
-          "client/src/stores/useDashboardStore.ts",
-          "client/src/providers/DashboardRealtimeProvider.tsx"
+          "server/routes/woo.ts",
+          "client/src/components/beats/beat-card.tsx",
+          "convex/products.ts"
         ]
       },
       {
-        "name": "Audio Player & Waveform Visualization",
-        "description": "Professional audio preview system with WaveSurfer.js waveform visualization, individual controls per beat, and click-to-seek functionality",
+        "name": "Audio Player",
+        "description": "WaveSurfer.js-based audio player with waveform visualization",
         "files": [
-          "client/src/components/audio/",
-          "client/src/stores/useAudioStore.ts",
-          "client/src/services/beatMetadataService.ts"
+          "client/src/components/audio/GlobalAudioPlayer.tsx",
+          "client/src/components/audio/WaveformPlayer.tsx"
         ]
       },
       {
-        "name": "Shopping Cart & Checkout",
-        "description": "Persistent shopping cart with license selection, cross-device sync for authenticated users, and guest cart with localStorage",
+        "name": "Shopping Cart",
+        "description": "Persistent shopping cart with localStorage and Convex sync",
         "files": [
-          "client/src/pages/cart.tsx",
-          "client/src/pages/checkout.tsx",
-          "client/src/components/cart/",
-          "client/src/hooks/use-cart.ts",
-          "client/src/stores/useCartStore.ts",
-          "client/src/lib/cart.ts"
+          "client/src/components/cart/AddToCartButton.tsx",
+          "convex/cartItems.ts"
         ]
       },
       {
         "name": "Payment Processing",
-        "description": "Multi-payment gateway integration with Stripe and PayPal, webhook handling, order creation, and payment confirmation",
+        "description": "Multi-gateway payment system with Stripe and PayPal",
         "files": [
           "server/routes/stripe.ts",
           "server/routes/paypal.ts",
-          "server/routes/payments.ts",
-          "server/config/paypal.ts",
-          "client/src/services/paypal.ts",
-          "client/src/config/paypal.ts",
-          "convex/orders/createOrder.ts",
-          "convex/orders/updateOrder.ts"
+          "convex/orders.ts"
+        ]
+      },
+      {
+        "name": "Order Management",
+        "description": "Complete order lifecycle with status tracking and invoices",
+        "files": [
+          "server/routes/orders.ts",
+          "client/src/components/orders/OrderCard.tsx",
+          "convex/orders.ts"
         ]
       },
       {
         "name": "Reservation System",
-        "description": "Complete booking system for studio services (mixing, mastering, recording, consultation) with status workflow, email notifications, and reminders",
+        "description": "Service booking for mixing, mastering, recording, and consultations",
         "files": [
-          "convex/reservations/",
           "server/routes/reservations.ts",
-          "server/services/ReservationEmailService.ts",
-          "client/src/components/reservations/",
-          "client/src/pages/mixing-mastering.tsx",
-          "client/src/pages/recording-sessions.tsx",
-          "client/src/pages/production-consultation.tsx"
+          "convex/reservations.ts"
         ]
       },
       {
-        "name": "Product Catalog & WooCommerce Sync",
-        "description": "WordPress/WooCommerce integration for product catalog with scheduled sync, product display, and filtering",
+        "name": "Download Management",
+        "description": "Secure file downloads with quota tracking and license validation",
         "files": [
-          "convex/sync/woocommerce.ts",
-          "convex/sync/wordpress.ts",
-          "convex/products.ts",
-          "server/services/woo.ts",
-          "server/services/wp.ts",
-          "server/routes/woo.ts",
-          "server/routes/wp.ts",
-          "client/src/api/woocommerce.ts",
-          "client/src/api/wordpress.ts",
-          "client/src/hooks/use-woocommerce.ts"
-        ]
-      },
-      {
-        "name": "Downloads & Quota Management",
-        "description": "Download tracking with subscription-based quotas, download history, and license validation",
-        "files": [
-          "convex/downloads/",
-          "convex/quotas/",
           "server/routes/downloads.ts",
-          "client/src/hooks/useDownloads.ts",
-          "client/src/pages/premium-downloads.tsx"
+          "convex/downloads.ts",
+          "convex/quotas.ts"
         ]
       },
       {
         "name": "Subscription Management",
-        "description": "Clerk Billing integration for subscription tiers with download quotas, invoice management, and subscription status tracking",
+        "description": "Clerk Billing integration with download quotas and feature access",
         "files": [
-          "convex/subscriptions/",
-          "client/src/components/subscriptions/",
-          "client/src/pages/MembershipPageFixed.tsx"
+          "convex/subscriptions.ts",
+          "convex/quotas.ts",
+          "convex/invoices.ts"
         ]
       },
       {
-        "name": "Favorites & Wishlist",
-        "description": "User favorites and wishlist functionality with real-time sync and persistent storage",
+        "name": "User Dashboard",
+        "description": "Real-time dashboard with analytics, orders, downloads, and favorites",
         "files": [
-          "convex/favorites/",
-          "server/routes/wishlist.ts",
-          "client/src/hooks/useFavorites.ts",
-          "client/src/hooks/useWishlist.ts",
-          "client/src/pages/wishlist.tsx"
-        ]
-      },
-      {
-        "name": "File Upload & Storage",
-        "description": "Secure file upload system with antivirus scanning, MIME type validation, and storage management",
-        "files": [
-          "convex/files.ts",
-          "server/lib/upload.ts",
-          "server/lib/storage.ts",
-          "server/middleware/fileUploadSecurity.ts",
-          "server/routes/uploads.ts",
-          "server/routes/storage.ts"
-        ]
-      },
-      {
-        "name": "Email System",
-        "description": "Comprehensive email service with templates for reservations, orders, notifications, and reminders",
-        "files": [
-          "server/services/mail.ts",
-          "server/services/ReservationEmailService.ts",
-          "server/templates/emailTemplates.ts",
-          "server/routes/email.ts"
-        ]
-      },
-      {
-        "name": "Search & Filtering",
-        "description": "Advanced product filtering by genre, BPM, key, mood, price range with unified filter state management",
-        "files": [
-          "client/src/components/filters/",
-          "client/src/stores/useFilterStore.ts",
-          "client/src/hooks/useUnifiedFilters.ts",
-          "client/src/lib/unifiedFilters.ts"
-        ]
-      },
-      {
-        "name": "Internationalization (i18n)",
-        "description": "Multi-language support (6 languages) with automatic IP-based detection and currency conversion",
-        "files": [
-          "client/src/i18n/",
-          "client/src/utils/currency.ts"
-        ]
-      },
-      {
-        "name": "SEO & Meta Tags",
-        "description": "Dynamic Open Graph generation, schema markup, and sitemap generation for SEO optimization",
-        "files": [
-          "server/lib/openGraphGenerator.ts",
-          "server/lib/schemaMarkup.ts",
-          "server/lib/sitemapGenerator.ts",
-          "server/routes/openGraph.ts",
-          "server/routes/sitemap.ts",
-          "server/routes/schema.ts",
-          "client/src/components/seo/"
-        ]
-      },
-      {
-        "name": "Real-time Sync & WebSocket",
-        "description": "Real-time data synchronization with Convex, WebSocket management, and cross-tab sync",
-        "files": [
-          "server/services/ConvexRealtimeIntegration.ts",
-          "server/services/RealtimeSyncService.ts",
-          "server/services/WebSocketManager.ts",
-          "client/src/services/SyncManager.ts",
-          "client/src/services/CrossTabSyncManager.ts",
-          "client/src/hooks/useConvexSync.ts",
-          "client/src/hooks/useSyncManager.ts"
-        ]
-      },
-      {
-        "name": "Error Handling & Monitoring",
-        "description": "Comprehensive error tracking, logging, performance monitoring, and error boundaries",
-        "files": [
-          "server/lib/logger.ts",
-          "server/lib/monitoring.ts",
-          "server/lib/errorResponses.ts",
-          "server/routes/monitoring.ts",
-          "client/src/lib/errorTracker.ts",
-          "client/src/lib/performanceMonitor.ts",
-          "client/src/services/ErrorHandlingManager.ts",
-          "client/src/services/ErrorLoggingService.ts",
-          "client/src/components/errors/"
-        ]
-      },
-      {
-        "name": "Caching & Performance",
-        "description": "Multi-layer caching strategy with TanStack Query, cache warming, and performance optimization",
-        "files": [
-          "server/lib/cache.ts",
-          "server/services/cacheWarmingService.ts",
-          "client/src/lib/queryClient.ts",
-          "client/src/services/cachingStrategy.ts",
-          "client/src/hooks/useCache.ts",
-          "client/src/hooks/useCachingStrategy.ts",
-          "client/src/providers/CacheProvider.tsx"
-        ]
-      },
-      {
-        "name": "Security & Validation",
-        "description": "Comprehensive security with rate limiting, input validation, webhook verification, and access control",
-        "files": [
-          "server/middleware/rateLimiter.ts",
-          "server/middleware/validation.ts",
-          "server/lib/validation.ts",
-          "server/lib/webhookValidator.ts",
-          "server/lib/securityEnhancer.ts",
-          "server/lib/accessControl.ts",
-          "server/routes/security.ts",
-          "convex/lib/validation.ts",
-          "client/src/hooks/useFormValidation.ts",
-          "client/src/services/DataValidationService.ts"
-        ]
-      },
-      {
-        "name": "Admin Panel",
-        "description": "Administrative interface for managing subscriptions, orders, and system maintenance",
-        "files": [
-          "convex/admin/",
-          "client/src/pages/admin/",
-          "client/src/components/admin/"
-        ]
-      },
-      {
-        "name": "Data Consistency & Integrity",
-        "description": "Data validation, consistency checks, synchronization management, and rollback capabilities",
-        "files": [
-          "convex/consistency.ts",
-          "convex/dataConsistency.ts",
-          "convex/dataSynchronization.ts",
-          "convex/integrity.ts",
-          "server/lib/dataConsistencyManager.ts",
-          "server/lib/dataSynchronizationManager.ts",
-          "server/lib/rollbackManager.ts",
-          "client/src/utils/dataConsistency.ts"
-        ]
-      },
-      {
-        "name": "Offline Support",
-        "description": "Offline detection, connection management, and graceful degradation for poor network conditions",
-        "files": [
-          "client/src/hooks/useOfflineManager.ts",
-          "client/src/hooks/useConnectionManager.ts",
-          "client/src/services/ConnectionManager.ts",
-          "client/src/providers/ConnectionManagerProvider.tsx",
-          "client/src/components/dashboard/OfflineBanner.tsx"
-        ]
-      },
-      {
-        "name": "Optimistic Updates",
-        "description": "Optimistic UI updates with automatic rollback on failure for better user experience",
-        "files": [
-          "client/src/hooks/useOptimisticUpdates.ts",
-          "client/src/services/OptimisticUpdateManager.ts",
-          "client/src/providers/OptimisticUpdatesProvider.tsx"
-        ]
-      },
-      {
-        "name": "Activity Logging & Audit",
-        "description": "User activity tracking, audit trails, and system event logging",
-        "files": [
-          "convex/activity/",
-          "convex/audit.ts",
-          "server/lib/audit.ts",
-          "server/routes/activity.ts",
-          "convex/users/logActivity.ts"
-        ]
-      },
-      {
-        "name": "Rate Limiting & Alerts",
-        "description": "API rate limiting, alert system, and abuse prevention",
-        "files": [
-          "convex/rateLimits.ts",
-          "convex/alerts.ts",
-          "server/middleware/rateLimiter.ts",
-          "client/src/components/alerts/"
-        ]
-      },
-      {
-        "name": "Database Migrations",
-        "description": "Database migration scripts for data cleanup, price fixes, and schema updates",
-        "files": [
-          "convex/migrations/",
-          "convex/backup.ts",
-          "convex/restore.ts",
-          "convex/rollback.ts"
+          "client/src/components/dashboard/ModernDashboard.tsx",
+          "convex/dashboard.ts"
         ]
       }
     ]
