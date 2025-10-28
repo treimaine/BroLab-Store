@@ -335,6 +335,7 @@ class PollingConnection implements Connection {
   private readonly startTime: number;
   private isActive = false;
   private lastPollTime = 0;
+  private authToken?: string;
 
   constructor(
     private readonly url: string,
@@ -349,6 +350,13 @@ class PollingConnection implements Connection {
       errorCount: 0,
       qualityScore: 0.8, // Lower than WebSocket by default
     };
+  }
+
+  /**
+   * Set authentication token for requests
+   */
+  public setAuthToken(token: string): void {
+    this.authToken = token;
   }
 
   public async connect(): Promise<void> {
@@ -370,11 +378,17 @@ class PollingConnection implements Connection {
     let response: Response | undefined;
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (this.authToken) {
+        headers["Authorization"] = `Bearer ${this.authToken}`;
+      }
+
       response = await fetch(`${this.url}/send`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(message),
       });
     } catch (error) {
@@ -464,11 +478,18 @@ class PollingConnection implements Connection {
 
       try {
         const pollStart = Date.now();
+
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+
+        if (this.authToken) {
+          headers["Authorization"] = `Bearer ${this.authToken}`;
+        }
+
         response = await fetch(`${this.url}/poll?since=${this.lastPollTime}`, {
           method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
         });
 
         // Validate response exists and is a valid object
@@ -550,8 +571,8 @@ export class ConnectionManager extends BrowserEventEmitter {
     super();
 
     this.config = {
-      websocketUrl: config.websocketUrl || "ws://localhost:3001/ws",
-      pollingUrl: config.pollingUrl || "http://localhost:3001/api/sync",
+      websocketUrl: config.websocketUrl || "ws://localhost:5000/ws",
+      pollingUrl: config.pollingUrl || "http://localhost:5000/api/sync",
       connectionTimeout: config.connectionTimeout || 10000,
       heartbeatInterval: config.heartbeatInterval || 30000,
       pollingInterval: config.pollingInterval || 5000,
@@ -748,6 +769,15 @@ export class ConnectionManager extends BrowserEventEmitter {
 
     this.on("message", wrappedHandler);
     return () => this.off("message", wrappedHandler);
+  }
+
+  /**
+   * Set authentication token for polling requests
+   */
+  public setAuthToken(token: string): void {
+    if (this.currentConnection?.type === "polling") {
+      (this.currentConnection as PollingConnection).setAuthToken(token);
+    }
   }
 
   /**
