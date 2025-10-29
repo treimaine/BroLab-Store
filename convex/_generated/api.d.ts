@@ -21,6 +21,7 @@ import type * as alerts from "../alerts.js";
 import type * as audit from "../audit.js";
 import type * as auth_roles from "../auth/roles.js";
 import type * as backup from "../backup.js";
+import type * as cartItems from "../cartItems.js";
 import type * as clerk_simpleWebhook from "../clerk/simpleWebhook.js";
 import type * as clerk_webhooks from "../clerk/webhooks.js";
 import type * as consistency from "../consistency.js";
@@ -103,6 +104,7 @@ declare const fullApi: ApiFromModules<{
   audit: typeof audit;
   "auth/roles": typeof auth_roles;
   backup: typeof backup;
+  cartItems: typeof cartItems;
   "clerk/simpleWebhook": typeof clerk_simpleWebhook;
   "clerk/webhooks": typeof clerk_webhooks;
   consistency: typeof consistency;

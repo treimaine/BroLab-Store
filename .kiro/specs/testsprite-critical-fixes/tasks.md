@@ -19,8 +19,8 @@
   - Verify ErrorBoundary is properly wrapping routes in client/src/App.tsx - ALREADY DONE
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 3. Implement Shopping Cart Persistence
-- [ ] 3.1 Create Convex cart functions
+- [x] 3. Implement Shopping Cart Persistence
+- [x] 3.1 Create Convex cart functions
   - Create `convex/cartItems.ts` file (does not exist yet)
   - Create `syncCart` mutation for batch cart updates with authentication check
   - Create `loadCart` query to fetch user cart items using by_user index
@@ -29,7 +29,7 @@
   - Follow the pattern from convex/favorites/ (add.ts, remove.ts, getFavorites.ts) which is working
   - _Requirements: 3.1, 3.2, 3.3, 3.5_
 
-- [ ] 3.2 Create CartSyncService
+- [x] 3.2 Create CartSyncService
   - Create `client/src/services/CartSyncService.ts` file
   - Implement `syncToConvex` method with 300ms debounce using lodash or custom implementation
   - Implement `loadFromConvex` method with 2-second timeout
@@ -38,7 +38,7 @@
   - Add optimistic updates with automatic rollback on failure (retry up to 3 times)
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.6_
 
-- [ ] 3.3 Integrate CartSyncService into useCartStore
+- [x] 3.3 Integrate CartSyncService into useCartStore
   - Update client/src/stores/useCartStore.ts (file exists)
   - Add `syncStatus` state ('idle' | 'syncing' | 'error')
   - Add `lastSyncedAt` timestamp
