@@ -1,11 +1,11 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 
 export const log = mutation({
   args: {
     action: v.string(),
     resource: v.string(),
-    details: v.optional(v.any()),
+    details: v.optional(v.object({})),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("auditLogs", {
@@ -18,13 +18,11 @@ export const log = mutation({
   },
 });
 
-import { query } from "./_generated/server";
-
 export interface AuditLogEntry {
   userId?: string;
   action: string;
   resource: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
 }
@@ -48,8 +46,8 @@ export interface AuditDetails {
     clientVersion?: string;
     correlationId?: string;
   };
-  // Allow any additional custom properties for specific audit events
-  [key: string]: any;
+  // Allow additional custom properties for specific audit events
+  [key: string]: unknown;
 }
 
 // Log a security-relevant action
@@ -58,13 +56,11 @@ export const logAuditEvent = mutation({
     userId: v.optional(v.string()),
     action: v.string(),
     resource: v.string(),
-    details: v.optional(v.any()),
+    details: v.optional(v.object({})),
     ipAddress: v.optional(v.string()),
     userAgent: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-
     // Get user if userId is provided
     let user = null;
     if (args.userId) {
@@ -200,6 +196,37 @@ export const logFailedLogin = mutation({
       resource: "users",
       details: { username: args.username, event: "login_failed" },
       ipAddress: args.ipAddress || undefined,
+      userAgent: args.userAgent || undefined,
+      timestamp: Date.now(),
+    });
+  },
+});
+
+// Log authentication error (for Clerk errors)
+export const logAuthenticationError = mutation({
+  args: {
+    endpoint: v.string(),
+    statusCode: v.number(),
+    userAction: v.string(),
+    errorMessage: v.string(),
+    errorStack: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("auditLogs", {
+      userId: undefined,
+      clerkId: undefined,
+      action: "authentication_error",
+      resource: "clerk",
+      details: {
+        endpoint: args.endpoint,
+        statusCode: args.statusCode,
+        userAction: args.userAction,
+        errorMessage: args.errorMessage,
+        errorStack: args.errorStack,
+        timestamp: new Date().toISOString(),
+      },
+      ipAddress: undefined,
       userAgent: args.userAgent || undefined,
       timestamp: Date.now(),
     });

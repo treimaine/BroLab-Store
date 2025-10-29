@@ -8,7 +8,7 @@ import {
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Route, Switch } from "wouter";
 import { queryClient, warmCache } from "./lib/queryClient";
@@ -63,32 +63,80 @@ const Cart = createRouteLazyComponent(() => import("@/pages/cart"), "/cart");
 const Login = createRouteLazyComponent(() => import("@/pages/login"), "/login");
 const Dashboard = createRouteLazyComponent(() => import("@/pages/dashboard"), "/dashboard");
 
-// Secondary pages - lazy loaded for better bundle splitting
-const About = lazy(() => import("@/pages/about"));
-const Contact = lazy(() => import("@/pages/contact"));
-const Copyright = lazy(() => import("@/pages/copyright"));
-const FAQ = lazy(() => import("@/pages/faq"));
-const Licensing = lazy(() => import("@/pages/licensing"));
-const MembershipPage = lazy(() => import("@/pages/MembershipPageFixed"));
-const Privacy = lazy(() => import("@/pages/privacy"));
-const Refund = lazy(() => import("@/pages/refund"));
-const Terms = lazy(() => import("@/pages/terms"));
-const WishlistPage = lazy(() => import("@/pages/wishlist"));
+// Secondary pages - route-based lazy loading with error handling
+const About = createRouteLazyComponent(() => import("@/pages/about"), "/about");
+const Contact = createRouteLazyComponent(() => import("@/pages/contact"), "/contact");
+const Copyright = createRouteLazyComponent(() => import("@/pages/copyright"), "/copyright");
+const FAQ = createRouteLazyComponent(() => import("@/pages/faq"), "/faq");
+const Licensing = createRouteLazyComponent(() => import("@/pages/licensing"), "/licensing");
+const MembershipPage = createRouteLazyComponent(
+  () => import("@/pages/MembershipPageFixed"),
+  "/membership"
+);
+const Privacy = createRouteLazyComponent(() => import("@/pages/privacy"), "/privacy");
+const Refund = createRouteLazyComponent(() => import("@/pages/refund"), "/refund");
+const Terms = createRouteLazyComponent(() => import("@/pages/terms"), "/terms");
+const WishlistPage = createRouteLazyComponent(() => import("@/pages/wishlist"), "/wishlist");
 
-// Service pages - lazy loaded
-const CustomBeats = lazy(() => import("@/pages/custom-beats"));
-const MixingMastering = lazy(() => import("@/pages/mixing-mastering"));
-const PremiumDownloads = lazy(() => import("@/pages/premium-downloads"));
-const ProductionConsultation = lazy(() => import("@/pages/production-consultation"));
-const RecordingSessions = lazy(() => import("@/pages/recording-sessions"));
+// Service pages - route-based lazy loading with error handling
+const CustomBeats = createRouteLazyComponent(() => import("@/pages/custom-beats"), "/custom-beats");
+const MixingMastering = createRouteLazyComponent(
+  () => import("@/pages/mixing-mastering"),
+  "/mixing-mastering"
+);
+const PremiumDownloads = createRouteLazyComponent(
+  () => import("@/pages/premium-downloads"),
+  "/premium-downloads"
+);
+const ProductionConsultation = createRouteLazyComponent(
+  () => import("@/pages/production-consultation"),
+  "/production-consultation"
+);
+const RecordingSessions = createRouteLazyComponent(
+  () => import("@/pages/recording-sessions"),
+  "/recording-sessions"
+);
 
-// Auth pages - lazy loaded
-const ResetPasswordPage = lazy(() => import("@/pages/reset-password"));
-const VerifyEmailPage = lazy(() => import("@/pages/verify-email"));
+// Auth pages - route-based lazy loading with error handling
+const ResetPasswordPage = createRouteLazyComponent(
+  () => import("@/pages/reset-password"),
+  "/reset-password"
+);
+const VerifyEmailPage = createRouteLazyComponent(
+  () => import("@/pages/verify-email"),
+  "/verify-email"
+);
 
-// Checkout pages - lazy loaded as they're less frequently accessed
-const Checkout = lazy(() => import("@/pages/checkout"));
-const OrderConfirmation = lazy(() => import("@/pages/order-confirmation"));
+// Checkout pages - route-based lazy loading with error handling
+const Checkout = createRouteLazyComponent(() => import("@/pages/checkout"), "/checkout");
+const OrderConfirmation = createRouteLazyComponent(
+  () => import("@/pages/order-confirmation"),
+  "/order-confirmation"
+);
+const ClerkCheckout = createRouteLazyComponent(
+  () => import("@/pages/clerk-checkout"),
+  "/clerk-checkout"
+);
+const CheckoutSuccess = createRouteLazyComponent(
+  () => import("@/pages/checkout-success"),
+  "/checkout-success"
+);
+const PaymentSuccess = createRouteLazyComponent(
+  () => import("@/pages/payment-success"),
+  "/payment/success"
+);
+const PaymentCancel = createRouteLazyComponent(
+  () => import("@/pages/payment-cancel"),
+  "/payment/cancel"
+);
+
+// Admin and test pages - route-based lazy loading with error handling
+const AdminFiles = createRouteLazyComponent(() => import("@/pages/admin/files"), "/admin/files");
+const TestConvex = createRouteLazyComponent(() => import("@/pages/test-convex"), "/test-convex");
+const TestMockAlert = createRouteLazyComponent(
+  () => import("@/pages/test-mock-alert"),
+  "/test-mock-alert"
+);
 
 // PaymentTestComponent removed - using Clerk native interface
 import {
@@ -107,7 +155,7 @@ function Router() {
       <Route path="/shop" component={Shop} />
       <Route path="/product/:id" component={Product} />
       <Route path="/cart" component={Cart} />
-      <Route path="/clerk-checkout" component={lazy(() => import("./pages/clerk-checkout"))} />
+      <Route path="/clerk-checkout" component={ClerkCheckout} />
       <Route path="/order-confirmation" component={OrderConfirmation} />
 
       <Route path="/contact" component={Contact} />
@@ -126,9 +174,9 @@ function Router() {
 
       <Route path="/mixing-mastering" component={MixingMastering} />
       <Route path="/checkout" component={Checkout} />
-      <Route path="/checkout-success" component={lazy(() => import("./pages/checkout-success"))} />
-      <Route path="/payment/success" component={lazy(() => import("./pages/payment-success"))} />
-      <Route path="/payment/cancel" component={lazy(() => import("./pages/payment-cancel"))} />
+      <Route path="/checkout-success" component={CheckoutSuccess} />
+      <Route path="/payment/success" component={PaymentSuccess} />
+      <Route path="/payment/cancel" component={PaymentCancel} />
       <Route path="/premium-downloads" component={PremiumDownloads} />
       <Route path="/recording-sessions" component={RecordingSessions} />
       <Route path="/custom-beats" component={CustomBeats} />
@@ -136,9 +184,9 @@ function Router() {
 
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
-      <Route path="/admin/files" component={lazy(() => import("./pages/admin/files"))} />
-      <Route path="/test-convex" component={lazy(() => import("./pages/test-convex"))} />
-      <Route path="/test-mock-alert" component={lazy(() => import("./pages/test-mock-alert"))} />
+      <Route path="/admin/files" component={AdminFiles} />
+      <Route path="/test-convex" component={TestConvex} />
+      <Route path="/test-mock-alert" component={TestMockAlert} />
       {/* PaymentTestComponent removed - using Clerk native interface */}
 
       <Route component={NotFound} />

@@ -61,6 +61,8 @@ export function ResponsiveBeatCard({
         <img
           src={beat.image || beat.image_url || "/api/placeholder/400/400"}
           alt={beat.title || beat.name}
+          width={400}
+          height={400}
           className={cn(
             "w-full h-full object-cover transition-transform duration-300",
             !prefersReducedMotion && !isMobile && "group-hover:scale-110"

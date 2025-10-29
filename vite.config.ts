@@ -87,9 +87,10 @@ export default defineConfig({
       "wavesurfer.js",
       "zustand",
       "@clerk/clerk-react",
+      "@radix-ui/react-progress",
     ],
     exclude: ["@convex-dev/react"],
-    // Force optimization of commonly used packages
-    force: true,
+    // Prevent constant rebuilds - only force when dependencies change
+    force: false,
   },
 });
