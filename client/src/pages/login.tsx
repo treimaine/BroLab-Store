@@ -9,17 +9,17 @@ export default function Login() {
   // Scroll to top when component mounts
   useScrollToTop();
 
-  // Déterminer l'URL de redirection
-  const getRedirectUrl = () => {
-    // Si l'utilisateur vient de la page de paiement, y retourner
-    const urlParams = new URLSearchParams(window.location.search);
+  // Determine the redirect URL
+  const getFallbackRedirectUrl = () => {
+    // If the user comes from the payment page, return there
+    const urlParams = new URLSearchParams(globalThis.location.search);
     const returnTo = urlParams.get("returnTo");
 
     if (returnTo) {
       return returnTo;
     }
 
-    // Sinon, rediriger vers le dashboard
+    // Otherwise, redirect to the dashboard
     return "/dashboard";
   };
 
@@ -47,7 +47,7 @@ export default function Login() {
                 formFieldInputShowPasswordButton: "text-gray-400 hover:text-white",
               },
             }}
-            redirectUrl={getRedirectUrl()}
+            fallbackRedirectUrl={getFallbackRedirectUrl()}
             signInUrl="/login"
           />
         ) : (
@@ -71,7 +71,7 @@ export default function Login() {
                 formFieldInputShowPasswordButton: "text-gray-400 hover:text-white",
               },
             }}
-            redirectUrl={getRedirectUrl()}
+            fallbackRedirectUrl={getFallbackRedirectUrl()}
             signUpUrl="/signup"
           />
         )}

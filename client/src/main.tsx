@@ -2,6 +2,7 @@ import { ClerkProvider, useAuth } from "@clerk/clerk-react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { ClerkErrorBoundary } from "./components/auth/ClerkErrorBoundary";
 import "./index.css";
 import { initializePerformanceMonitoring } from "./lib/performanceMonitoring";
 import "./styles/z-index.css";
@@ -41,33 +42,37 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
 
 // Simple Convex initialization
 import { ConvexReactClient } from "convex/react";
-const convexUrl = import.meta.env.VITE_CONVEX_URL!;
+const convexUrl = import.meta.env.VITE_CONVEX_URL;
 if (!convexUrl) {
   throw new Error("Missing Convex URL");
 }
 const convex = new ConvexReactClient(convexUrl);
 
-// Clerk configuration simplifiée
-const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY!;
+// Clerk configuration with validation
+const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 if (!clerkPublishableKey) {
   throw new Error("Missing Clerk Publishable Key");
+}
+
+// Verify Clerk publishable key format (pk_test_* or pk_live_*)
+const isValidClerkKey = /^pk_(test|live)_/.test(clerkPublishableKey);
+if (!isValidClerkKey) {
+  console.error("Invalid Clerk publishable key format. Expected pk_test_* or pk_live_*");
+  throw new Error(
+    "Invalid Clerk Publishable Key format. Please check your environment configuration."
+  );
 }
 
 console.log("🚀 Starting React application...");
 console.log("📡 Convex URL:", convexUrl);
 console.log("🔐 Clerk configured with native PricingTable");
 
-// Loading component for Suspense boundaries
-const LoadingSpinner = () => (
-  <div className="flex items-center justify-center min-h-screen bg-[var(--deep-black)]">
-    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[var(--accent-purple)]" />
-  </div>
-);
-
 createRoot(document.getElementById("root")!).render(
-  <ClerkProvider publishableKey={clerkPublishableKey} telemetry={false}>
-    <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-      <App />
-    </ConvexProviderWithClerk>
-  </ClerkProvider>
+  <ClerkErrorBoundary>
+    <ClerkProvider publishableKey={clerkPublishableKey} telemetry={false}>
+      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+        <App />
+      </ConvexProviderWithClerk>
+    </ClerkProvider>
+  </ClerkErrorBoundary>
 );
