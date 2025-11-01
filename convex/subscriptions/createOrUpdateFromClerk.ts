@@ -66,8 +66,7 @@ export const upsert = mutation({
         currentPeriodEnd,
         cancelAtPeriodEnd: false,
         features: [],
-        downloadQuota:
-          planId === "ultimate" ? Number.MAX_SAFE_INTEGER : planId === "artist" ? 20 : 5,
+        downloadQuota: planId === "ultimate" ? -1 : planId === "artist" ? 50 : 10,
         downloadUsed: 0,
         createdAt: now,
         updatedAt: now,
@@ -78,7 +77,7 @@ export const upsert = mutation({
         userId: user._id,
         subscriptionId: undefined as any, // optional; could be linked in a follow-up query
         quotaType: "downloads",
-        limit: planId === "ultimate" ? -1 : planId === "artist" ? 20 : 5,
+        limit: planId === "ultimate" ? -1 : planId === "artist" ? 50 : 10,
         used: 0,
         resetAt: currentPeriodEnd,
         resetPeriod: "monthly",

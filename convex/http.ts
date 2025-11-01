@@ -3,7 +3,26 @@ import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
 
-// Webhook Clerk ultra-simple qui fonctionne
+/**
+ * Convex HTTP Router Configuration
+ *
+ * This file defines HTTP endpoints for Convex.
+ *
+ * WEBHOOK ROUTING ARCHITECTURE:
+ * - Clerk webhooks: Handled here in Convex for user session management
+ * - Stripe webhooks: Sent directly to Express at /api/webhooks/stripe (NOT forwarded through Convex)
+ * - PayPal webhooks: Sent directly to Express at /api/webhooks/paypal (NOT forwarded through Convex)
+ *
+ * Payment webhook processing is handled by server/services/PaymentService.ts
+ * This eliminates unnecessary network hops and improves webhook processing performance.
+ *
+ * Configure webhook URLs in provider dashboards:
+ * - Stripe: https://yourdomain.com/api/webhooks/stripe
+ * - PayPal: https://yourdomain.com/api/webhooks/paypal
+ * - Clerk: https://yourdomain.convex.site/api/webhooks/clerk
+ */
+
+// Clerk webhook handler for user session management
 const clerkWebhook = httpAction(async (ctx, request) => {
   console.log("🔔 Webhook Clerk reçu !");
 

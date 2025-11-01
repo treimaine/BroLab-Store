@@ -93,16 +93,41 @@ export const createReservation = mutation({
     }
 
     try {
+      console.log(`🔄 Convex: Checking time slot availability`);
+
+      // Check if the time slot is available
+      const existingReservations = await ctx.db
+        .query("reservations")
+        .filter(q =>
+          q.and(
+            q.eq(q.field("serviceType"), args.serviceType),
+            q.eq(q.field("preferredDate"), args.preferredDate),
+            // Only check non-cancelled reservations
+            q.neq(q.field("status"), "cancelled")
+          )
+        )
+        .collect();
+
+      if (existingReservations.length > 0) {
+        console.error(
+          `❌ Convex: Time slot already booked (${existingReservations.length} existing reservations)`
+        );
+        throw new Error(
+          "This time slot is no longer available. Please select a different date or time."
+        );
+      }
+
+      console.log(`✅ Convex: Time slot is available`);
       console.log(`🔄 Convex: Inserting reservation into database`);
-      
+
       // Normalize details object to ensure referenceLinks is in camelCase
       // This handles both reference_links (snake_case) and referenceLinks (camelCase)
       const normalizedDetails = { ...args.details };
-      if ('reference_links' in normalizedDetails) {
+      if ("reference_links" in normalizedDetails) {
         normalizedDetails.referenceLinks = normalizedDetails.reference_links;
         delete normalizedDetails.reference_links;
       }
-      
+
       const reservationId = await ctx.db.insert("reservations", {
         userId: userId,
         serviceType: args.serviceType,
