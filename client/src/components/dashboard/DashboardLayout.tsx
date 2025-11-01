@@ -152,13 +152,14 @@ export const DashboardLayout = memo<DashboardLayoutProps>(
             </aside>
 
             {/* Mobile Menu Button */}
-            <div className="md:hidden fixed top-20 left-4 z-50">
+            <div className="md:hidden fixed top-[4.5rem] left-3 z-50 shadow-lg">
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button
                     variant="outline"
                     size="icon"
-                    className="bg-gray-900/95 border-gray-700/50 text-white hover:bg-gray-800"
+                    className="bg-gray-900/95 border-gray-700/50 text-white hover:bg-gray-800 shadow-xl"
+                    aria-label="Open navigation menu"
                   >
                     <Menu className="w-5 h-5" />
                   </Button>
@@ -180,8 +181,8 @@ export const DashboardLayout = memo<DashboardLayoutProps>(
             </div>
 
             {/* Main Content Area */}
-            <main className="flex-1 md:ml-64">
-              <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
+            <main className="flex-1 md:ml-64 w-full">
+              <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-6 lg:py-8 space-y-3 sm:space-y-4 md:space-y-6 max-w-full overflow-x-hidden">
                 <motion.div
                   key={activeTab}
                   initial={{ opacity: 0, y: 10 }}
@@ -231,12 +232,12 @@ export const DashboardHeader = memo<DashboardHeaderProps>(({ user, className }) 
       }}
       className={className}
     >
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-2 sm:gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
+          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2">
             Hello, {displayName} 👋
           </h1>
-          <p className="text-sm sm:text-base text-gray-300">
+          <p className="text-xs sm:text-sm md:text-base text-gray-300">
             Here is an overview of your activity on BroLab
           </p>
         </div>

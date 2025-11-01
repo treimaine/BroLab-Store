@@ -13,15 +13,13 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useEnhancedFormSubmission } from "@/hooks/useEnhancedFormSubmission";
-import { AlertTriangle, CheckCircle, Clock, Loader2, Music, Send, Star } from "lucide-react";
-import { useState } from "react";
-import {
-  FileUploadProgress,
-  FormValidationLoading,
-  RetryIndicator,
-  SubmissionProgress,
-} from "./ReservationLoadingStates";
+import { useUser } from "@clerk/clerk-react";
+import { CheckCircle, Loader2, Music } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getDeliveryTime, getPriorityFee, getPriorityPrice } from "./CustomBeatRequestConstants";
+import { PriorityCard } from "./CustomBeatRequestHelpers";
+import { createFileUploadHandlers, type FileUploadState } from "./FileUploadHandlers";
+import { validateBeatRequestFile } from "./FileValidation";
 
 export interface CustomBeatRequestProps {
   readonly onSubmit: (request: BeatRequest) => void;
@@ -29,6 +27,12 @@ export interface CustomBeatRequestProps {
 }
 
 interface BeatRequest {
+  // Contact Information
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  // Beat Specifications
   genre: string;
   subGenre?: string;
   bpm: number;
@@ -86,7 +90,12 @@ const keys = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeatRequestProps) {
   const { toast } = useToast();
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const [request, setRequest] = useState<BeatRequest>({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
     genre: "",
     bpm: 120,
     key: "",
@@ -100,55 +109,66 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
     priority: "standard",
   });
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [fileUploadState, setFileUploadState] = useState<{
-    isUploading: boolean;
-    fileName?: string;
-    progress?: number;
-    status?: "uploading" | "scanning" | "completed" | "error";
-  }>({ isUploading: false });
+  const [fileUploadState, setFileUploadState] = useState<FileUploadState>({ isUploading: false });
 
-  // Enhanced form submission with multi-step process
-  const {
-    isSubmitting: isFormSubmitting,
-    isValidating,
-    currentStep,
-    totalSteps,
-    progress,
-    hasError,
-    retryCount,
-    isRecovering,
-    submitForm,
-    validateForm,
-    retry,
-    clearError,
-    getErrorDisplay,
-    createReservationSteps,
-  } = useEnhancedFormSubmission({
-    serviceName: "custom beat request",
-    maxRetries: 3,
-    showProgressToast: true,
-    autoRetryTransientErrors: false,
-    onStepComplete: (stepIndex: number, result: unknown) => {
-      // Log step completion for debugging
-      console.log(`Step ${stepIndex + 1} completed:`, result);
-    },
-    onSubmissionComplete: (result: unknown) => {
-      // Call the parent onSubmit callback with the result
-      onSubmit(result as BeatRequest);
-    },
-    onSubmissionError: (error: unknown) => {
-      console.error("Submission error:", error);
-    },
-  });
+  // Create file upload handlers
+  const fileUploadHandlers = createFileUploadHandlers(setFileUploadState, setUploadedFiles, toast);
 
-  // Use isFormSubmitting from the hook, but allow override from props
-  const submitting = isSubmitting || isFormSubmitting;
+  // Auto-fill form data when user data is available
+  useEffect(() => {
+    if (clerkLoaded && clerkUser) {
+      // Extract first and last name from fullName
+      const fullName = clerkUser.fullName || "";
+      const nameParts = fullName.trim().split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      // Only update fields that are currently empty to avoid overwriting user input
+      setRequest(prev => ({
+        ...prev,
+        firstName: prev.firstName || firstName,
+        lastName: prev.lastName || lastName,
+        email: prev.email || clerkUser.emailAddresses[0]?.emailAddress || "",
+        phone: prev.phone || clerkUser.phoneNumbers?.[0]?.phoneNumber || "",
+      }));
+    }
+  }, [clerkLoaded, clerkUser]);
+
+  // Form validation state
+  const [isValidating, setIsValidating] = useState(false);
 
   const validateFormData = async (): Promise<boolean> => {
-    return validateForm(async () => {
+    setIsValidating(true);
+    try {
+      // Validate contact information
+      if (!request.firstName || !request.lastName || !request.email || !request.phone) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all contact information fields",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(request.email)) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter a valid email address",
+          variant: "destructive",
+        });
+        return false;
+      }
+
       // Validate required fields
       if (!request.genre || !request.key || request.mood.length === 0) {
-        throw new Error("Please fill in all required fields (Genre, Key, and at least one Mood)");
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required fields (Genre, Key, and at least one Mood)",
+          variant: "destructive",
+        });
+        return false;
       }
 
       // Validate file uploads if any
@@ -157,39 +177,69 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
         const maxTotalSize = 200 * 1024 * 1024; // 200MB total
 
         if (totalSize > maxTotalSize) {
-          throw new Error(
-            `Total file size (${(totalSize / 1024 / 1024).toFixed(1)}MB) exceeds 200MB limit. Please remove some files.`
-          );
+          toast({
+            title: "Validation Error",
+            description: `Total file size (${(totalSize / 1024 / 1024).toFixed(1)}MB) exceeds 200MB limit. Please remove some files.`,
+            variant: "destructive",
+          });
+          return false;
         }
 
         // Check for duplicate files
         const fileNames = uploadedFiles.map(f => f.name.toLowerCase());
         const duplicates = fileNames.filter((name, index) => fileNames.indexOf(name) !== index);
         if (duplicates.length > 0) {
-          throw new Error(`Please remove duplicate files: ${duplicates.join(", ")}`);
+          toast({
+            title: "Validation Error",
+            description: `Please remove duplicate files: ${duplicates.join(", ")}`,
+            variant: "destructive",
+          });
+          return false;
         }
       }
 
       // Validate project description
       if (request.description.length < 20) {
-        throw new Error(
-          "Please provide a more detailed description of your project (at least 20 characters)"
-        );
+        toast({
+          title: "Validation Error",
+          description:
+            "Please provide a more detailed description of your project (at least 20 characters)",
+          variant: "destructive",
+        });
+        return false;
       }
 
       // Validate deadline
-      if (request.deadline) {
+      if (request.deadline && request.deadline.trim() !== "") {
         const deadlineDate = new Date(request.deadline);
+
+        // Check if date is valid
+        if (Number.isNaN(deadlineDate.getTime())) {
+          toast({
+            title: "Validation Error",
+            description: "Please enter a valid deadline date",
+            variant: "destructive",
+          });
+          return false;
+        }
+
         const minDate = new Date();
         minDate.setDate(minDate.getDate() + 1); // At least 1 day from now
 
         if (deadlineDate < minDate) {
-          throw new Error("Deadline must be at least 1 day from today");
+          toast({
+            title: "Validation Error",
+            description: "Deadline must be at least 1 day from today",
+            variant: "destructive",
+          });
+          return false;
         }
       }
 
       return true;
-    });
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -201,41 +251,34 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
       return;
     }
 
-    try {
-      // Create submission steps
-      const steps = createReservationSteps(
-        {
-          ...request,
-          uploadedFiles: uploadedFiles.map(f => ({
-            name: f.name,
-            size: f.size,
-            type: f.type,
-          })),
-        },
-        {
-          createPaymentIntent: true,
-          uploadFiles: uploadedFiles,
-          customSteps: [
-            {
-              name: "finalize_request",
-              description: "Finalizing custom beat request",
-              action: async () => {
-                // This would be the final step to confirm the request
-                return { ...request, uploadedFiles };
-              },
-              retryable: false,
-              timeout: 10000,
-            },
-          ],
-        }
-      );
+    // Call the parent onSubmit callback with the request data
+    onSubmit({
+      ...request,
+      uploadedFiles,
+    });
 
-      // Submit the form with all steps
-      await submitForm(steps);
-    } catch (err) {
-      // Error is already handled by useEnhancedFormSubmission
-      console.error("Form submission failed:", err);
-    }
+    // Reset form after successful submission
+    setRequest({
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      genre: "",
+      subGenre: "",
+      bpm: 120,
+      key: "",
+      mood: [],
+      instruments: [],
+      description: "",
+      referenceTrack: "",
+      deadline: "",
+      budget: 500,
+      priority: "standard",
+      revisions: 2,
+      duration: 180,
+      additionalNotes: "",
+    });
+    setUploadedFiles([]);
   };
 
   const toggleMood = (mood: string) => {
@@ -254,19 +297,14 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
     }));
   };
 
-  const getPriorityPrice = () => {
-    const basePrices = { standard: 0, priority: 50, express: 100 };
-    return request.budget + basePrices[request.priority];
-  };
+  // Computed values
+  const totalPrice = getPriorityPrice(request.budget, request.priority);
+  const deliveryTime = getDeliveryTime(request.priority);
+  const priorityFee = getPriorityFee(request.priority);
 
-  const getDeliveryTime = () => {
-    const times = { standard: "5-7 days", priority: "3-5 days", express: "1-2 days" };
-    return times[request.priority];
-  };
-
-  const getPriorityFee = () => {
-    const fees = { standard: 0, priority: 50, express: 100 };
-    return fees[request.priority];
+  // Handler for removing uploaded files
+  const handleRemoveFile = (fileToRemove: File) => {
+    setUploadedFiles(files => files.filter(f => f !== fileToRemove));
   };
 
   return (
@@ -284,88 +322,104 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
 
       <CardContent>
         {/* Form Validation Loading State */}
-        <FormValidationLoading isVisible={isValidating} />
+        {isValidating && (
+          <div className="mb-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+              <p className="text-blue-300">Validating form data...</p>
+            </div>
+          </div>
+        )}
 
-        {/* Submission Progress */}
-        <SubmissionProgress
-          isVisible={submitting && !hasError}
-          currentStep={currentStep}
-          totalSteps={totalSteps}
-          progress={progress}
-          stepName={
-            currentStep > 0 && currentStep <= totalSteps
-              ? [
-                  "Validating authentication",
-                  "Creating reservation",
-                  "Uploading files",
-                  "Setting up payment",
-                  "Finalizing request",
-                ][currentStep - 1]
-              : undefined
-          }
-        />
-
-        {/* Error Display */}
-        {hasError && (
-          <div className="mb-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+        {/* File Upload Progress */}
+        {fileUploadState.isUploading && (
+          <div className="mb-6 p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
               <div className="flex-1">
-                <h4 className="font-medium text-red-300 mb-2">Submission Error</h4>
-                <p className="text-red-200 text-sm mb-3">
-                  {getErrorDisplay()?.message || "An error occurred while processing your request"}
-                </p>
-
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={clearError}
-                    className="border-red-500/30 text-red-300 hover:bg-red-500/10"
-                  >
-                    Dismiss
-                  </Button>
-                  {getErrorDisplay()?.canRetry && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={retry}
-                      className="bg-red-500/20 text-red-300 hover:bg-red-500/30"
-                      disabled={isRecovering}
-                    >
-                      {isRecovering ? (
-                        <>
-                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          Retrying...
-                        </>
-                      ) : (
-                        `Try Again (${3 - retryCount} left)`
-                      )}
-                    </Button>
-                  )}
-                </div>
+                <p className="text-purple-300 font-medium">Uploading {fileUploadState.fileName}</p>
+                {fileUploadState.progress !== undefined && (
+                  <div className="mt-2 bg-purple-900/30 rounded-full h-2">
+                    <div
+                      className="bg-purple-500 h-2 rounded-full transition-all"
+                      style={{ width: `${fileUploadState.progress}%` }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* Retry Indicator */}
-        <RetryIndicator
-          isVisible={retryCount > 0 && !hasError}
-          attempt={retryCount}
-          maxAttempts={3}
-        />
-
-        {/* File Upload Progress */}
-        <FileUploadProgress
-          isVisible={fileUploadState.isUploading}
-          fileName={fileUploadState.fileName}
-          progress={fileUploadState.progress}
-          status={fileUploadState.status}
-        />
-
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Contact Information */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-white">Contact Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="firstName-input" className="form-label">
+                  First Name *
+                </label>
+                <Input
+                  id="firstName-input"
+                  type="text"
+                  value={request.firstName}
+                  onChange={e => setRequest(prev => ({ ...prev, firstName: e.target.value }))}
+                  placeholder="John"
+                  className="form-input"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="lastName-input" className="form-label">
+                  Last Name *
+                </label>
+                <Input
+                  id="lastName-input"
+                  type="text"
+                  value={request.lastName}
+                  onChange={e => setRequest(prev => ({ ...prev, lastName: e.target.value }))}
+                  placeholder="Doe"
+                  className="form-input"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="email-input" className="form-label">
+                  Email *
+                </label>
+                <Input
+                  id="email-input"
+                  type="email"
+                  value={request.email}
+                  onChange={e => setRequest(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="john.doe@example.com"
+                  className="form-input"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="phone-input" className="form-label">
+                  Phone *
+                </label>
+                <Input
+                  id="phone-input"
+                  type="tel"
+                  value={request.phone}
+                  onChange={e => setRequest(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="+1 (555) 123-4567"
+                  className="form-input"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Beat Specifications */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-white">Beat Specifications</h3>
+          </div>
+
           {/* Basic Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -532,68 +586,12 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
             <span className="form-label">Reference Tracks & Files (Optional)</span>
             <div className="space-y-4">
               <FileUpload
-                onUploadStart={(file: File) => {
-                  setFileUploadState({
-                    isUploading: true,
-                    fileName: file.name,
-                    progress: 0,
-                    status: "uploading",
-                  });
-                }}
-                onUploadProgress={(progress: number) => {
-                  setFileUploadState(prev => ({
-                    ...prev,
-                    progress,
-                    status: progress < 100 ? "uploading" : "scanning",
-                  }));
-                }}
-                onUploadSuccess={(file: File) => {
-                  setFileUploadState({
-                    isUploading: false,
-                    fileName: file.name,
-                    progress: 100,
-                    status: "completed",
-                  });
-
-                  setUploadedFiles(prev => [...prev, file]);
-
-                  toast({
-                    title: "File Uploaded Successfully",
-                    description: `${file.name} has been uploaded and scanned for security.`,
-                    variant: "default",
-                  });
-
-                  // Clear upload state after a delay
-                  setTimeout(() => {
-                    setFileUploadState({ isUploading: false });
-                  }, 3000);
-                }}
-                onUploadError={(error: {
-                  message: string;
-                  code: string;
-                  recoverable?: boolean;
-                  severity?: "warning" | "error";
-                }) => {
-                  console.error("File upload error:", error);
-
-                  setFileUploadState({
-                    isUploading: false,
-                    fileName: fileUploadState.fileName,
-                    status: "error",
-                  });
-
-                  // Show error toast
-                  toast({
-                    title: "File Upload Failed",
-                    description: error.message,
-                    variant: "destructive",
-                  });
-
-                  // Clear upload state after a delay
-                  setTimeout(() => {
-                    setFileUploadState({ isUploading: false });
-                  }, 5000);
-                }}
+                onUploadStart={fileUploadHandlers.onUploadStart}
+                onUploadProgress={fileUploadHandlers.onUploadProgress}
+                onUploadSuccess={fileUploadHandlers.onUploadSuccess}
+                onUploadError={error =>
+                  fileUploadHandlers.onUploadError(error, fileUploadState.fileName)
+                }
                 acceptedFileTypes={[
                   "audio/mpeg",
                   "audio/wav",
@@ -605,46 +603,13 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
                   "application/x-rar-compressed",
                   "application/x-7z-compressed",
                 ]}
-                maxFileSize={100 * 1024 * 1024} // 100MB as shown in UI
-                uploadDelay={0} // No upload simulation
+                maxFileSize={100 * 1024 * 1024}
+                uploadDelay={0}
                 enableAntivirusScanning={true}
-                enableSecureUpload={false} // Keep as simulation for now
+                enableSecureUpload={false}
                 allowFormSubmissionOnError={true}
                 maxRetries={3}
-                validateFile={(file: File) => {
-                  // Additional custom validation for beat requests
-                  const fileName = file.name.toLowerCase();
-
-                  // Check for common audio formats
-                  const audioExtensions = [".mp3", ".wav", ".aiff", ".flac", ".m4a"];
-                  const archiveExtensions = [".zip", ".rar", ".7z"];
-                  const isAudio = audioExtensions.some(ext => fileName.endsWith(ext));
-                  const isArchive = archiveExtensions.some(ext => fileName.endsWith(ext));
-
-                  if (!isAudio && !isArchive) {
-                    return {
-                      message:
-                        "Please upload audio files or compressed archives containing audio files",
-                      code: "INVALID_CONTENT_TYPE",
-                      recoverable: false,
-                      severity: "error" as const,
-                    };
-                  }
-
-                  // Check for reasonable file sizes for audio
-                  if (isAudio && file.size > 50 * 1024 * 1024) {
-                    // 50MB for single audio files
-                    return {
-                      message:
-                        "Individual audio files should be under 50MB. Use compressed archives for larger files.",
-                      code: "AUDIO_FILE_TOO_LARGE",
-                      recoverable: false,
-                      severity: "warning" as const,
-                    };
-                  }
-
-                  return null;
-                }}
+                validateFile={validateBeatRequestFile}
                 className="w-full"
               />
 
@@ -666,7 +631,7 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
                       </div>
                       <button
                         type="button"
-                        onClick={() => setUploadedFiles(files => files.filter(f => f !== file))}
+                        onClick={() => handleRemoveFile(file)}
                         className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-red-400/10"
                       >
                         Remove
@@ -719,43 +684,14 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
           <fieldset>
             <legend className="form-label">Priority Level</legend>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
-              {(["standard", "priority", "express"] as const).map(priority => {
-                const getPriorityIcon = () => {
-                  if (priority === "express") return <Star className="w-5 h-5 text-yellow-400" />;
-                  if (priority === "priority")
-                    return <Clock className="w-5 h-5 text-[var(--accent-cyan)]" />;
-                  return <Music className="w-5 h-5 text-gray-400" />;
-                };
-
-                const getPriorityFeeAmount = () => {
-                  if (priority === "standard") return 0;
-                  if (priority === "priority") return 50;
-                  return 100;
-                };
-
-                return (
-                  <Card
-                    key={priority}
-                    className={`cursor-pointer transition-all ${
-                      request.priority === priority
-                        ? "border-[var(--accent-purple)] bg-[var(--accent-purple)]/10"
-                        : "border-[var(--medium-gray)] hover:border-[var(--accent-purple)]/50"
-                    }`}
-                    onClick={() => setRequest(prev => ({ ...prev, priority }))}
-                  >
-                    <CardContent className="p-4 text-center">
-                      <div className="flex items-center justify-center mb-2">
-                        {getPriorityIcon()}
-                      </div>
-                      <h4 className="font-medium text-white capitalize">{priority}</h4>
-                      <p className="text-xs text-gray-400 mt-1">{getDeliveryTime()}</p>
-                      <p className="text-sm font-bold text-[var(--accent-purple)] mt-2">
-                        +${getPriorityFeeAmount()}
-                      </p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+              {(["standard", "priority", "express"] as const).map(priority => (
+                <PriorityCard
+                  key={priority}
+                  priority={priority}
+                  isSelected={request.priority === priority}
+                  onSelect={priority => setRequest(prev => ({ ...prev, priority }))}
+                />
+              ))}
             </div>
           </fieldset>
 
@@ -784,17 +720,15 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Priority Fee:</span>
-                  <span className="text-white">+${getPriorityFee()}</span>
+                  <span className="text-white">+${priorityFee}</span>
                 </div>
                 <div className="flex justify-between border-t border-[var(--dark-gray)] pt-2">
                   <span className="font-medium text-white">Total:</span>
-                  <span className="font-bold text-[var(--accent-purple)]">
-                    ${getPriorityPrice()}
-                  </span>
+                  <span className="font-bold text-[var(--accent-purple)]">${totalPrice}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Delivery:</span>
-                  <span className="text-[var(--accent-cyan)]">{getDeliveryTime()}</span>
+                  <span className="text-[var(--accent-cyan)]">{deliveryTime}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Revisions:</span>
@@ -808,50 +742,19 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
           <Button
             type="submit"
             className="w-full btn-primary text-lg py-4"
-            disabled={submitting || isValidating || fileUploadState.isUploading || hasError}
+            disabled={isSubmitting || isValidating || fileUploadState.isUploading}
           >
-            {(() => {
-              if (submitting) {
-                return (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {currentStep > 0 && totalSteps > 0
-                      ? `Processing (${currentStep}/${totalSteps})...`
-                      : "Submitting Request..."}
-                  </div>
-                );
-              }
-              if (isValidating) {
-                return (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Validating...
-                  </div>
-                );
-              }
-              if (fileUploadState.isUploading) {
-                return (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Uploading Files...
-                  </div>
-                );
-              }
-              if (hasError) {
-                return (
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    Please Fix Errors Above
-                  </div>
-                );
-              }
-              return (
-                <>
-                  <Send className="w-4 h-4 mr-2" />
-                  Submit Custom Beat Request - ${getPriorityPrice()}
-                </>
-              );
-            })()}
+            {isSubmitting || isValidating ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                {isValidating ? "Validating..." : "Submitting..."}
+              </>
+            ) : (
+              <>
+                <Music className="w-5 h-5 mr-2" />
+                Submit Custom Beat Request - ${totalPrice}
+              </>
+            )}
           </Button>
 
           {/* Form Status Indicators */}
@@ -879,11 +782,7 @@ export function CustomBeatRequest({ onSubmit, isSubmitting = false }: CustomBeat
             </div>
 
             <div className="flex items-center gap-1">
-              {hasError ? (
-                <AlertTriangle className="w-3 h-3 text-red-400" />
-              ) : (
-                <CheckCircle className="w-3 h-3 text-green-400" />
-              )}
+              <CheckCircle className="w-3 h-3 text-green-400" />
               <span>Ready to Submit</span>
             </div>
           </div>
