@@ -66,7 +66,7 @@
   - Copy webhook secret to environment variables
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 4.2 Verify and enhance existing Convex subscription functions
+- [x] 4.2 Verify and enhance existing Convex subscription functions
   - Verify convex/subscriptions/upsertSubscription.ts exists and works correctly
   - Verify convex/subscriptions/createOrUpdateFromClerk.ts handles webhook events
   - Verify convex/subscriptions/updateSubscription.ts updates status correctly
@@ -102,8 +102,8 @@
   - Write integration test for plan upgrade flow
   - _Requirements: 4.2, 4.3, 4.4, 4.5, 4.6_
 
-- [ ] 5. Restore Payment Processing Flow (Dependent on Task 3 - Cart Persistence)
-- [ ] 5.1 Create PaymentService
+- [x] 5. Restore Payment Processing Flow (Dependent on Task 3 - Cart Persistence)
+- [x] 5.1 Create PaymentService
   - Create `server/services/PaymentService.ts` file (does not exist yet)
   - Implement `createPaymentIntent` method with order metadata (complete within 3 seconds)
   - Implement `handleStripeWebhook` method with signature verification using STRIPE_WEBHOOK_SECRET
@@ -115,7 +115,7 @@
   - Preserve cart contents in Zustand store on payment failure
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.6_
 
-- [ ] 5.2 Update Convex order functions
+- [x] 5.2 Update Convex order functions
   - Verify convex/orders/createOrder.ts exists and creates payment intent with metadata
   - Verify convex/orders/updateOrder.ts exists and updates order status
   - Create `confirmPayment` mutation in convex/orders/ if not exists
@@ -134,8 +134,8 @@
   - Write integration test for payment failure handling
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
 
-- [ ] 6. Validate Service Reservation System
-- [ ] 6.1 Verify and enhance reservation form in mixing-mastering page
+- [x] 6. Validate Service Reservation System
+- [x] 6.1 Verify and enhance reservation form in mixing-mastering page
   - Verify form validation in client/src/pages/mixing-mastering.tsx (file exists with extensive form handling)
   - Verify Zod schema validation using mixingMasteringSubmissionSchema from @shared/validation
   - Verify email format validation is working
@@ -145,7 +145,7 @@
   - Test form submission in isolation to identify if timeout is from form validation or email notification
   - _Requirements: 6.1, 6.5, 6.6_
 
-- [ ] 6.2 Verify and enhance existing email functions
+- [x] 6.2 Verify and enhance existing email functions
   - Verify convex/reservations/sendAdminNotification.ts exists and works
   - Verify convex/reservations/sendStatusUpdateEmail.ts exists and works
   - Verify convex/reservations/sendReminderEmail.ts exists and works
@@ -156,7 +156,7 @@
   - Create email templates for consistency if not exists
   - _Requirements: 6.2, 6.3, 6.4_
 
-- [ ] 6.3 Verify and update Convex reservation functions
+- [x] 6.3 Verify and update Convex reservation functions
   - Verify convex/reservations/createReservation.ts exists and creates reservations
   - Add time slot availability validation by querying reservations by preferredDate and serviceType
   - Verify email notification is triggered after reservation creation via sendAdminNotification.ts

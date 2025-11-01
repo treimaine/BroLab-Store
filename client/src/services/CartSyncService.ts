@@ -88,12 +88,13 @@ export class CartSyncService {
       throw new Error("Convex client not initialized");
     }
     // Type assertion to bypass deep type instantiation issue with Convex API
-    // @ts-expect-error - Convex API types cause deep instantiation issues
-    const apiFunction = api.cartItems.syncCart;
+    // We cast the entire mutation call to avoid TypeScript's deep type instantiation
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mutationFn = this.convexClient.mutation as any;
+    const mutation = this.convexClient.mutation as any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result: any = await mutationFn(apiFunction, { items });
+    const apiRef: any = api;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result: any = await mutation(apiRef.cartItems.syncCart, { items });
     return result as SyncCartResult;
   }
 

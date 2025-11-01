@@ -1,6 +1,15 @@
+/**
+ * PayPal Routes
+ *
+ * This file contains PayPal order creation, capture, and details routes.
+ *
+ * NOTE: PayPal webhook handling is NOT in this file.
+ * All webhook events are processed through server/routes/webhooks.ts
+ * at POST /api/webhooks/paypal with centralized payment processing logic.
+ */
+
 import { Request, Response, Router } from "express";
 import { isAuthenticated as requireAuth } from "../auth";
-import { PAYPAL_WEBHOOK_ID } from "../config/paypal";
 import { urls } from "../config/urls";
 import PayPalService, { PaymentRequest } from "../services/paypal";
 import {
@@ -223,59 +232,11 @@ router.get("/capture/:token", async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/paypal/webhook
- * Webhook PayPal pour les notifications automatiques
- * ⚠️ PAS D'AUTHENTIFICATION (PayPal appelle directement)
+ * NOTE: PayPal webhook handling is centralized in server/routes/webhooks.ts
+ * All PayPal webhook events (PAYMENT.CAPTURE.COMPLETED, PAYMENT.CAPTURE.DENIED, etc.)
+ * are processed through POST /api/webhooks/paypal with proper signature verification
+ * and unified payment processing logic.
  */
-router.post("/webhook", async (req: Request, res: Response) => {
-  try {
-    // Vérification de la signature du webhook
-    const webhookId = PAYPAL_WEBHOOK_ID;
-    const transmissionId = req.headers["paypal-transmission-id"] as string;
-    const timestamp = req.headers["paypal-transmission-time"] as string;
-    const certUrl = req.headers["paypal-cert-url"] as string;
-    const authAlgo = req.headers["paypal-auth-algo"] as string;
-    const transmissionSig = req.headers["paypal-transmission-sig"] as string;
-
-    if (!webhookId || !transmissionId || !timestamp || !certUrl || !authAlgo || !transmissionSig) {
-      console.error("❌ Missing PayPal webhook headers");
-      res.status(400).json({ error: "Missing webhook headers" });
-      return;
-    }
-
-    // Vérification de la signature
-    const isValidSignature = await PayPalService.verifyWebhookSignature(
-      webhookId,
-      transmissionId,
-      timestamp,
-      certUrl,
-      authAlgo,
-      transmissionSig,
-      JSON.stringify(req.body)
-    );
-
-    if (!isValidSignature) {
-      console.error("❌ Invalid webhook signature");
-      res.status(400).json({ error: "Invalid webhook signature" });
-      return;
-    }
-
-    console.log("✅ Webhook signature verified successfully");
-
-    // Traitement de l'événement webhook
-    const result = await PayPalService.processWebhookEvent(req.body);
-
-    if (result.success) {
-      console.log("✅ Webhook processed successfully:", result.message);
-      res.json({ success: true, message: result.message });
-    } else {
-      console.error("❌ Failed to process webhook:", result.message);
-      res.status(500).json({ success: false, error: result.message });
-    }
-  } catch (error: unknown) {
-    handleRouteError(error, res, "PayPal webhook processing failed");
-  }
-});
 
 /**
  * GET /api/paypal/order/:orderId

@@ -262,10 +262,13 @@ export default defineSchema({
 
   // Webhook processed events (idempotence)
   processedEvents: defineTable({
-    provider: v.string(), // 'stripe'
+    provider: v.string(), // 'stripe' | 'paypal'
     eventId: v.string(),
     processedAt: v.number(),
-  }).index("by_provider_event", ["provider", "eventId"]),
+    metadata: v.optional(v.any()), // Additional event data for debugging
+  })
+    .index("by_provider_eventId", ["provider", "eventId"])
+    .index("by_processedAt", ["processedAt"]),
 
   // Downloads (remplace Supabase downloads)
   downloads: defineTable({
@@ -321,6 +324,13 @@ export default defineSchema({
     completedAt: v.optional(v.number()), // Date de completion
     cancelledAt: v.optional(v.number()), // Date d'annulation
     cancellationReason: v.optional(v.string()), // Raison d'annulation
+    // Payment metadata (for webhook updates)
+    paymentProvider: v.optional(v.string()), // 'stripe' | 'paypal'
+    paymentStatus: v.optional(v.string()), // 'succeeded' | 'failed' | 'refunded'
+    stripeSessionId: v.optional(v.string()),
+    stripePaymentIntentId: v.optional(v.string()),
+    paypalTransactionId: v.optional(v.string()),
+    paypalOrderId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

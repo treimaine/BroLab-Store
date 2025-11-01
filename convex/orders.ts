@@ -394,6 +394,7 @@ export const recordPayment = mutation({
     stripeEventId: v.optional(v.string()),
     stripePaymentIntentId: v.optional(v.string()),
     stripeChargeId: v.optional(v.string()),
+    paypalTransactionId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -488,7 +489,7 @@ export const markProcessedEvent = mutation({
   handler: async (ctx, { provider, eventId }) => {
     const existing = await ctx.db
       .query("processedEvents")
-      .withIndex("by_provider_event", q => q.eq("provider", provider).eq("eventId", eventId))
+      .withIndex("by_provider_eventId", q => q.eq("provider", provider).eq("eventId", eventId))
       .first();
     if (existing) return { alreadyProcessed: true } as const;
     await ctx.db.insert("processedEvents", { provider, eventId, processedAt: Date.now() });
@@ -726,7 +727,16 @@ export const listOrders = query({
   },
 });
 
-// Get order by ID
+// Get order by ID (alias for backward compatibility)
+export const getOrder = query({
+  args: { orderId: v.id("orders") },
+  handler: async (ctx, { orderId }) => {
+    const order = await ctx.db.get(orderId);
+    return order;
+  },
+});
+
+// Get order by ID with authentication
 export const getOrderById = query({
   args: { orderId: v.id("orders") },
   handler: async (ctx, { orderId }) => {
