@@ -91,28 +91,28 @@ const DownloadsTable = memo<DownloadsTableProps>(
             const isNearLimit = isLimited && value >= row.maxDownloads! * 0.8;
             const isAtLimit = isLimited && value >= row.maxDownloads!;
 
+            const getTextColor = () => {
+              if (isAtLimit) return "text-red-600";
+              if (isNearLimit) return "text-orange-600";
+              return "text-green-600";
+            };
+
+            const getProgressColor = () => {
+              if (isAtLimit) return "bg-red-500";
+              if (isNearLimit) return "bg-orange-500";
+              return "bg-green-500";
+            };
+
             return (
               <div className="space-y-1">
                 <div className="flex items-center gap-1">
-                  <span
-                    className={`font-medium ${
-                      isAtLimit
-                        ? "text-red-600"
-                        : isNearLimit
-                          ? "text-orange-600"
-                          : "text-green-600"
-                    }`}
-                  >
-                    {value}
-                  </span>
+                  <span className={`font-medium ${getTextColor()}`}>{value}</span>
                   {isLimited && <span className="text-muted-foreground">/ {row.maxDownloads}</span>}
                 </div>
                 {isLimited && (
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div
-                      className={`h-1.5 rounded-full ${
-                        isAtLimit ? "bg-red-500" : isNearLimit ? "bg-orange-500" : "bg-green-500"
-                      }`}
+                      className={`h-1.5 rounded-full ${getProgressColor()}`}
                       style={{ width: `${Math.min((value / row.maxDownloads!) * 100, 100)}%` }}
                     />
                   </div>
@@ -199,7 +199,7 @@ const DownloadsTable = memo<DownloadsTableProps>(
       link.style.visibility = "hidden";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
 
       toast.success(`Downloading "${download.beatTitle}" started`);
     }, []);
@@ -241,7 +241,7 @@ const DownloadsTable = memo<DownloadsTableProps>(
           link.style.visibility = "hidden";
           document.body.appendChild(link);
           link.click();
-          document.body.removeChild(link);
+          link.remove();
 
           toast.success("CSV export downloaded");
         } else {
@@ -290,45 +290,45 @@ const DownloadsTable = memo<DownloadsTableProps>(
     return (
       <div className={className}>
         {/* Quick stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-gray-900/20 backdrop-blur-sm border border-gray-700/30 p-4 rounded-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-gray-900/20 backdrop-blur-sm border border-gray-700/30 p-3 sm:p-4 rounded-lg">
             <div className="flex items-center gap-2">
-              <FileAudio className="w-5 h-5 text-blue-500" />
+              <FileAudio className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
               <div>
-                <p className="text-2xl font-bold">{stats.total}</p>
-                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-xl sm:text-2xl font-bold">{stats.total}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-900/20 backdrop-blur-sm border border-gray-700/30 p-4 rounded-lg">
+          <div className="bg-gray-900/20 backdrop-blur-sm border border-gray-700/30 p-3 sm:p-4 rounded-lg">
             <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-500" />
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
               <div>
-                <p className="text-2xl font-bold text-green-600">{stats.available}</p>
-                <p className="text-sm text-muted-foreground">Available</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-600">{stats.available}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Available</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-900/20 backdrop-blur-sm border border-gray-700/30 p-4 rounded-lg">
+          <div className="bg-gray-900/20 backdrop-blur-sm border border-gray-700/30 p-3 sm:p-4 rounded-lg">
             <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500" />
+              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
               <div>
-                <p className="text-2xl font-bold text-red-600">{stats.expired}</p>
-                <p className="text-sm text-muted-foreground">Expired</p>
+                <p className="text-xl sm:text-2xl font-bold text-red-600">{stats.expired}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Expired</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-900/20 backdrop-blur-sm border border-gray-700/30 p-4 rounded-lg">
+          <div className="bg-gray-900/20 backdrop-blur-sm border border-gray-700/30 p-3 sm:p-4 rounded-lg">
             <div className="flex items-center gap-2">
-              <Download className="w-5 h-5 text-purple-500" />
+              <Download className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
               <div>
-                <p className="text-2xl font-bold text-purple-600">
+                <p className="text-xl sm:text-2xl font-bold text-purple-600">
                   {stats.totalSize.toFixed(1)} MB
                 </p>
-                <p className="text-sm text-muted-foreground">Total size</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Total size</p>
               </div>
             </div>
           </div>

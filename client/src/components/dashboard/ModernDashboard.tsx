@@ -309,12 +309,15 @@ export const ModernDashboard = memo(() => {
           }
         }}
       >
-        <div className="pt-16 sm:pt-20 min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800">
-          <div className="space-y-4 sm:space-y-6">
+        <div className="pt-16 sm:pt-20 min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800 overflow-x-hidden">
+          <div className="space-y-3 sm:space-y-4 md:space-y-6">
             <DashboardLayout activeTab={activeTab} onTabChange={handleTabChange}>
               {/* Dashboard Header with Enhanced Connection Status */}
-              <div className="flex items-center justify-between mb-4">
-                <DashboardHeader user={user || clerkUser || null} className="space-y-2 flex-1" />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 md:mb-6">
+                <DashboardHeader
+                  user={user || clerkUser || null}
+                  className="space-y-1 sm:space-y-2 flex-1 w-full sm:w-auto"
+                />
 
                 {/* Enhanced Data Sync Status with Connection Indicators */}
                 <DataSyncIndicator
@@ -327,7 +330,7 @@ export const ModernDashboard = memo(() => {
                   }
                   showConnectionStatus={true}
                   showDataFreshness={true}
-                  className="flex-shrink-0"
+                  className="flex-shrink-0 w-full sm:w-auto"
                 />
               </div>
 

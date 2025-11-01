@@ -17,7 +17,15 @@ interface StatCardProps {
   formatValue?: (value: number | string) => string;
 }
 
-function StatCard({ title, value, icon, trend, color, delay = 0, formatValue }: StatCardProps) {
+function StatCard({
+  title,
+  value,
+  icon,
+  trend,
+  color,
+  delay = 0,
+  formatValue,
+}: Readonly<StatCardProps>) {
   const formattedValue = useMemo(() => {
     if (formatValue && typeof value === "number") {
       return formatValue(value);
@@ -94,7 +102,12 @@ interface StatsCardsProps {
   className?: string;
 }
 
-export function StatsCards({ stats, previousStats, isLoading, className }: StatsCardsProps) {
+export function StatsCards({
+  stats,
+  previousStats,
+  isLoading,
+  className,
+}: Readonly<StatsCardsProps>) {
   const calculateTrend = (current: number, previous?: number) => {
     if (!previous || previous === 0) return null;
     const change = ((current - previous) / previous) * 100;
@@ -105,7 +118,7 @@ export function StatsCards({ stats, previousStats, isLoading, className }: Stats
   };
 
   const formatCurrency = (value: number | string) => {
-    const num = typeof value === "string" ? parseFloat(value) : value;
+    const num = typeof value === "string" ? Number.parseFloat(value) : value;
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -148,12 +161,9 @@ export function StatsCards({ stats, previousStats, isLoading, className }: Stats
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card
-            key={`stats-loading-${i}`}
-            className="bg-gray-900/50 border-gray-700/50 animate-pulse"
-          >
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+        {Array.from({ length: 4 }, (_, i) => `stats-skeleton-${Date.now()}-${i}`).map(key => (
+          <Card key={key} className="bg-gray-900/50 border-gray-700/50 animate-pulse">
             <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center space-x-2 sm:space-x-3">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-gray-700 rounded-lg" />
@@ -172,7 +182,7 @@ export function StatsCards({ stats, previousStats, isLoading, className }: Stats
   return (
     <div
       className={cn(
-        "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6",
+        "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6",
         className
       )}
     >
@@ -197,11 +207,11 @@ export function DetailedStatsCard({
   title,
   children,
   className,
-}: {
+}: Readonly<{
   title: string;
   children: React.ReactNode;
   className?: string;
-}) {
+}>) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

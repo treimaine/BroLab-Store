@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useEnhancedFormSubmission } from "@/hooks/useEnhancedFormSubmission";
 import { useUser } from "@clerk/clerk-react";
-import { AlertTriangle, CheckCircle, Clock, Music, Star } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, Loader2, Music, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -38,6 +38,7 @@ export default function CustomBeats() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { user: clerkUser, isSignedIn, isLoaded: clerkLoaded } = useUser();
+  const [isPageLoading, setIsPageLoading] = useState(true);
 
   // Authentication state management
   const [authState, setAuthState] = useState({
@@ -88,6 +89,8 @@ export default function CustomBeats() {
         errorMessage: null,
       };
       setAuthState(newAuthState);
+      // Mark page as loaded after a short delay to ensure all components are ready
+      setTimeout(() => setIsPageLoading(false), 500);
     }
   }, [clerkLoaded, isSignedIn, clerkUser]);
 
@@ -130,7 +133,10 @@ export default function CustomBeats() {
         email: clerkUser.emailAddresses[0]?.emailAddress || "",
         phone: clerkUser.phoneNumbers?.[0]?.phoneNumber || "0000000000",
       },
-      preferredDate: new Date(request.deadline).toISOString(),
+      preferredDate:
+        request.deadline && request.deadline.trim() !== ""
+          ? new Date(request.deadline).toISOString()
+          : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       preferredDuration: 480, // 8 hours for custom beat production
       serviceDetails: {
         genre: request.genre,
@@ -143,18 +149,18 @@ export default function CustomBeats() {
         return `Genre: ${request.genre}${subGenreText}
 BPM: ${request.bpm}
 Key: ${request.key}
-Mood: ${request.mood.join(", ")}
-Instruments: ${request.instruments.join(", ")}
+Mood: ${request.mood?.join(", ") || "Not specified"}
+Instruments: ${request.instruments?.join(", ") || "Not specified"}
 Duration: ${request.duration} seconds
 Description: ${request.description}
 Reference Track: ${request.referenceTrack || "None"}
 Priority: ${request.priority}
-Deadline: ${request.deadline}
+Deadline: ${request.deadline || "Not specified"}
 Revisions: ${request.revisions}
 Additional Notes: ${request.additionalNotes || "None"}
 Uploaded Files: ${request.uploadedFiles?.length ? `${request.uploadedFiles.length} file(s) uploaded` : "None"}
 
-Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadline}`;
+Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadline || "Not specified"}`;
       })(),
       budget: totalPrice * 100, // Convert to cents
       acceptTerms: true, // Required by schema
@@ -204,6 +210,18 @@ Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadlin
       // Error handling is managed by the enhanced form submission hook
     }
   };
+
+  // Show loading state while page is initializing
+  if (isPageLoading || !clerkLoaded) {
+    return (
+      <div className="min-h-screen bg-[var(--deep-black)] text-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-[var(--accent-purple)] mx-auto mb-4" />
+          <p className="text-gray-400">Loading Custom Beat Request...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ReservationErrorBoundary

@@ -25,17 +25,17 @@ const ActivityItem = memo<ActivityItemProps>(({ activity, index }) => {
   const getActivityIcon = useCallback((type: string) => {
     switch (type) {
       case "order":
-        return <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />;
+        return <ShoppingCart className="w-4 h-4 sm:w-4 sm:h-4 md:w-5 md:h-5" />;
       case "download":
-        return <Download className="w-3 h-3 sm:w-4 sm:h-4" />;
+        return <Download className="w-4 h-4 sm:w-4 sm:h-4 md:w-5 md:h-5" />;
       case "favorite":
-        return <Heart className="w-3 h-3 sm:w-4 sm:h-4" />;
+        return <Heart className="w-4 h-4 sm:w-4 sm:h-4 md:w-5 md:h-5" />;
       case "profile":
-        return <User className="w-3 h-3 sm:w-4 sm:h-4" />;
+        return <User className="w-4 h-4 sm:w-4 sm:h-4 md:w-5 md:h-5" />;
       case "beat":
-        return <Music className="w-3 h-3 sm:w-4 sm:h-4" />;
+        return <Music className="w-4 h-4 sm:w-4 sm:h-4 md:w-5 md:h-5" />;
       default:
-        return <Clock className="w-3 h-3 sm:w-4 sm:h-4" />;
+        return <Clock className="w-4 h-4 sm:w-4 sm:h-4 md:w-5 md:h-5" />;
     }
   }, []);
 
@@ -95,10 +95,10 @@ const ActivityItem = memo<ActivityItemProps>(({ activity, index }) => {
       whileHover={{ scale: 1.02 }}
       className="group"
     >
-      <div className="flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg hover:bg-gray-800/50 transition-colors duration-200">
+      <div className="flex items-start space-x-2 sm:space-x-3 p-2.5 sm:p-3 md:p-4 rounded-lg hover:bg-gray-800/50 transition-colors duration-200">
         <div
           className={cn(
-            "w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center flex-shrink-0",
+            "w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0",
             getActivityColor(activity.type, activity.severity)
           )}
         >
@@ -107,7 +107,7 @@ const ActivityItem = memo<ActivityItemProps>(({ activity, index }) => {
 
         <div className="flex-1 min-w-0">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
-            <p className="text-xs sm:text-sm font-medium text-white truncate">
+            <p className="text-sm sm:text-sm md:text-base font-medium text-white truncate">
               {activity.beatTitle || activity.description}
             </p>
             <div className="flex items-center space-x-1 sm:space-x-2">
@@ -169,11 +169,8 @@ export const ActivityFeed = memo<ActivityFeedProps>(
           )}
           <CardContent className="p-4 sm:p-6">
             <div className="space-y-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div
-                  key={`loading-${i}`}
-                  className="flex items-center space-x-2 sm:space-x-3 animate-pulse"
-                >
+              {Array.from({ length: 3 }, (_, i) => `skeleton-${Date.now()}-${i}`).map(key => (
+                <div key={key} className="flex items-center space-x-2 sm:space-x-3 animate-pulse">
                   <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-700 rounded-full" />
                   <div className="flex-1 space-y-2">
                     <div className="h-3 sm:h-4 bg-gray-700 rounded w-3/4" />
