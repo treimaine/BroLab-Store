@@ -94,8 +94,18 @@ export function OptimizedImage({
   const [hasError, setHasError] = useState(false);
   const [imageSrc, setImageSrc] = useState<string>("");
 
-  // Generate srcset for responsive images
+  // Check if image is from external source (WordPress, CDN, etc.)
+  const isExternalImage = (url: string): boolean => {
+    return url.startsWith("http://") || url.startsWith("https://");
+  };
+
+  // Generate srcset for responsive images (only for local images)
   const generateSrcSet = (originalSrc: string): string => {
+    // Skip srcset generation for external images
+    if (isExternalImage(originalSrc)) {
+      return "";
+    }
+
     const basePath = originalSrc.replace(/\.(jpg|jpeg|png|webp)$/i, "");
     const extension = "webp";
 
@@ -189,28 +199,51 @@ export function OptimizedImage({
 
       {/* Optimized image with WebP and responsive srcset */}
       {imageSrc && !hasError && (
-        <picture className="absolute inset-0">
-          {/* WebP source with srcset */}
-          <source type="image/webp" srcSet={generateSrcSet(src)} sizes={sizes} />
+        <>
+          {isExternalImage(src) ? (
+            // For external images (WordPress, CDN), use simple img tag
+            <img
+              src={imageSrc}
+              alt={alt}
+              width={width}
+              height={height}
+              loading={priority ? "eager" : "lazy"}
+              decoding={priority ? "sync" : "async"}
+              className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${
+                isLoading ? "opacity-0" : "opacity-100"
+              }`}
+              style={{
+                objectFit,
+              }}
+              onLoad={handleLoad}
+              onError={handleError}
+            />
+          ) : (
+            // For local images, use picture element with WebP srcset
+            <picture className="absolute inset-0">
+              {/* WebP source with srcset */}
+              <source type="image/webp" srcSet={generateSrcSet(src)} sizes={sizes} />
 
-          {/* Fallback to original format */}
-          <img
-            src={imageSrc}
-            alt={alt}
-            width={width}
-            height={height}
-            loading={priority ? "eager" : "lazy"}
-            decoding={priority ? "sync" : "async"}
-            className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${
-              isLoading ? "opacity-0" : "opacity-100"
-            }`}
-            style={{
-              objectFit,
-            }}
-            onLoad={handleLoad}
-            onError={handleError}
-          />
-        </picture>
+              {/* Fallback to original format */}
+              <img
+                src={imageSrc}
+                alt={alt}
+                width={width}
+                height={height}
+                loading={priority ? "eager" : "lazy"}
+                decoding={priority ? "sync" : "async"}
+                className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${
+                  isLoading ? "opacity-0" : "opacity-100"
+                }`}
+                style={{
+                  objectFit,
+                }}
+                onLoad={handleLoad}
+                onError={handleError}
+              />
+            </picture>
+          )}
+        </>
       )}
     </div>
   );
