@@ -2,6 +2,7 @@ import { Express } from "express";
 import { registerAuthRoutes, setupAuth } from "../auth";
 import activityRouter from "./activity";
 import avatarRouter from "./avatar";
+import clerkBillingRouter from "./clerk-billing";
 import downloadsRouter from "./downloads";
 import emailRouter from "./email";
 import monitoringRouter from "./monitoring";
@@ -18,7 +19,6 @@ import uploadsRouter from "./uploads";
 import wishlistRouter from "./wishlist";
 import wooRouter from "./woo";
 import wpRouter from "./wp";
-// import subscriptionRouter from './subscription'; // Removed - using Clerk for billing
 
 export async function registerRoutes(app: Express) {
   // Setup authentication
@@ -46,32 +46,8 @@ export async function registerRoutes(app: Express) {
   app.use("/api/woo", wooRouter);
   app.use("/api/wp", wpRouter);
 
-  // Webhook Clerk - Solution directe
-  app.post("/api/webhooks/clerk", async (req, res) => {
-    console.log("🔔 Webhook Clerk reçu !");
-    console.log("📦 Body:", req.body);
-
-    try {
-      const evt = req.body;
-      const eventType = evt.type;
-
-      console.log(`📋 Événement: ${eventType}`);
-
-      if (eventType === "session.created" && evt.data?.user_id) {
-        console.log(`🔐 Session créée pour: ${evt.data.user_id}`);
-        // TODO: Appeler Convex pour enregistrer l'activité
-      }
-
-      res.status(200).json({
-        success: true,
-        message: "Webhook processed",
-        eventType,
-      });
-    } catch (error) {
-      console.error("❌ Erreur webhook:", error);
-      res.status(500).json({ error: "Webhook failed" });
-    }
-  });
+  // Clerk Billing webhook - handles subscription and invoice events
+  app.use("/api/webhooks/clerk-billing", clerkBillingRouter);
 
   // WordPress and WooCommerce routes
   app.use("/api/products", wooRouter);

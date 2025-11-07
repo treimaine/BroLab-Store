@@ -34,14 +34,15 @@
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
 - [ ] 4. Complete Clerk Billing Integration Setup
-- [ ] 4.1 Configure Clerk Billing in Clerk Dashboard (Manual Configuration Required)
-  - Enable Clerk Billing in Clerk Dashboard settings at https://dashboard.clerk.com
-  - Create three subscription plans: Basic ($9.99/month, 10 downloads), Artist ($29.99/month, 50 downloads), Ultimate ($99.99/month, unlimited)
-  - Configure webhook endpoint URL: `/api/webhooks/clerk-billing`
-  - Add webhook events: `subscription.created`, `subscription.updated`, `subscription.deleted`
-  - Copy webhook secret to environment variables
+- [x] 4.1 Configure Clerk Billing in Clerk Dashboard (Manual Configuration Required) - COMPLETED
+  - ✅ Clerk Billing enabled in Clerk Dashboard settings at https://dashboard.clerk.com
+  - ✅ Three subscription plans created: Basic ($9.99/month, 10 downloads), Artist ($29.99/month, 50 downloads), Ultimate ($99.99/month, unlimited)
+  - ✅ Webhook endpoint URL configured: `/api/webhooks/clerk-billing`
+  - ✅ Webhook events added: `subscription.created`, `subscription.updated`, `subscription.deleted`
+  - ✅ Webhook secret copied to environment variables (CLERK_WEBHOOK_SECRET)
+  - ✅ Created dedicated webhook handler in server/routes/clerk-billing.ts
+  - ✅ Integrated webhook handler into server/routes/index.ts
   - _Requirements: 4.1, 4.2, 4.3_
-  - _Note: This is a manual configuration task that must be completed in the Clerk Dashboard_
 
 - [x] 4.2 Verify existing Convex subscription functions - VERIFIED
   - Existing functions in convex/subscriptions/ and convex/quotas/ are functional
@@ -93,16 +94,17 @@
   - Write integration test for cancellation logic
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
 
-- [ ] 7. Fix File Upload Functionality
-- [ ] 7.1 Investigate and fix profile picture upload
-  - Investigate why camera icon on Profile tab doesn't trigger file upload dialog
-  - Check if Clerk UserProfile component is overriding custom upload functionality
-  - Implement file input element with accept="image/jpeg,image/png,image/webp"
-  - Trigger file input click event using ref.current.click() when camera icon is clicked
-  - Add MIME type validation using file-type library
-  - Add file size validation (max 5MB) with toast notification
-  - Upload to Convex storage using convex/files.ts action
-  - Update user.imageUrl field in Convex users table
+- [x] 7. Fix File Upload Functionality
+- [x] 7.1 Investigate and fix profile picture upload
+  - ✅ Investigated - camera icon exists but API endpoint was missing
+  - ✅ AvatarUpload component already implemented with camera icon overlay
+  - ✅ File input element with accept="image/jpeg,image/png,image/webp,image/gif"
+  - ✅ Trigger file input click event using ref.current.click() when camera icon is clicked
+  - ✅ MIME type validation (image/\* only)
+  - ✅ File size validation (max 5MB) with toast notification
+  - ✅ Upload to Convex storage via /api/avatar/upload endpoint
+  - ✅ Backend validates, scans, and uploads to Convex storage
+  - ✅ Update user.imageUrl field in Convex users table via updateUserAvatar mutation
   - _Requirements: 7.1, 7.2, 7.3, 7.6_
 
 - [ ]\* 7.2 Write file upload tests
@@ -145,8 +147,8 @@
   - Document performance improvements
   - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 9. Add Audio Playback Testing Infrastructure
-- [ ] 9.1 Investigate and fix audio player timeout issues
+- [x] 9. Add Audio Playback Testing Infrastructure
+- [x] 9.1 Investigate and fix audio player timeout issues
   - Investigate why TC012 test timed out after 15 minutes
   - Check if product catalog crash (TC011) is preventing navigation to audio player
   - Review EnhancedGlobalAudioPlayer.tsx for blocking operations

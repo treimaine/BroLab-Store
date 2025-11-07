@@ -1,10 +1,11 @@
 import { useCartContext } from "@/components/cart/cart-provider";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/useBreakpoint";
-import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
 import { useAudioStore } from "@/stores/useAudioStore";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Loader2,
   Pause,
   Play,
   ShoppingCart,
@@ -14,7 +15,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function EnhancedGlobalAudioPlayer() {
   const {
@@ -38,12 +39,14 @@ export function EnhancedGlobalAudioPlayer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const [isMuted, setIsMuted] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const lastTrackRef = useRef<string | null>(null);
   const lastPlayingRef = useRef<boolean>(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const audioContextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isMobile = useIsMobile();
-  const prefersReducedMotion = usePrefersReducedMotion();
+  const { toast } = useToast();
 
   // Web Audio API: initialize once and reuse for the lifetime of the audio element
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -51,134 +54,297 @@ export function EnhancedGlobalAudioPlayer() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
 
+  // Helper function to stop other audio elements
+  const stopOtherAudioElements = useCallback((currentAudio: HTMLAudioElement): void => {
+    const allAudio = document.querySelectorAll("audio");
+    for (const otherAudio of allAudio) {
+      if (otherAudio !== currentAudio && !otherAudio.paused) {
+        console.log("🛑 Stopping other audio on track change");
+        otherAudio.pause();
+        otherAudio.currentTime = 0;
+      }
+    }
+  }, []);
+
+  // Helper function to handle loading timeout
+  const setupLoadingTimeout = useCallback((): void => {
+    loadingTimeoutRef.current = setTimeout(() => {
+      console.error("❌ Audio loading timed out after 30 seconds");
+      setIsLoading(false);
+      setIsPlaying(false);
+      toast({
+        title: "Audio Loading Failed",
+        description: "The audio file took too long to load. Please try again.",
+        variant: "destructive",
+      });
+    }, 30000);
+  }, [setIsLoading, setIsPlaying, toast]);
+
   // Update audio source when track changes
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
 
+    // Only update if track actually changed
+    if (lastTrackRef.current === currentTrack.id) return;
+
     console.log("🔍 Setting audio source:", currentTrack.audioUrl);
 
-    // Stop all other audio elements when track changes
-    document.querySelectorAll("audio").forEach(otherAudio => {
-      if (otherAudio !== audio && !otherAudio.paused) {
-        console.log("🛑 Stopping other audio on track change");
-        otherAudio.pause();
-        otherAudio.currentTime = 0;
-      }
-    });
+    // Clear any existing loading timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
 
-    // Reset duration when track changes
+    // Set loading state
+    setIsLoading(true);
+    setLoadingProgress(0);
+
+    // Stop all other audio elements when track changes
+    stopOtherAudioElements(audio);
+
+    // Reset state when track changes
     setDuration(0);
     setCurrentTime(0);
 
+    // Set audio source
     audio.src = currentTrack.audioUrl;
+    audio.load(); // Force reload
     lastTrackRef.current = currentTrack.id;
 
-    // Force play when track changes (if isPlaying is true)
-    if (isPlaying) {
-      console.log("🎵 Forcing play on track change");
-      audio.play().catch(error => {
-        console.error("❌ Audio play failed on track change:", error);
-      });
-    }
-  }, [currentTrack?.id, isPlaying, setDuration, setCurrentTime]);
+    // Set up 30-second timeout for audio loading
+    setupLoadingTimeout();
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+    };
+  }, [
+    currentTrack,
+    setDuration,
+    setCurrentTime,
+    toast,
+    setIsPlaying,
+    setupLoadingTimeout,
+    stopOtherAudioElements,
+  ]);
+
+  // Helper function to wait for audio to be ready
+  const waitForAudioReady = useCallback(async (audio: HTMLAudioElement): Promise<void> => {
+    if (audio.readyState >= 2) return;
+
+    console.log("⏳ Waiting for audio to be ready...");
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Audio not ready after 5 seconds"));
+      }, 5000);
+
+      const onCanPlay = (): void => {
+        clearTimeout(timeout);
+        audio.removeEventListener("canplay", onCanPlay);
+        resolve();
+      };
+
+      audio.addEventListener("canplay", onCanPlay);
+    });
+  }, []);
+
+  // Helper function to handle play action
+  const handlePlayAction = useCallback(
+    async (audio: HTMLAudioElement): Promise<void> => {
+      console.log("▶️ Attempting to play audio...");
+
+      try {
+        // Resume audio context if suspended
+        const ctx = audioContextRef.current;
+        if (ctx?.state === "suspended") {
+          await ctx.resume();
+        }
+
+        // Wait for audio to be ready if needed
+        await waitForAudioReady(audio);
+
+        // Stop other audio elements
+        stopOtherAudioElements(audio);
+
+        await audio.play();
+        console.log("✅ Audio playing successfully");
+      } catch (error) {
+        console.error("❌ Audio play failed:", error);
+        setIsPlaying(false);
+        toast({
+          title: "Playback Error",
+          description: "Failed to play audio. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+    [setIsPlaying, toast, waitForAudioReady, stopOtherAudioElements]
+  );
 
   // Handle play/pause separately to avoid loops
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
 
+    // Only update if state actually changed
+    if (lastPlayingRef.current === isPlaying) return;
+
     console.log("🎵 Play/pause state changed:", {
       isPlaying,
       currentTrack: currentTrack.title,
-      audioUrl: currentTrack.audioUrl,
+      readyState: audio.readyState,
     });
 
-    // Only update if state actually changed
-    if (lastPlayingRef.current !== isPlaying) {
+    const handlePlayPause = async (): Promise<void> => {
       if (isPlaying) {
-        console.log("▶️ Attempting to play audio...");
-
-        const tryPlay = async () => {
-          try {
-            const ctx = audioContextRef.current;
-            if (ctx && ctx.state === "suspended") {
-              await ctx.resume();
-            }
-
-            // Only stop other audio elements if this audio is ready to play
-            if (audio.readyState >= 2) {
-              document.querySelectorAll("audio").forEach(otherAudio => {
-                if (otherAudio !== audio && !otherAudio.paused) {
-                  console.log("🛑 Stopping other audio element");
-                  otherAudio.pause();
-                  otherAudio.currentTime = 0;
-                }
-              });
-            }
-
-            await audio.play();
-          } catch (error) {
-            console.error("❌ Audio play failed:", error);
-          }
-        };
-
-        void tryPlay();
+        await handlePlayAction(audio);
       } else {
         console.log("⏸️ Pausing audio...");
         audio.pause();
       }
-      lastPlayingRef.current = isPlaying;
-    }
-  }, [isPlaying, currentTrack?.id]);
 
+      lastPlayingRef.current = isPlaying;
+    };
+
+    void handlePlayPause();
+  }, [isPlaying, currentTrack, setIsPlaying, toast, handlePlayAction]);
+
+  // Helper function to check if duration is valid
+  const isValidDuration = (duration: number): boolean => {
+    return Boolean(duration) && !Number.isNaN(duration) && Number.isFinite(duration);
+  };
+
+  // Helper function to clear loading timeout
+  const clearLoadingTimeout = (): void => {
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+  };
+
+  // Audio event listeners
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => {
-      if (audio.currentTime !== currentTime) {
-        setCurrentTime(audio.currentTime);
+    const updateTime = (): void => {
+      setCurrentTime(audio.currentTime);
+    };
+
+    const handleLoadedMetadata = (): void => {
+      if (isValidDuration(audio.duration)) {
+        console.log("🎵 Metadata loaded - Duration:", audio.duration);
+        setDuration(audio.duration);
+        setLoadingProgress(50);
       }
     };
 
-    const updateDuration = () => {
-      if (audio.duration && audio.duration !== duration) {
-        console.log("🎵 Duration updated:", audio.duration);
+    const handleCanPlay = (): void => {
+      console.log("🎵 Can play - Ready state:", audio.readyState);
+
+      // Set duration if not already set
+      if (isValidDuration(audio.duration)) {
         setDuration(audio.duration);
+      }
+
+      // Clear loading state
+      setIsLoading(false);
+      setLoadingProgress(100);
+      clearLoadingTimeout();
+
+      // Auto-play if isPlaying is true
+      if (isPlaying && audio.paused) {
+        console.log("🎵 Auto-playing after canplay");
+        audio.play().catch(error => {
+          console.error("❌ Auto-play failed:", error);
+        });
       }
     };
 
-    const handleCanPlay = () => {
-      if (audio.duration && audio.duration !== duration) {
-        console.log("🎵 Can play - Duration:", audio.duration);
-        setDuration(audio.duration);
+    const handleLoadedData = (): void => {
+      console.log("🎵 Data loaded");
+      setLoadingProgress(75);
+    };
+
+    const handleLoadStart = (): void => {
+      console.log("🎵 Load start");
+      setLoadingProgress(10);
+    };
+
+    const handleProgress = (): void => {
+      if (audio.buffered.length > 0) {
+        const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
+        const audioDuration = audio.duration;
+        if (audioDuration > 0) {
+          const progress = (bufferedEnd / audioDuration) * 100;
+          setLoadingProgress(Math.min(progress, 90));
+        }
       }
     };
 
-    const handleLoadedData = () => {
-      if (audio.duration && audio.duration !== duration) {
-        console.log("🎵 Loaded data - Duration:", audio.duration);
-        setDuration(audio.duration);
-      }
+    const handleError = (e: Event): void => {
+      const target = e.target as HTMLAudioElement;
+      console.error("❌ Audio error:", {
+        error: target.error,
+        code: target.error?.code,
+        message: target.error?.message,
+        src: target.src,
+      });
+
+      setIsLoading(false);
+      setIsPlaying(false);
+      clearLoadingTimeout();
+
+      toast({
+        title: "Audio Error",
+        description: "Failed to load audio file. Please check the URL and try again.",
+        variant: "destructive",
+      });
+    };
+
+    const handleEnded = (): void => {
+      console.log("🎵 Audio ended");
+      setIsPlaying(false);
+      nextTrack();
+    };
+
+    const handlePlaying = (): void => {
+      console.log("🎵 Audio is playing");
+      setIsLoading(false);
+    };
+
+    const handleWaiting = (): void => {
+      console.log("⏳ Audio is waiting/buffering");
+      setIsLoading(true);
     };
 
     audio.addEventListener("timeupdate", updateTime);
-    audio.addEventListener("loadedmetadata", updateDuration);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("canplay", handleCanPlay);
     audio.addEventListener("loadeddata", handleLoadedData);
-    audio.addEventListener("ended", () => {
-      setIsPlaying(false);
-      nextTrack();
-    });
+    audio.addEventListener("loadstart", handleLoadStart);
+    audio.addEventListener("progress", handleProgress);
+    audio.addEventListener("error", handleError);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("playing", handlePlaying);
+    audio.addEventListener("waiting", handleWaiting);
 
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
-      audio.removeEventListener("loadedmetadata", updateDuration);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("canplay", handleCanPlay);
       audio.removeEventListener("loadeddata", handleLoadedData);
+      audio.removeEventListener("loadstart", handleLoadStart);
+      audio.removeEventListener("progress", handleProgress);
+      audio.removeEventListener("error", handleError);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("playing", handlePlaying);
+      audio.removeEventListener("waiting", handleWaiting);
     };
-  }, [setCurrentTime, setDuration, setIsPlaying, nextTrack, currentTime, duration]);
+  }, [setCurrentTime, setDuration, setIsPlaying, nextTrack, toast, isPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -187,45 +353,101 @@ export function EnhancedGlobalAudioPlayer() {
     }
   }, [volume, isMuted]);
 
-  // Initialize Web Audio graph once and reuse; close only on unmount
+  // Helper function to initialize Web Audio API
+  const initAudioContext = (audio: HTMLAudioElement): void => {
+    try {
+      // Only initialize once
+      if (audioContextRef.current) return;
+
+      console.log("🎵 Initializing Web Audio API...");
+
+      // Create audio context
+      const AudioContextClass =
+        globalThis.AudioContext ||
+        (globalThis as typeof globalThis & { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+
+      if (!AudioContextClass) {
+        throw new Error("Web Audio API not supported");
+      }
+
+      audioContextRef.current = new AudioContextClass();
+
+      // Create media source (only once per audio element)
+      mediaSourceRef.current ??= audioContextRef.current.createMediaElementSource(audio);
+
+      // Create analyser
+      const analyser = audioContextRef.current.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      analyserRef.current = analyser;
+
+      const bufferLength = analyser.frequencyBinCount;
+      dataArrayRef.current = new Uint8Array(bufferLength);
+
+      // Connect nodes
+      mediaSourceRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+
+      console.log("✅ Web Audio API initialized successfully");
+    } catch (error) {
+      console.error("❌ Failed to initialize Web Audio API:", error);
+      // Don't show toast - visualization is optional
+    }
+  };
+
+  // Helper function to cleanup audio resources
+  const cleanupAudioResources = (): void => {
+    // Cleanup timeouts
+    if (audioContextTimeoutRef.current) {
+      clearTimeout(audioContextTimeoutRef.current);
+      audioContextTimeoutRef.current = null;
+    }
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+
+    // Cancel animation
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = undefined;
+    }
+
+    // Close audio context on unmount
+    if (audioContextRef.current) {
+      console.log("🧹 Cleaning up audio context");
+      audioContextRef.current.close().catch(() => undefined);
+      audioContextRef.current = null;
+    }
+    mediaSourceRef.current = null;
+    analyserRef.current = null;
+    dataArrayRef.current = null;
+  };
+
+  // Initialize Web Audio API once
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      }
-      if (!mediaSourceRef.current) {
-        mediaSourceRef.current = audioContextRef.current.createMediaElementSource(audio);
-      }
-      if (!analyserRef.current) {
-        const analyser = audioContextRef.current.createAnalyser();
-        analyser.fftSize = 256;
-        analyserRef.current = analyser;
-        const bufferLength = analyser.frequencyBinCount;
-        dataArrayRef.current = new Uint8Array(bufferLength);
+    // Initialize on first user interaction
+    const handleFirstInteraction = (): void => {
+      initAudioContext(audio);
+      document.removeEventListener("click", handleFirstInteraction);
+    };
 
-        mediaSourceRef.current.connect(analyserRef.current);
-        analyserRef.current.connect(audioContextRef.current.destination);
-      }
-    } catch (error) {
-      console.error("❌ Failed to initialize audio context:", error);
-    }
+    document.addEventListener("click", handleFirstInteraction);
+
+    // Try to initialize immediately
+    initAudioContext(audio);
 
     return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => undefined);
-        audioContextRef.current = null;
-      }
-      mediaSourceRef.current = null;
-      analyserRef.current = null;
-      dataArrayRef.current = null;
+      document.removeEventListener("click", handleFirstInteraction);
+      cleanupAudioResources();
     };
   }, []);
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement | HTMLCanvasElement>) => {
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement | HTMLCanvasElement>): void => {
     const audio = audioRef.current;
     if (!audio || !duration) return;
 
@@ -248,7 +470,7 @@ export function EnhancedGlobalAudioPlayer() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const animate = () => {
+    const animate = (): void => {
       if (!analyser || !dataArray) return;
 
       analyser.getByteFrequencyData(dataArray);
@@ -280,28 +502,28 @@ export function EnhancedGlobalAudioPlayer() {
     };
   }, [isPlaying]);
 
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     setVolume(Number(e.target.value));
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (): void => {
     if (!currentTrack) return;
 
     addItem({
-      beatId: parseInt(currentTrack.id),
+      beatId: Number.parseInt(currentTrack.id, 10),
       title: currentTrack.title,
       genre: "Unknown",
-      imageUrl: currentTrack.imageUrl || "",
+      imageUrl: currentTrack.imageUrl ?? "",
       licenseType: "basic" as const,
       quantity: 1,
-      isFree: currentTrack.isFree || false,
+      isFree: currentTrack.isFree ?? false,
     });
   };
 
-  const getDisplayPrice = () => {
+  const getDisplayPrice = (): string => {
     if (!currentTrack) return "";
 
-    // Utiliser les propriétés du track directement
+    // Use track properties directly
     const trackPrice = currentTrack.price;
     const trackIsFree = currentTrack.isFree;
 
@@ -309,27 +531,27 @@ export function EnhancedGlobalAudioPlayer() {
       return "FREE";
     }
 
-    if (trackPrice && typeof trackPrice === "number") {
+    if (typeof trackPrice === "number") {
       return `$${(trackPrice / 100).toFixed(2)}`;
     }
 
-    if (trackPrice && typeof trackPrice === "string") {
-      // Si c'est déjà une chaîne formatée
+    if (typeof trackPrice === "string") {
+      // If it's already a formatted string
       return trackPrice.startsWith("$") ? trackPrice : `$${trackPrice}`;
     }
 
-    // Si aucun prix n'est disponible, ne rien afficher
+    // If no price is available, display nothing
     return "";
   };
 
-  const handleClose = () => {
+  const handleClose = (): void => {
     setCurrentTrack(null);
     setIsPlaying(false);
     setCurrentTime(0);
   };
 
-  const formatTime = (time: number) => {
-    if (!time || isNaN(time)) return "0:00";
+  const formatTime = (time: number): string => {
+    if (!time || Number.isNaN(time) || !Number.isFinite(time)) return "0:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
@@ -346,7 +568,9 @@ export function EnhancedGlobalAudioPlayer() {
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
         className="fixed bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-sm border-t border-zinc-800 z-50 pb-safe-area-inset-bottom"
       >
-        <audio ref={audioRef} crossOrigin="anonymous" />
+        <audio ref={audioRef} preload="metadata">
+          <track kind="captions" />
+        </audio>
 
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4">
@@ -356,7 +580,8 @@ export function EnhancedGlobalAudioPlayer() {
                 variant="ghost"
                 size="sm"
                 onClick={previousTrack}
-                className="w-8 h-8 p-0 text-gray-400 hover:text-white"
+                disabled={isLoading}
+                className="w-8 h-8 p-0 text-gray-400 hover:text-white disabled:opacity-50"
               >
                 <SkipBack className="w-4 h-4" />
               </Button>
@@ -368,7 +593,7 @@ export function EnhancedGlobalAudioPlayer() {
                   try {
                     if (!isPlaying) {
                       const ctx = audioContextRef.current;
-                      if (ctx && ctx.state === "suspended") {
+                      if (ctx?.state === "suspended") {
                         await ctx.resume();
                       }
                     }
@@ -376,16 +601,26 @@ export function EnhancedGlobalAudioPlayer() {
                     setIsPlaying(!isPlaying);
                   }
                 }}
-                className="w-12 h-10 p-0 bg-[var(--accent-purple)] hover:bg-purple-600 rounded-lg"
+                disabled={isLoading}
+                className="w-12 h-10 p-0 bg-[var(--accent-purple)] hover:bg-purple-600 rounded-lg disabled:opacity-50"
               >
-                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+                {(() => {
+                  if (isLoading) {
+                    return <Loader2 className="w-5 h-5 animate-spin" />;
+                  }
+                  if (isPlaying) {
+                    return <Pause className="w-5 h-5" />;
+                  }
+                  return <Play className="w-5 h-5 ml-0.5" />;
+                })()}
               </Button>
 
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={nextTrack}
-                className="w-8 h-8 p-0 text-gray-400 hover:text-white"
+                disabled={isLoading}
+                className="w-8 h-8 p-0 text-gray-400 hover:text-white disabled:opacity-50"
               >
                 <SkipForward className="w-4 h-4" />
               </Button>
@@ -398,6 +633,13 @@ export function EnhancedGlobalAudioPlayer() {
               </span>
 
               <div className="flex-1 relative">
+                {/* Loading Progress Bar */}
+                {isLoading && (
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gray-700 rounded-full overflow-hidden">
+                    <Progress value={loadingProgress} className="h-full" />
+                  </div>
+                )}
+
                 {/* Waveform Canvas */}
                 <canvas
                   ref={canvasRef}
@@ -405,29 +647,40 @@ export function EnhancedGlobalAudioPlayer() {
                   height={40}
                   className="w-full h-10 cursor-pointer"
                   onClick={handleSeek}
+                  style={{ opacity: isLoading ? 0.5 : 1 }}
                 />
 
                 {/* Progress Overlay */}
-                <motion.div
-                  className="absolute top-0 left-0 h-full bg-red-500/30 pointer-events-none"
-                  style={{
-                    width: `${duration ? (currentTime / duration) * 100 : 0}%`,
-                  }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-                  transition={{ duration: 0.1, ease: "linear" }}
-                />
+                {(() => {
+                  const progressWidth = duration ? (currentTime / duration) * 100 : 0;
+                  return (
+                    <motion.div
+                      className="absolute top-0 left-0 h-full bg-red-500/30 pointer-events-none"
+                      style={{
+                        width: `${progressWidth}%`,
+                      }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progressWidth}%` }}
+                      transition={{ duration: 0.1, ease: "linear" }}
+                    />
+                  );
+                })()}
 
                 {/* Playback Cursor */}
-                <motion.div
-                  className="absolute top-1/2 transform -translate-y-1/2 w-1 h-8 bg-red-500 rounded-full"
-                  style={{
-                    left: `${duration ? (currentTime / duration) * 100 : 0}%`,
-                  }}
-                  initial={{ left: 0 }}
-                  animate={{ left: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-                  transition={{ duration: 0.1, ease: "linear" }}
-                />
+                {(() => {
+                  const cursorPosition = duration ? (currentTime / duration) * 100 : 0;
+                  return (
+                    <motion.div
+                      className="absolute top-1/2 transform -translate-y-1/2 w-1 h-8 bg-red-500 rounded-full"
+                      style={{
+                        left: `${cursorPosition}%`,
+                      }}
+                      initial={{ left: 0 }}
+                      animate={{ left: `${cursorPosition}%` }}
+                      transition={{ duration: 0.1, ease: "linear" }}
+                    />
+                  );
+                })()}
               </div>
 
               <span className="text-xs text-gray-400 w-8">{formatTime(duration)}</span>
