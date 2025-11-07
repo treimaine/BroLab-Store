@@ -1,8 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { isAuthenticated } from "../auth";
-import { updateUserAvatar } from "../lib/db";
-import { scanFile, uploadToSupabase, validateFile } from "../lib/upload";
+import { scanFile, validateFile } from "../lib/upload";
 import { uploadRateLimit } from "../middleware/rateLimiter";
 
 const router = Router();
@@ -42,32 +41,94 @@ router.post(
       }
 
       // Scan antivirus
-      const isSafe = await scanFile(req.file);
-      if (!isSafe) {
+      const scanResult = await scanFile(req.file);
+      if (!scanResult.safe) {
         res.status(400).json({
           error: "Le fichier n'a pas passé le scan de sécurité",
+          threats: scanResult.threats,
         });
         return;
       }
 
-      // Génération du chemin de stockage pour l'avatar
-      const timestamp = Date.now();
-      const userId = req.user!.id;
-      const extension = req.file.originalname.split(".").pop();
-      const filePath = `avatars/${userId}/${timestamp}.${extension}`;
+      // Get Clerk user ID
+      const clerkId = req.user!.id;
 
-      // Upload vers Supabase Storage
-      const { path, url } = await uploadToSupabase(req.file, filePath, {
-        contentType: req.file.mimetype,
-        cacheControl: "3600",
+      // Get Convex URL
+      const convexUrl = process.env.VITE_CONVEX_URL || process.env.CONVEX_URL;
+      if (!convexUrl) {
+        throw new Error("CONVEX_URL environment variable is required");
+      }
+
+      // Step 1: Generate upload URL from Convex
+      const generateUrlResponse = await fetch(`${convexUrl}/api/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: "files:generateUploadUrl",
+          args: {},
+          format: "json",
+        }),
       });
 
-      // Mise à jour de l'avatar dans la base de données
-      await updateUserAvatar(userId, url);
+      if (!generateUrlResponse.ok) {
+        throw new Error("Failed to generate upload URL");
+      }
+
+      const { value: uploadUrlData } = await generateUrlResponse.json();
+      const uploadUrl = uploadUrlData.url;
+
+      // Step 2: Upload file to Convex storage
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": req.file.mimetype },
+        body: req.file.buffer,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to upload file to Convex storage");
+      }
+
+      const { storageId } = await uploadResponse.json();
+
+      // Step 3: Get the storage URL
+      const getUrlResponse = await fetch(`${convexUrl}/api/mutation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: "files:getStorageUrl",
+          args: { storageId },
+          format: "json",
+        }),
+      });
+
+      if (!getUrlResponse.ok) {
+        throw new Error("Failed to get storage URL");
+      }
+
+      const { value: avatarUrl } = await getUrlResponse.json();
+
+      if (!avatarUrl) {
+        throw new Error("Storage URL is null");
+      }
+
+      // Step 4: Update user avatar in database
+      const updateResponse = await fetch(`${convexUrl}/api/mutation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path: "users:updateUserAvatar",
+          args: { clerkId, avatarUrl },
+          format: "json",
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error("Failed to update user avatar");
+      }
 
       res.json({
         success: true,
-        url,
+        url: avatarUrl,
         message: "Avatar mis à jour avec succès",
       });
     } catch (error: unknown) {

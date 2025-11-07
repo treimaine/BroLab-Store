@@ -1,16 +1,17 @@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useUser } from "@clerk/clerk-react";
 import { Camera } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 const DEFAULT_AVATAR = "/assets/default-avatar.svg";
 
 interface AvatarUploadProps {
-  src?: string | null;
-  alt?: string;
-  size?: "sm" | "md" | "lg";
-  className?: string;
-  onUpload?: (url: string) => void;
+  readonly src?: string | null;
+  readonly alt?: string;
+  readonly size?: "sm" | "md" | "lg";
+  readonly className?: string;
+  readonly onUpload?: (url: string) => void;
 }
 
 const sizeClasses = {
@@ -30,6 +31,7 @@ export function AvatarUpload({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { user } = useUser();
 
   // Mettre à jour imgSrc quand src change
   useEffect(() => {
@@ -60,8 +62,19 @@ export function AvatarUpload({
       return;
     }
 
+    if (!user?.id) {
+      toast({
+        title: "Erreur",
+        description: "Vous devez être connecté pour uploader un avatar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsUploading(true);
+
+      // Use the Express API endpoint which handles Convex upload
       const formData = new FormData();
       formData.append("avatar", file);
 
@@ -71,7 +84,8 @@ export function AvatarUpload({
       });
 
       if (!response.ok) {
-        throw new Error("Upload failed");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Upload failed");
       }
 
       const { url } = await response.json();
@@ -146,7 +160,7 @@ export function AvatarUpload({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/gif"
         className="hidden"
         onChange={handleFileSelect}
       />

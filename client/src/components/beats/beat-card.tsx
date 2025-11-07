@@ -120,29 +120,31 @@ export function BeatCard({
     }
   };
 
-  const handleImageLoad = () => {
-    // Image loaded successfully
-  };
-
-  const handleImageError = () => {
-    // Image failed to load
-  };
-
   return (
     <div
-      className={`card-dark overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer ${
+      className={`card-dark overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl ${
         featured ? "ring-2 ring-[var(--accent-purple)]" : ""
       } ${className}`}
     >
-      <button onClick={handleViewDetails} className="w-full text-left" type="button">
+      <div className="w-full">
         {/* Product Image - Fixed dimensions to prevent layout shifts (CLS < 0.1) */}
         <div
-          className="relative bg-gradient-to-br from-purple-600 to-blue-600 rounded-t-xl overflow-hidden group cursor-pointer"
+          className="relative bg-gradient-to-br from-purple-600 to-blue-600 rounded-t-xl overflow-hidden group"
           style={{
             aspectRatio: "1 / 1",
             minHeight: "200px",
           }}
         >
+          {/* Clickable overlay for view details */}
+          <button
+            onClick={handleViewDetails}
+            type="button"
+            className="absolute inset-0 w-full h-full cursor-pointer z-10"
+            aria-label={`View details for ${title}`}
+          >
+            <span className="sr-only">View details for {title}</span>
+          </button>
+
           {/* Wishlist Button */}
           <button
             onClick={handleWishlistToggle}
@@ -152,6 +154,7 @@ export function BeatCard({
                 : "bg-black/70 text-white hover:bg-red-500 hover:text-white"
             }`}
             title={isFavorite(beatIdAsNumber) ? "Remove from wishlist" : "Add to wishlist"}
+            type="button"
           >
             <Heart
               className={`w-3 h-3 sm:w-4 sm:h-4 ${isFavorite(beatIdAsNumber) ? "fill-current" : ""}`}
@@ -168,8 +171,12 @@ export function BeatCard({
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                 className="transition-transform duration-300 group-hover:scale-110"
                 objectFit="cover"
-                onLoad={handleImageLoad}
-                onError={handleImageError}
+                onLoad={() => {
+                  // Image loaded successfully
+                }}
+                onError={() => {
+                  // Image failed to load
+                }}
               />
             </div>
           ) : (
@@ -181,24 +188,31 @@ export function BeatCard({
 
           {/* Hover Play Button */}
           {audioUrl && (
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
-              <HoverPlayButton
-                audioUrl={audioUrl}
-                productId={id.toString()}
-                productName={title}
-                imageUrl={imageUrl}
-                price={price}
-                isFree={isFree}
-                size="lg"
-                onPlay={handlePreviewAudio}
-              />
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 pointer-events-none">
+              <div className="pointer-events-auto">
+                <HoverPlayButton
+                  audioUrl={audioUrl}
+                  productId={id.toString()}
+                  productName={title}
+                  imageUrl={imageUrl}
+                  price={price}
+                  isFree={isFree}
+                  size="lg"
+                  onPlay={handlePreviewAudio}
+                />
+              </div>
             </div>
           )}
         </div>
 
         {/* Beat Info - Reserve space with min-height to prevent layout shifts */}
         <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4" style={{ minHeight: "180px" }}>
-          <div>
+          <button
+            onClick={handleViewDetails}
+            type="button"
+            className="cursor-pointer text-left w-full"
+            aria-label={`View details for ${title}`}
+          >
             <h3
               className="text-lg sm:text-xl font-bold text-white mb-2 line-clamp-2"
               style={{ minHeight: "3.5rem" }}
@@ -224,7 +238,7 @@ export function BeatCard({
                   </span>
                 ))}
             </div>
-          </div>
+          </button>
 
           {/* Price and Actions */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 sm:pt-6 mt-4 sm:mt-6 border-t border-gray-700">
@@ -243,6 +257,7 @@ export function BeatCard({
                   ? "btn-primary bg-[var(--accent-cyan)] hover:bg-[var(--accent-cyan)]/80 text-white font-bold flex items-center gap-2 w-full sm:w-auto justify-center"
                   : "btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
               }
+              type="button"
             >
               {isFree ? <Download className="w-4 h-4" /> : <ShoppingCart className="w-4 h-4" />}
               <span className="hidden sm:inline">{isFree ? "Free Download" : "Add to Cart"}</span>
@@ -250,7 +265,7 @@ export function BeatCard({
             </Button>
           </div>
         </div>
-      </button>
+      </div>
     </div>
   );
 }

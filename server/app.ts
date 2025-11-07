@@ -6,6 +6,7 @@ import activityRouter from "./routes/activity";
 import avatarRouter from "./routes/avatar";
 import categoriesRouter from "./routes/categories";
 import clerkRouter from "./routes/clerk";
+import clerkBillingRouter from "./routes/clerk-billing";
 import downloadsRouter from "./routes/downloads";
 import emailRouter from "./routes/email";
 import monitoringRouter from "./routes/monitoring";
@@ -68,6 +69,9 @@ app.use("/api/payment/paypal", paypalRouter);
 app.use("/api/payment/stripe", stripeRouter);
 app.use("/api/clerk", clerkRouter);
 app.use("/api/payments", paymentsRouter);
+
+// Clerk Billing webhook - handles subscription and invoice events
+app.use("/api/webhooks/clerk-billing", clerkBillingRouter);
 
 app.use("/api/schema", schemaRouter);
 app.use("/api/security", securityRouter);
