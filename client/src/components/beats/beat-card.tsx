@@ -145,9 +145,13 @@ export function BeatCard({
       } ${className}`}
       onClick={handleViewDetails}
     >
-      {/* Product Image */}
+      {/* Product Image - Fixed dimensions to prevent layout shifts (CLS < 0.1) */}
       <div
-        className="relative aspect-square bg-gradient-to-br from-purple-600 to-blue-600 rounded-t-xl overflow-hidden group cursor-pointer"
+        className="relative bg-gradient-to-br from-purple-600 to-blue-600 rounded-t-xl overflow-hidden group cursor-pointer"
+        style={{
+          aspectRatio: "1 / 1",
+          minHeight: "200px",
+        }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={handleViewDetails}
@@ -172,7 +176,12 @@ export function BeatCard({
             alt={title}
             width={400}
             height={400}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+            style={{
+              aspectRatio: "1 / 1",
+            }}
             onError={e => {
               console.log("❌ Erreur de chargement image:", imageUrl);
               e.currentTarget.style.display = "none";
@@ -182,7 +191,9 @@ export function BeatCard({
             }}
           />
         ) : (
-          <Music className="w-12 h-12 sm:w-16 sm:h-16 text-white/20" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Music className="w-12 h-12 sm:w-16 sm:h-16 text-white/20" />
+          </div>
         )}
         <div className="absolute inset-0 bg-black/20" />
 
@@ -203,10 +214,15 @@ export function BeatCard({
         )}
       </div>
 
-      {/* Beat Info */}
-      <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4">
+      {/* Beat Info - Reserve space with min-height to prevent layout shifts */}
+      <div className="p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4" style={{ minHeight: "180px" }}>
         <div>
-          <h3 className="text-lg sm:text-xl font-bold text-white mb-2 line-clamp-2">{title}</h3>
+          <h3
+            className="text-lg sm:text-xl font-bold text-white mb-2 line-clamp-2"
+            style={{ minHeight: "3.5rem" }}
+          >
+            {title}
+          </h3>
           <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-400 mb-2 sm:mb-3">
             <span className="bg-gray-700 px-2 py-1 rounded text-xs">{genre}</span>
             {downloads > 0 && (
@@ -214,10 +230,10 @@ export function BeatCard({
             )}
           </div>
 
-          {/* Tags */}
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-3 sm:mb-4">
-              {tags.slice(0, 2).map((tag, index) => (
+          {/* Tags - Reserve space even when empty */}
+          <div className="flex flex-wrap gap-1 mb-3 sm:mb-4" style={{ minHeight: "2rem" }}>
+            {tags.length > 0 &&
+              tags.slice(0, 2).map((tag, index) => (
                 <span
                   key={index}
                   className="text-xs bg-[var(--accent-purple)]/20 text-[var(--accent-purple)] px-2 py-1 rounded-full"
@@ -225,8 +241,7 @@ export function BeatCard({
                   #{tag}
                 </span>
               ))}
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Price and Actions */}
