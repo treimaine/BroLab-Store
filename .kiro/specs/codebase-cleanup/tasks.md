@@ -154,20 +154,45 @@
   - _Requirements: 1.4, 1.5, 4.4, 5.5_
 
 - [ ] 10. Convex Functions Cleanup
-  - Remove unused Convex functions and old migrations
+  - Remove unused Convex utility functions (backup, restore, rollback, consistency, etc.)
+  - Clean up stub/mock implementations that are not actively used
   - Preserve all active database operations and queries
   - _Requirements: 4.4, 5.5_
 
-- [ ] 10.1 Remove unused Convex functions
-  - Analyze Convex functions for usage in client and server code
-  - Remove unused query/mutation functions that are not called
-  - Clean up old migration files that are no longer needed
+- [ ] 10.1 Remove unused Convex utility functions
+  - Remove stub implementations in convex/backup.ts (only logs, no real storage)
+  - Remove stub implementations in convex/restore.ts (not actively used)
+  - Remove stub implementations in convex/rollback.ts (not actively used)
+  - Remove stub implementations in convex/consistency.ts (returns mock data)
+  - Remove stub implementations in convex/dataConsistency.ts (duplicates data.ts functionality)
+  - Remove stub implementations in convex/dataSynchronization.ts (duplicates data.ts functionality)
+  - Remove stub implementations in convex/integrity.ts (not actively used)
+  - Remove stub implementations in convex/alerts.ts (returns mock data)
+  - Remove convex/messages.ts (simple example, not used in production)
+  - Keep convex/audit.ts (actively used in PaymentService and ReservationPaymentService)
+  - Keep convex/data.ts (provides generic data operations used by server)
+  - Keep convex/files.ts (provides upload URL generation)
   - _Requirements: 4.4, 5.5_
 
-- [ ] 10.2 Validate Convex functions cleanup
+- [ ] 10.2 Clean up empty Convex directories
+  - Remove empty convex/debug/ directory
+  - Remove empty convex/fixes/ directory
+  - Document that these directories were cleaned up
+  - _Requirements: 5.1, 5.3_
+
+- [ ] 10.3 Evaluate and clean up Convex migration files
+  - Review convex/migrations/ directory for old migrations that have been applied
+  - Keep migrations that may be needed for data recovery or rollback
+  - Document which migrations are safe to remove vs. which should be preserved
+  - Consider archiving old migrations instead of deleting them
+  - _Requirements: 4.4, 5.5_
+
+- [ ] 10.4 Validate Convex functions cleanup
   - Test dashboard functionality to ensure all queries work
   - Verify real-time data sync and mutations function correctly
+  - Test payment flows to ensure audit logging still works
   - Run database operations tests to check data integrity
+  - Verify file upload functionality still works
   - _Requirements: 1.4, 1.5, 4.4, 5.5_
 
 - [ ] 11. Final Validation and Documentation
