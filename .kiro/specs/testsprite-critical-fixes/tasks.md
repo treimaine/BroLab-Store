@@ -112,15 +112,15 @@
   - Write integration test for error handling
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
-- [ ] 8. Implement Performance Optimizations
-- [ ] 8.1 Optimize images and assets
+- [x] 8. Implement Performance Optimizations
+- [x] 8.1 Optimize images and assets
   - Convert hero-bg.jpg and logo.png to WebP format with compression
   - Generate responsive image sizes (320w, 640w, 1024w, 1920w)
   - Add preload tags for critical images in client/index.html
   - Add explicit width and height attributes to images to prevent layout shifts (target CLS < 0.1)
   - _Requirements: 8.3, 8.4, 8.5_
 
-- [ ] 8.2 Create OptimizedImage component
+- [x] 8.2 Create OptimizedImage component
   - Create `client/src/components/ui/OptimizedImage.tsx` file
   - Generate srcset for responsive images
   - Use WebP format with fallback
@@ -129,7 +129,7 @@
   - Add loading skeleton for better UX
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 8.3 Fix layout shifts in beat cards
+- [x] 8.3 Fix layout shifts in beat cards
   - Add CSS aspect-ratio for responsive images
   - Add explicit width/height to all beat card images
   - Use skeleton loaders with fixed dimensions for beat cards
