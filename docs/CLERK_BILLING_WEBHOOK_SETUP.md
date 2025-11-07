@@ -68,7 +68,7 @@ Ensure these are set in your `.env.local` file:
 
 ```bash
 # Clerk Billing Configuration
-CLERK_WEBHOOK_SECRET=whsec_oEQtTrG0e3HsUgBmMR2zh9goYKm0Pbca
+CLERK_WEBHOOK_SECRET=whsec_
 CLERK_BILLING_ENABLED=true
 
 # Convex Configuration (for data sync)

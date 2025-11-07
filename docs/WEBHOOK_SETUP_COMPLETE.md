@@ -158,7 +158,7 @@ npm run ngrok:url      # Get webhook URL
 ### Environment Variables (Already Set)
 
 ```bash
-CLERK_WEBHOOK_SECRET=whsec_oEQtTrG0e3HsUgBmMR2zh9goYKm0Pbca
+CLERK_WEBHOOK_SECRET=whsec_
 CLERK_BILLING_ENABLED=true
 VITE_CONVEX_URL=https://agile-boar-163.convex.cloud
 ```
