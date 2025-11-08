@@ -1,4 +1,4 @@
-import { mutation } from "../_generated/server";
+import { mutation, type MutationCtx } from "../../_generated/server";
 
 /**
  * Migration pour corriger les prix des commandes existantes
@@ -8,7 +8,7 @@ import { mutation } from "../_generated/server";
  */
 export const fixOrderPrices = mutation({
   args: {},
-  handler: async ctx => {
+  handler: async (ctx: MutationCtx) => {
     console.log("🔧 Starting order prices migration...");
 
     // Récupérer toutes les commandes
@@ -20,7 +20,7 @@ export const fixOrderPrices = mutation({
     for (const order of orders) {
       try {
         // Vérifier si la commande a des items avec des prix suspects
-        const hasIncorrectPrices = order.items?.some(item => {
+        const hasIncorrectPrices = order.items?.some((item: any) => {
           // Si le prix est très petit (< 10 dollars en centimes = 1000)
           // c'est probablement un prix mal calculé
           return item.price && item.price < 1000;
@@ -31,7 +31,7 @@ export const fixOrderPrices = mutation({
 
           // Pour les commandes avec des prix suspects, on peut essayer de les recalculer
           // basé sur les prix standards des beats
-          const fixedItems = order.items?.map(item => {
+          const fixedItems = order.items?.map((item: any) => {
             if (item.price && item.price < 1000) {
               // Essayer de déduire le prix correct basé sur des prix standards
               let correctPrice: number;
@@ -94,7 +94,7 @@ export const fixOrderPrices = mutation({
  */
 export const markFreeBeats = mutation({
   args: {},
-  handler: async ctx => {
+  handler: async (ctx: MutationCtx) => {
     console.log("🔧 Marking free beats with correct pricing...");
 
     const orders = await ctx.db.query("orders").collect();
@@ -102,7 +102,7 @@ export const markFreeBeats = mutation({
 
     for (const order of orders) {
       let needsUpdate = false;
-      const updatedItems = order.items?.map(item => {
+      const updatedItems = order.items?.map((item: any) => {
         // Identifier les beats gratuits par leur nom
         const isFree =
           item.title?.toLowerCase().includes("free") ||

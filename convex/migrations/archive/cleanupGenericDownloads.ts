@@ -2,10 +2,10 @@
  * Migration to clean up generic downloads and create proper downloads from paid orders
  */
 
-import { internalMutation } from "../_generated/server";
+import { internalMutation, type MutationCtx } from "../../_generated/server";
 
 export const cleanupGenericDownloads = internalMutation({
-  handler: async (ctx: any) => {
+  handler: async (ctx: MutationCtx) => {
     console.log("🧹 Starting cleanup of generic downloads...");
 
     try {
