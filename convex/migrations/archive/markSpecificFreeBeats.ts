@@ -1,4 +1,4 @@
-import { mutation } from "../_generated/server";
+import { mutation, type MutationCtx } from "../../_generated/server";
 
 /**
  * Migration pour marquer des beats spécifiques comme gratuits
@@ -6,7 +6,7 @@ import { mutation } from "../_generated/server";
  */
 export const markSpecificFreeBeats = mutation({
   args: {},
-  handler: async ctx => {
+  handler: async (ctx: MutationCtx) => {
     console.log("🔧 Marking specific beats as free based on store data...");
 
     // Liste des beats qui sont gratuits dans le store
@@ -22,7 +22,7 @@ export const markSpecificFreeBeats = mutation({
 
     for (const order of orders) {
       let needsUpdate = false;
-      const updatedItems = order.items?.map(item => {
+      const updatedItems = order.items?.map((item: any) => {
         // Vérifier si le nom du beat correspond à un beat gratuit
         const isFree = freeBeats.some(
           freeBeat =>
@@ -44,7 +44,7 @@ export const markSpecificFreeBeats = mutation({
       if (needsUpdate) {
         // Recalculer le total de la commande
         const newTotal =
-          updatedItems?.reduce((sum, item) => {
+          updatedItems?.reduce((sum: number, item: any) => {
             return sum + (item.price || 0) * (item.quantity || 1);
           }, 0) || 0;
 
@@ -75,12 +75,12 @@ export const markSpecificFreeBeats = mutation({
  */
 export const listAllBeatNames = mutation({
   args: {},
-  handler: async ctx => {
+  handler: async (ctx: MutationCtx) => {
     const orders = await ctx.db.query("orders").collect();
     const beatNames = new Set<string>();
 
-    orders.forEach(order => {
-      order.items?.forEach(item => {
+    orders.forEach((order: any) => {
+      order.items?.forEach((item: any) => {
         if (item.name) beatNames.add(item.name);
         if (item.title) beatNames.add(item.title);
       });

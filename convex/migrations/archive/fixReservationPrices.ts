@@ -1,4 +1,4 @@
-import { mutation } from "../_generated/server";
+import { mutation, type MutationCtx } from "../../_generated/server";
 
 /**
  * Migration pour corriger les prix des réservations
@@ -18,7 +18,7 @@ const SERVICE_RATES = {
 
 export const fixReservationPrices = mutation({
   args: {},
-  handler: async ctx => {
+  handler: async (ctx: MutationCtx) => {
     console.log("🔧 Fixing reservation prices based on standard rates...");
 
     const reservations = await ctx.db.query("reservations").collect();
@@ -82,10 +82,10 @@ export const fixReservationPrices = mutation({
  */
 export const listReservationPrices = mutation({
   args: {},
-  handler: async ctx => {
+  handler: async (ctx: MutationCtx) => {
     const reservations = await ctx.db.query("reservations").collect();
 
-    const priceAnalysis = reservations.map(reservation => {
+    const priceAnalysis = reservations.map((reservation: any) => {
       const serviceType = reservation.serviceType as keyof typeof SERVICE_RATES;
       const duration = reservation.durationMinutes || 60;
       const currentPrice = reservation.totalPrice;
@@ -115,7 +115,7 @@ export const listReservationPrices = mutation({
       reservations: priceAnalysis,
       summary: {
         total: reservations.length,
-        needingCorrection: priceAnalysis.filter(r => r.needsCorrection).length,
+        needingCorrection: priceAnalysis.filter((r: any) => r.needsCorrection).length,
       },
     };
   },

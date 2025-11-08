@@ -4,22 +4,22 @@ import { useBreakpoint, useIsMobile, useIsTablet } from "@/hooks/useBreakpoint";
 import { useOrientation } from "@/hooks/useOrientation";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 import type { UIBeat } from "@/types/ui";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BeatCard } from "./beat-card";
 
 interface FeaturedBeatsCarouselProps {
-  beats: UIBeat[];
-  title?: string;
-  isLoading?: boolean;
+  readonly beats: UIBeat[];
+  readonly title?: string;
+  readonly isLoading?: boolean;
 }
 
 export function FeaturedBeatsCarousel({
   beats,
   title = "Featured Beats",
   isLoading = false,
-}: FeaturedBeatsCarouselProps) {
+}: Readonly<FeaturedBeatsCarouselProps>) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -51,38 +51,41 @@ export function FeaturedBeatsCarousel({
     if (prefersReducedMotion || isMobile) return;
 
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
+      setCurrentIndex(prev => (prev >= maxIndex ? 0 : prev + 1));
     }, 5000);
 
     return () => clearInterval(interval);
   }, [maxIndex, prefersReducedMotion, isMobile]);
 
-  const scrollToIndex = (index: number) => {
-    const container = scrollContainerRef.current;
-    if (!container || !isMobile) return;
+  const scrollToIndex = useCallback(
+    (index: number): void => {
+      const container = scrollContainerRef.current;
+      if (!container || !isMobile) return;
 
-    const itemWidth = container.scrollWidth / filteredBeats.length;
-    container.scrollTo({
-      left: index * itemWidth,
-      behavior: prefersReducedMotion ? "auto" : "smooth",
-    });
-  };
+      const itemWidth = container.scrollWidth / filteredBeats.length;
+      container.scrollTo({
+        left: index * itemWidth,
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+      });
+    },
+    [isMobile, filteredBeats.length, prefersReducedMotion]
+  );
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback((): void => {
     const newIndex = currentIndex > 0 ? currentIndex - 1 : maxIndex;
     setCurrentIndex(newIndex);
     scrollToIndex(newIndex);
-  };
+  }, [currentIndex, maxIndex, scrollToIndex]);
 
-  const handleNext = () => {
+  const handleNext = useCallback((): void => {
     const newIndex = currentIndex < maxIndex ? currentIndex + 1 : 0;
     setCurrentIndex(newIndex);
     scrollToIndex(newIndex);
-  };
+  }, [currentIndex, maxIndex, scrollToIndex]);
 
   // Handle keyboard navigation
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
+    const handleKeyPress = (e: KeyboardEvent): void => {
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         handlePrevious();
@@ -92,9 +95,9 @@ export function FeaturedBeatsCarousel({
       }
     };
 
-    window.addEventListener("keydown", handleKeyPress);
-    return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [currentIndex, maxIndex]);
+    globalThis.addEventListener("keydown", handleKeyPress);
+    return () => globalThis.removeEventListener("keydown", handleKeyPress);
+  }, [currentIndex, maxIndex, handlePrevious, handleNext]);
 
   if (!filteredBeats.length && !isLoading) return null;
 
@@ -122,9 +125,7 @@ export function FeaturedBeatsCarousel({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 md:mb-8">
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">
-            {title}
-          </h2>
+          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">{title}</h2>
 
           {/* Desktop Navigation Controls */}
           {!isMobile && (
@@ -170,13 +171,13 @@ export function FeaturedBeatsCarousel({
               {/* Gradient fade overlay - left */}
               <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[var(--deep-black)] to-transparent z-10 pointer-events-none" />
 
-              {filteredBeats.map((beat, index) => (
+              {filteredBeats.map(beat => (
                 <div
                   key={beat.id}
                   className="flex-none w-64 sm:w-72 snap-start"
                   style={{ scrollSnapAlign: "start" }}
                 >
-                  <BeatCard 
+                  <BeatCard
                     id={beat.id}
                     title={beat.title}
                     genre={beat.genre}
@@ -199,22 +200,23 @@ export function FeaturedBeatsCarousel({
 
             {/* Mobile Dots Indicator */}
             <div className="flex justify-center gap-2 mt-4">
-              {Array.from({
-                length: Math.ceil(filteredBeats.length / visibleItems),
-              }).map((_, index) => (
+              {Array.from(
+                { length: Math.ceil(filteredBeats.length / visibleItems) },
+                (_, i) => i
+              ).map(slideIndex => (
                 <button
-                  key={index}
+                  key={`mobile-slide-${slideIndex}-of-${filteredBeats.length}`}
                   onClick={() => {
-                    setCurrentIndex(index * visibleItems);
-                    scrollToIndex(index * visibleItems);
+                    setCurrentIndex(slideIndex * visibleItems);
+                    scrollToIndex(slideIndex * visibleItems);
                   }}
                   className={cn(
                     "w-2 h-2 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]",
-                    index === Math.floor(currentIndex / visibleItems)
+                    slideIndex === Math.floor(currentIndex / visibleItems)
                       ? "bg-[var(--accent-purple)]"
                       : "bg-gray-600"
                   )}
-                  aria-label={`Go to slide ${index + 1}`}
+                  aria-label={`Go to slide ${slideIndex + 1}`}
                 />
               ))}
             </div>
@@ -230,45 +232,43 @@ export function FeaturedBeatsCarousel({
               xl ? "grid-cols-5" : ""
             )}
           >
-            {filteredBeats
-              .slice(currentIndex, currentIndex + visibleItems)
-              .map((beat) => (
-                <BeatCard
-                  key={beat.id}
-                  id={beat.id}
-                  title={beat.title}
-                  genre={beat.genre}
-                  bpm={beat.bpm}
-                  price={beat.price}
-                  imageUrl={beat.imageUrl || ""}
-                  audioUrl={beat.audioUrl || ""}
-                  tags={beat.tags || []}
-                  featured={beat.featured || false}
-                  downloads={beat.downloads || 0}
-                  duration={beat.duration || 0}
-                  className={cn(
-                    "transform transition-transform duration-200",
-                    !prefersReducedMotion && "hover:scale-105"
-                  )}
-                />
-              ))}
+            {filteredBeats.slice(currentIndex, currentIndex + visibleItems).map(beat => (
+              <BeatCard
+                key={beat.id}
+                id={beat.id}
+                title={beat.title}
+                genre={beat.genre}
+                bpm={beat.bpm}
+                price={beat.price}
+                imageUrl={beat.imageUrl || ""}
+                audioUrl={beat.audioUrl || ""}
+                tags={beat.tags || []}
+                featured={beat.featured || false}
+                downloads={beat.downloads || 0}
+                duration={beat.duration || 0}
+                className={cn(
+                  "transform transition-transform duration-200",
+                  !prefersReducedMotion && "hover:scale-105"
+                )}
+              />
+            ))}
           </div>
         )}
 
         {/* Progress Indicator for Desktop */}
         {!isMobile && maxIndex > 0 && (
           <div className="flex justify-center gap-2 mt-6">
-            {Array.from({ length: maxIndex + 1 }).map((_, index) => (
+            {Array.from({ length: maxIndex + 1 }, (_, i) => i).map(pageIndex => (
               <button
-                key={index}
-                onClick={() => setCurrentIndex(index)}
+                key={`desktop-page-${pageIndex}-of-${maxIndex + 1}`}
+                onClick={() => setCurrentIndex(pageIndex)}
                 className={cn(
                   "w-3 h-3 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]",
-                  index === currentIndex
+                  pageIndex === currentIndex
                     ? "bg-[var(--accent-purple)]"
                     : "bg-gray-600 hover:bg-gray-500"
                 )}
-                aria-label={`Go to page ${index + 1}`}
+                aria-label={`Go to page ${pageIndex + 1}`}
               />
             ))}
           </div>

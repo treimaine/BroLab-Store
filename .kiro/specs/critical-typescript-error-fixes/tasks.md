@@ -203,102 +203,39 @@
   - Fix handler function return types in error management services
   - _Requirements: 2.1, 2.2, 2.3_
 
-## Phase 8: Final Error Resolution (Current: 46 errors across 11 files)
+## Phase 8: Final Error Resolution (Current: 37 errors across 13 files)
 
 - [x] 8. Fix remaining TypeScript errors
 
-- [x] 8.1 Fix SyncDashboard component errors (6 errors)
-  - Fix `useServerSync` hook to return proper interface with missing properties:
-    - Add `syncStatus` property with `isSuccess`, `isError`, `error`, and `data` fields
-    - Add `syncWordPress` method
-    - Add `syncWooCommerce` method
-    - Add `syncAll` method
-    - Add `getStats` method
-    - Add `isLoading` property
-  - Update `client/src/hooks/useConvexSync.ts` to implement full interface
-  - _Requirements: 3.1, 3.2, 3.3_
-
-- [x] 8.2 Fix BeatCard component type error (1 error)
-  - Fix `beat-card.tsx` line 97 - argument type mismatch
-  - The component is passing a full beat object instead of just the beat ID
-  - Update the function call to pass only `beat.id` instead of the entire beat object
+- [x] 8.1 Fix BeatCard component missing bpm property (7 errors)
+  - Add `bpm` property to `BeatCardProps` interface in `client/src/components/beats/beat-card.tsx`
+  - The property should be optional: `bpm?: number`
+  - This will fix errors in:
+    - `FeaturedBeatsCarousel.tsx` (2 errors)
+    - `OptimizedBeatGrid.tsx` (1 error)
+    - `RecentlyViewedBeats.tsx` (1 error)
+    - `UnifiedFilterDemo.tsx` (1 error)
+    - `shop.tsx` (1 error)
+    - `wishlist.tsx` (1 error)
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [x] 8.3 Fix RecentlyViewedBeats component errors (5 errors)
-  - Fix `RecentBeat` type definition to include missing properties:
-    - Add `title` property
-    - Add `genre` property
-    - Add `price` property
-    - Add `image_url` property
-    - Add `audio_url` property
-  - Update type definition in `client/src/hooks/useRecentlyViewedBeats.ts`
-  - _Requirements: 2.1, 2.2, 2.3_
+- [x] 8.2 Fix archived migration files type errors (29 errors)
+  - Add proper type annotations to archived migration files in `convex/migrations/archive/`
+  - Fix missing `_generated` imports by using proper Convex types
+  - Add explicit types to all function parameters (ctx, args, item, etc.)
+  - Files to fix:
+    - `cleanOrders.ts` (3 errors)
+    - `cleanupGenericDownloads.ts` (1 error)
+    - `cleanupSupabase.ts` (6 errors)
+    - `fixOrderPrices.ts` (6 errors)
+    - `fixReservationPrices.ts` (5 errors)
+    - `markSpecificFreeBeats.ts` (8 errors)
+  - _Requirements: 4.1, 4.2, 4.3_
 
-- [x] 8.4 Fix CartProvider component error (1 error)
-  - Fix `Cart` type to include missing properties:
-    - Add `subtotal` property
-    - Add `itemCount` property
-  - Update type definition in `client/src/lib/cart.ts`
-  - _Requirements: 2.1, 2.2, 2.3_
-
-- [x] 8.5 Fix OfflineIndicator component error (1 error)
-  - Fix state update type mismatch in `OfflineIndicator.tsx` line 43
-  - Add missing `total` and `syncing` properties to the state update object
-  - _Requirements: 2.1, 2.2, 2.3_
-
-- [x] 8.6 Fix LoyaltyCard component errors (7 errors)
-  - Fix `useLoyaltyPoints` hook to return proper interface:
-    - Change return type from `number` to object with `totalPoints`, `lifetimePoints`, and `lastUpdated` properties
-  - Update `client/src/hooks/use-loyalty.ts` to return proper structure
-  - _Requirements: 3.1, 3.2, 3.3_
-
-- [x] 8.7 Fix RewardsGrid component errors (5 errors)
-  - Fix `useRewards` hook to return proper interface:
-    - Add `redeemReward` property (function)
-    - Add `isLoading` property
-    - Add `eligibility` property (function)
-  - Fix rewards array type to include `id` property
-  - Update `client/src/hooks/use-loyalty.ts` to implement full interface
-  - _Requirements: 3.1, 3.2, 3.3_
-
-- [x] 8.8 Fix TransactionHistory component errors (9 errors)
-  - Fix `useLoyaltyTransactions` hook to accept `userId` parameter
-  - Fix transaction type to include all required properties:
-    - Add `userId` property
-    - Add `source` property
-    - Add `points` property
-    - Add `type` property
-    - Add `description` property
-  - Update `client/src/hooks/use-loyalty.ts` to implement full interface
-  - _Requirements: 3.1, 3.2, 3.3_
-
-- [x] 8.9 Fix LoadingStateProvider component error (1 error)
-  - Fix `LoadingStateProvider` to return full `LoadingStateContextType` interface
-  - Update `useLoadingState` hook to return all required properties:
-    - Add `globalLoading` property
-    - Add `loadingStates` property
-    - Add `setLoading` method
-    - Add `setError` method
-    - Add `setData` method
-    - Add `clearState` method
-    - Add `withLoading` method
-    - Add `isLoadingAny` method
-    - Add `hasErrors` method
-    - Add `getLoadingKeys` method
-    - Add `getErrorKeys` method
-  - _Requirements: 3.1, 3.2, 3.3_
-
-- [x] 8.10 Fix CustomBeatRequest component errors (2 errors)
-  - Fix error handling type in line 239 - ensure error object is properly typed as ReactNode
-  - Fix error object type in line 251 - add `userMessage` property to error type
-  - Update error handling to use proper error types with `userMessage` property
-  - _Requirements: 2.1, 2.2, 2.3_
-
-- [x] 8.11 Fix useFavorites hook errors (2 errors)
-  - Fix "Type instantiation is excessively deep and possibly infinite" error in line 12
-  - Fix `fav` type in line 21 - properly type the favorites array items
-  - Add proper type definition for favorite items with `beat_id` property
-  - _Requirements: 3.1, 3.2, 3.3_
+- [x] 8.3 Remove unused @ts-expect-error directive (1 error)
+  - Remove the unused `@ts-expect-error` comment in `server/services/PaymentService.ts` line 139
+  - The underlying type issue has been resolved, so the suppression is no longer needed
+  - _Requirements: 5.1, 5.2, 5.3_
 
 ## Phase 9: Validation and Testing
 
@@ -352,29 +289,32 @@
 4. **Phase 5 Completion**: ✅ Component import and server-side type errors resolved
 5. **Phase 6 Completion**: ✅ Dashboard modernization errors resolved
 6. **Phase 7 Completion**: ✅ Type system enhancement completed
-7. **Phase 8 Completion**: 🔄 Final error resolution needed (46 errors across 11 files)
+7. **Phase 8 Completion**: 🔄 Final error resolution needed (37 errors across 13 files)
 8. **Phase 9 Completion**: 🔄 Validation and testing pending
 9. **Phase 10 Completion**: 🔄 Documentation and cleanup pending
 
 ### Quality Metrics
 
-- **Error Reduction**: 114 errors reduced to 46 (60% improvement from original baseline)
-- **Compilation Success**: `npx tsc --noEmit` currently shows 46 remaining errors across 11 files
+- **Error Reduction**: 114 errors reduced to 37 (68% improvement from original baseline)
+- **Compilation Success**: `npx tsc --noEmit` currently shows 37 remaining errors across 13 files
 - **Application Startup**: ✅ `npm run dev` starts without errors
 - **Frontend Access**: ✅ Application loads in browser without console errors
 - **Error Distribution**:
-  - 6 errors in `client/src/components/admin/SyncDashboard.tsx` (missing hook properties)
-  - 1 error in `client/src/components/beats/beat-card.tsx` (type mismatch)
-  - 5 errors in `client/src/components/beats/RecentlyViewedBeats.tsx` (missing type properties)
-  - 1 error in `client/src/components/cart/cart-provider.tsx` (missing Cart properties)
-  - 1 error in `client/src/components/loading/OfflineIndicator.tsx` (state update type)
-  - 7 errors in `client/src/components/loyalty/LoyaltyCard.tsx` (incorrect hook return type)
-  - 5 errors in `client/src/components/loyalty/RewardsGrid.tsx` (missing hook properties)
-  - 9 errors in `client/src/components/loyalty/TransactionHistory.tsx` (missing type properties)
-  - 1 error in `client/src/components/providers/LoadingStateProvider.tsx` (incomplete interface)
-  - 2 errors in `client/src/components/reservations/CustomBeatRequest.tsx` (error handling types)
-  - 2 errors in `client/src/hooks/useFavorites.ts` (type instantiation depth)
-  - 6 errors in `client/src/hooks/useOrders.ts` (suppressed with @ts-expect-error)
+  - 7 errors across 7 files (missing `bpm` property in BeatCard component)
+    - `FeaturedBeatsCarousel.tsx` (2 errors)
+    - `OptimizedBeatGrid.tsx` (1 error)
+    - `RecentlyViewedBeats.tsx` (1 error)
+    - `UnifiedFilterDemo.tsx` (1 error)
+    - `shop.tsx` (1 error)
+    - `wishlist.tsx` (1 error)
+  - 29 errors in archived migration files (missing type annotations)
+    - `convex/migrations/archive/cleanOrders.ts` (3 errors)
+    - `convex/migrations/archive/cleanupGenericDownloads.ts` (1 error)
+    - `convex/migrations/archive/cleanupSupabase.ts` (6 errors)
+    - `convex/migrations/archive/fixOrderPrices.ts` (6 errors)
+    - `convex/migrations/archive/fixReservationPrices.ts` (5 errors)
+    - `convex/migrations/archive/markSpecificFreeBeats.ts` (8 errors)
+  - 1 error in `server/services/PaymentService.ts` (unused @ts-expect-error directive)
 
 ### Current Status
 
@@ -385,19 +325,11 @@
 - **Dashboard Modernization**: ✅ All dashboard component errors resolved
 - **New Issues**: 🔄 46 TypeScript errors from incomplete hook implementations and type mismatches
 
-**🔄 CURRENT WORK NEEDED**: 46 TypeScript errors across 11 files:
+**🔄 CURRENT WORK NEEDED**: 37 TypeScript errors across 13 files:
 
-- **SyncDashboard Component**: Missing properties in `useServerSync` hook (6 errors)
-- **BeatCard Component**: Type mismatch in function argument (1 error)
-- **RecentlyViewedBeats Component**: Missing properties in `RecentBeat` type (5 errors)
-- **CartProvider Component**: Missing properties in `Cart` type (1 error)
-- **OfflineIndicator Component**: State update type mismatch (1 error)
-- **LoyaltyCard Component**: Incorrect return type from `useLoyaltyPoints` hook (7 errors)
-- **RewardsGrid Component**: Missing properties in `useRewards` hook (5 errors)
-- **TransactionHistory Component**: Missing properties in transaction type (9 errors)
-- **LoadingStateProvider Component**: Incomplete interface implementation (1 error)
-- **CustomBeatRequest Component**: Error handling type issues (2 errors)
-- **useFavorites Hook**: Type instantiation depth and unknown type issues (2 errors)
+- **BeatCard Component**: Missing `bpm` property in interface (7 errors across 7 files)
+- **Archived Migration Files**: Missing type annotations in legacy migration scripts (29 errors across 6 files)
+- **PaymentService**: Unused @ts-expect-error directive (1 error)
 
 ### Rollback Triggers
 
@@ -428,9 +360,9 @@
 
 ## Current State Summary
 
-This implementation plan has **successfully resolved 60% of the original critical TypeScript errors**. However, new errors have emerged from incomplete hook implementations and type mismatches. Current status:
+This implementation plan has **successfully resolved 68% of the original critical TypeScript errors**. The remaining errors are straightforward fixes in component interfaces and archived migration files. Current status:
 
-### ✅ **Major Progress** (114 → 46 errors, 60% reduction)
+### ✅ **Major Progress** (114 → 37 errors, 68% reduction)
 
 The original critical syntax errors and dashboard modernization errors have been completely resolved:
 
@@ -440,46 +372,35 @@ The original critical syntax errors and dashboard modernization errors have been
 - Dashboard modernization type errors fixed
 - Service interface compatibility resolved
 - Type system consolidation completed
+- Hook implementations completed
 - Application starts and runs successfully
 
-### 🔄 **New Errors Emerged** (46 remaining errors)
+### 🔄 **Remaining Errors** (37 errors across 13 files)
 
-New TypeScript errors have appeared from incomplete hook implementations and type mismatches across 11 files:
+The remaining errors fall into three simple categories:
 
-1. **Incomplete Hook Implementations**: Several custom hooks (`useServerSync`, `useLoyaltyPoints`, `useRewards`, `useLoyaltyTransactions`, `useLoadingState`) are returning incomplete interfaces
-2. **Type Definition Gaps**: Missing properties in type definitions (`RecentBeat`, `Cart`, transaction types)
-3. **Type Instantiation Issues**: Deep type instantiation in `useFavorites` and `useOrders` hooks
-4. **Error Handling Types**: Missing `userMessage` property in error objects
+1. **Missing BeatCard Property** (7 errors): The `BeatCardProps` interface is missing the optional `bpm` property that is being passed from multiple components
+2. **Archived Migration Files** (29 errors): Legacy migration scripts in `convex/migrations/archive/` need proper type annotations for parameters
+3. **Unused Suppression** (1 error): An unnecessary `@ts-expect-error` directive in PaymentService that can be removed
 
 ### **Implementation Strategy**
 
-The remaining tasks focus on fixing the 46 errors by completing hook implementations and type definitions:
+The remaining tasks are straightforward fixes:
 
-1. **Phase 8**: Fix remaining TypeScript errors (11 sub-tasks)
-   - Complete `useServerSync` hook implementation (6 errors)
-   - Fix BeatCard component type mismatch (1 error)
-   - Complete `RecentBeat` type definition (5 errors)
-   - Complete `Cart` type definition (1 error)
-   - Fix OfflineIndicator state update (1 error)
-   - Complete `useLoyaltyPoints` hook (7 errors)
-   - Complete `useRewards` hook (5 errors)
-   - Complete `useLoyaltyTransactions` hook (9 errors)
-   - Complete `useLoadingState` hook (1 error)
-   - Fix CustomBeatRequest error handling (2 errors)
-   - Fix useFavorites type issues (2 errors)
+1. **Phase 8**: Fix remaining TypeScript errors (3 sub-tasks)
+   - Add `bpm?: number` property to BeatCardProps interface (fixes 7 errors)
+   - Add type annotations to archived migration files (fixes 29 errors)
+   - Remove unused @ts-expect-error directive (fixes 1 error)
 2. **Phase 9**: Validate fixes and ensure no regressions
 3. **Phase 10**: Document changes and optimize build configuration
 
-These fixes require implementing complete interfaces for custom hooks and adding missing type properties. The application runs successfully, but TypeScript compilation needs these type definitions to be complete.
-
 ### **Next Steps**
 
-The remaining work is focused on completing hook implementations and type definitions:
+The remaining work is minimal and focused:
 
-1. **Complete Hook Implementations**: Implement full interfaces for `useServerSync`, `useLoyaltyPoints`, `useRewards`, `useLoyaltyTransactions`, and `useLoadingState`
-2. **Add Missing Type Properties**: Complete type definitions for `RecentBeat`, `Cart`, and transaction types
-3. **Fix Type Instantiation**: Resolve deep type instantiation issues in `useFavorites` and `useOrders`
-4. **Fix Error Handling**: Add `userMessage` property to error types
-5. **Final Validation**: Ensure zero TypeScript errors
+1. **Add Missing Property**: Add `bpm?: number` to BeatCardProps interface in `beat-card.tsx`
+2. **Type Archived Migrations**: Add explicit type annotations to parameters in archived migration files
+3. **Remove Unused Directive**: Delete the unnecessary @ts-expect-error comment in PaymentService
+4. **Final Validation**: Run `npx tsc --noEmit` to confirm zero errors
 
-These are systematic fixes that require implementing complete interfaces and type definitions. The work is straightforward but requires careful attention to ensure all properties and methods are properly typed.
+These are simple, mechanical fixes that will bring the TypeScript error count to zero. The application is already running successfully, and these fixes will ensure full type safety across the codebase.

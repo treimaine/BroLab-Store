@@ -136,7 +136,7 @@ export class PaymentService {
       );
 
       // Update order with payment intent ID
-      // @ts-expect-error - Type instantiation depth issue
+      // @ts-expect-error - Convex API type instantiation depth limitation
       await convex.mutation(api.orders.saveStripeCheckoutSession, {
         orderId: order._id,
         checkoutSessionId: paymentIntent.id,

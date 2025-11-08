@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { mutation, type MutationCtx } from "../../_generated/server";
 
 // Migration: clean orders documents to match current schema
 // - Move taxAmount -> tax (if tax missing)
@@ -13,7 +13,7 @@ export const cleanOrders = mutation({
     dryRun: v.optional(v.boolean()),
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, { dryRun = true, limit = 500 }) => {
+  handler: async (ctx: MutationCtx, { dryRun = true, limit = 500 }) => {
     let scanned = 0;
     let updated = 0;
     let skipped = 0;
@@ -68,7 +68,7 @@ export const cleanOrders = mutation({
       if (o.userId && typeof o.userId === "string") {
         const user = await ctx.db
           .query("users")
-          .withIndex("by_clerk_id", q => q.eq("clerkId", o.userId))
+          .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", o.userId))
           .first();
         if (user?._id) patch.userId = user._id;
       }

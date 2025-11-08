@@ -21,6 +21,8 @@ interface BeatCardProps {
   readonly downloads?: number;
   readonly className?: string;
   readonly isFree?: boolean;
+  readonly bpm?: number;
+  readonly duration?: number;
   readonly onViewDetails?: () => void;
 }
 
