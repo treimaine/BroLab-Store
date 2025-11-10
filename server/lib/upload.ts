@@ -1,7 +1,6 @@
 import { fileTypeFromBuffer } from "file-type";
-// import { supabaseAdmin } from './supabaseAdmin'; // Removed - using Convex for data
 
-// Configuration des types de fichiers autorisés
+// Configuration of allowed file types
 const ALLOWED_MIME_TYPES = {
   audio: ["audio/mpeg", "audio/wav", "audio/x-wav", "audio/aiff", "audio/flac"],
   image: ["image/jpeg", "image/png", "image/gif", "image/webp"],

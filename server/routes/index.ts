@@ -26,7 +26,6 @@ export async function registerRoutes(app: Express) {
   registerAuthRoutes(app);
 
   // Register API routes
-  // app.use('/api/subscription', subscriptionRouter); // Removed - using Clerk for billing
   app.use("/api/downloads", downloadsRouter);
   app.use("/api/service-orders", serviceOrdersRouter);
   app.use("/api/orders", ordersRouter);
@@ -40,7 +39,6 @@ export async function registerRoutes(app: Express) {
   app.use("/api/payment/paypal", paypalRouter);
   app.use("/api/security", securityRouter);
   app.use("/api/storage", storageRouter);
-  // app.use('/api/stripe/webhook', stripeWebhookRouter); // Removed - using Clerk for billing
   app.use("/api/uploads", uploadsRouter);
   app.use("/api/wishlist", wishlistRouter);
   app.use("/api/woo", wooRouter);

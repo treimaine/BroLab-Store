@@ -1,156 +1,231 @@
-# 🚀 COMMENCEZ ICI - Fix Souscription Clerk
+# 🚀 COMMENCEZ ICI - BroLab Entertainment
 
-## ⚡ Problème Identifié
+## 📋 Guide de Démarrage Rapide
 
-Vous voyez l'**interface native de Clerk** (reconnaissable par "Secured by Clerk" en bas). Les plans et dates incorrects sont configurés **directement dans Clerk Dashboard**, pas dans votre application.
+Bienvenue dans BroLab Entertainment! Ce guide vous aidera à configurer et démarrer l'application rapidement.
 
-### Ce Que Vous Voyez
+## 🏗️ Architecture Actuelle
 
-- "Ultimate Pass" marqué comme "Active"
-- "Artist" avec "Starts Aug 8, 2026"
-- Interface Clerk Account Management
+### Stack Technique Principal
 
-### Pourquoi C'est Différent
+- **Frontend**: React 18 + TypeScript + Vite
+- **Backend**: Node.js + Express + TypeScript
+- **Base de données**: Convex (temps réel)
+- **Authentification**: Clerk
+- **Paiements**: Stripe + PayPal
+- **CMS Externe**: WordPress/WooCommerce (catalogue produits)
 
-Ce n'est **pas** votre application qui affiche ces données, c'est **Clerk lui-même**. Les scripts Convex ne peuvent pas corriger cela.
+### ⚠️ Important: Systèmes Dépréciés
 
-## ✅ Solution: Nettoyer dans Clerk Dashboard
+- **Supabase**: N'est plus utilisé, toutes les fonctionnalités ont été migrées vers Convex
+- **Authentification personnalisée**: Remplacée par Clerk
 
-### Option 1: Nettoyage Manuel (Recommandé)
+## ✅ Configuration Initiale
 
-**Suivez le guide détaillé:** `docs/GUIDE_CLERK_DASHBOARD_NETTOYAGE.md`
+### Étape 1: Installation des Dépendances
 
-**Résumé rapide:**
+```bash
+# Cloner le projet
+git clone <repository-url> brolab-entertainment
+cd brolab-entertainment
 
-1. **Accéder à Clerk Dashboard**
-   - Allez sur: https://dashboard.clerk.com
-   - Connectez-vous
+# Installer les dépendances
+npm install
+```
 
-2. **Trouver votre utilisateur**
-   - Menu de gauche → **Users**
-   - Trouvez: Steve LEMBA (slemba2@yahoo.fr)
-   - Cliquez sur l'utilisateur
+### Étape 2: Configuration de l'Environnement
 
-3. **Annuler les souscriptions**
-   - Onglet **Subscriptions**
-   - Annulez la souscription "Ultimate Pass"
-   - Confirmez l'annulation
+1. **Copier le fichier d'environnement**
 
-4. **Vérifier dans l'application**
-   - Déconnectez-vous
-   - Reconnectez-vous
-   - Dashboard → Settings → Billing
-   - Vérifiez que "Free" est le seul plan disponible
+   ```bash
+   cp .env.example .env
+   ```
 
-### Option 2: Créer une Nouvelle App Clerk (Plus Rapide)
+2. **Configurer les variables essentielles**
 
-Si le nettoyage est compliqué, créez une nouvelle application Clerk propre:
-
-1. **Créer une nouvelle app**
-   - Clerk Dashboard → Create Application
-   - Nom: "BroLab Entertainment - Clean Dev"
-
-2. **Copier les nouvelles clés**
-   - Copiez `CLERK_PUBLISHABLE_KEY` et `CLERK_SECRET_KEY`
-
-3. **Mettre à jour .env**
+   Éditez `.env` et configurez:
 
    ```env
-   CLERK_PUBLISHABLE_KEY=pk_test_VOTRE_NOUVELLE_CLE
-   CLERK_SECRET_KEY=sk_test_VOTRE_NOUVELLE_CLE
-   VITE_CLERK_PUBLISHABLE_KEY=pk_test_VOTRE_NOUVELLE_CLE
+   # Convex (Base de données temps réel)
+   CONVEX_DEPLOYMENT=dev:votre-deployment
+   VITE_CONVEX_URL=https://votre-deployment.convex.cloud
+
+   # Clerk (Authentification)
+   VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+   CLERK_SECRET_KEY=sk_test_...
+   CLERK_WEBHOOK_SECRET=whsec_...
+
+   # WordPress/WooCommerce (Catalogue produits)
+   WOOCOMMERCE_API_URL=https://votre-site.com/wp-json/wc/v3
+   WOOCOMMERCE_CONSUMER_KEY=ck_...
+   WOOCOMMERCE_CONSUMER_SECRET=cs_...
+
+   # Stripe (Paiements)
+   VITE_STRIPE_PUBLIC_KEY=pk_test_...
+   STRIPE_SECRET_KEY=sk_test_...
+   STRIPE_WEBHOOK_SECRET=whsec_...
+
+   # PayPal (Paiements alternatifs)
+   PAYPAL_CLIENT_ID=...
+   PAYPAL_CLIENT_SECRET=...
+   PAYPAL_MODE=sandbox
    ```
 
-4. **Configurer les plans**
-   - Dans la nouvelle app: Billing → Plans
-   - Créez: Free ($0), Basic ($9.99), Artist ($19.99), Ultimate Pass ($49.99)
+### Étape 3: Démarrer Convex
 
-5. **Redémarrer**
-   ```bash
-   npm run dev
-   ```
+```bash
+# Démarrer le serveur de développement Convex
+npx convex dev
+```
+
+### Étape 4: Démarrer l'Application
+
+```bash
+# Dans un nouveau terminal
+npm run dev
+```
+
+L'application sera accessible sur:
+
+- **Frontend**: http://localhost:5000
+- **Backend API**: http://localhost:5000/api
+- **Convex Dashboard**: Accessible via `npx convex dashboard`
 
 ## 📚 Documentation Complète
 
-### Guides Principaux
+### Guides Essentiels
 
-1. **`docs/GUIDE_CLERK_DASHBOARD_NETTOYAGE.md`** ⭐
-   - Guide pas à pas avec instructions détaillées
-   - Navigation dans Clerk Dashboard
-   - Comment annuler les souscriptions
+1. **`docs/development/LOCAL_DEVELOPMENT_GUIDE.md`** ⭐
+   - Guide complet de configuration locale
+   - Dépannage et résolution de problèmes
+   - Meilleures pratiques de développement
 
-2. **`docs/CLERK_DASHBOARD_FIX.md`**
-   - Explication technique du problème
-   - Pourquoi les scripts Convex n'ont pas aidé
-   - Solutions alternatives
+2. **`docs/deployment/DEPLOYMENT_CHECKLIST.md`**
+   - Liste de vérification pour le déploiement en production
+   - Configuration des webhooks
+   - Optimisations de performance
 
-3. **`docs/EXPLICATION_PROBLEME_CLERK.md`**
-   - Diagnostic détaillé
-   - Diagramme du flux de données
-   - Configuration complète
+3. **`docs/testing/TESTING_GUIDE.md`**
+   - Stratégies de test
+   - Exécution des tests
+   - Couverture de code
 
-### Scripts Convex (Pour Référence)
+4. **`docs/AUTHENTICATION_GUIDE.md`**
+   - Configuration de Clerk
+   - Gestion des utilisateurs
+   - Intégration de la facturation
 
-Les scripts créés nettoient **votre base de données Convex**, pas Clerk Dashboard:
+5. **`docs/README.md`**
+   - Index complet de la documentation
+   - Navigation rapide
+   - Structure du projet
+
+### Commandes Utiles
 
 ```bash
-# Vérifier Convex (pas Clerk)
-npm run fix-subscriptions -- verify
+# Développement
+npm run dev              # Démarrer le serveur de développement
+npm run client           # Frontend uniquement
+npx convex dev           # Serveur Convex
 
-# Nettoyer Convex (pas Clerk)
-npm run fix-subscriptions -- clean
+# Tests
+npm test                 # Exécuter les tests
+npm run type-check       # Vérification TypeScript
+npm run lint             # Vérification ESLint
+npm run lint:fix         # Correction automatique
+
+# Build
+npm run build            # Build de production
+npm run start            # Démarrer en production
+
+# Convex
+npx convex dashboard     # Ouvrir le dashboard Convex
+npx convex deploy        # Déployer les fonctions Convex
+npx convex import        # Importer des données
+npx convex export        # Exporter des données
+
+# Nettoyage
+npm run clean            # Nettoyer node_modules
+npm run clean:all        # Nettoyage complet
+npm run clean:logs       # Nettoyer les logs
 ```
 
-Ces scripts sont utiles pour maintenir la cohérence entre Clerk et Convex, mais ne résolvent pas le problème que vous voyez dans l'interface Clerk.
+## 🎯 Prochaines Étapes
 
-## 🎯 Résumé
+### Pour les Nouveaux Développeurs
 
-### Le Problème
+1. **Lire la documentation**: Commencez par `docs/development/LOCAL_DEVELOPMENT_GUIDE.md`
+2. **Explorer le code**: Familiarisez-vous avec la structure du projet
+3. **Exécuter les tests**: Assurez-vous que tout fonctionne avec `npm test`
+4. **Créer une branche**: Utilisez Git pour vos modifications
 
-- Vous voyez l'interface **Clerk Account Management**
-- Les données viennent de **Clerk Dashboard**, pas de votre app
-- Les scripts Convex ne peuvent pas corriger cela
+### Pour le Déploiement
 
-### La Solution
-
-1. **Nettoyer dans Clerk Dashboard** (Users → Subscriptions)
-2. **OU créer une nouvelle app Clerk** pour repartir à zéro
-
-### Temps Estimé
-
-- **Nettoyage manuel**: 10-15 minutes
-- **Nouvelle app**: 5 minutes
+1. **Vérifier la configuration**: Assurez-vous que toutes les variables d'environnement sont définies
+2. **Tester localement**: Exécutez `npm run build` et `npm run start`
+3. **Suivre la checklist**: Consultez `docs/deployment/DEPLOYMENT_CHECKLIST.md`
+4. **Configurer les webhooks**: Stripe, PayPal, et Clerk
 
 ## 🆘 Besoin d'Aide?
 
-1. **Guide détaillé**: `docs/GUIDE_CLERK_DASHBOARD_NETTOYAGE.md`
-2. **Support Clerk**: https://clerk.com/support
-3. **Discord Clerk**: https://clerk.com/discord
+### Ressources
 
-## 📞 Configuration Clerk Dashboard
+1. **Documentation locale**: Dossier `docs/`
+2. **README principal**: `README.md`
+3. **Guides de dépannage**: `docs/development/TROUBLESHOOTING.md`
 
-Après avoir nettoyé:
+### Dashboards Externes
 
-### Plans à Vérifier
+- **Convex**: https://dashboard.convex.dev
+- **Clerk**: https://dashboard.clerk.com
+- **Stripe**: https://dashboard.stripe.com
+- **PayPal**: https://developer.paypal.com/dashboard
 
-Clerk Dashboard → **Billing → Plans**
+## 📞 Configuration des Services Externes
 
-| Plan ID    | Nom           | Prix        |
-| ---------- | ------------- | ----------- |
-| `free`     | Free          | $0          |
-| `basic`    | Basic         | $9.99/mois  |
-| `artist`   | Artist        | $19.99/mois |
-| `ultimate` | Ultimate Pass | $49.99/mois |
+### Clerk Dashboard
 
-### Webhooks à Configurer
+**URL**: https://dashboard.clerk.com
 
-Clerk Dashboard → **Webhooks**
+1. **Plans de facturation** (Billing → Plans)
 
-- **URL**: `https://votre-domaine.com/api/webhooks/clerk`
-- **Événements**: `subscription.*`, `invoice.*`
+   | Plan ID    | Nom           | Prix        |
+   | ---------- | ------------- | ----------- |
+   | `free`     | Free          | $0          |
+   | `basic`    | Basic         | $9.99/mois  |
+   | `artist`   | Artist        | $19.99/mois |
+   | `ultimate` | Ultimate Pass | $49.99/mois |
+
+2. **Webhooks** (Webhooks → Add Endpoint)
+   - **URL**: `https://votre-domaine.com/api/webhooks/clerk`
+   - **Événements**: `user.*`, `session.*`, `subscription.*`, `invoice.*`
+
+### Stripe Dashboard
+
+**URL**: https://dashboard.stripe.com
+
+1. **Webhooks** (Developers → Webhooks)
+   - **URL**: `https://votre-domaine.com/api/webhooks/stripe`
+   - **Événements**: `payment_intent.*`, `checkout.session.*`
+
+### PayPal Dashboard
+
+**URL**: https://developer.paypal.com/dashboard
+
+1. **Webhooks** (Apps & Credentials → Webhooks)
+   - **URL**: `https://votre-domaine.com/api/webhooks/paypal`
+   - **Événements**: `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`
+
+### Convex Dashboard
+
+**URL**: https://dashboard.convex.dev
+
+- Gérer les fonctions et les données en temps réel
+- Surveiller les performances
+- Consulter les logs
 
 ---
 
-**Temps estimé**: 10-15 minutes (nettoyage) ou 5 minutes (nouvelle app)
+**Temps estimé**: 30-45 minutes (configuration complète)
 **Difficulté**: Moyenne
-**Prérequis**: Accès à Clerk Dashboard
+**Prérequis**: Comptes créés sur Clerk, Stripe, PayPal, et Convex

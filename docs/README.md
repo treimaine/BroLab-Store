@@ -2,28 +2,36 @@
 
 This directory contains all project documentation organized by category.
 
+## Quick Start
+
+- **New developers**: Start with `docs/development/LOCAL_DEVELOPMENT_GUIDE.md`
+- **Deployment**: Check `docs/deployment/DEPLOYMENT_CHECKLIST.md`
+- **Testing**: Use `docs/testing/TESTING_GUIDE.md`
+- **Features**: Review `docs/specs/` for current specifications
+
 ## Active Documentation
 
-### Root Level
+### Authentication & Authorization
 
-- `README.md` - Main project documentation
-- `CLEANUP_PLAN.md` - Documentation cleanup plan (can be removed after review)
+- `AUTHENTICATION_GUIDE.md` - Clerk authentication implementation
+- `CLERK_BILLING_WEBHOOK_SETUP.md` - Clerk billing webhook configuration
+- `CLERK_SUBSCRIPTION_DEBUG_GUIDE.md` - Subscription debugging guide
 
 ### Development (`docs/development/`)
 
 - `LOCAL_DEVELOPMENT_GUIDE.md` - Complete local development setup
 - `LOCAL_DEVELOPMENT_SETUP.md` - Quick setup instructions
-- `README-local.md` - Local development README
-- `README-responsive.md` - Responsive design guidelines
 - `INTERNATIONALIZATION_GUIDE.md` - Multi-language implementation
 - `CLAUDE.md` - AI assistant guidelines
 
 ### Deployment (`docs/deployment/`)
 
 - `DEPLOYMENT_CHECKLIST.md` - Production deployment checklist
-- `README_DEPLOY_O2SWITCH.md` - O2Switch hosting deployment
-- `README-deployment.md` - General deployment guide
+- `production-deployment-guide.md` - Production deployment guide
+- `production-configuration-guide.md` - Production configuration
 - `WORDPRESS_SETUP.md` - WordPress/WooCommerce setup
+- `lazy-loading-strategy.md` - Code splitting and lazy loading
+- `component-usage-patterns.md` - Component usage patterns
 
 ### Testing (`docs/testing/`)
 
@@ -39,65 +47,86 @@ This directory contains all project documentation organized by category.
 - `UNIFIED_FILTERING_SYSTEM.md` - Filtering system specification
 - `MISSING_FEATURES.md` - Feature gap analysis
 
+### Monitoring (`docs/monitoring/`)
+
+- `error-tracking-runbook.md` - Error tracking and debugging
+- `performance-monitoring-runbook.md` - Performance monitoring
+- `system-optimization-monitoring-runbook.md` - System optimization monitoring
+
+### Examples (`docs/examples/`)
+
+- `ErrorHandlingManager.example.ts` - Error handling examples
+- `validation.config.example.ts` - Validation configuration examples
+
+### Component Documentation
+
+- `ErrorHandlingManager.README.md` - Error handling manager documentation
+- `ErrorMessage.usage.md` - Error message component usage
+- `EventBus.README.md` - Event bus system documentation
+- `OfflineBanner.README.md` - Offline banner component
+- `OfflineBanner.IMPLEMENTATION.md` - Offline banner implementation
+- `OfflineBanner.example.tsx` - Offline banner usage example
+- `ConnectionManagerWithAuth.example.tsx` - Connection manager example
+- `RealtimeSyncUsageExample.tsx` - Real-time sync example
+
+### System Architecture
+
+- `configuration-system.md` - Configuration system architecture
+- `rate-limiting-system.md` - Rate limiting implementation
+- `enhanced-email-system.md` - Email system architecture
+- `recently-viewed-beats.md` - Recently viewed beats feature
+- `dashboard-component-business-value.md` - Dashboard component analysis
+
+### Performance & Optimization
+
+- `performance-optimization-guide.md` - Performance optimization guide
+- `optimization-features-guide.md` - Optimization features
+- `lazy-loading-guide.md` - Lazy loading implementation
+- `bundle-analysis-report.md` - Bundle analysis report
+
+### Setup & Configuration
+
+- `EMAIL_CONFIGURATION.md` - Email configuration guide
+- `FAVICON_SETUP.md` - Favicon setup instructions
+- `NGROK_SETUP_GUIDE.md` - ngrok setup for webhooks
+- `NGROK_VISUAL_GUIDE.md` - ngrok visual guide
+- `WEBHOOK_TESTING_QUICKSTART.md` - Webhook testing quickstart
+
+### Diagnostics & Debugging
+
+- `ACTIVITY_SYNC_DIAGNOSTIC.md` - Activity sync diagnostics
+- `DASHBOARD_LIVE_DATA_VERIFICATION.md` - Dashboard data verification
+- `EnhancedGlobalAudioPlayer-DEBUG.md` - Audio player debugging
+- `TROUBLESHOOTING_404.md` - 404 error troubleshooting
+- `test-realtime-sync.md` - Real-time sync testing
+
+### Reports (`docs/reports/`)
+
+- `any-audit.md` - Any type usage audit
+- `log-audit.md` - Console log audit
+
+### Dashboard Mock Data Detection (`docs/dashboard-mock-data-detection/`)
+
+- `README.md` - Dashboard mock data detection overview
+- Task summaries and implementation details
+
 ## Archived Documentation
 
-### Migration Reports (`docs/archive/migration-reports/`)
+All completed migrations, fixes, and historical documentation have been moved to `docs/archive/` and backed up to `archive-backup-YYYYMMDD.tar.gz`.
 
-Completed migration documentation from Supabase/Stripe to Clerk/Convex:
+### Archive Structure
 
-- `PLAN_MIGRATION_SUPABASE_STRIPE_VERS_CLERK_CONVEX.md`
-- `RESUME_MIGRATION_COMPLETE.md`
-- `CONVEX_CLERK_SYNC_GUIDE.md`
-- `CLERK_BILLING_MIGRATION.md`
-- And more migration-related files
-
-### Fix Summaries (`docs/archive/fix-summaries/`)
-
-Historical bug fixes and improvements:
-
-- Audio player fixes
-- UI component fixes
-- Performance optimizations
-- Error handling improvements
-- And many more completed fixes
-
-### Analysis & Audits (`docs/archive/analysis-audits/`)
-
-Project analysis and audit reports:
-
-- Technical planning documents
-- System audits
-- Process gap analyses
-- Dashboard improvement plans
-
-### Export & Windows (`docs/archive/export-windows/`)
-
-Windows-specific export and setup documentation:
-
-- Windows export procedures
-- Local development for Windows
-- Export status reports
-
-### Development Archive (`docs/archive/development/`)
-
-Historical development documentation:
-
-- TypeScript migration progress
-- Bundle analysis reports
-- Build tool validation
-- Development checks and reports
-
-## Navigation Tips
-
-- **New developers**: Start with `docs/development/LOCAL_DEVELOPMENT_GUIDE.md`
-- **Deployment**: Check `docs/deployment/DEPLOYMENT_CHECKLIST.md`
-- **Testing**: Use `docs/testing/TESTING_GUIDE.md`
-- **Features**: Review `docs/specs/` for current specifications
-- **Historical context**: Browse `docs/archive/` for past decisions and fixes
+- `migration-reports/` - Completed migrations (Supabase→Convex, Stripe→Clerk)
+- `fix-summaries/` - Historical bug fixes and improvements
+- `analysis-audits/` - Project analysis and audit reports
+- `export-windows/` - Windows-specific documentation
+- `development/` - Historical development documentation
+- `config-variants/` - Configuration variants
 
 ## Maintenance
 
 - Keep active documentation up to date
-- Archive completed project documentation
+- Archive completed project documentation to `docs/archive/`
 - Remove outdated files regularly
 - Update this index when adding new documentation
+- Backup archive directory periodically

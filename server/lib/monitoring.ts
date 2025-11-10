@@ -1,7 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
 
-// import { supabaseAdmin } from './supabaseAdmin'; // Removed - using Convex for data
-
 // System health monitoring
 export interface HealthCheck {
   service: string;

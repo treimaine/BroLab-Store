@@ -1,5 +1,3 @@
-// import { supabaseAdmin } from './supabaseAdmin'; // Removed - using Convex for data
-
 // Supabase Storage buckets configuration
 const STORAGE_BUCKETS = {
   USER_UPLOADS: "user-uploads",
