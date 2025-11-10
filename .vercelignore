@@ -1,6 +1,42 @@
-node_modules
-build
-dist
-.git
-.trae
-.log
+# Dependencies
+node_modules/
+
+# Build outputs
+build/
+dist/
+coverage/
+
+# Development files
+.git/
+.trae/
+.reports/
+attached_assets/
+
+# Logs
+*.log
+logs/
+
+# IDE files
+.vscode/
+.cursor/
+.idea/
+
+# Environment files (already handled by Vercel)
+.env.local
+.env.*.local
+
+# Test files
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Temporary files
+tmp/
+temp/
+.cache/

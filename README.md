@@ -25,7 +25,7 @@ BroLab Entertainment is a modern full-stack TypeScript application that provides
 - **Multi-Payment Processing**: Stripe and PayPal integration with comprehensive error handling
 - **Responsive Design**: Mobile-first approach with device-specific optimizations (320px-1920px+)
 - **Advanced Cart System**: Persistent cart with license selection and pricing management
-- **Dual Database Strategy**: Convex for new real-time features, Supabase for legacy support
+- **Convex Real-time Database**: Primary database for all features with live updates
 - **File Management System**: Secure file uploads with antivirus scanning and quota management
 - **Comprehensive Reservation System**: Studio booking, mixing, mastering, recording, and consultation services
 - **Advanced Security**: Clerk authentication, RLS policies, rate limiting, and comprehensive validation
@@ -79,16 +79,21 @@ BroLab Entertainment is a modern full-stack TypeScript application that provides
 
 ### Database Architecture
 
-- **Convex (Primary)**: Real-time database for all new features
-  - Users, orders, reservations, subscriptions, downloads
+- **Convex (Primary)**: Real-time database for all features
+  - Users, orders, reservations, subscriptions, downloads, favorites, cart
   - Real-time mutations and queries with automatic caching
   - Built-in authentication integration with Clerk
   - Optimistic updates and conflict resolution
+  - All new features use Convex exclusively
 - **WordPress/WooCommerce (External)**: Product catalog source
   - Read-only integration via REST API v3
   - OAuth 1.0a authentication
   - Scheduled sync (not real-time) for performance
   - Never write back to WordPress from the app
+- **Supabase (Legacy)**: Deprecated, no longer used
+  - Maintained for historical reference only
+  - All functionality migrated to Convex
+  - Do not extend or add new features
 
 ### Development Tools
 
@@ -637,11 +642,11 @@ Common HTTP status codes:
 - **Rate Limiting**: API endpoint protection and abuse prevention
 - **Secure Session Management**: JWT-based authentication with Clerk
 - **Payment Data Encryption**: PCI-compliant Stripe and PayPal integration
-- **Row-Level Security (RLS)**: Database-level access control (Supabase)
+- **Permission-Based Access Control**: Convex-powered authorization with Clerk integration
 - **File Upload Security**: Antivirus scanning and comprehensive validation
 - **Download Quota Enforcement**: License-based limits with real-time tracking
 - **Comprehensive Input Validation**: Zod schema validation across all endpoints
-- **Real-time Security**: Convex-powered permission validation and access control
+- **Real-time Security**: Convex-powered permission validation with Clerk authentication
 
 ## 📈 Performance Optimizations
 
@@ -650,9 +655,8 @@ Common HTTP status codes:
 - **CDN Integration**: Static asset optimization and delivery
 - **Database Query Optimization**: Indexed queries and efficient data fetching
 - **Client-side Caching**: TanStack Query for intelligent server state management
-- **Real-time Efficiency**: Convex optimized queries and mutations
-- **Supabase Edge Functions**: Serverless computing for legacy features
-- **Database Indexing**: Optimized query performance across both databases
+- **Real-time Efficiency**: Convex optimized queries and mutations with automatic caching
+- **Database Indexing**: Optimized query performance with Convex indexes
 - **File Compression**: Automatic asset optimization and progressive loading
 - **Bundle Optimization**: Tree shaking and dynamic imports for minimal bundle size
 
@@ -660,19 +664,17 @@ Common HTTP status codes:
 
 1. **Local Development**: Convex dev server with Clerk authentication
 2. **Feature Development**: Type-safe development with hot reloading and strict TypeScript
-3. **Real-time Features**: Use Convex mutations and queries for new functionality
-4. **Legacy Maintenance**: Maintain Supabase integration without extending
-5. **Testing**: Comprehensive Jest and React Testing Library test suite
-6. **Deployment**: Automated scripts for production deployment
-7. **Monitoring**: Real-time error tracking and performance monitoring
+3. **Real-time Features**: Use Convex mutations and queries for all functionality
+4. **Testing**: Comprehensive Jest and React Testing Library test suite
+5. **Deployment**: Automated scripts for production deployment
+6. **Monitoring**: Real-time error tracking and performance monitoring
 
 ### Database Strategy
 
-- **New Features**: Use Convex mutations/queries for real-time capabilities
-- **Legacy Features**: Maintain Supabase integration, don't extend
+- **All Features**: Use Convex mutations/queries for real-time capabilities
 - **Data Flow**: Client → Convex (real-time) or Client → Express → External APIs
-- **Database Management**: Convex dashboard for real-time data, Drizzle Studio for legacy
-- **Security Testing**: Validate Clerk permissions and Convex access controls
+- **Database Management**: Convex dashboard for all data management
+- **Security**: Validate Clerk permissions and Convex access controls in all functions
 
 ## 📚 Documentation
 

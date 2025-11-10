@@ -14,7 +14,10 @@ export function useLoadingState(initialState = false) {
   const [loadingStates, setLoadingStates] = useState<Record<string, LoadingStateItem>>({});
 
   const setLoading = (key: string, loading: boolean) => {
-    setLoadingStates(prev => ({ ...prev, [key]: { loading } }));
+    setLoadingStates(prev => ({
+      ...prev,
+      [key]: { ...prev[key], loading },
+    }));
   };
 
   const setError = (key: string, error: Error | null) => {
@@ -49,6 +52,10 @@ export function useLoadingState(initialState = false) {
     }
   ): Promise<T> => {
     setLoading(key, true);
+    setLoadingStates(prev => ({
+      ...prev,
+      [key]: { ...prev[key], loading: true, error: null },
+    }));
     try {
       const result = await operation();
       setData(key, result);

@@ -196,7 +196,7 @@
   - Verify file upload functionality still works
   - _Requirements: 1.4, 1.5, 4.4, 5.5_
 
-- [ ] 11. Code Quality and Technical Debt Cleanup
+- [x] 11. Code Quality and Technical Debt Cleanup
   - Remove commented out code and unused imports
   - Consolidate duplicate directories (store vs stores)
   - Clean up French comments in production code
@@ -204,14 +204,14 @@
   - Fix state management anti-patterns (global variables, broken hooks)
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 11.1 Remove commented out code
+- [x] 11.1 Remove commented out code
   - Remove commented imports in server/routes/index.ts (subscription, stripe webhook)
   - Remove commented imports in server/lib/\*.ts files (supabaseAdmin references)
   - Clean up commented code in server/app.ts (French comments about authentication)
   - Document why code was commented and confirm it's safe to remove
   - _Requirements: 5.1, 5.3_
 
-- [ ] 11.2 Consolidate duplicate store directories
+- [x] 11.2 Consolidate duplicate store directories
   - ✅ VERIFIED: client/src/store/ contains only re-export for backward compatibility
   - Remove client/src/store/ directory (contains only re-export wrapper)
   - Update all imports from @/store/_ to @/stores/_ (already done in most files)
@@ -219,7 +219,7 @@
   - Update tsconfig.json paths if needed
   - _Requirements: 5.1, 5.2_
 
-- [ ] 11.3 Clean up test compatibility stubs in server/app.ts
+- [x] 11.3 Clean up test compatibility stubs in server/app.ts
   - Review 500+ lines of test endpoint stubs in server/app.ts
   - Move test endpoints to separate test-only router file
   - Keep only production endpoints in main app.ts
@@ -227,28 +227,28 @@
   - Consider environment-based loading of test endpoints
   - _Requirements: 5.1, 5.4_
 
-- [ ] 11.4 Remove French comments and standardize to English
+- [x] 11.4 Remove French comments and standardize to English
   - Replace French comments in server/app.ts with English equivalents
   - Update "Configuration de l'authentification" to "Authentication configuration"
   - Standardize all code comments to English for consistency
   - Keep French in user-facing content only (i18n translations)
   - _Requirements: 5.3_
 
-- [ ] 11.5 Fix newsletter modal hook implementation
+- [x] 11.5 Fix newsletter modal hook implementation
   - Add openModal function to useNewsletterModalLazy hook
   - Expose openModal via event listener or persistent storage
   - Allow modal to be triggered from user interactions or deferred activation
   - Test modal can be opened programmatically and via user events
   - _Requirements: 5.1, 5.4_
 
-- [ ] 11.6 Fix useLoadingState hook data loss issue
+- [x] 11.6 Fix useLoadingState hook data loss issue
   - Merge setLoading(key, value) calls with existing state instead of overwriting
   - Preserve error and data fields when updating loading status
   - Update withLoading to use null for error reset instead of overwriting entire state
   - Add tests to verify state persistence across loading transitions
   - _Requirements: 5.1, 5.4_
 
-- [ ] 11.7 Replace global state variables with proper state management
+- [x] 11.7 Replace global state variables with proper state management
   - Replace cartItems, favorites, wishlist, recentlyPlayed global arrays in server/app.ts
   - Implement session-based storage using Map indexed by requestId or userId
   - Delegate to Convex for authenticated users (real-time sync)
@@ -256,7 +256,7 @@
   - Add cleanup mechanism for expired sessions
   - _Requirements: 5.1, 5.4, 5.5_
 
-- [ ] 11.8 Validate code quality and state management fixes
+- [x] 11.8 Validate code quality and state management fixes
   - Run TypeScript compiler to check for broken imports
   - Run ESLint to verify no new warnings introduced
   - Test newsletter modal can be opened programmatically
@@ -265,35 +265,35 @@
   - Verify test suite still passes
   - _Requirements: 1.4, 1.5, 5.5_
 
-- [ ] 12. Documentation and Configuration Cleanup
+- [x] 12. Documentation and Configuration Cleanup
   - Remove outdated documentation files
   - Clean up duplicate configuration files
   - Archive old migration reports
   - Update README with current architecture
   - _Requirements: 1.5, 5.3_
 
-- [ ] 12.1 Archive old documentation
+- [x] 12.1 Archive old documentation
   - Move docs/archive/ contents to separate archive repository or zip file
   - Keep only current, relevant documentation in docs/
   - Update docs/README.md with current documentation structure
   - Remove duplicate REORGANIZATION and IMPORT_FIXES documents
   - _Requirements: 5.3_
 
-- [ ] 12.2 Clean up configuration files
+- [x] 12.2 Clean up configuration files
   - Review .dockerignore, .gitignore, .vercelignore for duplicates
   - Consolidate ESLint configuration (eslint.config.js)
   - Review and update tsconfig.json, tsconfig.server.json, tsconfig.jest.json
   - Remove unused configuration files
   - _Requirements: 5.2, 5.3_
 
-- [ ] 12.3 Update main documentation
+- [x] 12.3 Update main documentation
   - Update README.md with current tech stack and architecture
   - Document Clerk + Convex as primary stack (not Supabase + Stripe)
   - Update COMMENCEZ_ICI.md with current setup instructions
   - Remove references to deprecated systems
   - _Requirements: 1.5, 5.3_
 
-- [ ] 12.4 Validate documentation cleanup
+- [x] 12.4 Validate documentation cleanup
   - Verify all documentation links work
   - Check that setup instructions are accurate
   - Test that new developers can follow documentation

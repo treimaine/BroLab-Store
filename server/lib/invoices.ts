@@ -2,7 +2,6 @@ import { Readable } from "stream";
 import { sendMail } from "../services/mail";
 import { getOrderInvoiceData, saveInvoiceUrl } from "./db";
 import { BrandConfig, buildInvoicePdfStream } from "./pdf";
-// import { supabaseAdmin } from './supabaseAdmin'; // Removed - using Convex for data
 
 export function makeInvoiceNumber(orderId: number, year?: number): string {
   const y = year || new Date().getFullYear();
