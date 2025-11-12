@@ -1,8 +1,7 @@
-import { ConvexHttpClient } from "convex/browser";
-
 // Configuration Convex
-const convexUrl = process.env.VITE_CONVEX_URL || "https://agile-boar-163.convex.cloud";
-const convex = new ConvexHttpClient(convexUrl);
+// SECURITY: Use lazy initialization with proper validation, no hardcoded fallback
+import { getConvex } from "./convex";
+const convex = getConvex();
 
 export interface AuditLogEntry {
   userId?: string;

@@ -31,19 +31,29 @@ declare module "express-session" {
 
 // Session configuration
 export function setupAuth(app: Express) {
+  // SECURITY: Enforce SESSION_SECRET in non-test environments
+  if (process.env.NODE_ENV !== "test" && !process.env.SESSION_SECRET) {
+    throw new Error(
+      "SESSION_SECRET environment variable is required for security. " +
+        "Generate a strong secret with: openssl rand -hex 32"
+    );
+  }
+
   app.use(cookieParser());
   app.use(
     session({
-      secret: process.env.SESSION_SECRET || "brolab-secret-key",
+      secret: process.env.SESSION_SECRET || "test-secret-key-only-for-testing",
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: false, // Always false for tests
+        secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         sameSite: "lax",
         maxAge: 24 * 60 * 60 * 1000,
       },
       store: process.env.NODE_ENV === "test" ? new session.MemoryStore() : undefined,
+      // TODO: Use Redis store in production for session persistence
+      // store: process.env.NODE_ENV === 'production' ? new RedisStore({ client: redisClient }) : new session.MemoryStore()
     })
   );
 

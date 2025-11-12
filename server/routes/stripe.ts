@@ -1,4 +1,3 @@
-import { ConvexHttpClient } from "convex/browser";
 import { Request, Response, Router } from "express";
 import Stripe from "stripe";
 import { Id } from "../../convex/_generated/dataModel";
@@ -109,7 +108,9 @@ router.post("/checkout", async (req, res): Promise<void> => {
       return;
     }
 
-    const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL!);
+    // SECURITY: Use lazy initialization with proper validation
+    const { getConvex } = await import("../lib/convex");
+    const convex = getConvex();
 
     // Validate orderId format before using it
     if (!orderId || typeof orderId !== "string") {

@@ -1,7 +1,7 @@
-import { ConvexHttpClient } from "convex/browser";
 import Stripe from "stripe";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import { getConvex } from "../lib/convex";
 import {
   PaymentData,
   ReservationEmailData,
@@ -23,7 +23,8 @@ import {
  */
 
 // Initialize Convex client
-const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL!);
+// SECURITY: Use lazy initialization with proper validation
+const convex = getConvex();
 
 // Types
 interface EmailResult {

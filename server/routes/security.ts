@@ -3,13 +3,16 @@
 // Purpose: Security management and RLS administration routes
 
 import { Router } from "express";
-import { handleRouteError } from "../types/routes";
+import { isAuthenticated as requireAuth } from "../auth";
+import { requireAdmin } from "../middleware/requireAdmin";
+import { AuthenticatedRequest, handleRouteError } from "../types/routes";
 // RLS Security removed - using Convex for security
 
 const router = Router();
 
 // Security handled by Convex (admin only)
-router.post("/admin/rls/initialize", async (req, res) => {
+// 🔒 SECURITY: Admin authentication required
+router.post("/admin/rls/initialize", requireAuth, requireAdmin, async (req, res) => {
   try {
     res.json({
       success: true,
@@ -21,7 +24,8 @@ router.post("/admin/rls/initialize", async (req, res) => {
 });
 
 // Security handled by Convex (admin only)
-router.post("/admin/rls/apply-policies", async (req, res) => {
+// 🔒 SECURITY: Admin authentication required
+router.post("/admin/rls/apply-policies", requireAuth, requireAdmin, async (req, res) => {
   try {
     res.json({
       success: true,
@@ -33,7 +37,8 @@ router.post("/admin/rls/apply-policies", async (req, res) => {
 });
 
 // Security handled by Convex (admin only)
-router.get("/admin/rls/verify", async (req, res) => {
+// 🔒 SECURITY: Admin authentication required
+router.get("/admin/rls/verify", requireAuth, requireAdmin, async (req, res) => {
   try {
     res.json({
       success: true,
@@ -44,7 +49,7 @@ router.get("/admin/rls/verify", async (req, res) => {
   }
 });
 
-// Security status check
+// Security status check (public)
 router.get("/security/status", (req, res) => {
   const status = {
     timestamp: new Date().toISOString(),
@@ -62,7 +67,8 @@ router.get("/security/status", (req, res) => {
 });
 
 // User security info (authenticated users only)
-router.get("/security/user-info", (req, res) => {
+// 🔒 SECURITY: Authentication required
+router.get("/security/user-info", requireAuth, async (req: AuthenticatedRequest, res) => {
   const userInfo = {
     userId: req.user?.id,
     username: req.user?.username,
