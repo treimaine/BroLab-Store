@@ -24,12 +24,16 @@ const router = Router();
 /**
  * GET /api/paypal/test
  * Route de test simple pour diagnostiquer PayPal
+ * 🔒 SECURITY: Development only
  */
 router.get("/test", async (req: Request, res: Response) => {
-  try {
-    console.log("🧪 Testing PayPal endpoint");
+  // SECURITY: Only allow in development
+  if (process.env.NODE_ENV === "production") {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
 
-    // Test simple sans authentification
+  try {
     const testResponse = {
       success: true,
       message: "PayPal endpoint accessible",
@@ -37,7 +41,6 @@ router.get("/test", async (req: Request, res: Response) => {
       test: true,
     };
 
-    console.log("✅ PayPal test successful:", testResponse);
     res.json(testResponse);
   } catch (error: unknown) {
     handleRouteError(error, res, "PayPal test failed");
@@ -47,25 +50,23 @@ router.get("/test", async (req: Request, res: Response) => {
 /**
  * GET /api/paypal/test-auth
  * Route de test pour vérifier l'authentification
+ * 🔒 SECURITY: Development only, authentication required
  */
 router.get("/test-auth", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    console.log("🔐 Testing PayPal authentication");
-    console.log("👤 User data:", {
-      clerkId: req.user?.clerkId || null,
-      id: req.user?.id || null,
-      email: req.user?.email || null,
-      username: req.user?.username || null,
-    });
+  // SECURITY: Only allow in development
+  if (process.env.NODE_ENV === "production") {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
 
+  try {
     res.json({
       success: true,
       message: "PayPal authentication test successful",
       user: {
-        clerkId: req.user?.clerkId || null,
         id: req.user?.id || null,
         email: req.user?.email || null,
-        username: req.user?.username || null,
+        // SECURITY: Don't expose sensitive data in logs
       },
       timestamp: new Date().toISOString(),
     });
@@ -103,13 +104,10 @@ router.post("/create-order", requireAuth, async (req: AuthenticatedRequest, res:
       return;
     }
 
-    console.log("🚀 Creating PayPal order for authenticated user:", req.user);
-    console.log("👤 User ID:", req.user.id);
-
     // Création de la commande PayPal avec l'utilisateur authentifié
     const paymentRequest: PaymentRequest = {
       serviceType,
-      amount: parseFloat(String(amount)),
+      amount: Number.parseFloat(String(amount)),
       currency: currency.toUpperCase(),
       description,
       reservationId,
@@ -117,11 +115,12 @@ router.post("/create-order", requireAuth, async (req: AuthenticatedRequest, res:
       customerEmail,
     };
 
-    console.log("🚀 Creating PayPal order:", paymentRequest);
+    // SECURITY: Log only non-sensitive data
+    console.log("🚀 Creating PayPal order for user:", req.user.id);
     const result = await PayPalService.createPaymentOrder(paymentRequest);
 
     if (result.success) {
-      console.log("✅ PayPal order created successfully:", result.orderId);
+      console.log("✅ PayPal order created:", result.orderId);
 
       // ✅ CORRECTION: Renvoyer uniquement l'approvalLink PayPal
       // Ne pas construire d'URL "maison" avec token= ou reservationId
@@ -146,9 +145,9 @@ router.post("/create-order", requireAuth, async (req: AuthenticatedRequest, res:
  * POST /api/paypal/capture-payment
  * Capture un paiement PayPal après approbation
  * ✅ CORRECTION: Utilise le token PayPal (orderId) pour la capture
+ * 🔒 SECURITY: Authentication required
  */
-router.post("/capture-payment", async (req: AuthenticatedRequest, res: Response) => {
-  // TEMPORAIRE: Authentification désactivée
+router.post("/capture-payment", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { orderId } = req.body as PayPalCapturePaymentRequest;
 
@@ -160,14 +159,14 @@ router.post("/capture-payment", async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
-    console.log("🎯 Capturing PayPal payment for order:", orderId);
-    console.log("🔐 User authenticated:", req.user?.clerkId || req.user?.id || "anonymous");
+    // SECURITY: Log only non-sensitive data
+    console.log("🎯 Capturing PayPal payment for user:", req.user?.id);
 
     // ✅ CORRECTION: orderId est le token PayPal, pas le reservationId
     const result = await PayPalService.capturePayment(orderId);
 
     if (result.success) {
-      console.log("✅ Payment captured successfully:", result.transactionId);
+      console.log("✅ Payment captured:", result.transactionId);
       res.json({
         success: true,
         transactionId: result.transactionId,
@@ -189,8 +188,9 @@ router.post("/capture-payment", async (req: AuthenticatedRequest, res: Response)
  * ✅ NOUVELLE ROUTE: GET /api/paypal/capture/:token
  * Capture automatique du paiement PayPal avec le token de l'URL
  * Cette route est appelée par PayPal lors du retour utilisateur
+ * 🔒 SECURITY: Authentication required
  */
-router.get("/capture/:token", async (req: Request, res: Response) => {
+router.get("/capture/:token", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { token } = req.params;
     const { PayerID } = req.query; // PayerID optionnel de PayPal
@@ -203,14 +203,14 @@ router.get("/capture/:token", async (req: Request, res: Response) => {
       return;
     }
 
-    console.log("🎯 Auto-capturing PayPal payment with token:", token);
-    console.log("👤 PayerID from PayPal:", PayerID);
+    // SECURITY: Log only non-sensitive data
+    console.log("🎯 Auto-capturing PayPal payment for user:", req.user?.id);
 
     // ✅ CORRECTION: token est l'orderId PayPal, pas le reservationId
     const result = await PayPalService.capturePayment(token);
 
     if (result.success) {
-      console.log("✅ Payment auto-captured successfully:", result.transactionId);
+      console.log("✅ Payment auto-captured:", result.transactionId);
 
       // ✅ CORRECTION: Rediriger vers la page de succès avec les bons paramètres
       const successUrl = urls.paypal.success(token, PayerID as string);
@@ -241,10 +241,9 @@ router.get("/capture/:token", async (req: Request, res: Response) => {
 /**
  * GET /api/paypal/order/:orderId
  * Obtient les détails d'une commande PayPal
- * ✅ AUTHENTIFICATION ACTIVÉE
+ * 🔒 SECURITY: Authentication required
  */
-router.get("/order/:orderId", async (req: AuthenticatedRequest, res: Response) => {
-  // TEMPORAIRE: Authentification désactivée
+router.get("/order/:orderId", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { orderId } = req.params;
 
@@ -256,8 +255,8 @@ router.get("/order/:orderId", async (req: AuthenticatedRequest, res: Response) =
       return;
     }
 
-    console.log("📋 Getting PayPal order details:", orderId);
-    console.log("🔐 User authenticated:", req.user?.clerkId || req.user?.id || "anonymous");
+    // SECURITY: Log only non-sensitive data
+    console.log("📋 Getting PayPal order for user:", req.user?.id);
 
     const orderDetails = await PayPalService.getOrderDetails(orderId);
 
@@ -282,11 +281,8 @@ router.get("/health", async (req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
       environment: process.env.PAYPAL_MODE || "sandbox",
     });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: "PayPal service is unhealthy",
-    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "PayPal service is unhealthy");
   }
 });
 

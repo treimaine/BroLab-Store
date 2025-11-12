@@ -4,14 +4,15 @@ import {
   OrderApplicationContextUserAction,
   OrdersController,
 } from "@paypal/paypal-server-sdk";
-import { ConvexHttpClient } from "convex/browser";
 import { createVerify } from "node:crypto";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { PAYPAL_CANCEL_URL, PAYPAL_RETURN_URL, paypalClient } from "../config/paypal";
+import { getConvex } from "../lib/convex";
 
 // Initialize Convex client for database operations
-const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL!);
+// SECURITY: Use lazy initialization with proper validation
+const convex = getConvex();
 
 export interface PaymentRequest {
   serviceType: string;

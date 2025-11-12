@@ -1,4 +1,3 @@
-import { ConvexHttpClient } from "convex/browser";
 import express from "express";
 import { Parser } from "json2csv";
 import { insertDownloadSchema } from "../../shared/schema";
@@ -23,8 +22,9 @@ interface DownloadRecord {
 }
 
 // Configuration Convex
-const convexUrl = process.env.VITE_CONVEX_URL || "https://agile-boar-163.convex.cloud";
-const convex = new ConvexHttpClient(convexUrl);
+// SECURITY: Use lazy initialization with proper validation, no hardcoded fallback
+import { getConvex } from "../lib/convex";
+const convex = getConvex();
 
 const router = express.Router();
 

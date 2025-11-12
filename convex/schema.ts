@@ -512,4 +512,37 @@ export default defineSchema({
     author: v.string(),
     body: v.string(),
   }),
+
+  // Email Verifications - Security: Token storage for email verification
+  emailVerifications: defineTable({
+    userId: v.id("users"),
+    email: v.string(),
+    token: v.string(), // UUID token
+    expiresAt: v.number(), // Expiration timestamp (24 hours)
+    verified: v.optional(v.boolean()), // Whether email was verified
+    verifiedAt: v.optional(v.number()), // Verification timestamp
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"])
+    .index("by_email", ["email"])
+    .index("by_expires", ["expiresAt"]),
+
+  // Password Resets - Security: Token storage for password reset
+  passwordResets: defineTable({
+    userId: v.id("users"),
+    email: v.string(),
+    token: v.string(), // UUID token
+    expiresAt: v.number(), // Expiration timestamp (15 minutes)
+    used: v.optional(v.boolean()), // Whether token was used
+    usedAt: v.optional(v.number()), // Usage timestamp
+    ipAddress: v.optional(v.string()), // IP address of request
+    userAgent: v.optional(v.string()), // User agent of request
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"])
+    .index("by_email", ["email"])
+    .index("by_expires", ["expiresAt"])
+    .index("by_used", ["used"]),
 });

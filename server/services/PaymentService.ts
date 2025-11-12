@@ -1,7 +1,7 @@
-import { ConvexHttpClient } from "convex/browser";
 import Stripe from "stripe";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import { getConvex } from "../lib/convex";
 import { PaymentError, PaymentErrorCode } from "../utils/errorHandling";
 import { adminNotificationService } from "./AdminNotificationService";
 import { getInvoiceService } from "./InvoiceService";
@@ -46,7 +46,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 // Initialize Convex client
-const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL!);
+// SECURITY: Use lazy initialization with proper validation
+const convex = getConvex();
 
 // Types
 interface Order {
@@ -136,7 +137,8 @@ export class PaymentService {
       );
 
       // Update order with payment intent ID
-      // @ts-expect-error - Convex API type instantiation depth limitation
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - Convex API deep type instantiation limitation
       await convex.mutation(api.orders.saveStripeCheckoutSession, {
         orderId: order._id,
         checkoutSessionId: paymentIntent.id,

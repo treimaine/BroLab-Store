@@ -1,4 +1,3 @@
-import { ConvexHttpClient } from "convex/browser";
 import { Router } from "express";
 import type {
   CreateOrderResponse,
@@ -47,7 +46,9 @@ interface CreateOrderResult {
 }
 
 const ordersRouter = Router();
-const convex = new ConvexHttpClient(process.env.VITE_CONVEX_URL!);
+// SECURITY: Use lazy initialization with proper validation
+import { getConvex } from "../lib/convex";
+const convex = getConvex();
 
 // Wrapper functions to avoid complex Convex type access
 const createOrderIdempotent = async (
