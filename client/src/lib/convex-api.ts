@@ -1,37 +1,41 @@
-// Simple wrapper to avoid deep type instantiation issues
-// Using dynamic import to avoid TypeScript compilation issues
+/**
+ * Simple wrapper to avoid deep type instantiation issues
+ * Using string literals to reference Convex functions dynamically
+ *
+ * Each string represents a path to a Convex function that will be resolved at runtime
+ */
 export const api = {
   favorites: {
     getFavorites: {
-      getFavorites: "favorites/getFavorites:getFavorites" as any,
-      getFavoritesWithBeats: "favorites/getFavorites:getFavoritesWithBeats" as any,
+      getFavorites: "favorites/getFavorites:getFavorites" as string,
+      getFavoritesWithBeats: "favorites/getFavorites:getFavoritesWithBeats" as string,
     },
     add: {
-      addToFavorites: "favorites/add:addToFavorites" as any,
+      addToFavorites: "favorites/add:addToFavorites" as string,
     },
     remove: {
-      removeFromFavorites: "favorites/remove:removeFromFavorites" as any,
+      removeFromFavorites: "favorites/remove:removeFromFavorites" as string,
     },
   },
   users: {
     getUserStats: {
-      getUserStats: "users/getUserStats:getUserStats" as any,
+      getUserStats: "users/getUserStats:getUserStats" as string,
     },
     clerkSync: {
-      forceSyncCurrentUser: "users/clerkSync:forceSyncCurrentUser" as any,
+      forceSyncCurrentUser: "users/clerkSync:forceSyncCurrentUser" as string,
     },
   },
   products: {
     forYou: {
-      getForYouBeats: "products/forYou:getForYouBeats" as any,
+      getForYouBeats: "products/forYou:getForYouBeats" as string,
     },
   },
   dashboard: {
-    getDashboardData: "dashboard:getDashboardData" as any,
-    getDashboardStats: "dashboard:getDashboardStats" as any,
-    getAnalyticsData: "dashboard:getAnalyticsData" as any,
+    getDashboardData: "dashboard:getDashboardData" as string,
+    getDashboardStats: "dashboard:getDashboardStats" as string,
+    getAnalyticsData: "dashboard:getAnalyticsData" as string,
   },
   orders: {
-    regenerateDownloadsFromOrders: "orders:regenerateDownloadsFromOrders" as unknown,
+    regenerateDownloadsFromOrders: "orders:regenerateDownloadsFromOrders" as string,
   },
-};
+} as const;
