@@ -1,5 +1,6 @@
 import { Request, Response, Router } from "express";
 import { isAuthenticated as requireAuth } from "../auth";
+import { requireAdmin } from "../middleware/requireAdmin";
 import { getMessageQueue, type QueuedMessage } from "../services/MessageQueueService";
 import { getWebSocketManager } from "../services/WebSocketManager";
 
@@ -284,18 +285,9 @@ router.get(
 router.post(
   "/broadcast",
   requireAuth,
+  requireAdmin,
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const isAdmin = req.user!.role === "admin" || req.user!.role === "service_role";
-
-      if (!isAdmin) {
-        res.status(403).json({
-          error: "Admin access required",
-          code: "ACCESS_DENIED",
-        });
-        return;
-      }
-
       const { type, payload, topics } = req.body;
 
       if (!type || !payload) {

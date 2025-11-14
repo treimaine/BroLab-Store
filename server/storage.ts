@@ -570,10 +570,10 @@ export class DatabaseStorage implements IStorage {
   async createReservation(
     reservation: InsertReservation & { clerkId?: string }
   ): Promise<Reservation> {
-    console.log(
-      "🔄 DatabaseStorage: Creating reservation with clerkId:",
-      reservation.clerkId ? `${reservation.clerkId.substring(0, 8)}...` : "undefined"
-    );
+    secureLogger.debug("DatabaseStorage: Creating reservation", {
+      hasClerkId: !!reservation.clerkId,
+      serviceType: reservation.serviceType,
+    });
 
     if (!reservation.clerkId) {
       throw new Error("Authentication error: clerkId is required for reservation creation");
@@ -707,7 +707,7 @@ export class DatabaseStorage implements IStorage {
   async getUserDownloads(userId: number): Promise<any[]> {
     // Downloads would be retrieved from database
     // For now, return empty array as downloads are not fully implemented
-    console.log(`Getting downloads for user: ${userId}`);
+    secureLogger.debug("Getting downloads for user", { hasUserId: !!userId });
     return [];
   }
 
@@ -719,7 +719,10 @@ export class DatabaseStorage implements IStorage {
     timestamp: string;
   }): Promise<any> {
     // Download logging would go to database
-    console.log(`Logging download:`, download);
+    secureLogger.info("Logging download", {
+      beatId: download.beatId,
+      hasUserId: !!download.userId,
+    });
     return {
       id: Date.now(), // Temporary ID
       ...download,
@@ -730,7 +733,7 @@ export class DatabaseStorage implements IStorage {
   async subscribeToNewsletter(email: string): Promise<void> {
     // Newsletter subscription logic would go here
     // For now, we'll implement a simple log
-    console.log(`Newsletter subscription for: ${email}`);
+    secureLogger.info("Newsletter subscription", { hasEmail: !!email });
   }
 
   async saveContactMessage(message: {
@@ -742,7 +745,10 @@ export class DatabaseStorage implements IStorage {
   }): Promise<void> {
     // Contact message storage logic would go here
     // For now, we'll implement a simple log
-    console.log(`Contact message from: ${message.email} - ${message.subject}`);
+    secureLogger.info("Contact message received", {
+      hasEmail: !!message.email,
+      subject: message.subject,
+    });
   }
 }
 

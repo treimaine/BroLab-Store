@@ -1,7 +1,9 @@
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 
-// Créer ou mettre à jour un utilisateur depuis Clerk avec gestion d'erreurs robuste
+/**
+ * Create or update a user from Clerk with robust error handling
+ */
 export const syncClerkUser = mutation({
   args: {
     clerkId: v.string(),
@@ -17,21 +19,43 @@ export const syncClerkUser = mutation({
     try {
       console.log(`🔄 Syncing Clerk user: ${args.clerkId} (${args.email})`);
 
-      // Validation des données d'entrée
+      // Validate input data
       if (!args.clerkId || !args.email) {
         throw new Error("ClerkId and email are required");
       }
 
-      // Vérifier si l'utilisateur existe déjà
+      // Check if user already exists
       const existingUser = await ctx.db
         .query("users")
         .withIndex("by_clerk_id", q => q.eq("clerkId", args.clerkId))
         .first();
 
       const now = Date.now();
+
+      // Determine the best username to use
+      // Priority: existing valid username > Clerk username > auto-generated
+      const clerkUsername = args.username || `user_${args.clerkId.slice(-8)}`;
+      const hasValidClerkUsername = args.username && !args.username.startsWith("user_");
+      const hasValidExistingUsername =
+        existingUser?.username && !existingUser.username.startsWith("user_");
+
+      let finalUsername: string;
+      if (existingUser) {
+        // Preserve existing username unless Clerk has a better one
+        if (hasValidExistingUsername && existingUser.username) {
+          finalUsername = existingUser.username;
+        } else if (hasValidClerkUsername) {
+          finalUsername = clerkUsername;
+        } else {
+          finalUsername = existingUser.username || clerkUsername;
+        }
+      } else {
+        finalUsername = clerkUsername;
+      }
+
       const userData = {
         email: args.email,
-        username: args.username || `user_${args.clerkId.slice(-8)}`,
+        username: finalUsername,
         firstName: args.firstName,
         lastName: args.lastName,
         imageUrl: args.imageUrl,
@@ -43,10 +67,10 @@ export const syncClerkUser = mutation({
       };
 
       if (existingUser) {
-        // Mettre à jour l'utilisateur existant
+        // Update existing user - username is preserved unless Clerk has a better one
         await ctx.db.patch(existingUser._id, userData);
 
-        // Log de l'activité
+        // Log user login activity
         await ctx.db.insert("activityLog", {
           userId: existingUser._id,
           action: "user_login",
@@ -62,14 +86,14 @@ export const syncClerkUser = mutation({
           user: await ctx.db.get(existingUser._id),
         };
       } else {
-        // Créer un nouvel utilisateur
+        // Create new user
         const userId = await ctx.db.insert("users", {
           clerkId: args.clerkId,
           ...userData,
           createdAt: now,
         });
 
-        // Log de l'activité de création
+        // Log user creation activity
         await ctx.db.insert("activityLog", {
           userId,
           action: "user_created",
@@ -90,7 +114,7 @@ export const syncClerkUser = mutation({
 
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      // Log de l'erreur
+      // Log sync error to audit logs
       await ctx.db.insert("auditLogs", {
         clerkId: args.clerkId,
         action: "sync_user_error",
@@ -109,7 +133,9 @@ export const syncClerkUser = mutation({
   },
 });
 
-// Obtenir un utilisateur par son Clerk ID
+/**
+ * Get a user by their Clerk ID
+ */
 export const getUserByClerkId = query({
   args: { clerkId: v.string() },
   handler: async (ctx, { clerkId }) => {
@@ -120,7 +146,9 @@ export const getUserByClerkId = query({
   },
 });
 
-// Obtenir un utilisateur par son email
+/**
+ * Get a user by their email
+ */
 export const getUserByEmail = query({
   args: { email: v.string() },
   handler: async (ctx, { email }) => {
@@ -131,7 +159,9 @@ export const getUserByEmail = query({
   },
 });
 
-// Supprimer un utilisateur (quand supprimé de Clerk) avec gestion sécurisée
+/**
+ * Delete a user (when deleted from Clerk) with secure handling
+ */
 export const deleteClerkUser = mutation({
   args: { clerkId: v.string() },
   handler: async (ctx, { clerkId }) => {
@@ -148,7 +178,7 @@ export const deleteClerkUser = mutation({
         return { success: false, message: "User not found" };
       }
 
-      // Au lieu de supprimer, désactiver l'utilisateur pour préserver l'intégrité des données
+      // Instead of deleting, deactivate the user to preserve data integrity
       await ctx.db.patch(user._id, {
         isActive: false,
         updatedAt: Date.now(),
@@ -158,7 +188,7 @@ export const deleteClerkUser = mutation({
         },
       });
 
-      // Log de l'activité de suppression
+      // Log deletion activity
       await ctx.db.insert("activityLog", {
         userId: user._id,
         action: "user_deactivated",
@@ -204,7 +234,7 @@ export const deleteClerkUser = mutation({
 
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      // Log de l'erreur
+      // Log deletion error to audit logs
       await ctx.db.insert("auditLogs", {
         clerkId: clerkId,
         action: "user_deletion_error",
@@ -223,7 +253,9 @@ export const deleteClerkUser = mutation({
   },
 });
 
-// Obtenir les statistiques d'un utilisateur
+/**
+ * Get user statistics
+ */
 export const getUserStats = query({
   args: { clerkId: v.string() },
   handler: async (ctx, { clerkId }) => {
@@ -236,21 +268,21 @@ export const getUserStats = query({
       return null;
     }
 
-    // Compter les favoris
+    // Count favorites
     const favoritesCount = await ctx.db
       .query("favorites")
       .withIndex("by_user", q => q.eq("userId", user._id))
       .collect()
       .then(favorites => favorites.length);
 
-    // Compter les téléchargements
+    // Count downloads
     const downloadsCount = await ctx.db
       .query("downloads")
       .withIndex("by_user", q => q.eq("userId", user._id))
       .collect()
       .then(downloads => downloads.length);
 
-    // Compter les commandes
+    // Count orders
     const ordersCount = await ctx.db
       .query("orders")
       .withIndex("by_user", q => q.eq("userId", user._id))
@@ -271,5 +303,126 @@ export const getUserStats = query({
         ordersCount,
       },
     };
+  },
+});
+
+/**
+ * Force sync current authenticated user from Clerk identity
+ */
+export const forceSyncCurrentUser = mutation({
+  args: {},
+  handler: async ctx => {
+    try {
+      // Get current user identity from Clerk
+      const identity = await ctx.auth.getUserIdentity();
+
+      if (!identity) {
+        throw new Error("Not authenticated");
+      }
+
+      console.log(`🔄 Force syncing current user: ${identity.subject}`);
+
+      // Extract user data from Clerk identity
+      const userData = {
+        clerkId: identity.subject,
+        email: identity.email || "",
+        // Use username from Clerk, not fullName (identity.name)
+        // Convert to string to ensure type safety
+        username:
+          (typeof identity.username === "string" ? identity.username : undefined) ||
+          `user_${identity.subject.slice(-8)}`,
+        firstName: identity.givenName,
+        lastName: identity.familyName,
+        imageUrl: identity.pictureUrl,
+      };
+
+      // Call the sync function directly instead of using runMutation to avoid circular type issues
+      // Check if user already exists
+      const existingUser = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", q => q.eq("clerkId", userData.clerkId))
+        .first();
+
+      const now = Date.now();
+
+      // Prepare update data - preserve existing username if it exists and is not auto-generated
+      const hasValidClerkUsername = userData.username && !userData.username.startsWith("user_");
+      const hasValidExistingUsername =
+        existingUser?.username && !existingUser.username.startsWith("user_");
+
+      // Determine the best username to use
+      let finalUsername: string;
+      if (existingUser) {
+        // Preserve existing username unless Clerk has a better one
+        if (hasValidExistingUsername && existingUser.username) {
+          finalUsername = existingUser.username;
+        } else if (hasValidClerkUsername) {
+          finalUsername = userData.username;
+        } else {
+          finalUsername = existingUser.username || userData.username;
+        }
+      } else {
+        finalUsername = userData.username;
+      }
+
+      const userDataWithDefaults = {
+        email: userData.email,
+        username: finalUsername,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        imageUrl: userData.imageUrl,
+        role: "user",
+        isActive: true,
+        lastLoginAt: now,
+        updatedAt: now,
+      };
+
+      if (existingUser) {
+        // Update existing user - username is preserved unless Clerk has a better one
+        await ctx.db.patch(existingUser._id, userDataWithDefaults);
+
+        // Log user login activity
+        await ctx.db.insert("activityLog", {
+          userId: existingUser._id,
+          action: "user_login",
+          details: { source: "force_sync", updated: true },
+          timestamp: now,
+        });
+
+        console.log(`✅ Force sync updated user: ${userData.clerkId}`);
+        return {
+          success: true,
+          action: "updated",
+          userId: existingUser._id,
+          user: await ctx.db.get(existingUser._id),
+        };
+      } else {
+        // Create new user
+        const userId = await ctx.db.insert("users", {
+          clerkId: userData.clerkId,
+          ...userDataWithDefaults,
+          createdAt: now,
+        });
+
+        // Log user creation activity
+        await ctx.db.insert("activityLog", {
+          userId,
+          action: "user_created",
+          details: { source: "force_sync", email: userData.email },
+          timestamp: now,
+        });
+
+        console.log(`✅ Force sync created new user: ${userData.clerkId}`);
+        return {
+          success: true,
+          action: "created",
+          userId,
+          user: await ctx.db.get(userId),
+        };
+      }
+    } catch (error) {
+      console.error(`❌ Error force syncing user:`, error);
+      throw error;
+    }
   },
 });

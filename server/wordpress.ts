@@ -58,8 +58,10 @@ const WOOCOMMERCE_API_URL =
 const WC_CONSUMER_KEY = process.env.WOOCOMMERCE_CONSUMER_KEY;
 const WC_CONSUMER_SECRET = process.env.WOOCOMMERCE_CONSUMER_SECRET;
 
+import { secureLogger } from "./lib/secureLogger";
+
 // Debug environment loading
-console.log("WordPress module loaded - API credentials:", {
+secureLogger.debug("WordPress module loaded - API credentials", {
   wordpressUrl: WORDPRESS_API_URL,
   woocommerceUrl: WOOCOMMERCE_API_URL,
   consumerKey: WC_CONSUMER_KEY ? "present" : "missing",
@@ -91,7 +93,7 @@ async function wpApiRequest(endpoint: string, options: RequestInit = {}) {
 function proxyAudioUrl(originalUrl: string | null): string | null {
   if (!originalUrl) return null;
 
-  console.log("🔗 Original audio URL:", originalUrl);
+  secureLogger.debug("Original audio URL retrieved", { hasUrl: !!originalUrl });
 
   // Return the original URL directly - no proxy needed
   return originalUrl;
@@ -100,7 +102,7 @@ function proxyAudioUrl(originalUrl: string | null): string | null {
 function proxyImageUrl(originalUrl: string | null): string | null {
   if (!originalUrl) return null;
 
-  console.log("🖼️ Original image URL:", originalUrl);
+  secureLogger.debug("Original image URL retrieved", { hasUrl: !!originalUrl });
 
   // If it's already a full URL, return as is
   if (originalUrl.startsWith("http://") || originalUrl.startsWith("https://")) {
@@ -214,7 +216,7 @@ export function registerWordPressRoutes(app: Express) {
         return;
       }
 
-      console.log("🖼️ Proxying image:", url);
+      secureLogger.debug("Proxying image", { hasUrl: !!url });
 
       const response = await fetch(url);
       if (!response.ok) {

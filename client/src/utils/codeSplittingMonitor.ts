@@ -29,7 +29,7 @@ export interface CodeSplittingMetrics {
 
 class CodeSplittingMonitor {
   private static instance: CodeSplittingMonitor;
-  private metrics: CodeSplittingMetrics;
+  private readonly metrics: CodeSplittingMetrics;
   private performanceObserver?: PerformanceObserver;
 
   private constructor() {
@@ -50,14 +50,14 @@ class CodeSplittingMonitor {
     return CodeSplittingMonitor.instance;
   }
 
-  private initializeMonitoring() {
-    if (typeof window === "undefined" || process.env.NODEENV !== "development") {
+  private initializeMonitoring(): void {
+    if (globalThis.window === undefined || process.env.NODE_ENV !== "development") {
       return;
     }
 
     // Monitor resource loading (chunks)
     this.performanceObserver = new PerformanceObserver(list => {
-      list.getEntries().forEach(entry => {
+      for (const entry of list.getEntries()) {
         if (entry.name.includes("assets/") && entry.name.endsWith(".js")) {
           const chunkName = this.extractChunkName(entry.name);
           this.trackChunkLoad({
@@ -67,13 +67,13 @@ class CodeSplittingMonitor {
             timestamp: Date.now(),
           });
         }
-      });
+      }
     });
 
     this.performanceObserver.observe({ entryTypes: ["resource"] });
 
     // Track initial load time
-    window.addEventListener("load", () => {
+    globalThis.window.addEventListener("load", () => {
       this.metrics.initialLoadTime = performance.now();
     });
 
@@ -84,16 +84,17 @@ class CodeSplittingMonitor {
   }
 
   private extractChunkName(url: string): string {
-    const match = url.match(/assets\/(.+?)-[a-f0-9]+\.js$/);
+    const regex = /assets\/(.+?)-[a-f0-9]+\.js$/;
+    const match = regex.exec(url);
     return match ? match[1] : "unknown";
   }
 
-  trackChunkLoad(metric: ChunkLoadMetric) {
+  trackChunkLoad(metric: ChunkLoadMetric): void {
     this.metrics.chunksLoaded.push(metric);
     console.log(`📦 Chunk loaded: ${metric.chunkName} (${metric.loadTime.toFixed(2)}ms)`);
   }
 
-  trackComponentRender(componentName: string, renderTime: number, isLazyLoaded = false) {
+  trackComponentRender(componentName: string, renderTime: number, isLazyLoaded = false): void {
     const metric: ComponentRenderMetric = {
       componentName,
       renderTime,
@@ -121,7 +122,7 @@ class CodeSplittingMonitor {
     };
   }
 
-  private reportMetrics() {
+  private reportMetrics(): void {
     const metrics = this.getMetrics();
 
     console.group("📊 Code Splitting Performance Report");
@@ -133,19 +134,20 @@ class CodeSplittingMonitor {
     console.log(`Estimated lazy load savings: ${metrics.lazyLoadSavings}KB`);
 
     // Top slowest chunks
-    const slowestChunks = metrics.chunksLoaded.sort((a, b) => b.loadTime - a.loadTime).slice(0, 5);
+    const sortedChunks = metrics.chunksLoaded.toSorted((a, b) => b.loadTime - a.loadTime);
+    const slowestChunks = sortedChunks.slice(0, 5);
 
     if (slowestChunks.length > 0) {
       console.log("Slowest chunks:");
-      slowestChunks.forEach(chunk => {
+      for (const chunk of slowestChunks) {
         console.log(`  ${chunk.chunkName}: ${chunk.loadTime.toFixed(2)}ms`);
-      });
+      }
     }
 
     console.groupEnd();
   }
 
-  destroy() {
+  destroy(): void {
     this.performanceObserver?.disconnect();
   }
 }

@@ -24,6 +24,49 @@ inclusion: always
 - Avoids broken builds and failed deployments
 - Reduces technical debt accumulation
 
+## Mandatory Anti-Duplication Rule
+
+**Before creating any new component, function, implementation, or configuration file, ALWAYS verify it doesn't already exist.**
+
+### Pre-Creation Verification Workflow
+
+1. **Search** - Use `grepSearch` or `fileSearch` to find existing implementations
+2. **Check Locations** - Verify common directories for similar functionality:
+   - Components: `client/src/components/[feature]/`
+   - Utilities: `shared/utils/`, `client/src/utils/`, `server/utils/`
+   - Services: `client/src/services/`, `server/services/`
+   - Hooks: `client/src/hooks/`
+   - Types: `shared/types/`, `client/src/types/`
+   - Config: Root directory, `.kiro/`, `convex/`
+3. **Reuse** - If found, import and use the existing implementation
+4. **Create** - Only create new files after confirming they don't exist
+5. **Document** - If creating, follow project structure conventions
+
+### Why This Matters
+
+- Prevents duplicate components in different locations
+- Avoids redundant utility functions and services
+- Eliminates multiple configuration files for the same purpose
+- Reduces code bloat and maintenance overhead
+- Prevents conflicting implementations
+- Maintains single source of truth for functionality
+
+### Search Pattern Examples
+
+```bash
+# Before creating a validation utility
+grepSearch: "validateEmail|emailValidation"
+
+# Before creating a payment service
+fileSearch: "payment" in server/services/
+
+# Before creating a dashboard component
+fileSearch: "Dashboard" in client/src/components/
+
+# Before creating a Convex function
+fileSearch: "users" in convex/
+```
+
 ## Mandatory File Organization Rule
 
 **All documentation and example files MUST be placed in the `docs/` directory.**

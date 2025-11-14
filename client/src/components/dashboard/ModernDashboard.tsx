@@ -50,6 +50,9 @@ import { ValidatedDashboard } from "./ValidatedDashboard";
 // Import unified dashboard hook
 import { useDashboard } from "@/hooks/useDashboard";
 
+// Import Convex mutation for user sync
+import { useMutation } from "convex/react";
+
 // Import other dashboard tabs (removed lazy loading)
 import UserProfile from "@/components/auth/UserProfile";
 import DownloadsRegenerator from "@/components/dashboard/DownloadsRegenerator";
@@ -141,11 +144,15 @@ RecommendationsPanel.displayName = "RecommendationsPanel";
 
 // Main dashboard component
 export const ModernDashboard = memo(() => {
-  const { user: clerkUser } = useUser();
+  const { user: clerkUser, isLoaded: isClerkLoaded } = useUser();
   const { openUserProfile } = useClerk();
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
   const { config } = useDashboardConfig();
+
+  // Convex mutation for forcing user sync - using string reference to avoid circular dependency
+  const forceSyncUser = useMutation("users/clerkSync:forceSyncCurrentUser" as never);
+  const [hasSyncedUser, setHasSyncedUser] = useState(false);
 
   // State management
   const [activeTab, setActiveTab] = useState("overview");
@@ -205,6 +212,33 @@ export const ModernDashboard = memo(() => {
       destroyCrossTabSync();
     };
   }, [clerkUser?.id, initializeCrossTabSync, destroyCrossTabSync]);
+
+  // Force sync user data from Clerk on first load if user data is missing or invalid
+  useEffect(() => {
+    const shouldSync =
+      isClerkLoaded &&
+      clerkUser &&
+      !hasSyncedUser &&
+      user &&
+      (!user.firstName ||
+        !user.lastName ||
+        user.email?.includes("unknown") ||
+        user.email?.includes("temp"));
+
+    if (shouldSync) {
+      console.log("🔄 Auto-syncing user data from Clerk...");
+      forceSyncUser()
+        .then(() => {
+          console.log("✅ User data synced successfully");
+          setHasSyncedUser(true);
+          // Refresh dashboard data after sync
+          setTimeout(() => refetch(), 1000);
+        })
+        .catch((error: Error) => {
+          console.error("❌ Failed to sync user data:", error);
+        });
+    }
+  }, [isClerkLoaded, clerkUser, user, hasSyncedUser, forceSyncUser, refetch]);
 
   // Use real stats from unified hook - no fallbacks or recalculation needed
   const consistentStats = useMemo(() => {
@@ -314,10 +348,37 @@ export const ModernDashboard = memo(() => {
             <DashboardLayout activeTab={activeTab} onTabChange={handleTabChange}>
               {/* Dashboard Header with Enhanced Connection Status */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 md:mb-6">
-                <DashboardHeader
-                  user={user || clerkUser || null}
-                  className="space-y-1 sm:space-y-2 flex-1 w-full sm:w-auto"
-                />
+                {(() => {
+                  // Prioritize Convex user data, but fallback to Clerk for name if needed
+                  let userToPass = user || null;
+
+                  // If Convex user doesn't have firstName/lastName, try to get from Clerk
+                  if (userToPass && !userToPass.firstName && !userToPass.lastName && clerkUser) {
+                    userToPass = {
+                      ...userToPass,
+                      firstName: clerkUser.firstName || undefined,
+                      lastName: clerkUser.lastName || undefined,
+                    };
+                  } else if (!userToPass && clerkUser) {
+                    // If no Convex user at all, create a minimal user object from Clerk
+                    userToPass = {
+                      id: clerkUser.id,
+                      clerkId: clerkUser.id,
+                      email: clerkUser.primaryEmailAddress?.emailAddress || "",
+                      firstName: clerkUser.firstName || undefined,
+                      lastName: clerkUser.lastName || undefined,
+                      imageUrl: clerkUser.imageUrl || undefined,
+                      username: clerkUser.username || undefined,
+                    };
+                  }
+
+                  return (
+                    <DashboardHeader
+                      user={userToPass}
+                      className="space-y-1 sm:space-y-2 flex-1 w-full sm:w-auto"
+                    />
+                  );
+                })()}
 
                 {/* Enhanced Data Sync Status with Connection Indicators */}
                 <DataSyncIndicator
@@ -518,21 +579,45 @@ export const ModernDashboard = memo(() => {
                           <div>
                             <p className="text-xs sm:text-sm font-medium text-white">Full Name</p>
                             <p className="text-muted-foreground text-xs sm:text-sm">
-                              {user?.firstName && user?.lastName
-                                ? `${user.firstName} ${user.lastName}`
-                                : clerkUser?.fullName || ""}
+                              {(() => {
+                                // Prioritize Clerk data for name
+                                if (clerkUser?.fullName) return clerkUser.fullName;
+                                if (clerkUser?.firstName && clerkUser?.lastName) {
+                                  return `${clerkUser.firstName} ${clerkUser.lastName}`;
+                                }
+                                if (user?.firstName && user?.lastName) {
+                                  return `${user.firstName} ${user.lastName}`;
+                                }
+                                if (clerkUser?.firstName) return clerkUser.firstName;
+                                if (user?.firstName) return user.firstName;
+                                return "Not set";
+                              })()}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs sm:text-sm font-medium text-white">Email</p>
                             <p className="text-muted-foreground text-xs sm:text-sm">
-                              {user?.email || clerkUser?.primaryEmailAddress?.emailAddress || ""}
+                              {(() => {
+                                // Prioritize Clerk email over invalid Convex email
+                                const clerkEmail = clerkUser?.primaryEmailAddress?.emailAddress;
+                                const convexEmail = user?.email;
+
+                                // If Convex email is invalid/temp, use Clerk email
+                                if (
+                                  convexEmail &&
+                                  !convexEmail.includes("unknown") &&
+                                  !convexEmail.includes("temp")
+                                ) {
+                                  return convexEmail;
+                                }
+                                return clerkEmail || convexEmail || "Not set";
+                              })()}
                             </p>
                           </div>
                           <div>
                             <p className="text-xs sm:text-sm font-medium text-white">Username</p>
                             <p className="text-muted-foreground text-xs sm:text-sm">
-                              {user?.username || clerkUser?.username || "Not set"}
+                              {user?.username || "Not set"}
                             </p>
                           </div>
                           {user?.subscription && (

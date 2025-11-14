@@ -257,6 +257,23 @@ async function processWebhookEvent(
     };
   }
 
+  // Handle session.created events for activity logging
+  if (
+    eventType === "session.created" ||
+    eventType === "user.created" ||
+    eventType === "user.updated"
+  ) {
+    await handleUserEvent(eventType, eventData, convexUrl, requestId);
+    return {
+      received: true,
+      synced: true,
+      handled: "user_session",
+      eventType,
+      requestId,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   // Unknown event type
   console.log(`ℹ️ [${requestId}] Unhandled event type: ${eventType}`);
   return {
@@ -312,6 +329,53 @@ function logEventDetails(
       amount: data.amount,
       status: data.status,
     });
+  }
+}
+
+/**
+ * Handle user events (session.created, user.created, user.updated)
+ */
+async function handleUserEvent(
+  eventType: string,
+  data: Record<string, unknown>,
+  convexUrl: string,
+  requestId: string
+): Promise<void> {
+  console.log(`👤 [${requestId}] Handling user event: ${eventType}`);
+
+  try {
+    // Extract user data from event
+    const userId = (data.user_id as string) || (data.id as string);
+    const emailAddresses = data.email_addresses as Array<{ email_address: string }> | undefined;
+    const email = emailAddresses?.[0]?.email_address || "unknown@temp.com";
+
+    // Call syncClerkUser mutation
+    const response = await fetch(`${convexUrl}/api/mutation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: "users/clerkSync:syncClerkUser",
+        args: {
+          clerkId: userId,
+          email: email,
+          username: data.username as string | undefined,
+          firstName: data.first_name as string | undefined,
+          lastName: data.last_name as string | undefined,
+          imageUrl: data.image_url as string | undefined,
+        },
+        format: "json",
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Convex mutation failed: ${errorText}`);
+    }
+
+    console.log(`✅ [${requestId}] User synced successfully: ${userId}`);
+  } catch (error) {
+    console.error(`❌ [${requestId}] Error syncing user:`, error);
+    throw error;
   }
 }
 
