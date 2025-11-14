@@ -1,4 +1,5 @@
 import { httpRouter } from "convex/server";
+import type { ActionCtx } from "./_generated/server";
 import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
@@ -22,26 +23,132 @@ const http = httpRouter();
  * - Clerk: https://yourdomain.convex.site/api/webhooks/clerk
  */
 
+/**
+ * User data structure for Clerk webhook synchronization
+ */
+interface ClerkUserData {
+  clerkId: string;
+  email: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  imageUrl?: string;
+}
+
+/**
+ * Clerk webhook event data structure
+ */
+interface ClerkWebhookEvent {
+  type: string;
+  data: {
+    id?: string;
+    user_id?: string;
+    email_addresses?: Array<{ email_address: string }>;
+    username?: string;
+    first_name?: string;
+    last_name?: string;
+    image_url?: string;
+  };
+}
+
+/**
+ * Result type for sync operations
+ */
+interface SyncResult {
+  success: boolean;
+  error?: unknown;
+}
+
+/**
+ * Helper function to sync Clerk user data to Convex database
+ * Uses scheduler to avoid circular dependencies with api imports
+ */
+async function syncClerkUserMutation(ctx: ActionCtx, userData: ClerkUserData): Promise<SyncResult> {
+  try {
+    // Use scheduler with string reference to avoid circular dependency
+    await ctx.scheduler.runAfter(0, "users/clerkSync:syncClerkUser" as never, userData as never);
+    return { success: true };
+  } catch (error) {
+    console.error("Error scheduling syncClerkUser:", error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * Extract user data from Clerk webhook event
+ */
+function extractUserData(evt: ClerkWebhookEvent): ClerkUserData | null {
+  const userId = evt.data.id || evt.data.user_id;
+  const email = evt.data.email_addresses?.[0]?.email_address;
+
+  if (!userId || !email) {
+    return null;
+  }
+
+  return {
+    clerkId: userId,
+    email,
+    username: evt.data.username,
+    firstName: evt.data.first_name,
+    lastName: evt.data.last_name,
+    imageUrl: evt.data.image_url,
+  };
+}
+
+/**
+ * Process user sync for different event types
+ */
+async function processUserSync(
+  ctx: ActionCtx,
+  evt: ClerkWebhookEvent,
+  eventLabel: string
+): Promise<void> {
+  const userData = extractUserData(evt);
+
+  if (!userData) {
+    console.warn(`Missing user data for ${eventLabel}`);
+    return;
+  }
+
+  console.log(`${eventLabel}: ${userData.clerkId}`);
+
+  const result = await syncClerkUserMutation(ctx, userData);
+
+  if (result.success) {
+    console.log(`User synced successfully: ${userData.clerkId}`);
+  } else {
+    console.error(`User sync error:`, result.error);
+  }
+}
+
 // Clerk webhook handler for user session management
 const clerkWebhook = httpAction(async (ctx, request) => {
-  console.log("🔔 Webhook Clerk reçu !");
+  console.log("Clerk webhook received");
 
   try {
     const body = await request.text();
-    const evt = JSON.parse(body);
+    const evt: ClerkWebhookEvent = JSON.parse(body);
 
-    console.log(`📋 Événement: ${evt.type}`);
+    console.log(`Event type: ${evt.type}`);
 
-    if (evt.type === "session.created" && evt.data?.user_id) {
-      console.log(`🔐 Session créée pour: ${evt.data.user_id}`);
-
-      // Juste logger pour l'instant
-      console.log("✅ Session créée - webhook fonctionne !");
+    // Handle different event types
+    switch (evt.type) {
+      case "session.created":
+        await processUserSync(ctx, evt, "Session created");
+        break;
+      case "user.created":
+        await processUserSync(ctx, evt, "User created");
+        break;
+      case "user.updated":
+        await processUserSync(ctx, evt, "User updated");
+        break;
+      default:
+        console.log(`Unhandled event type: ${evt.type}`);
     }
 
     return new Response("OK", { status: 200 });
   } catch (error) {
-    console.error("❌ Erreur webhook:", error);
+    console.error("Webhook error:", error);
     return new Response("Error", { status: 500 });
   }
 });

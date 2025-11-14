@@ -346,7 +346,7 @@ router.post(
       // Clerk handles authentication, so this requires updating Clerk password via API
       // For now, we validate the token flow and mark it as used
       console.log("🔐 Password reset validated for user:", reset.userId);
-      console.log("🔐 New hashed password ready (length:", hashedPassword.length, ")");
+      console.log("🔐 New hashed password ready (length:", hashedPassword?.length || 0, ")");
 
       // SECURITY: Mark token as used to prevent reuse
       await convex.mutation(api.passwordResets.markUsed, { token });

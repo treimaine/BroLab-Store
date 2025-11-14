@@ -208,8 +208,10 @@ DashboardLayout.displayName = "DashboardLayout";
 // Dashboard header component with proper separation
 interface DashboardHeaderProps {
   user: {
+    username?: string | null;
     firstName?: string | null;
     lastName?: string | null;
+    fullName?: string | null; // For Clerk user object
   } | null;
   className?: string;
 }
@@ -218,8 +220,37 @@ export const DashboardHeader = memo<DashboardHeaderProps>(({ user, className }) 
   const { config } = useDashboardConfig();
 
   const displayName = useMemo(() => {
-    if (!user) return "User";
-    return user.firstName || "User";
+    if (!user) {
+      return "User";
+    }
+
+    // Prioritize username
+    if (user.username) {
+      return user.username;
+    }
+
+    // Fallback to full name if username not available
+    if (user.fullName) {
+      return user.fullName;
+    }
+
+    // Build full name from firstName and lastName
+    const firstName = user.firstName?.trim();
+    const lastName = user.lastName?.trim();
+
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    }
+
+    if (firstName) {
+      return firstName;
+    }
+
+    if (lastName) {
+      return lastName;
+    }
+
+    return "User";
   }, [user]);
 
   return (

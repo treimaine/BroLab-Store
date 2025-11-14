@@ -121,7 +121,11 @@ export const getDashboardData = query({
             firstName: identity.givenName || "",
             lastName: identity.familyName || "",
             imageUrl: identity.pictureUrl || "",
-            username: identity.name || `user_${clerkId.slice(-8)}`,
+            // Use username from Clerk, not fullName (identity.name)
+            // Convert to string to ensure type safety
+            username:
+              (typeof identity.username === "string" ? identity.username : undefined) ||
+              `user_${clerkId.slice(-8)}`,
           },
           stats: {
             totalFavorites: 0,
@@ -704,7 +708,7 @@ export const getDashboardStats = query({
         .query("favorites")
         .withIndex("by_user", q => q.eq("userId", user._id))
         .collect()
-        .then((results: any[]) => results.length),
+        .then((results: unknown[]) => results.length),
 
       ctx.db
         .query("downloads")

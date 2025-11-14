@@ -17,6 +17,9 @@ export const api = {
     getUserStats: {
       getUserStats: "users/getUserStats:getUserStats" as any,
     },
+    clerkSync: {
+      forceSyncCurrentUser: "users/clerkSync:forceSyncCurrentUser" as any,
+    },
   },
   products: {
     forYou: {
@@ -29,6 +32,6 @@ export const api = {
     getAnalyticsData: "dashboard:getAnalyticsData" as any,
   },
   orders: {
-    regenerateDownloadsFromOrders: "orders:regenerateDownloadsFromOrders" as any,
+    regenerateDownloadsFromOrders: "orders:regenerateDownloadsFromOrders" as unknown,
   },
 };
