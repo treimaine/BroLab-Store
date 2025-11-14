@@ -23,10 +23,13 @@ import type {
 // Time period definitions for trend analysis
 export type TimePeriod = "7d" | "30d" | "90d" | "1y";
 
+// Granularity type alias to avoid union type warnings
+export type Granularity = "day" | "week" | "month";
+
 export interface PeriodConfig {
   days: number;
   label: string;
-  granularity: "day" | "week" | "month";
+  granularity: Granularity;
 }
 
 export const PERIOD_CONFIGS: Record<TimePeriod, PeriodConfig> = {
@@ -42,7 +45,7 @@ export class CurrencyCalculator {
    * Convert cents to dollars with proper rounding
    */
   static centsToDollars(cents: number): number {
-    if (typeof cents !== "number" || isNaN(cents) || cents < 0) {
+    if (typeof cents !== "number" || Number.isNaN(cents) || cents < 0) {
       return 0;
     }
     return Math.round(cents) / 100;
@@ -52,7 +55,7 @@ export class CurrencyCalculator {
    * Convert dollars to cents for storage
    */
   static dollarsToCents(dollars: number): number {
-    if (typeof dollars !== "number" || isNaN(dollars) || dollars < 0) {
+    if (typeof dollars !== "number" || Number.isNaN(dollars) || dollars < 0) {
       return 0;
     }
     return Math.round(dollars * 100);
@@ -72,7 +75,7 @@ export class CurrencyCalculator {
    */
   static addAmounts(amounts: number[], fromCents = true): number {
     const total = amounts.reduce((sum, amount) => {
-      const value = typeof amount === "number" && !isNaN(amount) ? amount : 0;
+      const value = typeof amount === "number" && !Number.isNaN(amount) ? amount : 0;
       return sum + value;
     }, 0);
 
@@ -107,11 +110,7 @@ export class DateCalculator {
   /**
    * Generate date buckets for chart data based on granularity
    */
-  static generateDateBuckets(
-    start: Date,
-    end: Date,
-    granularity: "day" | "week" | "month"
-  ): string[] {
+  static generateDateBuckets(start: Date, end: Date, granularity: Granularity): string[] {
     const buckets: string[] = [];
     const current = new Date(start);
 
@@ -137,11 +136,12 @@ export class DateCalculator {
   /**
    * Get bucket key for a date based on granularity
    */
-  static getBucketKey(date: Date, granularity: "day" | "week" | "month"): string {
+  static getBucketKey(date: Date, granularity: Granularity): string {
     switch (granularity) {
       case "day":
         return date.toISOString().split("T")[0];
-      case "week": { // Get Monday of the week
+      case "week": {
+        // Get Monday of the week
         const monday = new Date(date);
         monday.setDate(date.getDate() - date.getDay() + 1);
         return monday.toISOString().split("T")[0];
@@ -158,11 +158,21 @@ export class StatisticsCalculator {
    * Calculate comprehensive user statistics
    */
   static calculateUserStats(data: {
-    favorites: any[];
-    downloads: any[];
-    orders: any[];
-    quotas: any[];
-    activityLog: any[];
+    favorites: Array<Record<string, unknown>>;
+    downloads: Array<{
+      timestamp?: number;
+    }>;
+    orders: Array<{
+      status: string;
+      total?: number;
+      createdAt: number;
+    }>;
+    quotas: Array<{
+      quotaType: string;
+      used?: number;
+      limit?: number;
+    }>;
+    activityLog: Array<Record<string, unknown>>;
   }): UserStats {
     const { favorites, downloads, orders, quotas, activityLog } = data;
 
@@ -182,7 +192,9 @@ export class StatisticsCalculator {
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
     const monthlyOrders = orders.filter(order => order.createdAt >= currentMonthStart);
-    const monthlyDownloads = downloads.filter(download => download.timestamp >= currentMonthStart);
+    const monthlyDownloads = downloads.filter(
+      download => (download.timestamp || 0) >= currentMonthStart
+    );
 
     const monthlyRevenue = CurrencyCalculator.addAmounts(
       monthlyOrders
@@ -233,15 +245,15 @@ export class StatisticsCalculator {
    */
   static calculateTrendData(
     currentPeriodData: {
-      orders: any[];
-      downloads: any[];
-      favorites: any[];
+      orders: Array<Record<string, unknown>>;
+      downloads: Array<Record<string, unknown>>;
+      favorites: Array<Record<string, unknown>>;
       revenue: number;
     },
     previousPeriodData: {
-      orders: any[];
-      downloads: any[];
-      favorites: any[];
+      orders: Array<Record<string, unknown>>;
+      downloads: Array<Record<string, unknown>>;
+      favorites: Array<Record<string, unknown>>;
       revenue: number;
     },
     period: TimePeriod = "30d"
@@ -271,35 +283,26 @@ export class StatisticsCalculator {
   }
 
   /**
-   * Generate chart data points for analytics visualization
+   * Helper: Check if date is within range
    */
-  static generateChartData(
-    orders: any[],
-    downloads: any[],
-    favorites: any[],
-    period: TimePeriod = "30d"
-  ): ChartDataPoint[] {
-    const { start, end } = DateCalculator.getPeriodRange(period);
-    const config = PERIOD_CONFIGS[period];
-    const buckets = DateCalculator.generateDateBuckets(start, end, config.granularity);
+  private static isDateInRange(date: Date, start: Date, end: Date): boolean {
+    return date >= start && date <= end;
+  }
 
-    // Initialize data structure
-    const dataByBucket = new Map<string, ChartDataPoint>();
-    buckets.forEach(bucket => {
-      dataByBucket.set(bucket, {
-        date: bucket,
-        orders: 0,
-        downloads: 0,
-        revenue: 0,
-        favorites: 0,
-      });
-    });
-
-    // Aggregate orders
-    orders.forEach(order => {
+  /**
+   * Helper: Aggregate orders into buckets
+   */
+  private static aggregateOrders(
+    orders: Array<{ createdAt: number; status: string; total?: number }>,
+    dataByBucket: Map<string, ChartDataPoint>,
+    start: Date,
+    end: Date,
+    granularity: Granularity
+  ): void {
+    for (const order of orders) {
       const orderDate = new Date(order.createdAt);
-      if (orderDate >= start && orderDate <= end) {
-        const bucketKey = DateCalculator.getBucketKey(orderDate, config.granularity);
+      if (this.isDateInRange(orderDate, start, end)) {
+        const bucketKey = DateCalculator.getBucketKey(orderDate, granularity);
         const bucket = dataByBucket.get(bucketKey);
         if (bucket) {
           bucket.orders += 1;
@@ -308,31 +311,90 @@ export class StatisticsCalculator {
           }
         }
       }
-    });
+    }
+  }
 
-    // Aggregate downloads
-    downloads.forEach(download => {
+  /**
+   * Helper: Aggregate downloads into buckets
+   */
+  private static aggregateDownloads(
+    downloads: Array<{ timestamp: number }>,
+    dataByBucket: Map<string, ChartDataPoint>,
+    start: Date,
+    end: Date,
+    granularity: Granularity
+  ): void {
+    for (const download of downloads) {
       const downloadDate = new Date(download.timestamp);
-      if (downloadDate >= start && downloadDate <= end) {
-        const bucketKey = DateCalculator.getBucketKey(downloadDate, config.granularity);
+      if (this.isDateInRange(downloadDate, start, end)) {
+        const bucketKey = DateCalculator.getBucketKey(downloadDate, granularity);
         const bucket = dataByBucket.get(bucketKey);
         if (bucket) {
           bucket.downloads += 1;
         }
       }
-    });
+    }
+  }
 
-    // Aggregate favorites
-    favorites.forEach(favorite => {
+  /**
+   * Helper: Aggregate favorites into buckets
+   */
+  private static aggregateFavorites(
+    favorites: Array<{ createdAt: number }>,
+    dataByBucket: Map<string, ChartDataPoint>,
+    start: Date,
+    end: Date,
+    granularity: Granularity
+  ): void {
+    for (const favorite of favorites) {
       const favoriteDate = new Date(favorite.createdAt);
-      if (favoriteDate >= start && favoriteDate <= end) {
-        const bucketKey = DateCalculator.getBucketKey(favoriteDate, config.granularity);
+      if (this.isDateInRange(favoriteDate, start, end)) {
+        const bucketKey = DateCalculator.getBucketKey(favoriteDate, granularity);
         const bucket = dataByBucket.get(bucketKey);
         if (bucket) {
           bucket.favorites += 1;
         }
       }
-    });
+    }
+  }
+
+  /**
+   * Generate chart data points for analytics visualization
+   */
+  static generateChartData(
+    orders: Array<{
+      createdAt: number;
+      status: string;
+      total?: number;
+    }>,
+    downloads: Array<{
+      timestamp: number;
+    }>,
+    favorites: Array<{
+      createdAt: number;
+    }>,
+    period: TimePeriod = "30d"
+  ): ChartDataPoint[] {
+    const { start, end } = DateCalculator.getPeriodRange(period);
+    const config = PERIOD_CONFIGS[period];
+    const buckets = DateCalculator.generateDateBuckets(start, end, config.granularity);
+
+    // Initialize data structure
+    const dataByBucket = new Map<string, ChartDataPoint>();
+    for (const bucket of buckets) {
+      dataByBucket.set(bucket, {
+        date: bucket,
+        orders: 0,
+        downloads: 0,
+        revenue: 0,
+        favorites: 0,
+      });
+    }
+
+    // Aggregate data using helper methods
+    this.aggregateOrders(orders, dataByBucket, start, end, config.granularity);
+    this.aggregateDownloads(downloads, dataByBucket, start, end, config.granularity);
+    this.aggregateFavorites(favorites, dataByBucket, start, end, config.granularity);
 
     return Array.from(dataByBucket.values()).sort((a, b) => a.date.localeCompare(b.date));
   }
@@ -341,11 +403,33 @@ export class StatisticsCalculator {
    * Calculate advanced metrics for detailed analytics
    */
   static calculateAdvancedMetrics(data: {
-    orders: any[];
-    downloads: any[];
-    favorites: any[];
+    orders: Array<{
+      createdAt: number;
+      status: string;
+      total?: number;
+    }>;
+    downloads: Array<{
+      timestamp: number;
+    }>;
+    favorites: Array<{
+      createdAt: number;
+    }>;
     period: TimePeriod;
-  }) {
+  }): {
+    conversionRates: {
+      favoriteToDownload: number;
+      downloadToOrder: number;
+    };
+    averageOrderValue: number;
+    dailyAverages: {
+      orders: number;
+      downloads: number;
+      favorites: number;
+      revenue: number;
+    };
+    totalRevenue: number;
+    periodDays: number;
+  } {
     const { orders, downloads, favorites, period } = data;
     const { start, end } = DateCalculator.getPeriodRange(period);
 

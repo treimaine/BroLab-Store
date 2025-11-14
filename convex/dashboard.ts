@@ -7,10 +7,13 @@ import type {
   Download,
   Favorite,
   Order,
+  OrderStatus,
   Reservation,
+  ReservationStatus,
   TrendData,
   UserStats,
 } from "../shared/types/dashboard";
+import type { QueryCtx } from "./_generated/server";
 import { query } from "./_generated/server";
 import {
   CurrencyCalculator,
@@ -238,7 +241,7 @@ export const getDashboardData = query({
           ? {
               id: subscription._id,
               planId: subscription.planId,
-              status: subscription.status as any,
+              status: subscription.status as "active" | "cancelled" | "past_due" | "unpaid",
               currentPeriodStart: subscription.currentPeriodStart,
               currentPeriodEnd: subscription.currentPeriodEnd,
               cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
@@ -310,16 +313,16 @@ export const getDashboardData = query({
         items: (order.items || []).map(item => ({
           productId: item.productId,
           title: item.title || item.name || `Product ${item.productId || "Unknown"}`,
-          price: item.price || undefined, // Les prix sont déjà en dollars dans la DB
+          price: item.price || undefined,
           quantity: item.quantity,
           license: item.license,
           type: item.type,
           sku: item.sku,
           metadata: item.metadata,
         })),
-        total: order.total || 0, // Les totaux sont déjà en dollars dans la DB
+        total: order.total || 0,
         currency: order.currency || "USD",
-        status: order.status as any,
+        status: order.status as OrderStatus,
         paymentMethod: order.paymentProvider,
         paymentStatus: order.paymentStatus,
         createdAt: new Date(order.createdAt).toISOString(),
@@ -351,15 +354,20 @@ export const getDashboardData = query({
       // Transform reservations
       const enrichedReservations: Reservation[] = reservations.map(reservation => ({
         id: reservation._id,
-        serviceType: reservation.serviceType as any,
+        serviceType: reservation.serviceType as
+          | "mixing"
+          | "mastering"
+          | "recording"
+          | "consultation"
+          | "custom_beat",
         preferredDate: reservation.preferredDate,
         duration: reservation.durationMinutes,
         totalPrice: CurrencyCalculator.centsToDollars(reservation.totalPrice),
-        status: reservation.status as any,
-        details: reservation.details as any,
+        status: reservation.status as ReservationStatus,
+        details: reservation.details,
         notes: reservation.notes,
         assignedTo: reservation.assignedTo,
-        priority: reservation.priority as any,
+        priority: reservation.priority as "low" | "medium" | "high" | "urgent" | undefined,
         createdAt: new Date(reservation.createdAt).toISOString(),
         updatedAt: new Date(reservation.updatedAt).toISOString(),
         completedAt: reservation.completedAt
@@ -374,13 +382,15 @@ export const getDashboardData = query({
       // Transform activity
       const enrichedActivity: Activity[] = activityLog.map(activity => ({
         id: activity._id,
-        type: activity.action as any,
+        type: activity.action as Activity["type"],
         description: activity.details?.description || activity.action,
         timestamp: new Date(activity.timestamp).toISOString(),
         metadata: activity.details || {},
         beatId: activity.details?.beatId,
         beatTitle: activity.details?.beatTitle,
-        severity: activity.details?.severity || "info",
+        severity:
+          (activity.details?.severity as "info" | "warning" | "error" | "success" | undefined) ||
+          "info",
       }));
 
       // Generate chart data if requested (default to 30 days)
@@ -419,7 +429,7 @@ export const getDashboardData = query({
  * Generate chart data for analytics with enhanced statistics
  */
 async function generateChartData(
-  ctx: any,
+  ctx: QueryCtx,
   userId: string,
   period: TimePeriod = "30d"
 ): Promise<ChartDataPoint[]> {
@@ -429,23 +439,38 @@ async function generateChartData(
   const [orders, downloads, favorites] = await Promise.all([
     ctx.db
       .query("orders")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), start.getTime()))
-      .filter((q: any) => q.lte(q.field("createdAt"), end.getTime()))
+      .withIndex("by_user")
+      .filter(q =>
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.gte(q.field("createdAt"), start.getTime()),
+          q.lte(q.field("createdAt"), end.getTime())
+        )
+      )
       .collect(),
 
     ctx.db
       .query("downloads")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("timestamp"), start.getTime()))
-      .filter((q: any) => q.lte(q.field("timestamp"), end.getTime()))
+      .withIndex("by_user")
+      .filter(q =>
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.gte(q.field("timestamp"), start.getTime()),
+          q.lte(q.field("timestamp"), end.getTime())
+        )
+      )
       .collect(),
 
     ctx.db
       .query("favorites")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), start.getTime()))
-      .filter((q: any) => q.lte(q.field("createdAt"), end.getTime()))
+      .withIndex("by_user")
+      .filter(q =>
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.gte(q.field("createdAt"), start.getTime()),
+          q.lte(q.field("createdAt"), end.getTime())
+        )
+      )
       .collect(),
   ]);
 
@@ -457,7 +482,7 @@ async function generateChartData(
  * Generate trend data with period-over-period comparisons using enhanced statistics
  */
 async function generateTrends(
-  ctx: any,
+  ctx: QueryCtx,
   userId: string,
   period: TimePeriod = "30d"
 ): Promise<TrendData> {
@@ -476,64 +501,98 @@ async function generateTrends(
     // Current period orders
     ctx.db
       .query("orders")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), currentStart.getTime()))
-      .filter((q: any) => q.lte(q.field("createdAt"), currentEnd.getTime()))
+      .withIndex("by_user")
+      .filter(q =>
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.gte(q.field("createdAt"), currentStart.getTime()),
+          q.lte(q.field("createdAt"), currentEnd.getTime())
+        )
+      )
       .collect(),
 
     // Previous period orders
     ctx.db
       .query("orders")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), previousStart.getTime()))
-      .filter((q: any) => q.lte(q.field("createdAt"), previousEnd.getTime()))
+      .withIndex("by_user")
+      .filter(q =>
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.gte(q.field("createdAt"), previousStart.getTime()),
+          q.lte(q.field("createdAt"), previousEnd.getTime())
+        )
+      )
       .collect(),
 
     // Current period downloads
     ctx.db
       .query("downloads")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("timestamp"), currentStart.getTime()))
-      .filter((q: any) => q.lte(q.field("timestamp"), currentEnd.getTime()))
+      .withIndex("by_user")
+      .filter(q =>
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.gte(q.field("timestamp"), currentStart.getTime()),
+          q.lte(q.field("timestamp"), currentEnd.getTime())
+        )
+      )
       .collect(),
 
     // Previous period downloads
     ctx.db
       .query("downloads")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("timestamp"), previousStart.getTime()))
-      .filter((q: any) => q.lte(q.field("timestamp"), previousEnd.getTime()))
+      .withIndex("by_user")
+      .filter(q =>
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.gte(q.field("timestamp"), previousStart.getTime()),
+          q.lte(q.field("timestamp"), previousEnd.getTime())
+        )
+      )
       .collect(),
 
     // Current period favorites
     ctx.db
       .query("favorites")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), currentStart.getTime()))
-      .filter((q: any) => q.lte(q.field("createdAt"), currentEnd.getTime()))
+      .withIndex("by_user")
+      .filter(q =>
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.gte(q.field("createdAt"), currentStart.getTime()),
+          q.lte(q.field("createdAt"), currentEnd.getTime())
+        )
+      )
       .collect(),
 
     // Previous period favorites
     ctx.db
       .query("favorites")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
-      .filter((q: any) => q.gte(q.field("createdAt"), previousStart.getTime()))
-      .filter((q: any) => q.lte(q.field("createdAt"), previousEnd.getTime()))
+      .withIndex("by_user")
+      .filter(q =>
+        q.and(
+          q.eq(q.field("userId"), userId),
+          q.gte(q.field("createdAt"), previousStart.getTime()),
+          q.lte(q.field("createdAt"), previousEnd.getTime())
+        )
+      )
       .collect(),
   ]);
 
   // Calculate revenue using enhanced currency calculator
   const currentRevenue = CurrencyCalculator.addAmounts(
     currentOrders
-      .filter((order: any) => order.status === "completed" || order.status === "paid")
-      .map((order: any) => order.total || 0),
+      .filter(
+        (order: { status: string }) => order.status === "completed" || order.status === "paid"
+      )
+      .map((order: { total?: number }) => order.total || 0),
     true // fromCents
   );
 
   const previousRevenue = CurrencyCalculator.addAmounts(
     previousOrders
-      .filter((order: any) => order.status === "completed" || order.status === "paid")
-      .map((order: any) => order.total || 0),
+      .filter(
+        (order: { status: string }) => order.status === "completed" || order.status === "paid"
+      )
+      .map((order: { total?: number }) => order.total || 0),
     true // fromCents
   );
 
@@ -570,7 +629,21 @@ export const getAnalyticsData = query({
   ): Promise<{
     chartData: ChartDataPoint[];
     trends: TrendData;
-    advancedMetrics: any;
+    advancedMetrics: {
+      conversionRates: {
+        favoriteToDownload: number;
+        downloadToOrder: number;
+      };
+      averageOrderValue: number;
+      dailyAverages: {
+        orders: number;
+        downloads: number;
+        favorites: number;
+        revenue: number;
+      };
+      totalRevenue: number;
+      periodDays: number;
+    };
   }> => {
     return executeDashboardQuery(async () => {
       const identity = await ctx.auth.getUserIdentity();
@@ -616,7 +689,21 @@ export const getAnalyticsData = query({
               isPositive: true,
             },
           },
-          advancedMetrics: {},
+          advancedMetrics: {
+            conversionRates: {
+              favoriteToDownload: 0,
+              downloadToOrder: 0,
+            },
+            averageOrderValue: 0,
+            dailyAverages: {
+              orders: 0,
+              downloads: 0,
+              favorites: 0,
+              revenue: 0,
+            },
+            totalRevenue: 0,
+            periodDays: 0,
+          },
         };
       }
 
@@ -627,23 +714,38 @@ export const getAnalyticsData = query({
       const [orders, downloads, favorites] = await Promise.all([
         ctx.db
           .query("orders")
-          .withIndex("by_user", q => q.eq("userId", user._id))
-          .filter(q => q.gte(q.field("createdAt"), start.getTime()))
-          .filter(q => q.lte(q.field("createdAt"), end.getTime()))
+          .withIndex("by_user")
+          .filter(q =>
+            q.and(
+              q.eq(q.field("userId"), user._id),
+              q.gte(q.field("createdAt"), start.getTime()),
+              q.lte(q.field("createdAt"), end.getTime())
+            )
+          )
           .collect(),
 
         ctx.db
           .query("downloads")
-          .withIndex("by_user", q => q.eq("userId", user._id))
-          .filter(q => q.gte(q.field("timestamp"), start.getTime()))
-          .filter(q => q.lte(q.field("timestamp"), end.getTime()))
+          .withIndex("by_user")
+          .filter(q =>
+            q.and(
+              q.eq(q.field("userId"), user._id),
+              q.gte(q.field("timestamp"), start.getTime()),
+              q.lte(q.field("timestamp"), end.getTime())
+            )
+          )
           .collect(),
 
         ctx.db
           .query("favorites")
-          .withIndex("by_user", q => q.eq("userId", user._id))
-          .filter(q => q.gte(q.field("createdAt"), start.getTime()))
-          .filter(q => q.lte(q.field("createdAt"), end.getTime()))
+          .withIndex("by_user")
+          .filter(q =>
+            q.and(
+              q.eq(q.field("userId"), user._id),
+              q.gte(q.field("createdAt"), start.getTime()),
+              q.lte(q.field("createdAt"), end.getTime())
+            )
+          )
           .collect(),
       ]);
 
