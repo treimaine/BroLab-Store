@@ -130,7 +130,7 @@ export function extractNumericId(convexId: Id<"users">): number {
   // Extract the last 8 characters and convert to number
   const idString = convexId.toString();
   const numericPart = idString.slice(-8);
-  const parsed = parseInt(numericPart, 16); // Parse as hex for better distribution
+  const parsed = Number.parseInt(numericPart, 16); // Parse as hex for better distribution
   return parsed || Math.floor(Math.random() * 1000000); // Fallback to random number
 }
 

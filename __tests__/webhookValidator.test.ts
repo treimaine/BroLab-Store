@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { WEBHOOK_CONFIGS, WebhookValidator } from "../server/lib/webhookValidator";
 
 describe("WebhookValidator", () => {
@@ -70,7 +70,7 @@ describe("WebhookValidator", () => {
         .digest("hex");
 
       // Create signature with same length but different content
-      const wrongSignature = correctSignature.replace(/a/g, "b").replace(/1/g, "2");
+      const wrongSignature = correctSignature.replaceAll("a", "b").replaceAll("1", "2");
 
       const startTime = process.hrtime.bigint();
       const isValid1 = validator.validateSignature(testPayload, wrongSignature, testSecret);
@@ -129,7 +129,7 @@ describe("WebhookValidator", () => {
         description: 'Normal text & some "quotes"',
       };
 
-      const sanitized = validator.sanitizePayload(dangerousPayload);
+      const sanitized = validator.sanitizePayload(dangerousPayload) as Record<string, string>;
       expect(sanitized.message).not.toContain("<script>");
       expect(sanitized.message).not.toContain("</script>");
       expect(sanitized.description).toBeDefined();
@@ -145,11 +145,11 @@ describe("WebhookValidator", () => {
         normalKey: "safe value",
       };
 
-      const sanitized = validator.sanitizePayload(dangerousPayload);
+      const sanitized = validator.sanitizePayload(dangerousPayload) as Record<string, unknown>;
       // Check that dangerous keys are not copied from the original object
-      expect(Object.hasOwnProperty.call(sanitized, "__proto__")).toBe(false);
-      expect(Object.hasOwnProperty.call(sanitized, "constructor")).toBe(false);
-      expect(Object.hasOwnProperty.call(sanitized, "prototype")).toBe(false);
+      expect(Object.hasOwn(sanitized, "__proto__")).toBe(false);
+      expect(Object.hasOwn(sanitized, "constructor")).toBe(false);
+      expect(Object.hasOwn(sanitized, "prototype")).toBe(false);
       expect(sanitized.normalKey).toBe("safe value");
     });
 
@@ -157,7 +157,7 @@ describe("WebhookValidator", () => {
       const longString = "a".repeat(20000);
       const payload = { longField: longString };
 
-      const sanitized = validator.sanitizePayload(payload);
+      const sanitized = validator.sanitizePayload(payload) as Record<string, string>;
       expect(sanitized.longField.length).toBeLessThan(longString.length);
       expect(sanitized.longField).toContain("[Truncated]");
     });
@@ -176,18 +176,25 @@ describe("WebhookValidator", () => {
       };
 
       const sanitized = validator.sanitizePayload(deepPayload);
-      expect(sanitized.level1.level2.level3.level4.level5).toBe("deep value");
+      if (typeof sanitized === "object" && sanitized !== null) {
+        const typedSanitized = sanitized as Record<string, unknown>;
+        const level1 = typedSanitized.level1 as Record<string, unknown>;
+        const level2 = level1.level2 as Record<string, unknown>;
+        const level3 = level2.level3 as Record<string, unknown>;
+        const level4 = level3.level4 as Record<string, unknown>;
+        expect(level4.level5).toBe("deep value");
+      }
     });
 
     it("should prevent infinite recursion with max depth", () => {
       const validator = new WebhookValidator({ maxDepth: 3 });
       const deepPayload: Record<string, unknown> = {};
-      let current = deepPayload;
+      let current: Record<string, unknown> = deepPayload;
 
       // Create object deeper than max depth
       for (let i = 0; i < 10; i++) {
         current.next = {};
-        current = current.next;
+        current = current.next as Record<string, unknown>;
       }
       current.value = "too deep";
 
@@ -204,7 +211,7 @@ describe("WebhookValidator", () => {
         string: "test",
       };
 
-      const sanitized = validator.sanitizePayload(payload);
+      const sanitized = validator.sanitizePayload(payload) as Record<string, unknown>;
       expect(sanitized.numbers).toEqual([1, 2, 3]);
       expect(sanitized.booleans).toEqual([true, false]);
       expect(sanitized.nullValue).toBeNull();
@@ -258,7 +265,10 @@ describe("WebhookValidator", () => {
 
     it("should handle unknown provider schema", () => {
       const payload = { test: "data" };
-      const result = validator.validatePayloadSchema(payload, "unknown" as any);
+      const result = validator.validatePayloadSchema(
+        payload,
+        "unknown" as "stripe" | "clerk" | "paypal"
+      );
       expect(result.valid).toBe(false);
       expect(result.errors[0]).toContain("No schema defined for provider");
     });
@@ -348,7 +358,7 @@ describe("WebhookValidator", () => {
 
       const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
 
-      const result = await validator.validateWebhook("stripe", testPayload, signature, headers);
+      await validator.validateWebhook("stripe", testPayload, signature, headers);
 
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("x-forwarded-for"));
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("x-real-ip"));
@@ -431,13 +441,13 @@ describe("WebhookValidator", () => {
 
     it("should handle null bytes in payload", () => {
       const payloadWithNull = "test\x00payload";
-      const sanitized = validator.sanitizePayload(payloadWithNull);
+      const sanitized = validator.sanitizePayload(payloadWithNull) as string;
       expect(sanitized).not.toContain("\x00");
     });
 
     it("should handle unicode characters safely", () => {
       const unicodePayload = { message: "🚀 Test with émojis and àccénts" };
-      const sanitized = validator.sanitizePayload(unicodePayload);
+      const sanitized = validator.sanitizePayload(unicodePayload) as Record<string, string>;
       expect(sanitized.message).toContain("🚀");
       expect(sanitized.message).toContain("émojis");
       expect(sanitized.message).toContain("àccénts");
@@ -466,7 +476,7 @@ describe("WebhookValidator", () => {
 });
 
 describe("Singleton WebhookValidator", () => {
-  it("should initialize with environment variables", () => {
+  it("should initialize with environment variables", async () => {
     // Mock environment variables
     const originalEnv = process.env;
     process.env = {
@@ -477,7 +487,7 @@ describe("Singleton WebhookValidator", () => {
 
     // Re-import to trigger initialization
     jest.resetModules();
-    const { webhookValidator: newValidator } = require("../server/lib/webhookValidator");
+    const { webhookValidator: newValidator } = await import("../server/lib/webhookValidator");
 
     expect(newValidator.getConfig("stripe")).toBeDefined();
     expect(newValidator.getConfig("clerk")).toBeDefined();

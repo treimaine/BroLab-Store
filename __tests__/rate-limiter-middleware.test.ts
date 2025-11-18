@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { NextFunction, Request, Response } from "express";
+import { Request } from "express";
 import RateLimiter from "../server/middleware/rateLimiter";
 
 // Mock the rate limiter
@@ -9,28 +9,24 @@ jest.mock("../shared/utils/rate-limiter", () => ({
   },
 }));
 
+interface MockRequest extends Partial<Request> {
+  isAuthenticated?: jest.Mock;
+  user?: { id: number };
+}
+
 describe("RateLimiter Middleware", () => {
-  let mockReq: Partial<Request>;
-  let mockRes: Partial<Response>;
-  let mockNext: NextFunction;
+  let mockReq: MockRequest;
   let rateLimiter: RateLimiter;
 
   beforeEach(() => {
+    const getMock = jest.fn().mockReturnValue("test-user-agent");
+    const isAuthMock = jest.fn().mockReturnValue(true);
     mockReq = {
-      isAuthenticated: jest.fn().mockReturnValue(true),
+      isAuthenticated: isAuthMock,
       user: { id: 123 },
       ip: "192.168.1.1",
-      get: jest.fn().mockReturnValue("test-user-agent"),
+      get: getMock as unknown as Request["get"],
     };
-
-    mockRes = {
-      set: jest.fn(),
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn(),
-      end: jest.fn(),
-    };
-
-    mockNext = jest.fn();
 
     rateLimiter = new RateLimiter("test_action", {
       windowMs: 60000,
@@ -61,13 +57,10 @@ describe("RateLimiter Middleware", () => {
   });
 
   describe("predefined rate limiters", () => {
-    it("should export predefined rate limiters", () => {
-      const {
-        uploadRateLimit,
-        downloadRateLimit,
-        apiRateLimit,
-        emailRateLimit,
-      } = require("../server/middleware/rateLimiter");
+    it("should export predefined rate limiters", async () => {
+      const { uploadRateLimit, downloadRateLimit, apiRateLimit, emailRateLimit } = await import(
+        "../server/middleware/rateLimiter"
+      );
 
       expect(typeof uploadRateLimit).toBe("function");
       expect(typeof downloadRateLimit).toBe("function");

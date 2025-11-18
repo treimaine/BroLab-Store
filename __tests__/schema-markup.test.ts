@@ -10,10 +10,11 @@ jest.mock("../server/lib/schemaMarkup", () => ({
 
 // Mock des modules avant l'import de l'app
 jest.mock("../server/routes/openGraph", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const express = require("express");
   const router = express.Router();
 
-  router.get("/beat/:id", (req: express.Request, _res: express.Response) => {
+  router.get("/beat/:id", (req: express.Request, res: express.Response) => {
     const beatId = req.params.id;
     if (beatId === "999999") {
       return res.status(404).json({ error: "Beat not found" });
@@ -35,7 +36,7 @@ jest.mock("../server/routes/openGraph", () => {
     `);
   });
 
-  router.get("/shop", (req: express.Request, _res: express.Response) => {
+  router.get("/shop", (_req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(`
@@ -52,7 +53,7 @@ jest.mock("../server/routes/openGraph", () => {
     `);
   });
 
-  router.get("/home", (req: express.Request, _res: express.Response) => {
+  router.get("/home", (_req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(`
@@ -69,7 +70,7 @@ jest.mock("../server/routes/openGraph", () => {
     `);
   });
 
-  router.get("/page/:pageName", (req: express.Request, _res: express.Response) => {
+  router.get("/page/:pageName", (req: express.Request, res: express.Response) => {
     const pageName = req.params.pageName;
     const validPages = ["about", "contact", "terms", "privacy", "license"];
 
@@ -98,6 +99,7 @@ jest.mock("../server/routes/openGraph", () => {
 
 // Mock des modules schema
 jest.mock("../server/routes/schema", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const express = require("express");
   const router = express.Router();
 
@@ -135,7 +137,7 @@ jest.mock("../server/routes/schema", () => {
     });
   });
 
-  router.get("/beats-list", (req: express.Request, res: express.Response) => {
+  router.get("/beats-list", (_req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "application/ld+json");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.json({
@@ -163,7 +165,7 @@ jest.mock("../server/routes/schema", () => {
     });
   });
 
-  router.get("/organization", (req: express.Request, res: express.Response) => {
+  router.get("/organization", (_req: express.Request, res: express.Response) => {
     res.setHeader("Content-Type", "application/ld+json");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.json({

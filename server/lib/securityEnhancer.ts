@@ -83,7 +83,7 @@ const sessionTracking = new Map<
 >();
 
 export class SecurityEnhancer {
-  private config: SecurityConfig;
+  private readonly config: SecurityConfig;
 
   constructor(config: Partial<SecurityConfig> = {}) {
     this.config = { ...DEFAULT_SECURITY_CONFIG, ...config };
@@ -341,7 +341,7 @@ export class SecurityEnhancer {
   private isSuspiciousIP(ipAddress: string): boolean {
     // Check for localhost/private IPs in production
     if (process.env.NODE_ENV === "production") {
-      const privateRanges = [/^127\./, /^10\./, /^172\.(1[6-9]|2[0-9]|3[0-1])\./, /^192\.168\./];
+      const privateRanges = [/^127\./, /^10\./, /^172\.(\d{2}|3[0-1])\./, /^192\.168\./];
 
       if (privateRanges.some(range => range.test(ipAddress))) {
         return true;
@@ -389,100 +389,138 @@ export class SecurityEnhancer {
   }
 
   /**
-   * Enhanced input sanitization with security logging
+   * Detect XSS patterns in input
    */
-  sanitizeInput(
-    input: unknown,
+  private detectXSSPatterns(input: string): boolean {
+    const xssPatterns = [
+      /<script[^>]*>.*?<\/script>/gi,
+      /javascript:/gi,
+      /on\w+\s*=/gi,
+      /<iframe[^>]*>.*?<\/iframe>/gi,
+    ];
+    return xssPatterns.some(pattern => pattern.test(input));
+  }
+
+  /**
+   * Detect SQL injection patterns in input
+   */
+  private detectSQLPatterns(input: string): boolean {
+    const sqlPatterns = [
+      /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b.*\b(FROM|INTO|SET|WHERE|TABLE)\b)/gi,
+      /(\b(OR|AND)\s+\d+\s*=\s*\d+)/gi,
+      /(';|'--|\s--\s|\/\*.*\*\/)/gi,
+    ];
+    return sqlPatterns.some(pattern => pattern.test(input));
+  }
+
+  /**
+   * Sanitize string input
+   */
+  private sanitizeString(
+    input: string,
     context: string,
-    req?: Request,
-    visited = new WeakSet()
+    req: Request | undefined
+  ): {
+    sanitized: string;
+    securityEvents: SecurityEventType[];
+  } {
+    const securityEvents: SecurityEventType[] = [];
+    const original = input;
+
+    // Detect potential XSS attempts
+    if (this.detectXSSPatterns(input)) {
+      securityEvents.push(SecurityEventType.XSS_ATTEMPT);
+      this.logSecurityEvent({
+        type: SecurityEventType.XSS_ATTEMPT,
+        riskLevel: SecurityRiskLevel.HIGH,
+        details: { context, originalInput: original },
+        req,
+      });
+    }
+
+    // Detect potential SQL injection attempts
+    if (this.detectSQLPatterns(input)) {
+      securityEvents.push(SecurityEventType.SQL_INJECTION_ATTEMPT);
+      this.logSecurityEvent({
+        type: SecurityEventType.SQL_INJECTION_ATTEMPT,
+        riskLevel: SecurityRiskLevel.CRITICAL,
+        details: { context, originalInput: original },
+        req,
+      });
+    }
+
+    // Sanitize the input
+    const sanitized = input
+      .replaceAll(/[<>"'&]/g, "") // Remove dangerous characters
+      .replaceAll("\u0000", "") // Remove null bytes
+      .trim()
+      .slice(0, 10000); // Limit length
+
+    return { sanitized, securityEvents };
+  }
+
+  /**
+   * Sanitize object input
+   */
+  private sanitizeObject(
+    input: object,
+    context: string,
+    req: Request | undefined,
+    visited: WeakSet<object>
   ): {
     sanitized: unknown;
     securityEvents: SecurityEventType[];
   } {
     const securityEvents: SecurityEventType[] = [];
 
+    if (Array.isArray(input)) {
+      const sanitized: unknown[] = [];
+      for (const [key, value] of Object.entries(input)) {
+        const result = this.sanitizeInput(value, `${context}.${key}`, req, visited);
+        sanitized[Number(key)] = result.sanitized;
+        securityEvents.push(...result.securityEvents);
+      }
+      return { sanitized, securityEvents };
+    } else {
+      const sanitized: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(input)) {
+        const result = this.sanitizeInput(value, `${context}.${key}`, req, visited);
+        sanitized[key] = result.sanitized;
+        securityEvents.push(...result.securityEvents);
+      }
+      return { sanitized, securityEvents };
+    }
+  }
+
+  /**
+   * Enhanced input sanitization with security logging
+   */
+  sanitizeInput(
+    input: unknown,
+    context: string,
+    req: Request | undefined = undefined,
+    visited = new WeakSet()
+  ): {
+    sanitized: unknown;
+    securityEvents: SecurityEventType[];
+  } {
     // Handle circular references
     if (typeof input === "object" && input !== null) {
       if (visited.has(input)) {
-        return { sanitized: "[Circular Reference]", securityEvents };
+        return { sanitized: "[Circular Reference]", securityEvents: [] };
       }
       visited.add(input);
     }
 
     if (typeof input === "string") {
-      const original = input;
-
-      // Detect potential XSS attempts
-      const xssPatterns = [
-        /<script[^>]*>.*?<\/script>/gi,
-        /javascript:/gi,
-        /on\w+\s*=/gi,
-        /<iframe[^>]*>.*?<\/iframe>/gi,
-      ];
-
-      if (xssPatterns.some(pattern => pattern.test(input))) {
-        securityEvents.push(SecurityEventType.XSS_ATTEMPT);
-        this.logSecurityEvent({
-          type: SecurityEventType.XSS_ATTEMPT,
-          riskLevel: SecurityRiskLevel.HIGH,
-          details: {
-            context,
-            originalInput: original,
-            detectedPatterns: xssPatterns.filter(p => p.test(input)).map(p => p.toString()),
-          },
-          req,
-        });
-      }
-
-      // Detect potential SQL injection attempts
-      const sqlPatterns = [
-        /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b.*\b(FROM|INTO|SET|WHERE|TABLE)\b)/gi,
-        /(\b(OR|AND)\s+\d+\s*=\s*\d+)/gi,
-        /(';|'--|\s--\s|\/\*.*\*\/)/gi,
-      ];
-
-      if (sqlPatterns.some(pattern => pattern.test(input))) {
-        securityEvents.push(SecurityEventType.SQL_INJECTION_ATTEMPT);
-        this.logSecurityEvent({
-          type: SecurityEventType.SQL_INJECTION_ATTEMPT,
-          riskLevel: SecurityRiskLevel.CRITICAL,
-          details: {
-            context,
-            originalInput: original,
-            detectedPatterns: sqlPatterns.filter(p => p.test(input)).map(p => p.toString()),
-          },
-          req,
-        });
-      }
-
-      // Sanitize the input
-      const sanitized = input
-        .replace(/[<>"'&]/g, "") // Remove dangerous characters
-        .replace(/[\u0000]/g, "") // Remove null bytes
-        .trim()
-        .slice(0, 10000); // Limit length
-
-      return { sanitized, securityEvents };
+      return this.sanitizeString(input, context, req);
     }
 
     if (typeof input === "object" && input !== null) {
-      const sanitized: Record<string, unknown> | unknown[] = Array.isArray(input) ? [] : {};
-
-      for (const [key, value] of Object.entries(input)) {
-        const result = this.sanitizeInput(value, `${context}.${key}`, req, visited);
-        if (Array.isArray(sanitized)) {
-          (sanitized as unknown[])[Number(key)] = result.sanitized;
-        } else {
-          (sanitized as Record<string, unknown>)[key] = result.sanitized;
-        }
-        securityEvents.push(...result.securityEvents);
-      }
-
-      return { sanitized, securityEvents };
+      return this.sanitizeObject(input, context, req, visited);
     }
 
-    return { sanitized: input, securityEvents };
+    return { sanitized: input, securityEvents: [] };
   }
 
   /**
@@ -577,7 +615,7 @@ export class SecurityEnhancer {
   }: {
     type: SecurityEventType;
     riskLevel: SecurityRiskLevel;
-    details: Record<string, any>;
+    details: Record<string, unknown>;
     req?: Request;
   }): Promise<void> {
     try {
@@ -585,7 +623,7 @@ export class SecurityEnhancer {
       const userAgent = req?.headers["user-agent"];
 
       await auditLogger.logSecurityEvent(
-        details.userId || "anonymous",
+        (details.userId as string) || "anonymous",
         type,
         {
           ...details,
@@ -601,6 +639,73 @@ export class SecurityEnhancer {
   }
 
   /**
+   * Handle brute force check in middleware
+   */
+  private async handleBruteForceCheck(req: Request, res: Response): Promise<{ allowed: boolean }> {
+    const ipAddress = this.getClientIP(req);
+    const bruteForceCheck = this.checkBruteForce(ipAddress);
+
+    if (!bruteForceCheck.allowed) {
+      await this.logSecurityEvent({
+        type: SecurityEventType.BRUTE_FORCE_ATTEMPT,
+        riskLevel: SecurityRiskLevel.HIGH,
+        details: {
+          ipAddress,
+          lockoutTime: bruteForceCheck.lockoutTime,
+        },
+        req,
+      });
+
+      res.status(429).json({
+        error: "Too many failed attempts",
+        retryAfter: bruteForceCheck.lockoutTime
+          ? Math.ceil((bruteForceCheck.lockoutTime - Date.now()) / 1000)
+          : undefined,
+      });
+      return { allowed: false };
+    }
+
+    return { allowed: true };
+  }
+
+  /**
+   * Sanitize request data
+   */
+  private sanitizeRequestData(req: Request): void {
+    interface SecurityRequest extends Request {
+      security?: {
+        authResult: AuthenticationResult;
+        riskLevel: SecurityRiskLevel;
+        securityEvents: SecurityEventType[];
+      };
+    }
+
+    // Sanitize request body
+    if (req.body) {
+      const sanitizationResult = this.sanitizeInput(req.body, "request.body", req);
+      req.body = sanitizationResult.sanitized;
+
+      if (sanitizationResult.securityEvents.length > 0) {
+        const authReq = req as SecurityRequest;
+        authReq.security?.securityEvents.push(...sanitizationResult.securityEvents);
+      }
+    }
+
+    // Sanitize query parameters
+    if (req.query) {
+      const sanitizationResult = this.sanitizeInput(req.query, "request.query", req);
+      if (sanitizationResult.sanitized && typeof sanitizationResult.sanitized === "object") {
+        req.query = sanitizationResult.sanitized as Request["query"];
+      }
+
+      if (sanitizationResult.securityEvents.length > 0) {
+        const authReq = req as SecurityRequest;
+        authReq.security?.securityEvents.push(...sanitizationResult.securityEvents);
+      }
+    }
+  }
+
+  /**
    * Create security middleware
    */
   createSecurityMiddleware() {
@@ -610,64 +715,28 @@ export class SecurityEnhancer {
         const authResult = await this.validateClerkToken(req);
 
         // Add security information to request
-        (req as any).security = {
+        interface SecurityRequest extends Request {
+          security: {
+            authResult: AuthenticationResult;
+            riskLevel: SecurityRiskLevel;
+            securityEvents: SecurityEventType[];
+          };
+        }
+
+        (req as SecurityRequest).security = {
           authResult,
           riskLevel: authResult.riskLevel,
           securityEvents: authResult.securityEvents,
         };
 
         // Check brute force protection
-        const ipAddress = this.getClientIP(req);
-        const bruteForceCheck = this.checkBruteForce(ipAddress);
-
-        if (!bruteForceCheck.allowed) {
-          await this.logSecurityEvent({
-            type: SecurityEventType.BRUTE_FORCE_ATTEMPT,
-            riskLevel: SecurityRiskLevel.HIGH,
-            details: {
-              ipAddress,
-              lockoutTime: bruteForceCheck.lockoutTime,
-            },
-            req,
-          });
-
-          res.status(429).json({
-            error: "Too many failed attempts",
-            retryAfter: bruteForceCheck.lockoutTime
-              ? Math.ceil((bruteForceCheck.lockoutTime - Date.now()) / 1000)
-              : undefined,
-          });
+        const bruteForceResult = await this.handleBruteForceCheck(req, res);
+        if (!bruteForceResult.allowed) {
           return;
         }
 
-        // Sanitize request body
-        if (req.body) {
-          const sanitizationResult = this.sanitizeInput(req.body, "request.body", req);
-          req.body = sanitizationResult.sanitized;
-
-          if (sanitizationResult.securityEvents.length > 0) {
-            const authReq = req as any;
-            if (authReq.security?.securityEvents) {
-              authReq.security.securityEvents.push(...sanitizationResult.securityEvents);
-            }
-          }
-        }
-
-        // Sanitize query parameters
-        if (req.query) {
-          const sanitizationResult = this.sanitizeInput(req.query, "request.query", req);
-          // Only assign if the result is a valid query object
-          if (sanitizationResult.sanitized && typeof sanitizationResult.sanitized === "object") {
-            req.query = sanitizationResult.sanitized as any;
-          }
-
-          if (sanitizationResult.securityEvents.length > 0) {
-            const authReq = req as any;
-            if (authReq.security?.securityEvents) {
-              authReq.security.securityEvents.push(...sanitizationResult.securityEvents);
-            }
-          }
-        }
+        // Sanitize request data
+        this.sanitizeRequestData(req);
 
         next();
       } catch (error) {

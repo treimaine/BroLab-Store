@@ -4,7 +4,6 @@ import { describe, expect, it } from "@jest/globals";
  * Tests for the configuration management system
  */
 
-
 describe("Dashboard Configuration System", () => {
   describe("Currency Utilities", () => {
     it("should format currency correctly with basic implementation", () => {
@@ -102,11 +101,11 @@ describe("Dashboard Configuration System", () => {
   });
 
   describe("Type Definitions", () => {
-    it("should have dashboard types available", () => {
+    it("should have dashboard types available", async () => {
       // Test that shared types can be imported
-      expect(() => {
-        require("@shared/types/dashboard");
-      }).not.toThrow();
+      await expect(async () => {
+        await import("@shared/types/dashboard");
+      }).resolves.not.toThrow();
     });
   });
 });

@@ -22,7 +22,7 @@ export function DownloadsRegenerator({
     ordersProcessed: number;
   } | null>(null);
 
-  const regenerateDownloads = useMutation(api.orders.regenerateDownloadsFromOrders);
+  const regenerateDownloads = useMutation(api.orders.regenerateDownloadsFromOrders as never);
 
   const handleRegenerate = async () => {
     try {
