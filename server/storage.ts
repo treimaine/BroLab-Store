@@ -12,7 +12,7 @@ import {
   type ReservationStatusEnum,
   type User,
 } from "@shared/schema";
-import * as crypto from "crypto";
+import * as crypto from "node:crypto";
 import { ErrorMessages } from "../shared/constants/ErrorMessages";
 import {
   createReservation,
@@ -26,6 +26,7 @@ import {
   updateReservationStatus,
   upsertUser,
 } from "./lib/db";
+import { logger } from "./lib/logger";
 
 // === Helpers for snake_case <-> camelCase mapping ===
 function toDbBeat(beat: {
@@ -570,9 +571,9 @@ export class DatabaseStorage implements IStorage {
   async createReservation(
     reservation: InsertReservation & { clerkId?: string }
   ): Promise<Reservation> {
-    secureLogger.debug("DatabaseStorage: Creating reservation", {
+    logger.info("DatabaseStorage: Creating reservation", {
       hasClerkId: !!reservation.clerkId,
-      serviceType: reservation.serviceType,
+      serviceType: reservation.service_type,
     });
 
     if (!reservation.clerkId) {
@@ -707,7 +708,7 @@ export class DatabaseStorage implements IStorage {
   async getUserDownloads(userId: number): Promise<any[]> {
     // Downloads would be retrieved from database
     // For now, return empty array as downloads are not fully implemented
-    secureLogger.debug("Getting downloads for user", { hasUserId: !!userId });
+    logger.info("Getting downloads for user", { hasUserId: !!userId });
     return [];
   }
 
@@ -717,9 +718,9 @@ export class DatabaseStorage implements IStorage {
     licenseType: string;
     downloadUrl: string;
     timestamp: string;
-  }): Promise<any> {
+  }): Promise<unknown> {
     // Download logging would go to database
-    secureLogger.info("Logging download", {
+    logger.info("Logging download", {
       beatId: download.beatId,
       hasUserId: !!download.userId,
     });
@@ -733,7 +734,7 @@ export class DatabaseStorage implements IStorage {
   async subscribeToNewsletter(email: string): Promise<void> {
     // Newsletter subscription logic would go here
     // For now, we'll implement a simple log
-    secureLogger.info("Newsletter subscription", { hasEmail: !!email });
+    logger.info("Newsletter subscription", { hasEmail: !!email });
   }
 
   async saveContactMessage(message: {
@@ -745,7 +746,7 @@ export class DatabaseStorage implements IStorage {
   }): Promise<void> {
     // Contact message storage logic would go here
     // For now, we'll implement a simple log
-    secureLogger.info("Contact message received", {
+    logger.info("Contact message received", {
       hasEmail: !!message.email,
       subject: message.subject,
     });

@@ -165,7 +165,7 @@ export function useDashboard(options: DashboardOptions = {}): DashboardHookRetur
 
   // Main dashboard data query using the unified Convex function
   const dashboardData = useQuery(
-    api.dashboard.getDashboardData,
+    api.dashboard.getDashboardData as never,
     queryArgs === "skip" ? "skip" : queryArgs
   );
 
@@ -345,7 +345,10 @@ export function useDashboardStats(): {
   const queryClient = useQueryClient();
 
   const isAuthenticated = Boolean(clerkUser && isLoaded);
-  const statsData = useQuery(api.dashboard.getDashboardStats, isAuthenticated ? {} : "skip");
+  const statsData = useQuery(
+    api.dashboard.getDashboardStats as never,
+    isAuthenticated ? {} : "skip"
+  );
 
   const isLoading = !isLoaded || (isAuthenticated && statsData === undefined);
 

@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { auditLogger } from "../server/lib/audit";
 import {
-    SecurityEnhancer,
-    SecurityEventType,
-    SecurityRiskLevel,
+  SecurityEnhancer,
+  SecurityEventType,
+  SecurityRiskLevel,
 } from "../server/lib/securityEnhancer";
 
 // Mock the audit logger
@@ -42,10 +42,8 @@ describe("SecurityEnhancer", () => {
   });
 
   describe("validateClerkToken", () => {
-    const { getAuth } = require("@clerk/express");
-
     it("should return success for valid Clerk token", async () => {
-      getAuth.mockReturnValue({
+      (getAuth as jest.Mock).mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
         sessionClaims: {
@@ -64,7 +62,7 @@ describe("SecurityEnhancer", () => {
     });
 
     it("should return failure for missing user ID", async () => {
-      getAuth.mockReturnValue({
+      (getAuth as jest.Mock).mockReturnValue({
         userId: null,
         sessionId: null,
         sessionClaims: null,
@@ -88,7 +86,7 @@ describe("SecurityEnhancer", () => {
     });
 
     it("should detect expired session claims", async () => {
-      getAuth.mockReturnValue({
+      (getAuth as jest.Mock).mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
         sessionClaims: {
@@ -107,7 +105,7 @@ describe("SecurityEnhancer", () => {
     });
 
     it("should detect future issued at time", async () => {
-      getAuth.mockReturnValue({
+      (getAuth as jest.Mock).mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
         sessionClaims: {
@@ -127,7 +125,7 @@ describe("SecurityEnhancer", () => {
     it("should detect suspicious user agent", async () => {
       mockRequest.headers!["user-agent"] = "curl/7.68.0";
 
-      getAuth.mockReturnValue({
+      (getAuth as jest.Mock).mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
         sessionClaims: {
@@ -145,7 +143,7 @@ describe("SecurityEnhancer", () => {
     });
 
     it("should handle authentication errors gracefully", async () => {
-      getAuth.mockImplementation(() => {
+      (getAuth as jest.Mock).mockImplementation(() => {
         throw new Error("Clerk service unavailable");
       });
 
@@ -283,8 +281,7 @@ describe("SecurityEnhancer", () => {
 
     beforeEach(() => {
       mockNext = jest.fn();
-      const { getAuth } = require("@clerk/express");
-      getAuth.mockReturnValue({
+      (getAuth as jest.Mock).mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
         sessionClaims: {
@@ -361,8 +358,7 @@ describe("SecurityEnhancer", () => {
       // Use a different IP to avoid brute force protection from previous tests
       mockRequest.headers!["x-forwarded-for"] = "10.0.0.1";
 
-      const { getAuth } = require("@clerk/express");
-      getAuth.mockImplementation(() => {
+      (getAuth as jest.Mock).mockImplementation(() => {
         throw new Error("Clerk service error");
       });
 
@@ -400,8 +396,7 @@ describe("SecurityEnhancer", () => {
 
       mockRequest.headers!["user-agent"] = "curl/7.68.0"; // Suspicious agent
 
-      const { getAuth } = require("@clerk/express");
-      getAuth.mockReturnValue({
+      (getAuth as jest.Mock).mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
         sessionClaims: {
@@ -422,8 +417,7 @@ describe("SecurityEnhancer", () => {
     it("should handle missing headers gracefully", async () => {
       mockRequest.headers = {};
 
-      const { getAuth } = require("@clerk/express");
-      getAuth.mockReturnValue({
+      (getAuth as jest.Mock).mockReturnValue({
         userId: "user_123",
         sessionId: "sess_456",
         sessionClaims: {

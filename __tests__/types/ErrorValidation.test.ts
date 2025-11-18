@@ -23,17 +23,17 @@ describe("Error Validation Tests", () => {
     test("should accept valid error severities", () => {
       const validSeverities = ["low", "medium", "high", "critical"];
 
-      validSeverities.forEach(severity => {
+      for (const severity of validSeverities) {
         expect(() => ErrorSeverity.parse(severity)).not.toThrow();
-      });
+      }
     });
 
     test("should reject invalid error severities", () => {
       const invalidSeverities = ["info", "warning", "error", "", "invalid-severity"];
 
-      invalidSeverities.forEach(severity => {
+      for (const severity of invalidSeverities) {
         expect(() => ErrorSeverity.parse(severity)).toThrow();
-      });
+      }
     });
   });
 
@@ -56,17 +56,17 @@ describe("Error Validation Tests", () => {
         "security",
       ];
 
-      validCategories.forEach(category => {
+      for (const category of validCategories) {
         expect(() => ErrorCategory.parse(category)).not.toThrow();
-      });
+      }
     });
 
     test("should reject invalid error categories", () => {
       const invalidCategories = ["ui", "frontend", "backend", "", "invalid-category"];
 
-      invalidCategories.forEach(category => {
+      for (const category of invalidCategories) {
         expect(() => ErrorCategory.parse(category)).toThrow();
-      });
+      }
     });
   });
 
@@ -79,9 +79,9 @@ describe("Error Validation Tests", () => {
         "two_factor_required",
       ];
 
-      authErrors.forEach(errorType => {
+      for (const errorType of authErrors) {
         expect(() => ErrorType.parse(errorType)).not.toThrow();
-      });
+      }
     });
 
     test("should accept valid authorization error types", () => {
@@ -92,9 +92,9 @@ describe("Error Validation Tests", () => {
         "quota_exceeded",
       ];
 
-      authzErrors.forEach(errorType => {
+      for (const errorType of authzErrors) {
         expect(() => ErrorType.parse(errorType)).not.toThrow();
-      });
+      }
     });
 
     test("should accept valid payment error types", () => {
@@ -106,9 +106,9 @@ describe("Error Validation Tests", () => {
         "subscription_expired",
       ];
 
-      paymentErrors.forEach(errorType => {
+      for (const errorType of paymentErrors) {
         expect(() => ErrorType.parse(errorType)).not.toThrow();
-      });
+      }
     });
 
     test("should accept valid audio processing error types", () => {
@@ -119,9 +119,9 @@ describe("Error Validation Tests", () => {
         "waveform_generation_failed",
       ];
 
-      audioErrors.forEach(errorType => {
+      for (const errorType of audioErrors) {
         expect(() => ErrorType.parse(errorType)).not.toThrow();
-      });
+      }
     });
 
     test("should accept valid business logic error types", () => {
@@ -132,17 +132,17 @@ describe("Error Validation Tests", () => {
         "order_processing_failed",
       ];
 
-      businessErrors.forEach(errorType => {
+      for (const errorType of businessErrors) {
         expect(() => ErrorType.parse(errorType)).not.toThrow();
-      });
+      }
     });
 
     test("should reject invalid error types", () => {
       const invalidTypes = ["unknown_error", "custom_error", "", "invalid-type"];
 
-      invalidTypes.forEach(errorType => {
+      for (const errorType of invalidTypes) {
         expect(() => ErrorType.parse(errorType)).toThrow();
-      });
+      }
     });
   });
 
@@ -654,7 +654,7 @@ describe("Error Validation Tests", () => {
       });
 
       test("should return 500 for unknown error types", () => {
-        expect(getHttpStatusForErrorType("unknown_error" as any)).toBe(500);
+        expect(getHttpStatusForErrorType("unknown_error" as never)).toBe(500);
       });
 
       test("should return correct status codes for system errors", () => {
@@ -693,7 +693,7 @@ describe("Error Validation Tests", () => {
       });
 
       test("should return generic message for unknown error types", () => {
-        expect(getUserMessageForErrorType("unknown_error" as any)).toBe(
+        expect(getUserMessageForErrorType("unknown_error" as never)).toBe(
           "An unexpected error occurred. Please try again."
         );
       });

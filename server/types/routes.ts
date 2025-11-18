@@ -341,11 +341,7 @@ export interface RouteError extends Error {
 /**
  * Error handler function type
  */
-export type RouteErrorHandler = (
-  error: RouteError | Error | unknown,
-  req: Request,
-  res: Response
-) => void;
+export type RouteErrorHandler = (error: RouteError | Error, req: Request, res: Response) => void;
 
 /**
  * Async route handler type
@@ -371,7 +367,7 @@ export type SafeRouteHandler<T = unknown> = (
  * Create a standardized error response
  */
 export function createErrorResponse(
-  error: string | Error | unknown,
+  error: string | Error,
   statusCode: number = 500,
   details?: Record<string, unknown>
 ): RouteErrorResponse {
@@ -402,17 +398,20 @@ export function createSuccessResponse<T>(data?: T, message?: string): RouteSucce
  * Handle async route errors
  */
 export function handleRouteError(
-  error: unknown,
+  error: Error | string | unknown,
   res: Response,
-  defaultMessage: string = "Internal server error"
+  customMessage?: string
 ): void {
-  console.error("Route error:", error);
+  const errorMessage = customMessage || (error instanceof Error ? error.message : String(error));
+  console.error("Route error:", errorMessage, error);
 
   if (error instanceof Error) {
     const statusCode = (error as RouteError).statusCode || 500;
-    res.status(statusCode).json(createErrorResponse(error, statusCode));
+    const message = customMessage || error.message;
+    res.status(statusCode).json(createErrorResponse(message, statusCode));
   } else {
-    res.status(500).json(createErrorResponse(defaultMessage, 500));
+    const message = customMessage || String(error);
+    res.status(500).json(createErrorResponse(message, 500));
   }
 }
 
@@ -424,7 +423,8 @@ export function withErrorHandling<T = unknown>(handler: AsyncRouteHandler<T>): S
     try {
       await handler(req, res);
     } catch (error) {
-      handleRouteError(error, res);
+      const errorMessage = error instanceof Error ? error : String(error);
+      handleRouteError(errorMessage, res);
     }
   };
 }

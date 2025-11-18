@@ -43,7 +43,6 @@ describe("useCache Hook", () => {
     expect(() => {
       renderHook(() => {
         // Mock the context to return null for this test
-        const React = require("react");
         const context = React.createContext(null);
         return (
           React.useContext(context) ||

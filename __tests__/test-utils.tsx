@@ -1,6 +1,5 @@
 import { RenderOptions, render } from "@testing-library/react";
 import React, { ReactElement } from "react";
-import { act } from "react-dom/test-utils";
 
 /**
  * Test utilities for React components with providers
@@ -9,24 +8,30 @@ import { act } from "react-dom/test-utils";
 
 // Mock QueryClient and QueryClientProvider for testing
 class MockQueryClient {
-  constructor(options?: unknown) {
-    this.options = options;
-  }
-
-  private options: unknown;
-
-  invalidateQueries() {
+  invalidateQueries(): Promise<void> {
     return Promise.resolve();
   }
 
-  setQueryData() {}
-  getQueryData() {}
-  clear() {}
+  setQueryData(): void {
+    // Mock implementation
+  }
+
+  getQueryData(): unknown {
+    return undefined;
+  }
+
+  clear(): void {
+    // Mock implementation
+  }
 }
 
-const MockQueryClientProvider = ({ children }: { children: React.ReactNode }) => (
-  <div data-testid="query-client-provider">{children}</div>
-);
+const MockQueryClientProvider = ({
+  children,
+  client: _client,
+}: {
+  children: React.ReactNode;
+  client?: MockQueryClient;
+}) => <div data-testid="query-client-provider">{children}</div>;
 
 // Use mocks instead of real imports to avoid constructor issues
 const QueryClient = MockQueryClient;
@@ -85,44 +90,22 @@ const mockClerk: MockClerkInstance = {
 };
 
 // Mock providers as simple components
-const MockClerkProvider = ({
-  children,
-}: {
-  children: React.ReactNode;
-  publishableKey?: string;
-  clerk?: MockClerkInstance;
-}) => {
+const MockClerkProvider = ({ children }: { children: React.ReactNode }) => {
   return <div data-testid="clerk-provider">{children}</div>;
 };
 
-const MockConvexProvider = ({
-  children,
-}: {
-  children: React.ReactNode;
-  client?: MockConvexClient;
-}) => {
+const MockConvexProvider = ({ children }: { children: React.ReactNode }) => {
   return <div data-testid="convex-provider">{children}</div>;
 };
 
 // Create a custom render function that includes providers
 function customRender(ui: ReactElement, options?: Omit<RenderOptions, "wrapper">) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        gcTime: 0,
-        staleTime: 0,
-      },
-      mutations: {
-        retry: false,
-      },
-    },
-  });
+  const queryClient = new QueryClient();
 
   function AllTheProviders({ children }: { children: React.ReactNode }) {
     return (
-      <MockClerkProvider publishableKey="pk_test_mock_key" clerk={mockClerk}>
-        <MockConvexProvider client={mockConvexClient}>
+      <MockClerkProvider>
+        <MockConvexProvider>
           <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
         </MockConvexProvider>
       </MockClerkProvider>
@@ -134,23 +117,12 @@ function customRender(ui: ReactElement, options?: Omit<RenderOptions, "wrapper">
 
 // Create a wrapper component for renderHook
 function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        gcTime: 0,
-        staleTime: 0,
-      },
-      mutations: {
-        retry: false,
-      },
-    },
-  });
+  const queryClient = new QueryClient();
 
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
-      <MockClerkProvider publishableKey="pk_test_mock_key" clerk={mockClerk}>
-        <MockConvexProvider client={mockConvexClient}>
+      <MockClerkProvider>
+        <MockConvexProvider>
           <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
         </MockConvexProvider>
       </MockClerkProvider>
@@ -159,32 +131,20 @@ function createWrapper() {
 }
 
 // Enhanced test utilities for ES module compatibility
-export const testUtils = {
-  createQueryClient: () =>
-    new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          gcTime: 0,
-          staleTime: 0,
-        },
-        mutations: {
-          retry: false,
-        },
-      },
-    }),
+const testUtilsObject = {
+  createQueryClient: () => new QueryClient(),
 
   mockConvexClient,
   mockClerk,
 
   // Helper for creating isolated test environments
   createIsolatedWrapper: (customQueryClient?: MockQueryClient) => {
-    const queryClient = customQueryClient || testUtils.createQueryClient();
+    const queryClient = customQueryClient || testUtilsObject.createQueryClient();
 
     return function IsolatedWrapper({ children }: { children: React.ReactNode }) {
       return (
-        <MockClerkProvider publishableKey="pk_test_mock_key" clerk={mockClerk}>
-          <MockConvexProvider client={mockConvexClient}>
+        <MockClerkProvider>
+          <MockConvexProvider>
             <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
           </MockConvexProvider>
         </MockClerkProvider>
@@ -200,7 +160,7 @@ export * from "@testing-library/react";
 export { customRender as render };
 
 // Export utilities for tests
-export { act, createWrapper, mockClerk, mockConvexClient, testUtils };
+export { createWrapper, mockClerk, mockConvexClient, testUtilsObject as testUtils };
 
 // ================================
 // DATA VALIDATION TEST UTILITIES
@@ -242,8 +202,8 @@ export {
  * expect(result.inconsistencies).toHaveLength(0);
  * ```
  */
-export function createTestConsistencyChecker() {
+export async function createTestConsistencyChecker() {
   // Import ConsistencyChecker dynamically to avoid circular dependencies
-  const { ConsistencyChecker } = require("../client/src/utils/dataConsistency");
+  const { ConsistencyChecker } = await import("../client/src/utils/dataConsistency");
   return ConsistencyChecker.createTestChecker();
 }

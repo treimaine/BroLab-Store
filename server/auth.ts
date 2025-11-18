@@ -1,15 +1,15 @@
+import { clerkMiddleware, getAuth } from "@clerk/express";
 import cookieParser from "cookie-parser";
-import type { Express, NextFunction, Response } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import session from "express-session";
 import type { User } from "../shared/schema";
-// Imports pour Convex et Clerk - NOUVEAU SDK
-import { clerkMiddleware, getAuth } from "@clerk/express";
-import type { Request } from "express";
 import { ConvexUser, convexUserToUser, userToConvexUserInput } from "../shared/types/ConvexUser";
 import { auditLogger } from "./lib/audit";
 import { getUserByClerkId, upsertUser } from "./lib/convex";
 
-// Type for request with user and security context for compatibility
+/**
+ * Extended request interface with user and security context
+ */
 interface RequestWithUser extends Request {
   user?: {
     id: string;
@@ -19,7 +19,11 @@ interface RequestWithUser extends Request {
     name?: string;
     role?: string;
   } & Record<string, unknown>;
-  security?: unknown;
+  security?: {
+    riskLevel: string;
+    securityEvents: string[];
+    sessionId?: string;
+  };
 }
 
 // Extend session to include userId
@@ -29,8 +33,11 @@ declare module "express-session" {
   }
 }
 
-// Session configuration
-export function setupAuth(app: Express) {
+/**
+ * Configure authentication middleware and session management
+ * Sets up cookie parser, session store, and Clerk middleware
+ */
+export function setupAuth(app: Express): void {
   // SECURITY: Enforce SESSION_SECRET in non-test environments
   if (process.env.NODE_ENV !== "test" && !process.env.SESSION_SECRET) {
     throw new Error(
@@ -52,12 +59,12 @@ export function setupAuth(app: Express) {
         maxAge: 24 * 60 * 60 * 1000,
       },
       store: process.env.NODE_ENV === "test" ? new session.MemoryStore() : undefined,
-      // TODO: Use Redis store in production for session persistence
-      // store: process.env.NODE_ENV === 'production' ? new RedisStore({ client: redisClient }) : new session.MemoryStore()
+      // NOTE: Consider using Redis store in production for session persistence
+      // Example: new RedisStore({ client: redisClient })
     })
   );
 
-  // Ajouter le middleware Clerk à toutes les requêtes - NOUVEAU SDK (noop in tests)
+  // Add Clerk middleware to all requests (noop in test environment)
   try {
     if (process.env.NODE_ENV === "test") {
       app.use((_req, _res, next) => next());
@@ -72,22 +79,29 @@ export function setupAuth(app: Express) {
   }
 }
 
-//
 // ==========================
-// Test token support for automated testing (e.g., TestSprite)
+// Test Token Support
 // ==========================
-//
 
+/**
+ * Test token management for automated testing (e.g., TestSprite)
+ */
 const issuedTestTokens = new Set<string>();
 const defaultAcceptedTokens = new Set<string>([
   "mock-test-token",
   "test_api_key_or_jwt_token_for_clerk_authentication",
 ]);
 
+/**
+ * Register a test token for acceptance in authentication
+ */
 export function registerTestToken(token: string): void {
   issuedTestTokens.add(token);
 }
 
+/**
+ * Check if a token is accepted for test authentication
+ */
 export function isTokenAccepted(token: string | undefined | null): boolean {
   if (!token) return false;
   const envToken = process.env.TEST_USER_TOKEN;
@@ -96,47 +110,200 @@ export function isTokenAccepted(token: string | undefined | null): boolean {
   return defaultAcceptedTokens.has(token);
 }
 
-// Middleware to check if user is authenticated
-// Enhanced middleware with security logging and validation
-export const isAuthenticated = async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
-    // Import security enhancer
-    const { securityEnhancer, SecurityEventType } = await import("./lib/securityEnhancer");
+/**
+ * Extract client IP address from request headers
+ */
+function getClientIP(req: Request): string {
+  return (
+    (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
+    (req.headers["x-real-ip"] as string) ||
+    req.socket.remoteAddress ||
+    "unknown"
+  );
+}
 
-    const ipAddress =
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
-      (req.headers["x-real-ip"] as string) ||
-      req.connection.remoteAddress ||
-      "unknown";
+/**
+ * Extract bearer token from Authorization header
+ */
+function extractBearerToken(req: Request): string | undefined {
+  const authHeader = req.headers.authorization || "";
+  const bearerPrefix = "Bearer ";
+  return authHeader.startsWith(bearerPrefix) ? authHeader.slice(bearerPrefix.length) : undefined;
+}
+
+/**
+ * Handle test token authentication
+ */
+async function handleTestTokenAuth(
+  req: RequestWithUser,
+  ipAddress: string,
+  userAgent: string
+): Promise<boolean> {
+  const bearerToken = extractBearerToken(req);
+
+  if (!isTokenAccepted(bearerToken)) {
+    return false;
+  }
+
+  const { SecurityEventType } = await import("./lib/securityEnhancer");
+
+  await auditLogger.logSecurityEvent(
+    "testsprite_user",
+    SecurityEventType.AUTHENTICATION_SUCCESS,
+    {
+      method: "test_token",
+      ipAddress,
+      userAgent,
+    },
+    ipAddress,
+    userAgent
+  );
+
+  req.user = {
+    id: "0",
+    username: "testsprite_user",
+    email: "testsprite@example.com",
+    role: "user",
+  };
+
+  return true;
+}
+
+/**
+ * Handle Clerk authentication and user creation/retrieval
+ */
+async function handleClerkAuth(
+  req: RequestWithUser,
+  userId: string,
+  sessionId: string | undefined,
+  authResult: {
+    success: boolean;
+    riskLevel: string;
+    securityEvents: string[];
+  },
+  ipAddress: string,
+  userAgent: string
+): Promise<boolean> {
+  const { securityEnhancer } = await import("./lib/securityEnhancer");
+
+  // Clear failed attempts on successful authentication
+  securityEnhancer.clearFailedAttempts(ipAddress);
+
+  // Retrieve user from Convex
+  let convexUser: ConvexUser | null = await getUserByClerkId(userId);
+
+  if (!convexUser) {
+    // Create user in Convex if doesn't exist
+    const newUserInput = userToConvexUserInput({
+      clerkId: userId,
+      email: "", // Will be updated client-side
+      username: `user_${userId.slice(-8)}`,
+    });
+    convexUser = await upsertUser(newUserInput);
+
+    // Log new user creation
+    if (convexUser) {
+      await auditLogger.logRegistration(userId, ipAddress, userAgent);
+    }
+  }
+
+  if (!convexUser) {
+    return false;
+  }
+
+  // Convert ConvexUser to shared User type
+  const sharedUser = convexUserToUser(convexUser);
+
+  // Log successful authentication
+  await auditLogger.logLogin(userId, ipAddress, userAgent);
+
+  // Log any security events detected during authentication
+  for (const event of authResult.securityEvents) {
+    await auditLogger.logSecurityEvent(
+      userId,
+      event,
+      {
+        riskLevel: authResult.riskLevel,
+        sessionId,
+        ipAddress,
+        userAgent,
+      },
+      ipAddress,
+      userAgent
+    );
+  }
+
+  // Set req.user for compatibility with existing routes
+  req.user = {
+    id: sharedUser.id.toString(),
+    clerkId: convexUser.clerkId,
+    username: sharedUser.username,
+    email: sharedUser.email,
+    role: convexUser.role || "user",
+  };
+
+  // Add security context to request
+  req.security = {
+    riskLevel: authResult.riskLevel,
+    securityEvents: authResult.securityEvents,
+    sessionId,
+  };
+
+  return true;
+}
+
+/**
+ * Handle session-based authentication fallback
+ */
+async function handleSessionAuth(
+  req: RequestWithUser,
+  ipAddress: string,
+  userAgent: string
+): Promise<boolean> {
+  if (!req.session?.userId) {
+    return false;
+  }
+
+  const { SecurityEventType } = await import("./lib/securityEnhancer");
+
+  await auditLogger.logSecurityEvent(
+    req.session.userId.toString(),
+    SecurityEventType.AUTHENTICATION_SUCCESS,
+    {
+      method: "session",
+      ipAddress,
+      userAgent,
+    },
+    ipAddress,
+    userAgent
+  );
+
+  req.user = {
+    id: req.session.userId.toString(),
+    username: `session_user_${req.session.userId}`,
+    email: "",
+    role: "user",
+  };
+
+  return true;
+}
+
+/**
+ * Authentication middleware with security logging and validation
+ * Supports Clerk authentication, test tokens, and session-based auth
+ */
+export const isAuthenticated = async (
+  req: RequestWithUser,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { securityEnhancer, SecurityEventType } = await import("./lib/securityEnhancer");
+    const ipAddress = getClientIP(req);
     const userAgent = req.headers["user-agent"] || "unknown";
 
-    // Support for test token via Authorization: Bearer <token>
-    const authHeader = (req.headers?.authorization as string | undefined) || "";
-    const bearerPrefix = "Bearer ";
-    const bearerToken = authHeader.startsWith(bearerPrefix)
-      ? authHeader.slice(bearerPrefix.length)
-      : undefined;
-
-    if (isTokenAccepted(bearerToken)) {
-      // Log test token usage
-      await auditLogger.logSecurityEvent(
-        "testsprite_user",
-        SecurityEventType.AUTHENTICATION_SUCCESS,
-        {
-          method: "test_token",
-          ipAddress,
-          userAgent,
-        },
-        ipAddress,
-        userAgent
-      );
-
-      req.user = {
-        id: "0",
-        username: "testsprite_user",
-        email: "testsprite@example.com",
-        role: "user",
-      };
+    // Check test token authentication
+    if (await handleTestTokenAuth(req, ipAddress, userAgent)) {
       return next();
     }
 
@@ -162,100 +329,32 @@ export const isAuthenticated = async (req: RequestWithUser, res: Response, next:
         userAgent
       );
 
-      return res.status(401).json({
+      res.status(401).json({
         error: "Authentication failed",
         details: process.env.NODE_ENV === "development" ? authResult.error : undefined,
       });
+      return;
     }
 
     const { userId, sessionId } = authResult.user || {};
 
+    // Handle Clerk authentication
     if (userId) {
-      // Clear failed attempts on successful authentication
-      securityEnhancer.clearFailedAttempts(ipAddress);
-
-      // Récupérer l'utilisateur depuis Convex
-      let convexUser: ConvexUser | null = await getUserByClerkId(userId);
-
-      if (!convexUser) {
-        // Créer l'utilisateur dans Convex s'il n'existe pas
-        const newUserInput = userToConvexUserInput({
-          clerkId: userId,
-          email: "", // Sera mis à jour côté client
-          username: `user_${userId.slice(-8)}`,
-        });
-        convexUser = await upsertUser(newUserInput);
-
-        // Log new user creation
-        if (convexUser) {
-          await auditLogger.logRegistration(userId, ipAddress, userAgent);
-        }
-      }
-
-      if (convexUser) {
-        // Convert ConvexUser to shared User type
-        const sharedUser = convexUserToUser(convexUser);
-
-        // Log successful authentication
-        await auditLogger.logLogin(userId, ipAddress, userAgent);
-
-        // Log any security events detected during authentication
-        for (const event of authResult.securityEvents) {
-          await auditLogger.logSecurityEvent(
-            userId,
-            event,
-            {
-              riskLevel: authResult.riskLevel,
-              sessionId,
-              ipAddress,
-              userAgent,
-            },
-            ipAddress,
-            userAgent
-          );
-        }
-
-        // Définir req.user pour la compatibilité avec les routes existantes
-        req.user = {
-          id: sharedUser.id.toString(),
-          clerkId: convexUser.clerkId,
-          username: sharedUser.username,
-          email: sharedUser.email,
-          role: convexUser.role || "user", // Use role from ConvexUser or default
-        };
-
-        // Add security context to request
-        req.security = {
-          riskLevel: authResult.riskLevel,
-          securityEvents: authResult.securityEvents,
-          sessionId,
-        };
-
+      const success = await handleClerkAuth(
+        req,
+        userId,
+        sessionId,
+        authResult,
+        ipAddress,
+        userAgent
+      );
+      if (success) {
         return next();
       }
     }
 
-    // Fallback vers l'authentification par session (pour compatibilité)
-    if (req.session?.userId) {
-      // Log session-based authentication
-      await auditLogger.logSecurityEvent(
-        req.session.userId.toString(),
-        SecurityEventType.AUTHENTICATION_SUCCESS,
-        {
-          method: "session",
-          ipAddress,
-          userAgent,
-        },
-        ipAddress,
-        userAgent
-      );
-
-      req.user = {
-        id: req.session.userId.toString(),
-        username: `session_user_${req.session.userId}`,
-        email: "",
-        role: "user",
-      };
+    // Fallback to session-based authentication
+    if (await handleSessionAuth(req, ipAddress, userAgent)) {
       return next();
     }
 
@@ -273,16 +372,11 @@ export const isAuthenticated = async (req: RequestWithUser, res: Response, next:
       userAgent
     );
 
-    return res.status(401).json({ error: "Non autorisé" });
+    res.status(401).json({ error: "Unauthorized" });
   } catch (error) {
-    console.error("Erreur lors de l'authentification:", error);
+    console.error("Authentication error:", error);
 
-    // Log authentication error
-    const ipAddress =
-      (req.headers["x-forwarded-for"] as string)?.split(",")[0] ||
-      (req.headers["x-real-ip"] as string) ||
-      req.connection.remoteAddress ||
-      "unknown";
+    const ipAddress = getClientIP(req);
     const userAgent = req.headers["user-agent"] || "unknown";
 
     await auditLogger.logSecurityEvent(
@@ -298,50 +392,53 @@ export const isAuthenticated = async (req: RequestWithUser, res: Response, next:
       userAgent
     );
 
-    return res.status(500).json({ error: "Erreur d'authentification" });
+    res.status(500).json({ error: "Authentication error" });
   }
 };
 
-// Fonction pour obtenir l'utilisateur actuel (Clerk + Convex)
+/**
+ * Get current authenticated user from Clerk and Convex
+ * Returns User object or null if not authenticated
+ */
 export const getCurrentUser = async (req: RequestWithUser): Promise<User | null> => {
   try {
-    // Priorité à l'authentification Clerk - NOUVEAU SDK
-    const { userId, sessionId } = getAuth(req);
+    // Priority to Clerk authentication
+    const { userId } = getAuth(req);
 
-    if (userId) {
-      const clerkUser = {
-        id: userId,
-        sessionId: sessionId,
-      };
+    if (!userId) {
+      return null;
+    }
 
-      // Récupérer l'utilisateur depuis Convex
-      let convexUser: ConvexUser | null = await getUserByClerkId(clerkUser.id);
+    // Retrieve user from Convex
+    let convexUser: ConvexUser | null = await getUserByClerkId(userId);
 
-      if (!convexUser) {
-        // Créer l'utilisateur dans Convex s'il n'existe pas
-        const newUserInput = userToConvexUserInput({
-          clerkId: clerkUser.id,
-          email: "", // Sera mis à jour côté client
-          username: `user_${clerkUser.id.slice(-8)}`,
-        });
-        convexUser = await upsertUser(newUserInput);
-      }
+    if (!convexUser) {
+      // Create user in Convex if doesn't exist
+      const newUserInput = userToConvexUserInput({
+        clerkId: userId,
+        email: "", // Will be updated client-side
+        username: `user_${userId.slice(-8)}`,
+      });
+      convexUser = await upsertUser(newUserInput);
+    }
 
-      if (convexUser) {
-        // Convert ConvexUser to shared User type using type-safe conversion
-        return convexUserToUser(convexUser);
-      }
+    if (convexUser) {
+      // Convert ConvexUser to shared User type using type-safe conversion
+      return convexUserToUser(convexUser);
     }
 
     return null;
   } catch (error) {
-    console.error("Erreur lors de la récupération de l'utilisateur:", error);
+    console.error("Error retrieving user:", error);
     return null;
   }
 };
 
-// Authentication routes - Simplifié pour utiliser uniquement Clerk
-export function registerAuthRoutes(app: Express) {
+/**
+ * Register authentication routes
+ * Simplified to use Clerk only
+ */
+export function registerAuthRoutes(app: Express): void {
   // Get current user (Clerk only)
   app.get("/api/auth/user", isAuthenticated, async (req, res): Promise<void> => {
     try {
@@ -350,13 +447,13 @@ export function registerAuthRoutes(app: Express) {
         res.status(401).json({ error: "Not authenticated" });
         return;
       }
-      const typedUser = user as User;
+
       res.json({
         user: {
-          id: typedUser.id,
-          username: typedUser.username,
-          email: typedUser.email,
-          created_at: typedUser.created_at,
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          created_at: user.created_at,
         },
       });
     } catch (error: unknown) {

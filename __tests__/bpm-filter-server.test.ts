@@ -1,3 +1,4 @@
+import express, { type Express } from "express";
 import { Server } from "http";
 import request from "supertest";
 import { registerRoutes } from "../server/routes";
@@ -8,7 +9,7 @@ describe("BPM Filter Server-Side", () => {
   let server: Server;
 
   beforeAll(async () => {
-    app = require("express")();
+    app = express();
     server = await registerRoutes(app);
   });
 

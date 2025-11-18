@@ -9,7 +9,7 @@
  * - Admin notifications
  */
 
-import { secureLogger } from "../lib/secureLogger";
+import { logger } from "../lib/logger";
 
 // Type definitions
 export interface PaymentData {
@@ -646,9 +646,9 @@ export const sendReservationConfirmationEmail = async (
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
-  secureLogger.info("Reservation confirmation email sent successfully", {
+  logger.info("Reservation confirmation email sent successfully", {
     attempts: result.attempts,
-    hasReservationId: !!reservation.id,
+    hasReservationId: !!reservations[0]?.id,
   });
 };
 
@@ -678,9 +678,9 @@ export const sendPaymentFailureEmail = async (
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
-  secureLogger.info("Payment failure email sent successfully", {
+  logger.info("Payment failure email sent successfully", {
     attempts: result.attempts,
-    hasReservationId: !!reservation.id,
+    hasReservationIds: reservationIds.length > 0,
   });
 };
 
@@ -711,7 +711,7 @@ export const sendReservationStatusUpdateEmail = async (
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
-  secureLogger.info("Status update email sent successfully", {
+  logger.info("Status update email sent successfully", {
     attempts: result.attempts,
     hasReservationId: !!reservation.id,
   });
@@ -731,7 +731,7 @@ export const sendAdminReservationNotification = async (
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
-  secureLogger.info("Admin notification email sent successfully", {
+  logger.info("Admin notification email sent successfully", {
     attempts: result.attempts,
     hasReservationId: !!reservation.id,
   });
@@ -758,9 +758,9 @@ export const sendPaymentConfirmationEmail = async (
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
-  secureLogger.info("Payment confirmation email sent successfully", {
+  logger.info("Payment confirmation email sent successfully", {
     attempts: result.attempts,
-    hasReservationId: !!reservation.id,
+    hasReservationId: !!reservations[0]?.id,
   });
 };
 
@@ -784,7 +784,7 @@ export const sendReservationReminderEmail = async (
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
-  secureLogger.info("Reservation reminder email sent successfully", {
+  logger.info("Reservation reminder email sent successfully", {
     attempts: result.attempts,
     hasReservationId: !!reservation.id,
   });

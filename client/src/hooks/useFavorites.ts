@@ -15,13 +15,14 @@ export function useFavorites() {
   const { user } = useUser();
 
   // Query favorites - skip query if user is not authenticated
-  const favorites = useQuery(api.favorites.getFavorites.getFavorites, user ? {} : undefined) as
-    | Favorite[]
-    | undefined;
+  const favorites = useQuery(
+    api.favorites.getFavorites.getFavorites as never,
+    user ? {} : undefined
+  ) as Favorite[] | undefined;
 
   // Mutations
-  const addToFavorites = useMutation(api.favorites.add.addToFavorites);
-  const removeFromFavorites = useMutation(api.favorites.remove.removeFromFavorites);
+  const addToFavorites = useMutation(api.favorites.add.addToFavorites as never);
+  const removeFromFavorites = useMutation(api.favorites.remove.removeFromFavorites as never);
 
   // Helper to check if a beat is favorited
   const isFavorite = (beatId: number): boolean => {

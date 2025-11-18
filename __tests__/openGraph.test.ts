@@ -12,6 +12,7 @@ jest.mock("../server/lib/openGraphGenerator", () => ({
 
 // Mock des modules avant l'import de l'app
 jest.mock("../server/routes/openGraph", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const express = require("express");
   const router = express.Router();
 
@@ -100,6 +101,7 @@ jest.mock("../server/routes/openGraph", () => {
 
 // Mock des modules schema
 jest.mock("../server/routes/schema", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const express = require("express");
   const router = express.Router();
 
