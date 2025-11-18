@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, Target } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import type { BeatProduct as Beat } from "@shared/schema";
 
@@ -20,148 +20,180 @@ interface SimilarityScore {
 }
 
 export interface BeatSimilarityRecommendationsProps {
-  currentBeat: Beat;
-  recommendations: Beat[];
-  onBeatSelect: (beat: Beat) => void;
-  isLoading?: boolean;
+  readonly currentBeat: Beat;
+  readonly recommendations: Beat[];
+  readonly onBeatSelect: (beat: Beat) => void;
+  readonly isLoading?: boolean;
 }
+
+type SortOption = "similarity" | "popularity" | "price" | "recent";
+
+// Utility function to normalize tags (handle both string and {name: string} formats)
+const normalizeTag = (tag: string | { name: string }): string => {
+  return typeof tag === "string" ? tag : tag.name;
+};
+
+// Utility function to normalize tags array
+const normalizeTags = (tags?: Array<string | { name: string }> | null): string[] => {
+  return tags ? tags.map(normalizeTag) : [];
+};
+
+// Check if two keys are musically related
+const isRelatedKey = (key1: string, key2: string): boolean => {
+  const relatedKeys: Record<string, string[]> = {
+    C: ["Am", "F", "G"],
+    G: ["Em", "C", "D"],
+    D: ["Bm", "G", "A"],
+    A: ["F#m", "D", "E"],
+    E: ["C#m", "A", "B"],
+    B: ["G#m", "E", "F#"],
+    "F#": ["D#m", "B", "C#"],
+    "C#": ["A#m", "F#", "G#"],
+    F: ["Dm", "Bb", "C"],
+    Bb: ["Gm", "F", "Eb"],
+    Eb: ["Cm", "Bb", "Ab"],
+    Ab: ["Fm", "Eb", "Db"],
+  };
+
+  return relatedKeys[key1]?.includes(key2) || relatedKeys[key2]?.includes(key1) || false;
+};
+
+// Calculate genre similarity score (40% weight)
+const calculateGenreScore = (beat1: Beat, beat2: Beat): number => {
+  if (beat1.genre && beat2.genre && beat1.genre.toLowerCase() === beat2.genre.toLowerCase()) {
+    return 40;
+  }
+  return 0;
+};
+
+// Calculate BPM similarity score (20% weight)
+const calculateBpmScore = (beat1: Beat, beat2: Beat): number => {
+  if (!beat1.bpm || !beat2.bpm) return 0;
+
+  const bpmDiff = Math.abs(beat1.bpm - beat2.bpm);
+  if (bpmDiff <= 5) return 20;
+  if (bpmDiff <= 10) return 15;
+  if (bpmDiff <= 20) return 10;
+  return 0;
+};
+
+// Calculate key similarity score (15% weight)
+const calculateKeyScore = (beat1: Beat, beat2: Beat): number => {
+  if (!beat1.key || !beat2.key) return 0;
+
+  if (beat1.key === beat2.key) return 15;
+  if (isRelatedKey(beat1.key, beat2.key)) return 10;
+  return 0;
+};
+
+// Calculate mood similarity score (15% weight)
+const calculateMoodScore = (beat1: Beat, beat2: Beat): number => {
+  if (beat1.mood && beat2.mood && beat1.mood.toLowerCase() === beat2.mood.toLowerCase()) {
+    return 15;
+  }
+  return 0;
+};
+
+// Calculate style/tags similarity score (10% weight)
+const calculateStyleScore = (beat1: Beat, beat2: Beat): number => {
+  if (!beat1.tags || !beat2.tags) return 0;
+
+  const normalizedTags1 = normalizeTags(beat1.tags);
+  const normalizedTags2 = normalizeTags(beat2.tags);
+  const commonTags = normalizedTags1.filter(tag => normalizedTags2.includes(tag));
+
+  if (normalizedTags1.length === 0) return 0;
+  return Math.min(10, (commonTags.length / normalizedTags1.length) * 10);
+};
 
 export function BeatSimilarityRecommendations({
   currentBeat,
   recommendations,
   onBeatSelect,
   isLoading = false,
-}: BeatSimilarityRecommendationsProps) {
-  const [sortBy, setSortBy] = useState<"similarity" | "popularity" | "price" | "recent">(
-    "similarity"
-  );
+}: BeatSimilarityRecommendationsProps): JSX.Element {
+  const [sortBy, setSortBy] = useState<SortOption>("similarity");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
-  // Utility function to normalize tags (handle both string and {name: string} formats)
-  const normalizeTag = (tag: string | { name: string }): string => {
-    return typeof tag === "string" ? tag : tag.name;
-  };
-
-  // Utility function to normalize tags array
-  const normalizeTags = (tags?: Array<string | { name: string }> | null): string[] => {
-    return tags ? tags.map(normalizeTag) : [];
-  };
-
   // Calculate similarity score between beats
-  const calculateSimilarity = (beat1: Beat, beat2: Beat): SimilarityScore => {
-    const scores = {
-      genre: 0,
-      bpm: 0,
-      key: 0,
-      mood: 0,
-      style: 0,
+  const calculateSimilarity = useCallback((beat1: Beat, beat2: Beat): SimilarityScore => {
+    const breakdown = {
+      genre: calculateGenreScore(beat1, beat2),
+      bpm: calculateBpmScore(beat1, beat2),
+      key: calculateKeyScore(beat1, beat2),
+      mood: calculateMoodScore(beat1, beat2),
+      style: calculateStyleScore(beat1, beat2),
     };
 
-    // Genre similarity (40% weight)
-    if (beat1.genre && beat2.genre && beat1.genre.toLowerCase() === beat2.genre.toLowerCase()) {
-      scores.genre = 40;
-    }
+    const total = Object.values(breakdown).reduce((sum, score) => sum + score, 0);
 
-    // BPM similarity (20% weight) - within 10 BPM range
-    if (beat1.bpm && beat2.bpm) {
-      const bpmDiff = Math.abs(beat1.bpm - beat2.bpm);
-      if (bpmDiff <= 5) {
-        scores.bpm = 20;
-      } else if (bpmDiff <= 10) {
-        scores.bpm = 15;
-      } else if (bpmDiff <= 20) {
-        scores.bpm = 10;
-      }
-    }
+    return { total, breakdown };
+  }, []);
 
-    // Key similarity (15% weight)
-    if (beat1.key && beat2.key) {
-      if (beat1.key === beat2.key) {
-        scores.key = 15;
-      } else if (isRelatedKey(beat1.key, beat2.key)) {
-        scores.key = 10;
-      }
-    }
+  const getSimilarityReason = useCallback(
+    (beat: Beat): string => {
+      const similarity = calculateSimilarity(currentBeat, beat);
+      const reasons: string[] = [];
 
-    // Mood similarity (15% weight)
-    if (beat1.mood && beat2.mood && beat1.mood.toLowerCase() === beat2.mood.toLowerCase()) {
-      scores.mood = 15;
-    }
+      if (similarity.breakdown.genre > 0) reasons.push("Same genre");
+      if (similarity.breakdown.bpm >= 15) reasons.push("Similar tempo");
+      if (similarity.breakdown.key > 0) reasons.push("Compatible key");
+      if (similarity.breakdown.mood > 0) reasons.push("Similar mood");
+      if (similarity.breakdown.style > 5) reasons.push("Similar style");
 
-    // Style/Tags similarity (10% weight)
-    if (beat1.tags && beat2.tags) {
-      const normalizedTags1 = normalizeTags(beat1.tags);
-      const normalizedTags2 = normalizeTags(beat2.tags);
-      const commonTags = normalizedTags1.filter(tag => normalizedTags2.includes(tag));
-      scores.style = Math.min(10, (commonTags.length / normalizedTags1.length) * 10);
-    }
+      return reasons.length > 0 ? reasons.slice(0, 2).join(", ") : "Similar characteristics";
+    },
+    [calculateSimilarity, currentBeat]
+  );
 
-    const total = Object.values(scores).reduce((sum, score) => sum + score, 0);
-
-    return { total, breakdown: scores };
-  };
-
-  // Check if two keys are musically related
-  const isRelatedKey = (key1: string, key2: string): boolean => {
-    const relatedKeys: Record<string, string[]> = {
-      C: ["Am", "F", "G"],
-      G: ["Em", "C", "D"],
-      D: ["Bm", "G", "A"],
-      A: ["F#m", "D", "E"],
-      E: ["C#m", "A", "B"],
-      B: ["G#m", "E", "F#"],
-      "F#": ["D#m", "B", "C#"],
-      "C#": ["A#m", "F#", "G#"],
-      F: ["Dm", "Bb", "C"],
-      Bb: ["Gm", "F", "Eb"],
-      Eb: ["Cm", "Bb", "Ab"],
-      Ab: ["Fm", "Eb", "Db"],
-    };
-
-    return relatedKeys[key1]?.includes(key2) || relatedKeys[key2]?.includes(key1) || false;
-  };
-
-  const getSimilarityReason = (beat: Beat): string => {
-    const similarity = calculateSimilarity(currentBeat, beat);
-    const reasons: string[] = [];
-
-    if (similarity.breakdown.genre > 0) reasons.push("Same genre");
-    if (similarity.breakdown.bpm >= 15) reasons.push("Similar tempo");
-    if (similarity.breakdown.key > 0) reasons.push("Compatible key");
-    if (similarity.breakdown.mood > 0) reasons.push("Similar mood");
-    if (similarity.breakdown.style > 5) reasons.push("Similar style");
-
-    return reasons.length > 0 ? reasons.slice(0, 2).join(", ") : "Similar characteristics";
-  };
-
-  const getSimilarityLevel = (score: number): { label: string; color: string } => {
+  const getSimilarityLevel = useCallback((score: number): { label: string; color: string } => {
     if (score >= 80) return { label: "Excellent Match", color: "text-green-400" };
     if (score >= 60) return { label: "Great Match", color: "text-[var(--accent-cyan)]" };
     if (score >= 40) return { label: "Good Match", color: "text-[var(--accent-purple)]" };
     if (score >= 20) return { label: "Fair Match", color: "text-yellow-400" };
     return { label: "Loose Match", color: "text-gray-400" };
-  };
+  }, []);
 
   // Sort recommendations
-  const sortedRecommendations = [...recommendations].sort((a, b) => {
-    switch (sortBy) {
-      case "similarity":
-        const scoreA = calculateSimilarity(currentBeat, a).total;
-        const scoreB = calculateSimilarity(currentBeat, b).total;
-        return scoreB - scoreA;
-      case "popularity":
-        return b.id - a.id; // Mock popularity based on ID
-      case "price":
-        return a.price - b.price;
-      case "recent":
-        return (b.title || "").localeCompare(a.title || ""); // Mock recent based on title
-      default:
-        return 0;
-    }
-  });
+  const sortedRecommendations = useMemo(() => {
+    return [...recommendations].sort((a, b) => {
+      switch (sortBy) {
+        case "similarity": {
+          const scoreA = calculateSimilarity(currentBeat, a).total;
+          const scoreB = calculateSimilarity(currentBeat, b).total;
+          return scoreB - scoreA;
+        }
+        case "popularity":
+          return b.id - a.id; // Mock popularity based on ID
+        case "price":
+          return a.price - b.price;
+        case "recent":
+          return (b.title || "").localeCompare(a.title || ""); // Mock recent based on title
+        default:
+          return 0;
+      }
+    });
+  }, [recommendations, sortBy, calculateSimilarity, currentBeat]);
 
   // Get unique tags from all recommendations
-  const allTags = Array.from(new Set(recommendations.flatMap(beat => normalizeTags(beat.tags))));
+  const allTags = useMemo(() => {
+    return Array.from(new Set(recommendations.flatMap(beat => normalizeTags(beat.tags))));
+  }, [recommendations]);
+
+  const handleSortChange = useCallback((value: string): void => {
+    setSortBy(value as SortOption);
+  }, []);
+
+  const handleTagToggle = useCallback((tag: string): void => {
+    setSelectedTags(prev => (prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]));
+  }, []);
+
+  const handleBeatClick = useCallback(
+    (beat: Beat): void => {
+      onBeatSelect(beat);
+    },
+    [onBeatSelect]
+  );
 
   if (isLoading) {
     return (
@@ -174,8 +206,8 @@ export function BeatSimilarityRecommendations({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center space-x-4">
+            {Array.from({ length: 6 }, (_, index) => (
+              <div key={`skeleton-${index}`} className="flex items-center space-x-4">
                 <div className="w-16 h-16 bg-gray-700 rounded animate-pulse" />
                 <div className="flex-1">
                   <div className="h-4 bg-gray-700 rounded mb-2 animate-pulse" />
@@ -204,8 +236,9 @@ export function BeatSimilarityRecommendations({
 
             <select
               value={sortBy}
-              onChange={e => setSortBy(e.target.value as any)}
+              onChange={e => handleSortChange(e.target.value)}
               className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] text-white rounded px-3 py-1 text-sm"
+              aria-label="Sort recommendations by"
             >
               <option value="similarity">Most Similar</option>
               <option value="popularity">Most Popular</option>
@@ -215,8 +248,8 @@ export function BeatSimilarityRecommendations({
           </div>
 
           <p className="text-gray-400">
-            Based on "{currentBeat.name}" - {currentBeat.genre} • {currentBeat.bpm} BPM •{" "}
-            {currentBeat.key}
+            Based on &ldquo;{currentBeat.name}&rdquo; - {currentBeat.genre} • {currentBeat.bpm} BPM
+            • {currentBeat.key}
           </p>
         </CardHeader>
 
@@ -256,25 +289,22 @@ export function BeatSimilarityRecommendations({
           {/* Tag Filter */}
           {allTags.length > 0 && (
             <div>
-              <label className="form-label">Filter by tags:</label>
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="form-label mb-2">Filter by tags:</div>
+              <div className="flex flex-wrap gap-2">
                 {allTags.map(tag => (
-                  <Badge
+                  <button
                     key={tag}
-                    variant={selectedTags.includes(tag) ? "default" : "outline"}
-                    className={`cursor-pointer transition-colors ${
+                    type="button"
+                    className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer ${
                       selectedTags.includes(tag)
-                        ? "bg-[var(--accent-purple)] text-white"
+                        ? "bg-[var(--accent-purple)] text-white border-transparent"
                         : "border-[var(--medium-gray)] text-gray-300 hover:bg-[var(--medium-gray)]"
                     }`}
-                    onClick={() => {
-                      setSelectedTags(prev =>
-                        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-                      );
-                    }}
+                    onClick={() => handleTagToggle(tag)}
+                    aria-pressed={selectedTags.includes(tag)}
                   >
                     #{tag}
-                  </Badge>
+                  </button>
                 ))}
               </div>
             </div>
@@ -294,10 +324,12 @@ export function BeatSimilarityRecommendations({
                 const { label, color } = getSimilarityLevel(similarity.total);
 
                 return (
-                  <div
+                  <button
                     key={beat.id}
-                    className="relative group cursor-pointer"
-                    onClick={() => onBeatSelect(beat)}
+                    type="button"
+                    className="relative group cursor-pointer w-full text-left"
+                    onClick={() => handleBeatClick(beat)}
+                    aria-label={`Select ${beat.title || beat.name} - ${Math.round(similarity.total)}% match`}
                   >
                     <ResponsiveBeatCard
                       beat={beat}
@@ -307,14 +339,14 @@ export function BeatSimilarityRecommendations({
                     />
 
                     {/* Similarity Overlay */}
-                    <div className="absolute top-2 right-2 z-10">
+                    <div className="absolute top-2 right-2 z-10 pointer-events-none">
                       <Badge className={`${color} bg-black/70 backdrop-blur-sm text-xs`}>
                         {Math.round(similarity.total)}% match
                       </Badge>
                     </div>
 
                     {/* Similarity Breakdown Tooltip */}
-                    <div className="absolute bottom-2 left-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute bottom-2 left-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                       <div className="bg-black/90 backdrop-blur-sm rounded p-2 text-xs">
                         <div className="font-medium text-white mb-1">{label}</div>
                         <div className="text-gray-300">{getSimilarityReason(beat)}</div>
@@ -323,7 +355,7 @@ export function BeatSimilarityRecommendations({
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
           </div>

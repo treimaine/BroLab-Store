@@ -14,6 +14,7 @@ import {
 } from "@/services/OptimisticUpdateManager";
 import { useDashboardStore } from "@/stores/useDashboardStore";
 import type { DashboardData } from "@shared/types";
+import type { Order } from "@shared/types/dashboard";
 import type { OptimisticUpdate, SyncError } from "@shared/types/sync";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -38,7 +39,7 @@ export interface UseOptimisticUpdatesReturn {
   ) => Promise<OptimisticUpdate>;
 
   /** Confirm an optimistic update */
-  confirmUpdate: (updateId: string, serverData?: any) => void;
+  confirmUpdate: (updateId: string, serverData?: unknown) => void;
 
   /** Rollback an optimistic update */
   rollbackUpdate: (updateId: string, reason: string, error?: SyncError) => void;
@@ -60,6 +61,49 @@ export interface UseOptimisticUpdatesReturn {
 
   /** Clear all updates */
   clearAll: () => void;
+}
+
+interface BeatData {
+  title?: string;
+  artist?: string;
+  imageUrl?: string;
+  genre?: string;
+  bpm?: number;
+  price?: number;
+  fileSize?: number;
+}
+
+interface FavoriteData {
+  id: string;
+  beatId: number;
+  beatTitle: string;
+  beatArtist?: string;
+  beatImageUrl?: string;
+  beatGenre?: string;
+  beatBpm?: number;
+  beatPrice?: number;
+  createdAt: string;
+}
+
+interface DownloadData {
+  id: string;
+  beatId: number;
+  beatTitle: string;
+  beatArtist?: string;
+  beatImageUrl?: string;
+  fileSize?: number;
+  format: "mp3";
+  quality: string;
+  licenseType: string;
+  downloadedAt: string;
+  downloadCount: number;
+  maxDownloads: number;
+}
+
+interface OrderData {
+  items?: unknown[];
+  total?: number;
+  paymentMethod?: string;
 }
 
 /**
@@ -89,9 +133,6 @@ export const useOptimisticUpdates = (
     confirmOptimisticUpdate: storeConfirmUpdate,
     rollbackOptimisticUpdate: storeRollbackUpdate,
   } = useDashboardStore();
-
-  // Event bus for communication
-  const { subscribe } = useEventBus();
 
   // Initialize manager
   useEffect(() => {
@@ -135,16 +176,14 @@ export const useOptimisticUpdates = (
       setQueueStatus(manager.getQueueStatus());
     };
 
-    const handleOptimisticRollback = ({
-      update,
-      reason,
-    }: {
-      update: OptimisticUpdate;
-      reason: string;
-    }) => {
+    const handleOptimisticRollback = ({ update }: { update: OptimisticUpdate; reason: string }) => {
       // Rollback in dashboard store
       storeRollbackUpdate(update.id);
       setQueueStatus(manager.getQueueStatus());
+    };
+
+    const autoDismissFeedback = (updateId: string) => {
+      setFeedback(current => (current?.updateId === updateId ? null : current));
     };
 
     const handleUserFeedback = (userFeedback: UserFeedback) => {
@@ -153,9 +192,7 @@ export const useOptimisticUpdates = (
 
         // Auto-dismiss after timeout
         if (userFeedback.timeout) {
-          setTimeout(() => {
-            setFeedback(current => (current?.updateId === userFeedback.updateId ? null : current));
-          }, userFeedback.timeout);
+          setTimeout(() => autoDismissFeedback(userFeedback.updateId), userFeedback.timeout);
         }
       }
 
@@ -212,7 +249,7 @@ export const useOptimisticUpdates = (
   );
 
   // Confirm update
-  const confirmUpdate = useCallback((updateId: string, serverData?: any) => {
+  const confirmUpdate = useCallback((updateId: string, serverData?: unknown) => {
     const manager = managerRef.current;
     if (manager) {
       manager.confirmOptimisticUpdate(updateId, serverData);
@@ -220,10 +257,10 @@ export const useOptimisticUpdates = (
   }, []);
 
   // Rollback update
-  const rollbackUpdate = useCallback((updateId: string, reason: string, error?: SyncError) => {
+  const rollbackUpdate = useCallback((updateId: string, _reason: string, error?: SyncError) => {
     const manager = managerRef.current;
     if (manager) {
-      manager.rollbackOptimisticUpdate(updateId, reason, error);
+      manager.rollbackOptimisticUpdate(updateId, _reason, error);
     }
   }, []);
 
@@ -267,13 +304,18 @@ export const useOptimisticUpdates = (
 /**
  * Hook for optimistic favorites management
  */
-export const useOptimisticFavorites = () => {
+export const useOptimisticFavorites = (): {
+  addFavorite: (beatId: number, beatData: BeatData) => Promise<OptimisticUpdate>;
+  removeFavorite: (favoriteId: string, favoriteData: FavoriteData) => Promise<OptimisticUpdate>;
+  confirmUpdate: (updateId: string, serverData?: unknown) => void;
+  rollbackUpdate: (updateId: string, reason: string, error?: SyncError) => void;
+} => {
   const { applyUpdate, confirmUpdate, rollbackUpdate } = useOptimisticUpdates();
   const { publishTyped } = useEventBus();
 
   const addFavorite = useCallback(
-    async (beatId: number, beatData: any) => {
-      const favoriteData = {
+    async (beatId: number, beatData: BeatData): Promise<OptimisticUpdate> => {
+      const favoriteData: FavoriteData = {
         id: `temp_${Date.now()}`,
         beatId,
         beatTitle: beatData.title || "Unknown Beat",
@@ -285,38 +327,31 @@ export const useOptimisticFavorites = () => {
         createdAt: new Date().toISOString(),
       };
 
-      try {
-        const update = await applyUpdate("favorites", "add", favoriteData);
+      const update = await applyUpdate("favorites", "add", favoriteData);
 
-        // Simulate server call
-        publishTyped("user.action", {
-          action: "add_favorite",
-          data: { beatId, updateId: update.id },
-        });
+      // Simulate server call
+      publishTyped("user.action", {
+        action: "add_favorite",
+        data: { beatId, updateId: update.id },
+      });
 
-        return update;
-      } catch (error) {
-        throw error;
-      }
+      return update;
     },
     [applyUpdate, publishTyped]
   );
 
   const removeFavorite = useCallback(
-    async (favoriteId: string, favoriteData: any) => {
-      try {
-        const update = await applyUpdate("favorites", "delete", { id: favoriteId }, favoriteData);
+    async (favoriteId: string, favoriteData: FavoriteData): Promise<OptimisticUpdate> => {
+      const deleteData = { id: favoriteId };
+      const update = await applyUpdate("favorites", "delete", deleteData, favoriteData);
 
-        // Simulate server call
-        publishTyped("user.action", {
-          action: "remove_favorite",
-          data: { favoriteId, updateId: update.id },
-        });
+      // Simulate server call
+      publishTyped("user.action", {
+        action: "remove_favorite",
+        data: { favoriteId, updateId: update.id },
+      });
 
-        return update;
-      } catch (error) {
-        throw error;
-      }
+      return update;
     },
     [applyUpdate, publishTyped]
   );
@@ -332,13 +367,21 @@ export const useOptimisticFavorites = () => {
 /**
  * Hook for optimistic downloads management
  */
-export const useOptimisticDownloads = () => {
+export const useOptimisticDownloads = (): {
+  addDownload: (
+    beatId: number,
+    licenseType: string,
+    beatData: BeatData
+  ) => Promise<OptimisticUpdate>;
+  confirmUpdate: (updateId: string, serverData?: unknown) => void;
+  rollbackUpdate: (updateId: string, reason: string, error?: SyncError) => void;
+} => {
   const { applyUpdate, confirmUpdate, rollbackUpdate } = useOptimisticUpdates();
   const { publishTyped } = useEventBus();
 
   const addDownload = useCallback(
-    async (beatId: number, licenseType: string, beatData: any) => {
-      const downloadData = {
+    async (beatId: number, licenseType: string, beatData: BeatData): Promise<OptimisticUpdate> => {
+      const downloadData: DownloadData = {
         id: `temp_${Date.now()}`,
         beatId,
         beatTitle: beatData.title || "Unknown Beat",
@@ -353,19 +396,15 @@ export const useOptimisticDownloads = () => {
         maxDownloads: licenseType === "exclusive" ? -1 : 3,
       };
 
-      try {
-        const update = await applyUpdate("downloads", "add", downloadData);
+      const update = await applyUpdate("downloads", "add", downloadData);
 
-        // Simulate server call
-        publishTyped("user.action", {
-          action: "add_download",
-          data: { beatId, licenseType, updateId: update.id },
-        });
+      // Simulate server call
+      publishTyped("user.action", {
+        action: "add_download",
+        data: { beatId, licenseType, updateId: update.id },
+      });
 
-        return update;
-      } catch (error) {
-        throw error;
-      }
+      return update;
     },
     [applyUpdate, publishTyped]
   );
@@ -380,12 +419,21 @@ export const useOptimisticDownloads = () => {
 /**
  * Hook for optimistic orders management
  */
-export const useOptimisticOrders = () => {
+export const useOptimisticOrders = (): {
+  createOrder: (orderData: OrderData) => Promise<OptimisticUpdate>;
+  updateOrderStatus: (
+    orderId: string,
+    status: string,
+    currentOrder: Order
+  ) => Promise<OptimisticUpdate>;
+  confirmUpdate: (updateId: string, serverData?: unknown) => void;
+  rollbackUpdate: (updateId: string, reason: string, error?: SyncError) => void;
+} => {
   const { applyUpdate, confirmUpdate, rollbackUpdate } = useOptimisticUpdates();
   const { publishTyped } = useEventBus();
 
   const createOrder = useCallback(
-    async (orderData: any) => {
+    async (orderData: OrderData): Promise<OptimisticUpdate> => {
       const order = {
         id: `temp_${Date.now()}`,
         orderNumber: `ORD-${Date.now()}`,
@@ -398,44 +446,36 @@ export const useOptimisticOrders = () => {
         updatedAt: new Date().toISOString(),
       };
 
-      try {
-        const update = await applyUpdate("orders", "add", order);
+      const update = await applyUpdate("orders", "add", order);
 
-        // Simulate server call
-        publishTyped("user.action", {
-          action: "create_order",
-          data: { order, updateId: update.id },
-        });
+      // Simulate server call
+      publishTyped("user.action", {
+        action: "create_order",
+        data: { order, updateId: update.id },
+      });
 
-        return update;
-      } catch (error) {
-        throw error;
-      }
+      return update;
     },
     [applyUpdate, publishTyped]
   );
 
   const updateOrderStatus = useCallback(
-    async (orderId: string, status: string, currentOrder: any) => {
-      const updatedOrder = {
+    async (orderId: string, status: string, currentOrder: Order): Promise<OptimisticUpdate> => {
+      const updatedOrder: Order = {
         ...currentOrder,
-        status,
+        status: status as Order["status"],
         updatedAt: new Date().toISOString(),
       };
 
-      try {
-        const update = await applyUpdate("orders", "update", updatedOrder, currentOrder);
+      const update = await applyUpdate("orders", "update", updatedOrder, currentOrder);
 
-        // Simulate server call
-        publishTyped("user.action", {
-          action: "update_order_status",
-          data: { orderId, status, updateId: update.id },
-        });
+      // Simulate server call
+      publishTyped("user.action", {
+        action: "update_order_status",
+        data: { orderId, status, updateId: update.id },
+      });
 
-        return update;
-      } catch (error) {
-        throw error;
-      }
+      return update;
     },
     [applyUpdate, publishTyped]
   );

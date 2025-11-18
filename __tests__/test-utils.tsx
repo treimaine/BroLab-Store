@@ -6,7 +6,10 @@ import React, { ReactElement } from "react";
  * Enhanced to handle ES module imports and exports properly
  */
 
-// Mock QueryClient and QueryClientProvider for testing
+// ================================
+// MOCK QUERY CLIENT
+// ================================
+
 class MockQueryClient {
   invalidateQueries(): Promise<void> {
     return Promise.resolve();
@@ -25,23 +28,17 @@ class MockQueryClient {
   }
 }
 
-const MockQueryClientProvider = ({
-  children,
-  client: _client,
-}: {
-  children: React.ReactNode;
-  client?: MockQueryClient;
-}) => <div data-testid="query-client-provider">{children}</div>;
-
 // Use mocks instead of real imports to avoid constructor issues
 const QueryClient = MockQueryClient;
-const QueryClientProvider = MockQueryClientProvider;
+
+// ================================
+// TYPE DEFINITIONS
+// ================================
 
 interface MockConvexClient {
   query: jest.Mock;
   mutation: jest.Mock;
   action: jest.Mock;
-  subscribe: jest.Mock;
   close: jest.Mock;
   connectionState: jest.Mock;
   setAuth: jest.Mock;
@@ -62,19 +59,26 @@ interface MockClerkInstance {
   isSignedIn: boolean;
 }
 
-// Mock Convex client with proper methods
+// ================================
+// MOCK INSTANCES
+// ================================
+
+/**
+ * Mock Convex client with proper methods for testing
+ */
 const mockConvexClient: MockConvexClient = {
   query: jest.fn().mockResolvedValue(null),
   mutation: jest.fn().mockResolvedValue(null),
   action: jest.fn().mockResolvedValue(null),
-  subscribe: jest.fn().mockReturnValue({ unsubscribe: jest.fn() }),
   close: jest.fn(),
   connectionState: jest.fn(() => ({ isWebSocketConnected: true })),
   setAuth: jest.fn(),
   clearAuth: jest.fn(),
 };
 
-// Mock Clerk for authentication
+/**
+ * Mock Clerk instance for authentication testing
+ */
 const mockClerk: MockClerkInstance = {
   user: {
     id: "user_test123",
@@ -89,24 +93,67 @@ const mockClerk: MockClerkInstance = {
   isSignedIn: true,
 };
 
-// Mock providers as simple components
-const MockClerkProvider = ({ children }: { children: React.ReactNode }) => {
+// ================================
+// PROVIDER COMPONENTS
+// ================================
+
+/**
+ * Mock QueryClient Provider for testing
+ * Wraps children with a test-friendly query client
+ */
+function MockQueryClientProvider({
+  children,
+  client,
+}: {
+  children: React.ReactNode;
+  client: MockQueryClient;
+}): React.ReactElement {
+  // Store client reference to avoid unused variable warning
+  const _clientRef = client;
+  return (
+    <div data-testid="query-client-provider" data-client={_clientRef ? "initialized" : "none"}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Mock Clerk Provider for authentication testing
+ */
+function MockClerkProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   return <div data-testid="clerk-provider">{children}</div>;
-};
+}
 
-const MockConvexProvider = ({ children }: { children: React.ReactNode }) => {
+/**
+ * Mock Convex Provider for real-time data testing
+ */
+function MockConvexProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   return <div data-testid="convex-provider">{children}</div>;
-};
+}
 
-// Create a custom render function that includes providers
+// ================================
+// RENDER UTILITIES
+// ================================
+
+/**
+ * Custom render function that includes all necessary providers
+ * Use this instead of @testing-library/react's render for component tests
+ *
+ * @example
+ * ```typescript
+ * import { render } from '@/__tests__/test-utils';
+ *
+ * render(<MyComponent />);
+ * ```
+ */
 function customRender(ui: ReactElement, options?: Omit<RenderOptions, "wrapper">) {
   const queryClient = new QueryClient();
 
-  function AllTheProviders({ children }: { children: React.ReactNode }) {
+  function AllTheProviders({ children }: { children: React.ReactNode }): React.ReactElement {
     return (
       <MockClerkProvider>
         <MockConvexProvider>
-          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          <MockQueryClientProvider client={queryClient}>{children}</MockQueryClientProvider>
         </MockConvexProvider>
       </MockClerkProvider>
     );
@@ -115,37 +162,77 @@ function customRender(ui: ReactElement, options?: Omit<RenderOptions, "wrapper">
   return render(ui, { wrapper: AllTheProviders, ...options });
 }
 
-// Create a wrapper component for renderHook
+/**
+ * Create a wrapper component for renderHook from @testing-library/react
+ * Use this for testing custom hooks that need providers
+ *
+ * @example
+ * ```typescript
+ * import { renderHook } from '@testing-library/react';
+ * import { createWrapper } from '@/__tests__/test-utils';
+ *
+ * const { result } = renderHook(() => useMyHook(), {
+ *   wrapper: createWrapper(),
+ * });
+ * ```
+ */
 function createWrapper() {
   const queryClient = new QueryClient();
 
-  return function Wrapper({ children }: { children: React.ReactNode }) {
+  return function Wrapper({ children }: { children: React.ReactNode }): React.ReactElement {
     return (
       <MockClerkProvider>
         <MockConvexProvider>
-          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          <MockQueryClientProvider client={queryClient}>{children}</MockQueryClientProvider>
         </MockConvexProvider>
       </MockClerkProvider>
     );
   };
 }
 
-// Enhanced test utilities for ES module compatibility
+// ================================
+// TEST UTILITIES OBJECT
+// ================================
+
+/**
+ * Enhanced test utilities for ES module compatibility
+ * Provides helper functions for creating test environments
+ */
 const testUtilsObject = {
+  /**
+   * Create a new QueryClient instance for testing
+   */
   createQueryClient: () => new QueryClient(),
 
+  /**
+   * Mock Convex client instance
+   */
   mockConvexClient,
+
+  /**
+   * Mock Clerk instance
+   */
   mockClerk,
 
-  // Helper for creating isolated test environments
+  /**
+   * Create an isolated wrapper with optional custom query client
+   * Useful for testing components in isolation
+   *
+   * @param customQueryClient - Optional custom query client
+   * @returns Wrapper component for testing
+   */
   createIsolatedWrapper: (customQueryClient?: MockQueryClient) => {
     const queryClient = customQueryClient || testUtilsObject.createQueryClient();
 
-    return function IsolatedWrapper({ children }: { children: React.ReactNode }) {
+    return function IsolatedWrapper({
+      children,
+    }: {
+      children: React.ReactNode;
+    }): React.ReactElement {
       return (
         <MockClerkProvider>
           <MockConvexProvider>
-            <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+            <MockQueryClientProvider client={queryClient}>{children}</MockQueryClientProvider>
           </MockConvexProvider>
         </MockClerkProvider>
       );
@@ -153,14 +240,33 @@ const testUtilsObject = {
   },
 };
 
-// Re-export everything
-export * from "@testing-library/react";
+// ================================
+// EXPORTS
+// ================================
 
-// Override render method
+// Re-export testing library utilities (excluding render to avoid conflicts)
+export {
+  act,
+  cleanup,
+  fireEvent,
+  renderHook,
+  screen,
+  waitFor,
+  waitForElementToBeRemoved,
+  within,
+} from "@testing-library/react";
+
+// Export custom render that includes providers
 export { customRender as render };
 
-// Export utilities for tests
-export { createWrapper, mockClerk, mockConvexClient, testUtilsObject as testUtils };
+// Export wrapper utilities for hooks
+export { createWrapper };
+
+// Export mock instances
+export { mockClerk, mockConvexClient };
+
+// Export test utilities object
+export { testUtilsObject as testUtils };
 
 // ================================
 // DATA VALIDATION TEST UTILITIES

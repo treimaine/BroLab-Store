@@ -24,6 +24,7 @@ import type {
 } from "@shared/types/dashboard";
 import { useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "convex/react";
+import type { FunctionReference } from "convex/server";
 import { useCallback, useMemo, useRef } from "react";
 
 // Error types for comprehensive error handling
@@ -164,10 +165,11 @@ export function useDashboard(options: DashboardOptions = {}): DashboardHookRetur
   }, [isAuthenticated, config]);
 
   // Main dashboard data query using the unified Convex function
+  // Using type assertion to work around Convex's deep type instantiation issues
   const dashboardData = useQuery(
-    api.dashboard.getDashboardData as never,
+    api.dashboard.getDashboardData as unknown as FunctionReference<"query">,
     queryArgs === "skip" ? "skip" : queryArgs
-  );
+  ) as DashboardData | undefined;
 
   // Loading state
   const isLoading = useMemo(() => {
@@ -206,11 +208,11 @@ export function useDashboard(options: DashboardOptions = {}): DashboardHookRetur
     return {
       id: clerkUser.id,
       clerkId: clerkUser.id,
-      email: clerkUser.emailAddresses[0]?.emailAddress || "",
-      firstName: clerkUser.firstName || undefined,
-      lastName: clerkUser.lastName || undefined,
-      imageUrl: clerkUser.imageUrl || undefined,
-      username: clerkUser.username || undefined,
+      email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
+      firstName: clerkUser.firstName ?? undefined,
+      lastName: clerkUser.lastName ?? undefined,
+      imageUrl: clerkUser.imageUrl ?? undefined,
+      username: clerkUser.username ?? undefined,
     };
   }, [clerkUser]);
 
@@ -234,7 +236,7 @@ export function useDashboard(options: DashboardOptions = {}): DashboardHookRetur
 
     // If we have valid dashboard data, return it
     if (dashboardData && typeof dashboardData === "object") {
-      return dashboardData as DashboardData;
+      return dashboardData;
     }
 
     // Default empty state for loading or unauthenticated users
@@ -346,9 +348,9 @@ export function useDashboardStats(): {
 
   const isAuthenticated = Boolean(clerkUser && isLoaded);
   const statsData = useQuery(
-    api.dashboard.getDashboardStats as never,
+    api.dashboard.getDashboardStats as unknown as FunctionReference<"query">,
     isAuthenticated ? {} : "skip"
-  );
+  ) as UserStats | undefined;
 
   const isLoading = !isLoaded || (isAuthenticated && statsData === undefined);
 

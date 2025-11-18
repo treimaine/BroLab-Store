@@ -5,17 +5,19 @@
 
 import { logger, type ErrorContext } from "./logger";
 
+export type ErrorSeverity = "low" | "medium" | "high" | "critical";
+
 export interface ErrorReport {
   id: string;
   timestamp: string;
-  error: Error | unknown;
+  error: Error;
   context: ErrorContext;
   userAgent: string;
   url: string;
   stackTrace?: string;
   breadcrumbs: Breadcrumb[];
   recoveryActions: RecoveryAction[];
-  severity: "low" | "medium" | "high" | "critical";
+  severity: ErrorSeverity;
   tags: string[];
 }
 
@@ -47,9 +49,9 @@ class ErrorTracker {
   private static instance: ErrorTracker;
   private breadcrumbs: Breadcrumb[] = [];
   private errorReports: ErrorReport[] = [];
-  private errorPatterns: Map<string, ErrorPattern> = new Map();
-  private maxBreadcrumbs = 50;
-  private maxErrorReports = 100;
+  private readonly errorPatterns: Map<string, ErrorPattern> = new Map();
+  private readonly maxBreadcrumbs = 50;
+  private readonly maxErrorReports = 100;
 
   private constructor() {
     this.initializeErrorTracking();
@@ -64,7 +66,7 @@ class ErrorTracker {
 
   private initializeErrorTracking(): void {
     // Track unhandled errors
-    window.addEventListener("error", event => {
+    globalThis.addEventListener("error", event => {
       this.trackError(event.error || new Error(event.message), {
         errorType: "critical",
         component: "global",
@@ -75,8 +77,9 @@ class ErrorTracker {
     });
 
     // Track unhandled promise rejections
-    window.addEventListener("unhandledrejection", event => {
-      this.trackError(event.reason, {
+    globalThis.addEventListener("unhandledrejection", event => {
+      const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+      this.trackError(error, {
         errorType: "critical",
         component: "global",
         action: "unhandled_promise_rejection",
@@ -91,7 +94,7 @@ class ErrorTracker {
       message: "Page loaded",
       level: "info",
       data: {
-        url: window.location.href,
+        url: globalThis.location.href,
         referrer: document.referrer,
       },
     });
@@ -116,10 +119,10 @@ class ErrorTracker {
     });
   }
 
-  public trackError(error: Error | unknown, context: ErrorContext): string {
+  public trackError(error: Error, context: ErrorContext): string {
     const errorId = this.generateErrorId();
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const stackTrace = error instanceof Error ? error.stack : undefined;
+    const errorMessage = error.message;
+    const stackTrace = error.stack;
 
     // Determine error severity
     const severity = this.determineSeverity(error, context);
@@ -134,7 +137,7 @@ class ErrorTracker {
       error,
       context,
       userAgent: navigator.userAgent,
-      url: window.location.href,
+      url: globalThis.location.href,
       stackTrace,
       breadcrumbs: [...this.breadcrumbs],
       recoveryActions,
@@ -179,18 +182,12 @@ class ErrorTracker {
   }
 
   private generateErrorId(): string {
-    return `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `error_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
-  private determineSeverity(
-    error: Error | unknown,
-    context: ErrorContext
-  ): "low" | "medium" | "high" | "critical" {
+  private determineSeverity(error: Error, context: ErrorContext): ErrorSeverity {
     // Critical errors that break core functionality
-    if (
-      context.errorType === "critical" ||
-      (error instanceof Error && error.name === "ChunkLoadError")
-    ) {
+    if (context.errorType === "critical" || error.name === "ChunkLoadError") {
       return "critical";
     }
 
@@ -208,7 +205,7 @@ class ErrorTracker {
     return "low";
   }
 
-  private generateRecoveryActions(error: Error | unknown, context: ErrorContext): RecoveryAction[] {
+  private generateRecoveryActions(error: Error, context: ErrorContext): RecoveryAction[] {
     const actions: RecoveryAction[] = [];
 
     switch (context.errorType) {
@@ -342,7 +339,7 @@ class ErrorTracker {
     return actions.sort((a, b) => a.priority - b.priority);
   }
 
-  private generateErrorTags(error: Error | unknown, context: ErrorContext): string[] {
+  private generateErrorTags(error: Error, context: ErrorContext): string[] {
     const tags: string[] = [context.errorType, context.component || "unknown"];
 
     if (context.action) {
@@ -359,14 +356,12 @@ class ErrorTracker {
       tags.push("non-recoverable");
     }
 
-    if (error instanceof Error) {
-      tags.push(`error_name:${error.name}`);
-    }
+    tags.push(`error_name:${error.name}`);
 
     return tags;
   }
 
-  private updateErrorPatterns(error: Error | unknown, context: ErrorContext): void {
+  private updateErrorPatterns(error: Error, context: ErrorContext): void {
     const patternKey = `${context.errorType}_${context.component}_${context.action}`;
     const existing = this.errorPatterns.get(patternKey);
     const now = new Date().toISOString();
@@ -391,7 +386,7 @@ class ErrorTracker {
   private executeAutomatedRecovery(actions: RecoveryAction[], errorReport: ErrorReport): void {
     const automatedActions = actions.filter(action => action.automated);
 
-    automatedActions.forEach(action => {
+    for (const action of automatedActions) {
       try {
         switch (action.action) {
           case "highlight_invalid_fields":
@@ -413,14 +408,16 @@ class ErrorTracker {
             });
         }
       } catch (recoveryError) {
-        logger.logError(`Recovery action failed: ${action.action}`, recoveryError, {
+        const normalizedRecoveryError =
+          recoveryError instanceof Error ? recoveryError : new Error(String(recoveryError));
+        logger.logError(`Recovery action failed: ${action.action}`, normalizedRecoveryError, {
           errorType: "critical",
           component: "error_tracker",
           action: "automated_recovery",
           originalErrorId: errorReport.id,
         });
       }
-    });
+    }
   }
 
   private highlightInvalidFields(errorReport: ErrorReport): void {
@@ -517,19 +514,19 @@ class ErrorTracker {
 
   private getErrorsByType(): Record<string, number> {
     const byType: Record<string, number> = {};
-    this.errorReports.forEach(report => {
+    for (const report of this.errorReports) {
       const type = report.context.errorType;
       byType[type] = (byType[type] || 0) + 1;
-    });
+    }
     return byType;
   }
 
   private getErrorsBySeverity(): Record<string, number> {
     const bySeverity: Record<string, number> = {};
-    this.errorReports.forEach(report => {
+    for (const report of this.errorReports) {
       const severity = report.severity;
       bySeverity[severity] = (bySeverity[severity] || 0) + 1;
-    });
+    }
     return bySeverity;
   }
 }
@@ -538,8 +535,10 @@ class ErrorTracker {
 export const errorTracker = ErrorTracker.getInstance();
 
 // Export convenience functions
-export const trackError = (error: Error | unknown, context: ErrorContext): string =>
-  errorTracker.trackError(error, context);
+export const trackError = (error: unknown, context: ErrorContext): string => {
+  const normalizedError = error instanceof Error ? error : new Error(String(error));
+  return errorTracker.trackError(normalizedError, context);
+};
 
 export const addBreadcrumb = (breadcrumb: Omit<Breadcrumb, "timestamp">): void =>
   errorTracker.addBreadcrumb(breadcrumb);
@@ -559,7 +558,15 @@ export const getDebugInfo = (): Record<string, unknown> => errorTracker.getDebug
 
 // Make error tracker available globally in development
 if (process.env.NODE_ENV === "development") {
-  (window as any).errorTracker = {
+  interface GlobalErrorTracker {
+    getErrorReports: typeof getErrorReports;
+    getErrorPatterns: typeof getErrorPatterns;
+    getBreadcrumbs: typeof getBreadcrumbs;
+    getDebugInfo: typeof getDebugInfo;
+    clearReports: () => void;
+  }
+
+  (globalThis as typeof globalThis & { errorTracker?: GlobalErrorTracker }).errorTracker = {
     getErrorReports,
     getErrorPatterns,
     getBreadcrumbs,

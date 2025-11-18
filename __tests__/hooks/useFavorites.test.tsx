@@ -1,8 +1,10 @@
-import * as clerkReact from "@clerk/clerk-react";
-import { describe, expect, it, jest } from "@jest/globals";
-import * as tanstackQuery from "@tanstack/react-query";
+/**
+ * Unit tests for useFavorites hook
+ * Tests real-time favorites management with Convex
+ */
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { renderHook, waitFor } from "@testing-library/react";
-import * as convexReact from "convex/react";
+import type { Favorite } from "../../client/src/hooks/useFavorites";
 import { useFavorites } from "../../client/src/hooks/useFavorites";
 import { createWrapper } from "../test-utils";
 
@@ -35,66 +37,54 @@ jest.mock("convex/react", () => ({
   useMutation: jest.fn(),
 }));
 
-// Mock TanStack Query
-jest.mock("@tanstack/react-query", () => ({
-  useMutation: jest.fn(),
-  useQueryClient: jest.fn(),
-}));
+// Import mocked modules after jest.mock declarations
+import { useUser } from "@clerk/clerk-react";
+import { useMutation, useQuery } from "convex/react";
 
 describe("useFavorites", () => {
-  const mockUseQuery = jest.mocked(convexReact.useQuery);
-  const mockUseMutation = jest.mocked(convexReact.useMutation);
-  const mockUseUser = jest.mocked(clerkReact.useUser);
-  const mockTanStackMutation = jest.mocked(tanstackQuery.useMutation);
-  const mockUseQueryClient = jest.mocked(tanstackQuery.useQueryClient);
-
-  beforeAll(() => {
-    // Setup default mock implementations
-    mockUseQueryClient.mockReturnValue({
-      invalidateQueries: jest.fn(),
-    } as unknown);
-  });
+  const mockUseQuery = jest.mocked(useQuery);
+  const mockUseMutation = jest.mocked(useMutation);
+  const mockUseUser = jest.mocked(useUser);
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Reset Clerk mock
+    // Reset Clerk mock - provide minimal user object
     mockUseUser.mockReturnValue({
-      user: { id: "user_test123" },
+      user: {
+        id: "user_test123",
+        emailAddresses: [{ emailAddress: "test@example.com" }],
+        firstName: "Test",
+        lastName: "User",
+      } as never,
       isLoaded: true,
       isSignedIn: true,
-    });
+    } as never);
 
     // Setup default mock returns
     mockUseQuery.mockReturnValue([]);
-    mockUseMutation.mockReturnValue(jest.fn().mockResolvedValue(undefined));
-    mockTanStackMutation.mockReturnValue({
-      mutate: jest.fn(),
-      isPending: false,
-      mutateAsync: jest.fn(),
-      reset: jest.fn(),
-      isError: false,
-      isIdle: true,
-      isSuccess: false,
-      data: undefined,
-      error: null,
-      failureCount: 0,
-      failureReason: null,
-      isLoading: false,
-      isPaused: false,
-      status: "idle" as const,
-      variables: undefined,
-      submittedAt: 0,
-    });
+    mockUseMutation.mockReturnValue(jest.fn() as never);
   });
 
   it("returns favorites array", async () => {
-    const mockFavorites = [
-      { _id: "fav1", beatId: 1, userId: "user_test123" },
-      { _id: "fav2", beatId: 2, userId: "user_test123" },
+    const mockFavorites: Favorite[] = [
+      {
+        _id: "fav1",
+        _creationTime: Date.now(),
+        beatId: 1,
+        userId: "user_test123",
+        createdAt: Date.now(),
+      },
+      {
+        _id: "fav2",
+        _creationTime: Date.now(),
+        beatId: 2,
+        userId: "user_test123",
+        createdAt: Date.now(),
+      },
     ];
 
-    mockUseQuery.mockReturnValue(mockFavorites);
+    mockUseQuery.mockReturnValue(mockFavorites as never);
 
     const wrapper = createWrapper();
     const { result } = renderHook(() => useFavorites(), { wrapper });
@@ -106,11 +96,13 @@ describe("useFavorites", () => {
   });
 
   it("supports add/remove operations", async () => {
-    const mockAddMutation = jest.fn().mockResolvedValue(undefined);
-    const mockRemoveMutation = jest.fn().mockResolvedValue(undefined);
+    const mockAddMutation = jest.fn();
+    const mockRemoveMutation = jest.fn();
 
-    mockUseQuery.mockReturnValue([]);
-    mockUseMutation.mockReturnValueOnce(mockAddMutation).mockReturnValueOnce(mockRemoveMutation);
+    mockUseQuery.mockReturnValue([] as never);
+    mockUseMutation
+      .mockReturnValueOnce(mockAddMutation as never)
+      .mockReturnValueOnce(mockRemoveMutation as never);
 
     const wrapper = createWrapper();
     const { result } = renderHook(() => useFavorites(), { wrapper });
@@ -122,12 +114,24 @@ describe("useFavorites", () => {
   });
 
   it("checks if beat is favorite", async () => {
-    const mockFavorites = [
-      { _id: "fav1", beatId: 1, userId: "user_test123" },
-      { _id: "fav2", beatId: 2, userId: "user_test123" },
+    const mockFavorites: Favorite[] = [
+      {
+        _id: "fav1",
+        _creationTime: Date.now(),
+        beatId: 1,
+        userId: "user_test123",
+        createdAt: Date.now(),
+      },
+      {
+        _id: "fav2",
+        _creationTime: Date.now(),
+        beatId: 2,
+        userId: "user_test123",
+        createdAt: Date.now(),
+      },
     ];
 
-    mockUseQuery.mockReturnValue(mockFavorites);
+    mockUseQuery.mockReturnValue(mockFavorites as never);
 
     const wrapper = createWrapper();
     const { result } = renderHook(() => useFavorites(), { wrapper });
@@ -136,5 +140,104 @@ describe("useFavorites", () => {
       expect(result.current.isFavorite(1)).toBe(true);
       expect(result.current.isFavorite(3)).toBe(false);
     });
+  });
+
+  it("returns empty array when not authenticated", () => {
+    mockUseUser.mockReturnValue({
+      user: null,
+      isLoaded: true,
+      isSignedIn: false,
+    } as never);
+
+    mockUseQuery.mockReturnValue(undefined as never);
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useFavorites(), { wrapper });
+
+    expect(result.current.favorites).toEqual([]);
+    expect(result.current.isAuthenticated).toBe(false);
+  });
+
+  it("handles loading state correctly", () => {
+    mockUseUser.mockReturnValue({
+      user: {
+        id: "user_test123",
+        emailAddresses: [{ emailAddress: "test@example.com" }],
+        firstName: "Test",
+        lastName: "User",
+      } as never,
+      isLoaded: true,
+      isSignedIn: true,
+    } as never);
+
+    mockUseQuery.mockReturnValue(undefined as never);
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useFavorites(), { wrapper });
+
+    expect(result.current.isLoading).toBe(true);
+  });
+
+  it("throws error when adding favorite without authentication", async () => {
+    mockUseUser.mockReturnValue({
+      user: null,
+      isLoaded: true,
+      isSignedIn: false,
+    } as never);
+
+    mockUseQuery.mockReturnValue([] as never);
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useFavorites(), { wrapper });
+
+    await expect(result.current.addToFavorites(1)).rejects.toThrow(
+      "User must be authenticated to add favorites"
+    );
+  });
+
+  it("throws error when removing favorite without authentication", async () => {
+    mockUseUser.mockReturnValue({
+      user: null,
+      isLoaded: true,
+      isSignedIn: false,
+    } as never);
+
+    mockUseQuery.mockReturnValue([] as never);
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useFavorites(), { wrapper });
+
+    await expect(result.current.removeFromFavorites(1)).rejects.toThrow(
+      "User must be authenticated to remove favorites"
+    );
+  });
+
+  it("toggles favorite status correctly", async () => {
+    const mockFavorites: Favorite[] = [
+      {
+        _id: "fav1",
+        _creationTime: Date.now(),
+        beatId: 1,
+        userId: "user_test123",
+        createdAt: Date.now(),
+      },
+    ];
+
+    const mockAddMutation = jest.fn();
+    const mockRemoveMutation = jest.fn();
+
+    mockUseQuery.mockReturnValue(mockFavorites as never);
+    mockUseMutation
+      .mockReturnValueOnce(mockAddMutation as never)
+      .mockReturnValueOnce(mockRemoveMutation as never);
+
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useFavorites(), { wrapper });
+
+    // Beat 1 is already a favorite, should remove
+    expect(result.current.isFavorite(1)).toBe(true);
+
+    // Beat 2 is not a favorite, should add
+    expect(result.current.isFavorite(2)).toBe(false);
   });
 });
