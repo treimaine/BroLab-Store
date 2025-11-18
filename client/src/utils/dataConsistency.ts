@@ -286,7 +286,7 @@ export class ConsistencyChecker {
 
     try {
       // Run all validation checks
-      this.runValidationChecks(
+      const context: ValidationContext = {
         data,
         startTime,
         skipTimeBasedValidations,
@@ -294,8 +294,10 @@ export class ConsistencyChecker {
         allowTestHashes,
         inconsistencies,
         checksPerformed,
-        checksSkipped
-      );
+        checksSkipped,
+      };
+
+      this.runValidationChecks(context);
 
       const result = this.buildValidationResult(inconsistencies, checksPerformed, checksSkipped);
 
@@ -315,27 +317,7 @@ export class ConsistencyChecker {
   /**
    * Run all validation checks and collect inconsistencies
    */
-  private static runValidationChecks(
-    data: DashboardData,
-    startTime: number,
-    skipTimeBasedValidations: boolean,
-    skipHashValidation: boolean,
-    allowTestHashes: boolean,
-    inconsistencies: Inconsistency[],
-    checksPerformed: string[],
-    checksSkipped: string[]
-  ): void {
-    const context: ValidationContext = {
-      data,
-      startTime,
-      skipTimeBasedValidations,
-      skipHashValidation,
-      allowTestHashes,
-      inconsistencies,
-      checksPerformed,
-      checksSkipped,
-    };
-
+  private static runValidationChecks(context: ValidationContext): void {
     this.runCoreValidations(context);
     this.runHashValidation(context);
     this.runDuplicateValidation(context);
@@ -963,40 +945,69 @@ export class ConsistencyChecker {
     const duration = Date.now() - startTime;
 
     if (this.DEBUG_MODE) {
-      if (result.consistent) {
-        console.log("✅ Data consistency validation passed");
-      } else {
-        console.warn("⚠️ Data consistency issues found:");
-        for (const [index, inc] of result.inconsistencies.entries()) {
-          const severityIcon = {
-            low: "🟡",
-            medium: "🟠",
-            high: "🔴",
-            critical: "💥",
-          }[inc.severity];
-
-          console.warn(
-            `  ${index + 1}. ${severityIcon} [${inc.severity.toUpperCase()}] ${inc.description}`
-          );
-          console.warn(`     Sections: ${inc.sections.join(", ")}`);
-          console.warn(`     Auto-resolvable: ${inc.autoResolvable ? "Yes" : "No"}`);
-
-          if (inc.expectedValue !== undefined && inc.actualValue !== undefined) {
-            const expectedStr = formatInconsistencyValue(inc.expectedValue);
-            const actualStr = formatInconsistencyValue(inc.actualValue);
-            console.warn(`     Expected: ${expectedStr}, Actual: ${actualStr}`);
-          }
-        }
-
-        console.warn(`  Recommended action: ${result.recommendedAction}`);
-        console.warn(`  Affected sections: ${result.affectedSections.join(", ")}`);
-      }
-
-      console.log(`⏱️ Validation completed in ${duration}ms`);
+      this.logDebugValidationResults(result, duration);
     }
 
     // Always log critical issues, even in production
-    const criticalIssues = result.inconsistencies.filter(inc => inc.severity === "critical");
+    this.logCriticalIssues(result.inconsistencies);
+  }
+
+  /**
+   * Log debug validation results
+   */
+  private static logDebugValidationResults(result: CrossValidationResult, duration: number): void {
+    if (result.consistent) {
+      console.log("✅ Data consistency validation passed");
+    } else {
+      this.logInconsistencyDetails(result);
+    }
+
+    console.log(`⏱️ Validation completed in ${duration}ms`);
+  }
+
+  /**
+   * Log inconsistency details
+   */
+  private static logInconsistencyDetails(result: CrossValidationResult): void {
+    console.warn("⚠️ Data consistency issues found:");
+
+    for (const [index, inc] of result.inconsistencies.entries()) {
+      this.logSingleInconsistency(inc, index);
+    }
+
+    console.warn(`  Recommended action: ${result.recommendedAction}`);
+    console.warn(`  Affected sections: ${result.affectedSections.join(", ")}`);
+  }
+
+  /**
+   * Log a single inconsistency
+   */
+  private static logSingleInconsistency(inc: Inconsistency, index: number): void {
+    const severityIcon = {
+      low: "🟡",
+      medium: "🟠",
+      high: "🔴",
+      critical: "💥",
+    }[inc.severity];
+
+    console.warn(
+      `  ${index + 1}. ${severityIcon} [${inc.severity.toUpperCase()}] ${inc.description}`
+    );
+    console.warn(`     Sections: ${inc.sections.join(", ")}`);
+    console.warn(`     Auto-resolvable: ${inc.autoResolvable ? "Yes" : "No"}`);
+
+    if (inc.expectedValue !== undefined && inc.actualValue !== undefined) {
+      const expectedStr = formatInconsistencyValue(inc.expectedValue);
+      const actualStr = formatInconsistencyValue(inc.actualValue);
+      console.warn(`     Expected: ${expectedStr}, Actual: ${actualStr}`);
+    }
+  }
+
+  /**
+   * Log critical issues
+   */
+  private static logCriticalIssues(inconsistencies: Inconsistency[]): void {
+    const criticalIssues = inconsistencies.filter(inc => inc.severity === "critical");
     if (criticalIssues.length > 0) {
       console.error("🚨 Critical dashboard data inconsistencies detected:", criticalIssues);
     }
@@ -1522,43 +1533,74 @@ export class ConsistencyMonitor {
     errors: string[];
   } {
     const unresolved = this.getUnresolvedInconsistencies();
-    let resolved = 0;
-    let failed = 0;
-    const errors: string[] = [];
+    const result = { resolved: 0, failed: 0, errors: [] as string[] };
 
     for (const record of unresolved) {
-      const autoResolvableInconsistencies = record.inconsistencies.filter(
-        inc => inc.autoResolvable
+      this.processRecordResolution(record, data, result);
+    }
+
+    this.logAutoResolutionResults(result);
+
+    return result;
+  }
+
+  /**
+   * Process resolution for a single record
+   */
+  private static processRecordResolution(
+    record: { timestamp: number; inconsistencies: Inconsistency[]; age: number },
+    data: DashboardData,
+    result: { resolved: number; failed: number; errors: string[] }
+  ): void {
+    const autoResolvableInconsistencies = record.inconsistencies.filter(inc => inc.autoResolvable);
+
+    for (const inconsistency of autoResolvableInconsistencies) {
+      this.resolveInconsistency(inconsistency, data, record.timestamp, result);
+    }
+  }
+
+  /**
+   * Resolve a single inconsistency
+   */
+  private static resolveInconsistency(
+    inconsistency: Inconsistency,
+    data: DashboardData,
+    timestamp: number,
+    result: { resolved: number; failed: number; errors: string[] }
+  ): void {
+    try {
+      const success = this.attemptAutoResolution(inconsistency, data);
+
+      if (success) {
+        result.resolved++;
+        this.markResolved(timestamp, "auto");
+      } else {
+        result.failed++;
+        result.errors.push(`Failed to auto-resolve: ${inconsistency.description}`);
+      }
+    } catch (_error) {
+      result.failed++;
+      const errorMessage = _error instanceof Error ? _error.message : "Unknown error";
+      result.errors.push(`Error auto-resolving: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Log auto-resolution results
+   */
+  private static logAutoResolutionResults(result: {
+    resolved: number;
+    failed: number;
+    errors: string[];
+  }): void {
+    if (this.DEBUG_MODE && (result.resolved > 0 || result.failed > 0)) {
+      console.log(
+        `🔧 Auto-resolution results: ${result.resolved} resolved, ${result.failed} failed`
       );
-
-      for (const inconsistency of autoResolvableInconsistencies) {
-        try {
-          // Attempt to auto-resolve based on inconsistency type
-          const success = this.attemptAutoResolution(inconsistency, data);
-
-          if (success) {
-            resolved++;
-            this.markResolved(record.timestamp, "auto");
-          } else {
-            failed++;
-            errors.push(`Failed to auto-resolve: ${inconsistency.description}`);
-          }
-        } catch (_error) {
-          failed++;
-          const errorMessage = _error instanceof Error ? _error.message : "Unknown error";
-          errors.push(`Error auto-resolving: ${errorMessage}`);
-        }
+      if (result.errors.length > 0) {
+        console.warn("Auto-resolution errors:", result.errors);
       }
     }
-
-    if (this.DEBUG_MODE && (resolved > 0 || failed > 0)) {
-      console.log(`🔧 Auto-resolution results: ${resolved} resolved, ${failed} failed`);
-      if (errors.length > 0) {
-        console.warn("Auto-resolution errors:", errors);
-      }
-    }
-
-    return { resolved, failed, errors };
   }
 
   /**
@@ -1571,22 +1613,11 @@ export class ConsistencyMonitor {
     // This is a placeholder for actual auto-resolution logic
     // In a real implementation, this would contain specific logic for each inconsistency type
 
-    switch (inconsistency.type) {
-      case "calculation":
-        // For calculation inconsistencies, we could trigger a recalculation
-        return true; // Assume success for now
-
-      case "timing":
-        // For timing inconsistencies, we could update timestamps
-        return true; // Assume success for now
-
-      case "duplicate_data":
-        // For duplicate data, we could remove duplicates
-        return true; // Assume success for now
-
-      default:
-        return false; // Cannot auto-resolve unknown types
-    }
+    // For calculation inconsistencies, we could trigger a recalculation
+    // For timing inconsistencies, we could update timestamps
+    // For duplicate data, we could remove duplicates
+    const resolvableTypes: Inconsistency["type"][] = ["calculation", "timing", "duplicate_data"];
+    return resolvableTypes.includes(inconsistency.type);
   }
 }
 
@@ -1682,17 +1713,17 @@ export function generateInconsistencyReport(inconsistencies: Inconsistency[]): s
     return "✅ No inconsistencies detected - all dashboard sections are synchronized.";
   }
 
-  const report: string[] = ["🔍 Dashboard Data Inconsistency Report", ""];
+  const summarySection = buildReportSummary(inconsistencies);
+  const detailedSection = ["", "📋 Detailed Issues:", ...buildDetailedIssues(inconsistencies)];
+  const recommendationsSection = buildRecommendations(inconsistencies);
 
-  // Add summary section
-  report.push(...buildReportSummary(inconsistencies));
-
-  // Add detailed issues section
-  report.push("", "📋 Detailed Issues:");
-  report.push(...buildDetailedIssues(inconsistencies));
-
-  // Add recommendations section
-  report.push(...buildRecommendations(inconsistencies));
+  const report = [
+    "🔍 Dashboard Data Inconsistency Report",
+    "",
+    ...summarySection,
+    ...detailedSection,
+    ...recommendationsSection,
+  ];
 
   return report.join("\n");
 }
@@ -1709,7 +1740,7 @@ function buildReportSummary(inconsistencies: Inconsistency[]): string[] {
     {} as Record<string, number>
   );
 
-  const summaryLines = ["� Summmary:", `   Total inconsistencies: ${inconsistencies.length}`];
+  const summaryLines = ["📊 Summary:", `   Total inconsistencies: ${inconsistencies.length}`];
 
   for (const [severity, count] of Object.entries(severityCounts)) {
     const icon = getSeverityIcon(severity);
@@ -1734,34 +1765,36 @@ function buildDetailedIssues(inconsistencies: Inconsistency[]): string[] {
  */
 function buildInconsistencyDetails(inc: Inconsistency, index: number): string[] {
   const icon = getSeverityIcon(inc.severity);
-  const lines = [
+  const baseLines = [
     `${index + 1}. ${icon} [${inc.severity.toUpperCase()}] ${inc.type}`,
     `   Sections: ${inc.sections.join(", ")}`,
     `   Description: ${inc.description}`,
     `   Auto-resolvable: ${inc.autoResolvable ? "Yes" : "No"}`,
   ];
 
+  const valueLines: string[] = [];
   if (inc.expectedValue !== undefined && inc.actualValue !== undefined) {
     const expectedStr = formatInconsistencyValue(inc.expectedValue);
     const actualStr = formatInconsistencyValue(inc.actualValue);
-    lines.push(`   Expected: ${expectedStr}`, `   Actual: ${actualStr}`);
+    valueLines.push(`   Expected: ${expectedStr}`, `   Actual: ${actualStr}`);
   }
 
   const age = Date.now() - inc.detectedAt;
   const ageStr = formatAge(age);
-  lines.push(`   Detected: ${ageStr} ago`, "");
+  const ageLines = [`   Detected: ${ageStr} ago`, ""];
 
-  return lines;
+  return [...baseLines, ...valueLines, ...ageLines];
 }
 
 /**
  * Build recommendations section
  */
 function buildRecommendations(inconsistencies: Inconsistency[]): string[] {
-  const recommendations: string[] = ["💡 Recommendations:"];
   const criticalIssues = inconsistencies.filter(inc => inc.severity === "critical");
   const highIssues = inconsistencies.filter(inc => inc.severity === "high");
   const autoResolvableCount = inconsistencies.filter(inc => inc.autoResolvable).length;
+
+  const recommendations: string[] = ["💡 Recommendations:"];
 
   if (criticalIssues.length > 0) {
     recommendations.push("   🚨 CRITICAL: Immediate action required - consider full data reload");

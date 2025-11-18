@@ -9,20 +9,20 @@
   - Files: `__tests__/bpm-filter-server.test.ts`, `__tests__/config-dashboard.test.ts`, `__tests__/convex-integration-type-safety.test.ts`, `__tests__/data-validation-cache.test.ts`, `__tests__/enhanced-statistics.test.ts`, `__tests__/integration/*.test.tsx`, `__tests__/server/*.test.ts`
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 2. Fix switch case lexical declaration issues
+- [x] 2. Fix switch case lexical declaration issues
   - Add block scopes (curly braces) around case blocks with `const`/`let` declarations
   - Ensure proper scoping in switch statements
   - Files: `client/src/lib/errorTracker.ts`, `server/routes/reservations.ts`
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 3. Remove useless try-catch wrappers
+- [x] 3. Remove useless try-catch wrappers
   - Identify try-catch blocks that only re-throw without adding value
   - Remove unnecessary wrappers while preserving error propagation
   - Keep try-catch blocks that add logging or error transformation
   - Files: `client/src/lib/convexClient.ts` (5 instances)
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 4. Fix unused expression violations
+- [x] 4. Fix unused expression violations
   - Convert unused expressions to assignments or remove them
   - Use void operator for intentional side-effect expressions
   - Files: `client/src/components/errors/OptimisticUpdateFeedback.tsx`

@@ -6,7 +6,7 @@
  */
 
 import { useOptimisticUpdates } from "@/hooks/useOptimisticUpdates";
-import type { UserFeedback } from "@/services/OptimisticUpdateManager";
+import type { FeedbackAction, UserFeedback } from "@/services/OptimisticUpdateManager";
 import { AlertCircle, CheckCircle, Clock, RefreshCw, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
@@ -134,7 +134,7 @@ const FeedbackNotification: React.FC<FeedbackNotificationProps> = ({ feedback, o
     return undefined;
   }, [feedback.timeout, onDismiss]);
 
-  const getIcon = () => {
+  const getIcon = (): JSX.Element => {
     switch (feedback.type) {
       case "success":
         return <CheckCircle className="w-5 h-5 text-green-500" />;
@@ -149,7 +149,7 @@ const FeedbackNotification: React.FC<FeedbackNotificationProps> = ({ feedback, o
     }
   };
 
-  const getBackgroundColor = () => {
+  const getBackgroundColor = (): string => {
     switch (feedback.type) {
       case "success":
         return "bg-green-50 border-green-200";
@@ -164,7 +164,7 @@ const FeedbackNotification: React.FC<FeedbackNotificationProps> = ({ feedback, o
     }
   };
 
-  const handleActionClick = (action: any) => {
+  const handleActionClick = (action: FeedbackAction): void => {
     action.handler();
     if (action.type === "dismiss") {
       onDismiss();
@@ -188,9 +188,9 @@ const FeedbackNotification: React.FC<FeedbackNotificationProps> = ({ feedback, o
 
           {feedback.actions && feedback.actions.length > 0 && (
             <div className="flex gap-2 mt-3">
-              {feedback.actions.map((action, index) => (
+              {feedback.actions.map(action => (
                 <button
-                  key={index}
+                  key={`${feedback.updateId}-${action.type}-${action.label}`}
                   onClick={() => handleActionClick(action)}
                   className={`
                     px-3 py-1 text-xs font-medium rounded-md transition-colors
@@ -223,8 +223,13 @@ const FeedbackNotification: React.FC<FeedbackNotificationProps> = ({ feedback, o
 /**
  * Pending updates indicator component
  */
+interface QueueStatus {
+  totalPending: number;
+  failed: unknown[];
+}
+
 interface PendingUpdatesIndicatorProps {
-  queueStatus: any;
+  queueStatus: QueueStatus;
 }
 
 const PendingUpdatesIndicator: React.FC<PendingUpdatesIndicatorProps> = ({ queueStatus }) => {

@@ -76,10 +76,12 @@ const formatServiceType = (serviceType: string): string => {
     production_consultation: "Production Consultation",
   };
 
-  return (
-    serviceNames[serviceType] ||
-    serviceType.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())
-  );
+  if (serviceNames[serviceType]) {
+    return serviceNames[serviceType];
+  }
+
+  // Use replaceAll for better performance and clarity
+  return serviceType.replaceAll("_", " ").replaceAll(/\b\w/g, letter => letter.toUpperCase());
 };
 
 /**
@@ -280,16 +282,22 @@ export const generateReservationConfirmationEmail = (
     })
     .join("");
 
-  const paymentSection = payment
-    ? `
+  // Extract payment section generation to avoid nested ternary
+  let paymentSection = "";
+  if (payment) {
+    const transactionIdSection = payment.paymentIntentId
+      ? `<p><strong>Transaction ID:</strong> ${payment.paymentIntentId}</p>`
+      : "";
+
+    paymentSection = `
     <div style="${EMAIL_STYLES.infoBox}">
       <h3 style="color: #8B5CF6; margin: 0 0 10px 0;">Payment Information</h3>
       <p><strong>Amount Paid:</strong> ${(payment.amount / 100).toFixed(2)} ${payment.currency.toUpperCase()}</p>
       <p><strong>Payment Method:</strong> ${payment.paymentMethod || "Card"}</p>
-      ${payment.paymentIntentId ? `<p><strong>Transaction ID:</strong> ${payment.paymentIntentId}</p>` : ""}
+      ${transactionIdSection}
     </div>
-  `
-    : "";
+  `;
+  }
 
   return generateEmailWrapper(
     "Payment Confirmed!",
@@ -434,9 +442,10 @@ export const generateReservationStatusUpdateEmail = (
         ${reservation.notes ? `<p><strong>Notes:</strong> ${reservation.notes}</p>` : ""}
       </div>
       
-      <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #E5E7EB;"></div>   <p style="color: #6B7280; margin-bottom: 10px;">Questions about your reservation?</p>
+      <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #E5E7EB;">
+        <p style="color: #6B7280; margin-bottom: 10px;">Questions about your reservation?</p>
         <p style="color: #8B5CF6; font-weight: bold;">
-          📧 contact@brolabentertainment.com<br>
+          � c3ontact@brolabentertainment.com<br>
           📞 +33 (0)1 XX XX XX XX
         </p>
       </div>
@@ -642,13 +651,17 @@ export const sendReservationConfirmationEmail = async (
   );
 
   if (!result.success) {
-    console.error("Failed to send reservation confirmation email:", result.error);
+    logger.error("Failed to send reservation confirmation email", {
+      error: result.error,
+      reservationCount: reservations.length,
+    });
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
   logger.info("Reservation confirmation email sent successfully", {
     attempts: result.attempts,
     hasReservationId: !!reservations[0]?.id,
+    reservationCount: reservations.length,
   });
 };
 
@@ -674,13 +687,16 @@ export const sendPaymentFailureEmail = async (
   );
 
   if (!result.success) {
-    console.error("Failed to send payment failure email:", result.error);
+    logger.error("Failed to send payment failure email", {
+      error: result.error,
+      reservationIdCount: reservationIds.length,
+    });
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
   logger.info("Payment failure email sent successfully", {
     attempts: result.attempts,
-    hasReservationIds: reservationIds.length > 0,
+    reservationIdCount: reservationIds.length,
   });
 };
 
@@ -707,13 +723,20 @@ export const sendReservationStatusUpdateEmail = async (
   );
 
   if (!result.success) {
-    console.error("Failed to send status update email:", result.error);
+    logger.error("Failed to send status update email", {
+      error: result.error,
+      reservationId: reservation.id,
+      oldStatus,
+      newStatus,
+    });
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
   logger.info("Status update email sent successfully", {
     attempts: result.attempts,
     hasReservationId: !!reservation.id,
+    oldStatus,
+    newStatus,
   });
 };
 
@@ -727,13 +750,18 @@ export const sendAdminReservationNotification = async (
   const result = await reservationEmailService.sendAdminNotification(user, reservation);
 
   if (!result.success) {
-    console.error("Failed to send admin notification email:", result.error);
+    logger.error("Failed to send admin notification email", {
+      error: result.error,
+      reservationId: reservation.id,
+      userId: user.id,
+    });
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
   logger.info("Admin notification email sent successfully", {
     attempts: result.attempts,
     hasReservationId: !!reservation.id,
+    userId: user.id,
   });
 };
 
@@ -754,13 +782,17 @@ export const sendPaymentConfirmationEmail = async (
   const result = await reservationEmailService.sendPaymentConfirmation(user, reservations, payment);
 
   if (!result.success) {
-    console.error("Failed to send payment confirmation email:", result.error);
+    logger.error("Failed to send payment confirmation email", {
+      error: result.error,
+      reservationCount: reservations.length,
+    });
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
   logger.info("Payment confirmation email sent successfully", {
     attempts: result.attempts,
     hasReservationId: !!reservations[0]?.id,
+    reservationCount: reservations.length,
   });
 };
 
@@ -780,13 +812,17 @@ export const sendReservationReminderEmail = async (
   const result = await reservationEmailService.sendReservationReminder(user, reservation);
 
   if (!result.success) {
-    console.error("Failed to send reservation reminder email:", result.error);
+    logger.error("Failed to send reservation reminder email", {
+      error: result.error,
+      reservationId: reservation.id,
+    });
     throw new Error(`Email sending failed: ${result.error}`);
   }
 
   logger.info("Reservation reminder email sent successfully", {
     attempts: result.attempts,
     hasReservationId: !!reservation.id,
+    reservationId: reservation.id,
   });
 };
 

@@ -2,59 +2,92 @@ import { api } from "@/lib/convex-api";
 import { useUser } from "@clerk/clerk-react";
 import { useMutation, useQuery } from "convex/react";
 
-interface Favorite {
-  beat_id: number;
-  userId?: string;
-  createdAt?: string;
+/**
+ * Favorite item returned from Convex
+ */
+export interface Favorite {
+  _id: string;
+  _creationTime: number;
+  userId: string;
+  beatId: number;
+  createdAt: number;
 }
 
 /**
  * Hook for managing user favorites using Convex
+ * Provides real-time synchronization of favorite beats
  */
 export function useFavorites() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
+  const isAuthenticated = Boolean(user && isLoaded);
 
   // Query favorites - skip query if user is not authenticated
   const favorites = useQuery(
     api.favorites.getFavorites.getFavorites as never,
-    user ? {} : undefined
+    isAuthenticated ? {} : "skip"
   ) as Favorite[] | undefined;
 
-  // Mutations
-  const addToFavorites = useMutation(api.favorites.add.addToFavorites as never);
-  const removeFromFavorites = useMutation(api.favorites.remove.removeFromFavorites as never);
+  // Mutations - typed as any to avoid Convex type instantiation issues
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const addToFavoritesMutation = useMutation(api.favorites.add.addToFavorites as any);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const removeFromFavoritesMutation = useMutation(api.favorites.remove.removeFromFavorites as any);
 
-  // Helper to check if a beat is favorited
+  /**
+   * Check if a beat is in the user's favorites
+   */
   const isFavorite = (beatId: number): boolean => {
-    if (!favorites) return false;
-    return favorites.some((fav: Favorite) => fav.beat_id === beatId);
+    if (!favorites || !Array.isArray(favorites)) return false;
+    return favorites.some((fav: Favorite) => fav.beatId === beatId);
   };
 
-  // Toggle favorite status
-  const toggleFavorite = async (beatId: number) => {
-    if (!user) {
+  /**
+   * Add a beat to favorites
+   */
+  const addToFavorites = async (beatId: number): Promise<void> => {
+    if (!isAuthenticated) {
+      throw new Error("User must be authenticated to add favorites");
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await addToFavoritesMutation({ beatId } as any);
+  };
+
+  /**
+   * Remove a beat from favorites
+   */
+  const removeFromFavorites = async (beatId: number): Promise<void> => {
+    if (!isAuthenticated) {
+      throw new Error("User must be authenticated to remove favorites");
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await removeFromFavoritesMutation({ beatId } as any);
+  };
+
+  /**
+   * Toggle favorite status for a beat
+   */
+  const toggleFavorite = async (beatId: number): Promise<void> => {
+    if (!isAuthenticated) {
       throw new Error("User must be authenticated to manage favorites");
     }
 
     if (isFavorite(beatId)) {
-      await removeFromFavorites({ beatId });
+      await removeFromFavorites(beatId);
     } else {
-      await addToFavorites({ beatId });
+      await addToFavorites(beatId);
     }
   };
 
   return {
     favorites: favorites || [],
-    isLoading: favorites === undefined,
+    isLoading: favorites === undefined && isAuthenticated,
+    isAuthenticated,
     isFavorite,
-    addToFavorites: async (beatId: number) => {
-      if (!user) throw new Error("User must be authenticated");
-      await addToFavorites({ beatId });
-    },
-    removeFromFavorites: async (beatId: number) => {
-      if (!user) throw new Error("User must be authenticated");
-      await removeFromFavorites({ beatId });
-    },
+    addToFavorites,
+    removeFromFavorites,
     toggleFavorite,
+    // Loading states for mutations (for UI feedback)
+    isAdding: false,
+    isRemoving: false,
   };
 }

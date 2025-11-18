@@ -9,11 +9,12 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Download, FileText, Music, Shield, Users } from "lucide-react";
+import { LicenseType } from "@shared/types/Beat";
+import { Download, FileText, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface LicensePreviewModalProps {
-  licenseType: "basic" | "premium" | "unlimited" | "exclusive";
+  licenseType: LicenseType;
   beatTitle: string;
   producer: string;
   onPurchase?: () => void;
@@ -23,7 +24,6 @@ interface LicenseDetails {
   name: string;
   description: string;
   price: number;
-  icon: any;
   features: string[];
   restrictions: string[];
   commercialUse: boolean;
@@ -46,12 +46,11 @@ export function LicensePreviewModal({
     setOpen(isOpen);
   }, [isOpen]);
 
-  const licenseDetails: Record<string, LicenseDetails> = {
-    basic: {
+  const licenseDetails: Record<LicenseType, LicenseDetails> = {
+    [LicenseType.BASIC]: {
       name: "Basic MP3 License",
       description: "If uploading songs to YouTube, Spotify, or any other streaming platform!",
       price: 29.99,
-      icon: Music,
       features: [
         "MP3 included",
         "Distribute up to 2,500 copies",
@@ -72,12 +71,11 @@ export function LicensePreviewModal({
       distributionLimit: "50,000 audio streams",
       creditRequired: true,
     },
-    premium: {
+    [LicenseType.PREMIUM]: {
       name: "Premium WAV License",
       description:
         "[Most Popular] If you want the highest quality audio file + streaming license this is for you!",
       price: 49.99,
-      icon: Shield,
       features: [
         "MP3 + WAV included",
         "Distribute up to 2,500 copies",
@@ -98,11 +96,10 @@ export function LicensePreviewModal({
       distributionLimit: "150,000 audio streams",
       creditRequired: true,
     },
-    unlimited: {
+    [LicenseType.UNLIMITED]: {
       name: "Unlimited License",
       description: "Better than Premium License!",
       price: 149.99,
-      icon: Users,
       features: [
         "MP3 + WAV + stems included",
         "Distribute up to unlimited copies",
@@ -125,7 +122,6 @@ export function LicensePreviewModal({
   };
 
   const license = licenseDetails[licenseType];
-  const Icon = license.icon;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -191,11 +187,11 @@ export function LicensePreviewModal({
             <div>
               <h4 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
                 <Download className="w-5 h-5 text-[var(--accent-green)]" />
-                What's Included
+                What&apos;s Included
               </h4>
               <div className="grid gap-2">
-                {license.features.map((feature, index) => (
-                  <div key={index} className="flex items-center gap-3 text-gray-300">
+                {license.features.map(feature => (
+                  <div key={feature} className="flex items-center gap-3 text-gray-300">
                     <div className="w-2 h-2 bg-[var(--accent-green)] rounded-full flex-shrink-0" />
                     {feature}
                   </div>
@@ -212,8 +208,8 @@ export function LicensePreviewModal({
                 Restrictions & Limitations
               </h4>
               <div className="grid gap-2">
-                {license.restrictions.map((restriction, index) => (
-                  <div key={index} className="flex items-center gap-3 text-gray-300">
+                {license.restrictions.map(restriction => (
+                  <div key={restriction} className="flex items-center gap-3 text-gray-300">
                     <div className="w-2 h-2 bg-yellow-500 rounded-full flex-shrink-0" />
                     {restriction}
                   </div>
@@ -229,8 +225,8 @@ export function LicensePreviewModal({
               <div className="bg-[var(--dark-gray)] p-4 rounded-lg text-sm text-gray-300 space-y-3">
                 <p>
                   <strong className="text-white">Grant of License:</strong> This license grants you
-                  the non-exclusive right to use the musical composition "{beatTitle}" produced by{" "}
-                  {producer} under the {license.name} terms specified above.
+                  the non-exclusive right to use the musical composition &quot;{beatTitle}&quot;
+                  produced by {producer} under the {license.name} terms specified above.
                 </p>
                 <p>
                   <strong className="text-white">Usage Rights:</strong>{" "}
@@ -241,7 +237,7 @@ export function LicensePreviewModal({
                 <p>
                   <strong className="text-white">Credit Requirements:</strong>{" "}
                   {license.creditRequired
-                    ? 'Producer credit "Prod. by BroLab Entertainment" must be included in all releases and metadata.'
+                    ? "Producer credit &quot;Prod. by BroLab Entertainment&quot; must be included in all releases and metadata."
                     : "Producer credit is optional but appreciated."}
                 </p>
                 <p>
@@ -282,7 +278,7 @@ export function LicensePreviewModal({
             {onPurchase && (
               <Button
                 onClick={() => {
-                  onPurchase && onPurchase();
+                  onPurchase();
                   onClose();
                 }}
                 className="bg-[var(--accent-purple)] hover:bg-purple-600 text-white"

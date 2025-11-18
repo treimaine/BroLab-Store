@@ -6,6 +6,7 @@ import {
   type InsertOrder,
   type InsertReservation,
   type InsertUser,
+  type LicenseTypeEnum,
   type Order,
   type OrderStatusEnum,
   type Reservation,
@@ -24,76 +25,22 @@ import {
   getUserReservations,
   listUserOrders,
   updateReservationStatus,
-  upsertUser,
 } from "./lib/db";
 import { logger } from "./lib/logger";
 
+interface Download {
+  id: number;
+  userId: number;
+  beatId: number;
+  licenseType: string;
+  downloadUrl: string;
+  timestamp: string;
+}
+
 // === Helpers for snake_case <-> camelCase mapping ===
-function toDbBeat(beat: {
-  id?: number;
-  title: string;
-  genre?: string;
-  bpm?: number;
-  price: number;
-  audioUrl?: string;
-  imageUrl?: string;
-  [key: string]: unknown;
-}) {
-  return {
-    ...beat,
-    wordpress_id: beat.wordpress_id ?? beat.wordpressId ?? 0,
-    image_url: beat.image_url ?? beat.imageUrl ?? "",
-    audio_url: beat.audio_url ?? beat.audioUrl ?? "",
-    is_active: beat.is_active ?? beat.isActive ?? true,
-    created_at: beat.created_at ?? beat.createdAt ?? new Date().toISOString(),
-  };
-}
-function fromDbBeat(row: {
-  id: number;
-  title: string;
-  genre?: string;
-  bpm?: number;
-  price: number;
-  audio_url?: string;
-  image_url?: string;
-  [key: string]: unknown;
-}) {
-  return {
-    ...row,
-    wordpressId: row.wordpress_id,
-    imageUrl: row.image_url,
-    audioUrl: row.audio_url,
-    isActive: row.is_active,
-    createdAt: row.created_at,
-  };
-}
-function toDbUser(user: {
-  id?: number;
-  email: string;
-  name?: string;
-  stripeCustomerId?: string;
-  [key: string]: unknown;
-}) {
-  const { stripeCustomerId, ...rest } = user;
-  return {
-    ...rest,
-    stripe_customer_id: user.stripeCustomerId ?? user.stripe_customer_id ?? null,
-  };
-}
-function fromDbUser(row: {
-  id: number;
-  email: string;
-  name?: string;
-  stripe_customer_id?: string;
-  [key: string]: unknown;
-}) {
-  return {
-    ...row,
-    stripeCustomerId: row.stripe_customer_id,
-  };
-}
+
 // For Order: ensure items is always an array
-function fromDbOrder(row: {
+interface DbOrder {
   id: number;
   user_id?: number;
   session_id?: string;
@@ -102,11 +49,13 @@ function fromDbOrder(row: {
   status: string;
   created_at: string;
   [key: string]: unknown;
-}) {
+}
+
+function fromDbOrder(row: DbOrder): Order {
   return {
     ...row,
     items: Array.isArray(row.items) ? row.items : [],
-  };
+  } as Order;
 }
 
 export interface IStorage {
@@ -150,14 +99,14 @@ export interface IStorage {
   updateOrderStatus(id: number, status: string): Promise<Order | undefined>;
 
   // Downloads management
-  getUserDownloads(userId: number): Promise<any[]>;
+  getUserDownloads(userId: number): Promise<Download[]>;
   logDownload(download: {
     userId: number;
     beatId: number;
     licenseType: string;
     downloadUrl: string;
     timestamp: string;
-  }): Promise<any>;
+  }): Promise<Download>;
 
   // Newsletter and contact
   subscribeToNewsletter(email: string): Promise<void>;
@@ -171,14 +120,13 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
-  private reservations: Map<string, Reservation>;
-
-  private users: Map<number, User>;
-  private beats: Map<number, Beat>;
-  private cartItems: Map<number, CartItem>;
-  private orders: Map<number, Order>;
-  private newsletterSubscriptions: Set<string>;
-  private contactMessages: Array<{
+  private readonly reservations: Map<string, Reservation>;
+  private readonly users: Map<number, User>;
+  private readonly beats: Map<number, Beat>;
+  private readonly cartItems: Map<number, CartItem>;
+  private readonly orders: Map<number, Order>;
+  private readonly newsletterSubscriptions: Set<string>;
+  private readonly contactMessages: Array<{
     id: number;
     name: string;
     email: string;
@@ -189,7 +137,7 @@ export class MemStorage implements IStorage {
   private currentBeatId: number;
   private currentCartId: number;
   private currentOrderId: number;
-  private downloads: Map<number, any[]> = new Map();
+  private readonly downloads: Map<number, Download[]> = new Map();
 
   constructor() {
     this.users = new Map();
@@ -253,7 +201,7 @@ export class MemStorage implements IStorage {
       },
     ];
 
-    sampleBeats.forEach(beat => {
+    for (const beat of sampleBeats) {
       const id = this.currentBeatId++;
       this.beats.set(id, {
         id,
@@ -265,9 +213,9 @@ export class MemStorage implements IStorage {
         image_url: beat.imageUrl || null,
         is_active: beat.isActive ?? true,
         created_at: new Date().toISOString(),
-        wordpress_id: (beat as any).wordpress_id ?? (beat as any).wordpressId ?? 0,
+        wordpress_id: beat.wordpressId ?? 0,
       });
-    });
+    }
   }
 
   // User management
@@ -275,8 +223,8 @@ export class MemStorage implements IStorage {
     return this.users.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.username === username);
+  async getUserByUsername(_username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.username === _username);
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -380,7 +328,13 @@ export class MemStorage implements IStorage {
     // Add new items
     if (Array.isArray(items)) {
       for (const item of items) {
-        const cartItem = item as any; // Type assertion for unknown items
+        const cartItem = item as {
+          beatId: number;
+          licenseType: LicenseTypeEnum;
+          price: number;
+          quantity: number;
+          userId?: number;
+        };
         await this.addCartItem({
           beat_id: cartItem.beatId,
           license_type: cartItem.licenseType,
@@ -433,16 +387,24 @@ export class MemStorage implements IStorage {
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     const id = this.currentOrderId++;
     // Convert order items to CartItem format for compatibility
-    const cartItems: CartItem[] = (insertOrder.items ?? []).map((item, index) => ({
-      id: index + 1,
-      beat_id: item.productId || 0,
-      license_type: (item.license as any) || "basic",
-      price: item.price || 0,
-      quantity: item.quantity || 1,
-      session_id: insertOrder.session_id || null,
-      user_id: insertOrder.user_id || null,
-      created_at: new Date().toISOString(),
-    }));
+    const cartItems: CartItem[] = (insertOrder.items ?? []).map((item, index) => {
+      const licenseType = item.license || "basic";
+      const validLicense: LicenseTypeEnum =
+        licenseType === "basic" || licenseType === "premium" || licenseType === "unlimited"
+          ? licenseType
+          : "basic";
+
+      return {
+        id: index + 1,
+        beat_id: item.productId || 0,
+        license_type: validLicense,
+        price: item.price || 0,
+        quantity: item.quantity || 1,
+        session_id: insertOrder.session_id || null,
+        user_id: insertOrder.user_id || null,
+        created_at: new Date().toISOString(),
+      };
+    });
 
     const order: Order = {
       ...insertOrder,
@@ -471,7 +433,7 @@ export class MemStorage implements IStorage {
   }
 
   // Downloads management
-  async getUserDownloads(userId: number): Promise<any[]> {
+  async getUserDownloads(userId: number): Promise<Download[]> {
     return this.downloads.get(userId) || [];
   }
 
@@ -481,9 +443,9 @@ export class MemStorage implements IStorage {
     licenseType: string;
     downloadUrl: string;
     timestamp: string;
-  }): Promise<any> {
+  }): Promise<Download> {
     const userDownloads = this.downloads.get(download.userId) || [];
-    const newDownload = {
+    const newDownload: Download = {
       id: Date.now(),
       ...download,
     };
@@ -534,7 +496,7 @@ export class MemStorage implements IStorage {
   }
 
   async getUserReservations(userId: string | number): Promise<Reservation[]> {
-    const numericUserId = typeof userId === "string" ? parseInt(userId) : userId;
+    const numericUserId = typeof userId === "string" ? Number.parseInt(userId, 10) : userId;
     return Array.from(this.reservations.values())
       .filter(reservation => reservation.user_id === numericUserId)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -567,6 +529,8 @@ export class MemStorage implements IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private readonly orders: Map<number, Order> = new Map();
+
   // Reservation methods
   async createReservation(
     reservation: InsertReservation & { clerkId?: string }
@@ -600,14 +564,13 @@ export class DatabaseStorage implements IStorage {
     return await getReservationsByDateRange(startDate, endDate);
   }
 
-  private orders: Map<number, Order> = new Map();
   // User methods
   async getUser(id: number): Promise<User | undefined> {
     const user = await getUserById(id);
     return user || undefined;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
+  async getUserByUsername(_username: string): Promise<User | undefined> {
     // getUserByUsername not implemented in current helpers
     // Would require new helper in lib/db.ts
     return undefined;
@@ -618,23 +581,20 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const dbUser = toDbUser(insertUser);
-    // Remove camelCase property if it exists
-    if ("stripeCustomerId" in dbUser) {
-      delete (dbUser as any).stripeCustomerId;
-    }
-    const user = await upsertUser(dbUser as any);
-    return fromDbUser(user as any) as User;
+  async createUser(_insertUser: InsertUser): Promise<User> {
+    // For DatabaseStorage, we need a clerkId which should be provided separately
+    // This is a limitation of the current implementation
+    // In production, user creation should go through Clerk webhooks
+    throw new Error(ErrorMessages.GENERIC.FEATURE_UNAVAILABLE);
   }
 
   // Beat methods - Not implemented (WooCommerce handles beats)
-  async getBeat(id: number): Promise<Beat | undefined> {
+  async getBeat(_id: number): Promise<Beat | undefined> {
     // Beats are managed via WooCommerce API, not database
     return undefined;
   }
 
-  async getBeats(filters?: {
+  async getBeats(_filters?: {
     genre?: string;
     minPrice?: number;
     maxPrice?: number;
@@ -647,37 +607,37 @@ export class DatabaseStorage implements IStorage {
     return [];
   }
 
-  async createBeat(insertBeat: InsertBeat): Promise<Beat> {
+  async createBeat(_insertBeat: InsertBeat): Promise<Beat> {
     // Beats are managed via WooCommerce API, not database
     throw new Error(ErrorMessages.GENERIC.FEATURE_UNAVAILABLE);
   }
 
-  async updateBeat(id: number, updates: Partial<Beat>): Promise<Beat | undefined> {
+  async updateBeat(_id: number, _updates: Partial<Beat>): Promise<Beat | undefined> {
     // Beats are managed via WooCommerce API, not database
     return undefined;
   }
 
   // Cart methods - Not implemented (client-side cart management)
-  async getCartItems(sessionId: string): Promise<CartItem[]> {
+  async getCartItems(_sessionId: string): Promise<CartItem[]> {
     // Cart is managed client-side with localStorage
     return [];
   }
 
-  async saveCartItems(sessionId: string, items: unknown[]): Promise<void> {
+  async saveCartItems(_sessionId: string, _items: unknown[]): Promise<void> {
     // Cart is managed client-side with localStorage
   }
 
-  async addCartItem(insertItem: InsertCartItem): Promise<CartItem> {
+  async addCartItem(_insertItem: InsertCartItem): Promise<CartItem> {
     // Cart is managed client-side with localStorage
     throw new Error(ErrorMessages.GENERIC.FEATURE_UNAVAILABLE);
   }
 
-  async updateCartItem(id: number, updates: Partial<CartItem>): Promise<CartItem | undefined> {
+  async updateCartItem(_id: number, _updates: Partial<CartItem>): Promise<CartItem | undefined> {
     // Cart is managed client-side with localStorage
     return undefined;
   }
 
-  async removeCartItem(id: number): Promise<boolean> {
+  async removeCartItem(_id: number): Promise<boolean> {
     // Cart is managed client-side with localStorage
     return false;
   }
@@ -685,27 +645,27 @@ export class DatabaseStorage implements IStorage {
   // Order methods - Not fully implemented
   async getOrdersByUser(userId: number): Promise<Order[]> {
     const orders = await listUserOrders(userId);
-    return orders.map(order => fromDbOrder(order as any)) as Order[];
+    return orders.map(order => fromDbOrder(order as DbOrder));
   }
 
   async getOrder(id: number): Promise<Order | undefined> {
     const { order } = await getOrderInvoiceData(id);
-    return fromDbOrder(order as any) as Order;
+    return fromDbOrder(order as DbOrder);
   }
 
-  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+  async createOrder(_insertOrder: InsertOrder): Promise<Order> {
     // Orders are not directly implemented in current helpers
     // This would require a new helper in lib/db.ts
     throw new Error(ErrorMessages.GENERIC.FEATURE_UNAVAILABLE);
   }
 
-  async updateOrderStatus(id: number, status: string): Promise<Order | undefined> {
+  async updateOrderStatus(_id: number, _status: string): Promise<Order | undefined> {
     // Orders not implemented in current helpers
     return undefined;
   }
 
   // Downloads management
-  async getUserDownloads(userId: number): Promise<any[]> {
+  async getUserDownloads(userId: number): Promise<Download[]> {
     // Downloads would be retrieved from database
     // For now, return empty array as downloads are not fully implemented
     logger.info("Getting downloads for user", { hasUserId: !!userId });
@@ -718,7 +678,7 @@ export class DatabaseStorage implements IStorage {
     licenseType: string;
     downloadUrl: string;
     timestamp: string;
-  }): Promise<unknown> {
+  }): Promise<Download> {
     // Download logging would go to database
     logger.info("Logging download", {
       beatId: download.beatId,

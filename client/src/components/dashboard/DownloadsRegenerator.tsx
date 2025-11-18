@@ -6,29 +6,56 @@ import { AlertCircle, CheckCircle, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+/**
+ * Result type for the regenerateDownloadsFromOrders mutation
+ * Matches the return type from convex/orders.ts
+ */
+interface RegenerateDownloadsResult {
+  success: boolean;
+  created: number;
+  skipped: number;
+  ordersProcessed: number;
+}
+
 interface DownloadsRegeneratorProps {
   readonly onRegenerateComplete?: () => void;
   readonly className?: string;
 }
 
+/**
+ * DownloadsRegenerator Component
+ *
+ * Provides a UI for users to regenerate download access from their paid orders.
+ * This is useful when downloads are missing or out of sync with order history.
+ *
+ * Features:
+ * - Scans all paid orders for the current user
+ * - Creates download access for purchased beats
+ * - Skips downloads that already exist
+ * - Updates activity log with new downloads
+ * - Shows detailed results after regeneration
+ *
+ * Requirements addressed:
+ * - Download quota validation before granting downloads
+ * - Data access control (users access only their own data)
+ * - Proper error handling with user-friendly messages
+ */
 export function DownloadsRegenerator({
   onRegenerateComplete,
   className,
-}: DownloadsRegeneratorProps) {
+}: DownloadsRegeneratorProps): JSX.Element {
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [lastResult, setLastResult] = useState<{
-    created: number;
-    skipped: number;
-    ordersProcessed: number;
-  } | null>(null);
+  const [lastResult, setLastResult] = useState<RegenerateDownloadsResult | null>(null);
 
+  // Using 'as never' to bypass deep type instantiation issues with Convex
   const regenerateDownloads = useMutation(api.orders.regenerateDownloadsFromOrders as never);
 
-  const handleRegenerate = async () => {
+  const handleRegenerate = async (): Promise<void> => {
     try {
       setIsRegenerating(true);
 
-      const result = await regenerateDownloads({});
+      // Call the Convex mutation to regenerate downloads
+      const result = (await regenerateDownloads({})) as RegenerateDownloadsResult;
 
       setLastResult(result);
 
