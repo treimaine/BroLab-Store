@@ -30,25 +30,31 @@ const CACHEABLE_APIS = [
 
 // Install event - cache static assets
 self.addEventListener("install", event => {
+  console.log("Service Worker installing...");
+
   event.waitUntil(
     Promise.all([
       // Cache static assets
       caches.open(CACHE_NAME).then(cache => {
+        console.log("Caching static assets");
         return cache.addAll(STATIC_ASSETS);
       }),
       // Create offline cache
       caches.open(OFFLINE_CACHE).then(cache => {
+        console.log("Creating offline cache");
         return cache.add("/offline.html");
       }),
     ]).then(() => {
       // Force activation of new service worker
-      return globalThis.skipWaiting();
+      return self.skipWaiting();
     })
   );
 });
 
 // Activate event - clean up old caches
 self.addEventListener("activate", event => {
+  console.log("Service Worker activating...");
+
   event.waitUntil(
     Promise.all([
       // Clean up old caches
@@ -60,13 +66,14 @@ self.addEventListener("activate", event => {
               cacheName !== OFFLINE_CACHE &&
               cacheName !== RUNTIME_CACHE
             ) {
+              console.log("Deleting old cache:", cacheName);
               return caches.delete(cacheName);
             }
           })
         );
       }),
       // Take control of all clients
-      globalThis.clients.claim(),
+      self.clients.claim(),
     ])
   );
 });
@@ -111,7 +118,9 @@ async function handleApiRequest(request) {
     }
 
     return networkResponse;
-  } catch (networkError) {
+  } catch (error) {
+    console.log("Network failed for API request, trying cache:", url.pathname);
+
     // Try cache fallback
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
@@ -138,7 +147,7 @@ async function handleApiRequest(request) {
       );
     }
 
-    throw networkError;
+    throw error;
   }
 }
 
@@ -161,8 +170,9 @@ async function handleStaticAsset(request) {
     }
 
     return networkResponse;
-  } catch (staticError) {
-    throw staticError;
+  } catch (error) {
+    console.log("Failed to load static asset:", request.url);
+    throw error;
   }
 }
 
@@ -181,7 +191,9 @@ async function handlePageRequest(request) {
     }
 
     return networkResponse;
-  } catch (pageError) {
+  } catch (error) {
+    console.log("Network failed for page request, trying cache:", request.url);
+
     // Try cache fallback
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
@@ -196,12 +208,14 @@ async function handlePageRequest(request) {
       }
     }
 
-    throw pageError;
+    throw error;
   }
 }
 
 // Handle background sync for offline operations
 self.addEventListener("sync", event => {
+  console.log("Background sync triggered:", event.tag);
+
   if (event.tag === "offline-sync") {
     event.waitUntil(syncOfflineOperations());
   }
@@ -219,17 +233,15 @@ async function syncOfflineOperations() {
       try {
         await syncOperation(operation);
         await markOperationSynced(operation.id);
-      } catch (syncError) {
-        // Retry failed operation
+      } catch (error) {
+        console.error("Failed to sync operation:", operation.id, error);
         await incrementRetryCount(operation.id);
-        throw syncError;
       }
     }
 
-    // Sync completed successfully
-  } catch (syncError) {
-    // Background sync failed - will retry on next sync event
-    throw syncError;
+    console.log("Offline sync completed");
+  } catch (error) {
+    console.error("Background sync failed:", error);
   }
 }
 
@@ -267,6 +279,7 @@ async function syncOperation(operation) {
  */
 async function markOperationSynced(operationId) {
   // This would update the OfflineManager's storage
+  console.log("Operation synced:", operationId);
 }
 
 /**
@@ -274,15 +287,18 @@ async function markOperationSynced(operationId) {
  */
 async function incrementRetryCount(operationId) {
   // This would update the OfflineManager's storage
+  console.log("Incrementing retry count for operation:", operationId);
 }
 
 // Handle push notifications (for future use)
 self.addEventListener("push", event => {
+  console.log("Push notification received:", event);
+
   if (event.data) {
     const data = event.data.json();
 
     event.waitUntil(
-      globalThis.registration.showNotification(data.title, {
+      self.registration.showNotification(data.title, {
         body: data.body,
         icon: data.icon || "/favicon.ico",
         badge: "/favicon.ico",
@@ -294,6 +310,8 @@ self.addEventListener("push", event => {
 
 // Handle notification clicks
 self.addEventListener("notificationclick", event => {
+  console.log("Notification clicked:", event);
+
   event.notification.close();
 
   // Open the app or focus existing window
@@ -301,7 +319,7 @@ self.addEventListener("notificationclick", event => {
     clients.matchAll({ type: "window" }).then(clientList => {
       // If app is already open, focus it
       for (const client of clientList) {
-        if (client.url === globalThis.location.origin && "focus" in client) {
+        if (client.url === self.location.origin && "focus" in client) {
           return client.focus();
         }
       }
@@ -316,10 +334,12 @@ self.addEventListener("notificationclick", event => {
 
 // Message handling for communication with main thread
 self.addEventListener("message", event => {
+  console.log("Service Worker received message:", event.data);
+
   if (event.data && event.data.type) {
     switch (event.data.type) {
       case "SKIP_WAITING":
-        globalThis.skipWaiting();
+        self.skipWaiting();
         break;
       case "CACHE_URLS":
         cacheUrls(event.data.urls);
@@ -327,6 +347,8 @@ self.addEventListener("message", event => {
       case "CLEAR_CACHE":
         clearCache(event.data.cacheName);
         break;
+      default:
+        console.log("Unknown message type:", event.data.type);
     }
   }
 });
@@ -335,13 +357,23 @@ self.addEventListener("message", event => {
  * Cache specific URLs
  */
 async function cacheUrls(urls) {
-  const cache = await caches.open(RUNTIME_CACHE);
-  await cache.addAll(urls);
+  try {
+    const cache = await caches.open(RUNTIME_CACHE);
+    await cache.addAll(urls);
+    console.log("URLs cached successfully:", urls);
+  } catch (error) {
+    console.error("Failed to cache URLs:", error);
+  }
 }
 
 /**
  * Clear specific cache
  */
 async function clearCache(cacheName) {
-  await caches.delete(cacheName || CACHE_NAME);
+  try {
+    const deleted = await caches.delete(cacheName || CACHE_NAME);
+    console.log("Cache cleared:", cacheName, deleted);
+  } catch (error) {
+    console.error("Failed to clear cache:", error);
+  }
 }

@@ -125,56 +125,25 @@ export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps) {
   );
 }
 
-// Hook to manage newsletter modal with lazy initialization
+// Hook to manage newsletter modal
 export function useNewsletterModal() {
-  // Lazy state initializer - only runs once on mount
-  const [isOpen, setIsOpen] = useState(() => false);
-  const [initialized, setInitialized] = useState(() => false);
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    // Skip if already initialized
-    if (initialized) return undefined;
+    // Check if user has already signed up
+    const hasSignedUp = localStorage.getItem("brolab-newsletter-signup");
 
-    // Defer initialization until after initial render
-    let cleanupTimer: NodeJS.Timeout | undefined;
+    if (!hasSignedUp) {
+      // Show modal after a delay on first visit
+      const timer = setTimeout(() => {
+        setIsOpen(true);
+      }, 10000); // 10 seconds delay
 
-    const initTimer =
-      typeof requestIdleCallback !== "undefined"
-        ? requestIdleCallback(() => {
-            const hasSignedUp = localStorage.getItem("brolab-newsletter-signup");
+      return () => clearTimeout(timer);
+    }
 
-            if (!hasSignedUp) {
-              // Show modal after a delay on first visit
-              cleanupTimer = setTimeout(() => {
-                setIsOpen(true);
-              }, 10000); // 10 seconds delay
-            }
-
-            setInitialized(true);
-          })
-        : setTimeout(() => {
-            const hasSignedUp = localStorage.getItem("brolab-newsletter-signup");
-
-            if (!hasSignedUp) {
-              cleanupTimer = setTimeout(() => {
-                setIsOpen(true);
-              }, 10000);
-            }
-
-            setInitialized(true);
-          }, 0);
-
-    return () => {
-      if (cleanupTimer) {
-        clearTimeout(cleanupTimer);
-      }
-      if (typeof initTimer === "number" && typeof cancelIdleCallback !== "undefined") {
-        cancelIdleCallback(initTimer);
-      } else if (typeof initTimer === "number") {
-        clearTimeout(initTimer);
-      }
-    };
-  }, [initialized]);
+    return undefined;
+  }, []);
 
   const openModal = () => setIsOpen(true);
   const closeModal = () => setIsOpen(false);

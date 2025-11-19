@@ -128,11 +128,7 @@ router.get(
       });
     } catch (error: unknown) {
       console.error("❌ Email verification failed:", error);
-      handleRouteError(
-        error instanceof Error ? error : String(error),
-        res,
-        "Email verification failed"
-      );
+      handleRouteError(error, res, "Email verification failed");
     }
   }
 );
@@ -205,11 +201,7 @@ router.post(
         message: "Verification email sent successfully",
       });
     } catch (error: unknown) {
-      handleRouteError(
-        error instanceof Error ? error : String(error),
-        res,
-        "Failed to send verification email"
-      );
+      handleRouteError(error, res, "Failed to send verification email");
     }
   }
 );
@@ -293,11 +285,7 @@ router.post(
         message: "If this email exists, a reset link has been sent",
       });
     } catch (error: unknown) {
-      handleRouteError(
-        error instanceof Error ? error : String(error),
-        res,
-        "Failed to process password reset request"
-      );
+      handleRouteError(error, res, "Failed to process password reset request");
     }
   }
 );
@@ -374,11 +362,7 @@ router.post(
       });
     } catch (error: unknown) {
       console.error("❌ Password reset failed:", error);
-      handleRouteError(
-        error instanceof Error ? error : String(error),
-        res,
-        "Failed to reset password"
-      );
+      handleRouteError(error, res, "Failed to reset password");
     }
   }
 );

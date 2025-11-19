@@ -42,11 +42,7 @@ const createPaymentSession: CreatePaymentSessionHandler = async (req, res) => {
 
     res.json(response);
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to create payment session"
-    );
+    handleRouteError(error, res, "Failed to create payment session");
   }
 };
 
@@ -199,11 +195,7 @@ const paymentWebhook = async (req: Request, res: Response) => {
       res.status(500).json({ received: true, synced: false, error: errorMessage });
     }
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to process payment webhook"
-    );
+    handleRouteError(error, res, "Failed to process payment webhook");
   }
 };
 

@@ -1,15 +1,11 @@
 import { createLazyComponent } from "@/utils/lazyLoading";
 import { Loader2, Music, Play } from "lucide-react";
-import { ComponentType, Suspense } from "react";
-
+import { Suspense } from "react";
 /**
  * Lazy Audio Components - Code splitting for heavy audio-related components
  *
  * These components contain heavy audio libraries like WaveSurfer.js and should be
  * loaded only when needed to improve initial bundle size and loading performance.
- *
- * Note: Non-component utilities (useAudioComponentPreloader, audioLibraryPreloader)
- * have been moved to @/utils/audioPreloader to maintain Fast Refresh compatibility.
  */
 
 // Loading fallback for audio components
@@ -38,8 +34,8 @@ const AudioLoadingFallback = ({
 // Lazy load heavy audio components
 const WaveformAudioPlayer = createLazyComponent(
   () =>
-    import("@/components/audio/WaveformAudioPlayer").then(m => ({
-      default: m.WaveformAudioPlayer as unknown as ComponentType<unknown>,
+    import("@/components/audio/WaveformAudioPlayer").then(module => ({
+      default: module.WaveformAudioPlayer,
     })),
   {
     preloadDelay: 3000,
@@ -49,16 +45,16 @@ const WaveformAudioPlayer = createLazyComponent(
 
 const EnhancedWaveformPlayer = createLazyComponent(
   () =>
-    import("@/components/audio/EnhancedWaveformPlayer").then(m => ({
-      default: m.EnhancedWaveformPlayer as unknown as ComponentType<unknown>,
+    import("@/components/audio/EnhancedWaveformPlayer").then(module => ({
+      default: module.EnhancedWaveformPlayer,
     })),
   { preloadDelay: 5000, retryOnError: true }
 );
 
 const SonaarAudioPlayer = createLazyComponent(
   () =>
-    import("@/components/audio/SonaarAudioPlayer").then(m => ({
-      default: m.SonaarAudioPlayer as unknown as ComponentType<unknown>,
+    import("@/components/audio/SonaarAudioPlayer").then(module => ({
+      default: module.SonaarAudioPlayer,
     })),
   {
     preloadDelay: 4000,
@@ -68,8 +64,8 @@ const SonaarAudioPlayer = createLazyComponent(
 
 const SimpleAudioPlayer = createLazyComponent(
   () =>
-    import("@/components/audio/SimpleAudioPlayer").then(m => ({
-      default: m.SimpleAudioPlayer as unknown as ComponentType<unknown>,
+    import("@/components/audio/SimpleAudioPlayer").then(module => ({
+      default: module.SimpleAudioPlayer,
     })),
   {
     preloadOnHover: true,
@@ -80,8 +76,8 @@ const SimpleAudioPlayer = createLazyComponent(
 // Enhanced Global Audio Player with lazy loading
 const EnhancedGlobalAudioPlayer = createLazyComponent(
   () =>
-    import("@/components/audio/EnhancedGlobalAudioPlayer").then(m => ({
-      default: m.EnhancedGlobalAudioPlayer as unknown as ComponentType<unknown>,
+    import("@/components/audio/EnhancedGlobalAudioPlayer").then(module => ({
+      default: module.EnhancedGlobalAudioPlayer,
     })),
   { preloadDelay: 2000, retryOnError: true }
 );
@@ -128,11 +124,10 @@ interface SonaarAudioPlayerProps {
 /**
  * Wrapper component for lazy-loaded waveform player
  */
-export function LazyWaveformPlayer(props: Readonly<WaveformAudioPlayerProps>) {
-  const Component = WaveformAudioPlayer as ComponentType<WaveformAudioPlayerProps>;
+export function LazyWaveformPlayer(props: WaveformAudioPlayerProps) {
   return (
     <Suspense fallback={<AudioLoadingFallback type="waveform" />}>
-      <Component {...props} />
+      <WaveformAudioPlayer {...props} />
     </Suspense>
   );
 }
@@ -140,11 +135,10 @@ export function LazyWaveformPlayer(props: Readonly<WaveformAudioPlayerProps>) {
 /**
  * Wrapper component for lazy-loaded enhanced waveform player
  */
-export function LazyEnhancedWaveformPlayer(props: Readonly<EnhancedWaveformPlayerProps>) {
-  const Component = EnhancedWaveformPlayer as ComponentType<EnhancedWaveformPlayerProps>;
+export function LazyEnhancedWaveformPlayer(props: EnhancedWaveformPlayerProps) {
   return (
     <Suspense fallback={<AudioLoadingFallback type="waveform" />}>
-      <Component {...props} />
+      <EnhancedWaveformPlayer {...props} />
     </Suspense>
   );
 }
@@ -152,11 +146,10 @@ export function LazyEnhancedWaveformPlayer(props: Readonly<EnhancedWaveformPlaye
 /**
  * Wrapper component for lazy-loaded Sonaar audio player
  */
-export function LazySonaarAudioPlayer(props: Readonly<SonaarAudioPlayerProps>) {
-  const Component = SonaarAudioPlayer as ComponentType<SonaarAudioPlayerProps>;
+export function LazySonaarAudioPlayer(props: SonaarAudioPlayerProps) {
   return (
     <Suspense fallback={<AudioLoadingFallback type="player" />}>
-      <Component {...props} />
+      <SonaarAudioPlayer {...props} />
     </Suspense>
   );
 }
@@ -182,3 +175,116 @@ export function LazyGlobalAudioPlayer() {
     </Suspense>
   );
 }
+
+/**
+ * Audio component preloader - preloads audio components based on user behavior
+ */
+export function useAudioComponentPreloader() {
+  // Preload audio components when user interacts with audio-related elements
+  const preloadAudioComponents = () => {
+    // Preload basic audio player first
+    import("@/components/audio/SimpleAudioPlayer").catch(() => {});
+
+    // Then preload more complex components after a delay
+    setTimeout(() => {
+      import("@/components/audio/WaveformAudioPlayer").catch(() => {});
+    }, 2000);
+
+    setTimeout(() => {
+      import("@/components/audio/EnhancedGlobalAudioPlayer").catch(() => {});
+    }, 4000);
+  };
+
+  // Setup event listeners for audio-related interactions
+  if (typeof window !== "undefined") {
+    const audioTriggers = [
+      "[data-audio-trigger]",
+      ".beat-card",
+      ".audio-player",
+      '[role="button"][aria-label*="play"]',
+    ];
+
+    audioTriggers.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(element => {
+        element.addEventListener("mouseenter", preloadAudioComponents, { once: true });
+        element.addEventListener("focus", preloadAudioComponents, { once: true });
+      });
+    });
+  }
+}
+
+/**
+ * Audio library preloader - preloads WaveSurfer.js and other heavy audio libraries
+ */
+export const audioLibraryPreloader = {
+  preloadWaveSurfer: () => {
+    return import("wavesurfer.js").catch(() => {
+      console.warn("Failed to preload WaveSurfer.js");
+    });
+  },
+
+  preloadOnUserIntent: () => {
+    const events = ["mousedown", "touchstart"];
+    const preload = () => {
+      audioLibraryPreloader.preloadWaveSurfer();
+
+      // Remove listeners after first interaction
+      events.forEach(event => {
+        document.removeEventListener(event, preload);
+      });
+    };
+
+    events.forEach(event => {
+      document.addEventListener(event, preload, { once: true, passive: true });
+    });
+  },
+
+  setupIntersectionObserver: () => {
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const isAudioElement =
+              entry.target.matches("[data-audio-element]") ||
+              entry.target.querySelector("[data-audio-element]");
+
+            if (isAudioElement) {
+              audioLibraryPreloader.preloadWaveSurfer();
+              observer.unobserve(entry.target);
+            }
+          }
+        });
+      },
+      {
+        rootMargin: "100px", // Start loading 100px before audio element is visible
+        threshold: 0.1,
+      }
+    );
+
+    // Observe audio-related elements
+    setTimeout(() => {
+      const audioElements = document.querySelectorAll(
+        "[data-audio-element], .beat-card, .audio-player"
+      );
+      audioElements.forEach(element => {
+        observer.observe(element);
+      });
+    }, 1000);
+
+    return observer;
+  },
+};
+
+// Export all lazy audio components
+export {
+  EnhancedGlobalAudioPlayer,
+  EnhancedWaveformPlayer,
+  SimpleAudioPlayer,
+  SonaarAudioPlayer,
+  WaveformAudioPlayer,
+};

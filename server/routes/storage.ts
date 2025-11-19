@@ -1,8 +1,9 @@
 import { Router } from "express";
 import multer from "multer";
+import { deleteFile, getSignedUrl, STORAGE_BUCKETS, uploadUserFile } from "../lib/storage";
+// import { supabaseAdmin } from '../lib/supabaseAdmin'; // Removed - using Convex for storage
 import { z } from "zod";
 import type { InsertFile } from "../../shared/schema";
-import { STORAGE_BUCKETS, uploadUserFile } from "../lib/storage";
 import { createValidationMiddleware as validateRequest } from "../lib/validation";
 import { downloadRateLimit, uploadRateLimit } from "../middleware/rateLimiter";
 import { handleRouteError } from "../types/routes";
@@ -84,7 +85,7 @@ router.post(
 
       // Validate and save file record to database
       const fileRecord: InsertFile = {
-        user_id: Number.parseInt(userId, 10),
+        user_id: parseInt(userId),
         filename: fileName,
         original_name: req.file.originalname,
         storage_path: path,
@@ -92,14 +93,21 @@ router.post(
         size: req.file.size,
         role: role as "upload" | "deliverable" | "invoice",
         reservation_id: reservation_id || null,
-        order_id: order_id ? Number.parseInt(order_id, 10) : null,
-        owner_id: Number.parseInt(userId, 10),
+        order_id: order_id ? parseInt(order_id) : null,
+        owner_id: parseInt(userId),
       };
 
       const validatedRecord = fileRecord;
 
-      // TODO: Implement file storage with Convex
-      // For now, return a temporary record with generated ID
+      // TODO: Implement with Convex
+      // const { data, error } = await supabaseAdmin
+      //   .from('files')
+      //   .insert(validatedRecord)
+      //   .select()
+      //   .single();
+
+      // if (error) throw error;
+
       const data = { ...validatedRecord, id: Date.now().toString() };
 
       res.json({
@@ -108,7 +116,7 @@ router.post(
         url: fullUrl,
       });
     } catch (error: unknown) {
-      handleRouteError(error instanceof Error ? error : String(error), res, "File upload failed");
+      handleRouteError(error, res, "File upload failed");
     }
   }
 );
@@ -124,20 +132,37 @@ router.get("/signed-url/:fileId", downloadRateLimit, async (req, res): Promise<v
     const { fileId } = req.params;
     const userId = req.user!.id;
 
-    // TODO: Implement file retrieval with Convex
-    // For now, return a not implemented error
-    res.status(501).json({
-      error: "Not implemented",
-      message: "File signed URL generation will be implemented with Convex",
-      fileId,
-      userId,
-    });
+    // TODO: Implement with Convex
+    // const { data: file, error } = await supabaseAdmin
+    //   .from('files')
+    //   .select('*')
+    //   .eq('id', fileId)
+    //   .single();
+
+    // if (error || !file) {
+    //   res.status(404).json({ error: 'File not found' });
+    return;
+    // }
+
+    const file = { id: fileId, owner_id: userId, role: "upload", storage_path: "temp" };
+
+    // Check ownership
+    if (file.owner_id !== userId) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
+
+    // Determine bucket
+    let bucket: string = STORAGE_BUCKETS.USER_UPLOADS;
+    if (file.role === "deliverable") bucket = STORAGE_BUCKETS.DELIVERABLES;
+    if (file.role === "invoice") bucket = STORAGE_BUCKETS.INVOICES;
+
+    // Generate signed URL (expires in 1 hour)
+    const signedUrl = await getSignedUrl(bucket, file.storage_path, 3600);
+
+    res.json({ url: signedUrl });
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to generate signed URL"
-    );
+    handleRouteError(error, res, "Failed to generate signed URL");
   }
 });
 
@@ -151,15 +176,28 @@ router.get("/files", validateRequest(fileFilterValidation), async (req, res): Pr
 
     const userId = req.user!.id;
 
-    const _filters = {
+    const filters = {
       role: req.query.role as string | undefined,
       reservation_id: req.query.reservation_id as string | undefined,
-      order_id: req.query.order_id ? Number.parseInt(req.query.order_id as string, 10) : undefined,
+      order_id: req.query.order_id ? parseInt(req.query.order_id as string) : undefined,
       owner_id: userId,
     };
 
-    // TODO: Implement file listing with Convex
-    // Query files based on filters and return paginated results
+    // TODO: Implement with Convex
+    // let query = supabaseAdmin
+    //   .from('files')
+    //   .select('*')
+    //   .eq('owner_id', userId)
+    //   .order('created_at', { ascending: false });
+
+    // if (filters.role) query = query.eq('role', filters.role);
+    // if (filters.reservation_id) query = query.eq('reservation_id', filters.reservation_id);
+    // if (filters.order_id) query = query.eq('order_id', filters.order_id);
+
+    // const { data: files, error } = await query;
+
+    // if (error) throw error;
+
     const files: Array<{
       id: string;
       filename: string;
@@ -172,7 +210,7 @@ router.get("/files", validateRequest(fileFilterValidation), async (req, res): Pr
 
     res.json({ files });
   } catch (error: unknown) {
-    handleRouteError(error instanceof Error ? error : String(error), res, "Failed to list files");
+    handleRouteError(error, res, "Failed to list files");
   }
 });
 
@@ -187,16 +225,45 @@ router.delete("/files/:fileId", async (req, res): Promise<void> => {
     const { fileId } = req.params;
     const userId = req.user!.id;
 
-    // TODO: Implement file deletion with Convex
-    // For now, return a not implemented error
-    res.status(501).json({
-      error: "Not implemented",
-      message: "File deletion will be implemented with Convex",
-      fileId,
-      userId,
-    });
+    // TODO: Implement with Convex
+    // const { data: file, error: fetchError } = await supabaseAdmin
+    //   .from('files')
+    //   .select('*')
+    //   .eq('id', fileId)
+    //   .single();
+
+    // if (fetchError || !file) {
+    //   res.status(404).json({ error: 'File not found' });
+    return;
+    // }
+
+    const file = { id: fileId, owner_id: userId, role: "upload", storage_path: "temp" };
+
+    // Check ownership
+    if (file.owner_id !== userId) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
+
+    // Determine bucket
+    let bucket: string = STORAGE_BUCKETS.USER_UPLOADS;
+    if (file.role === "deliverable") bucket = STORAGE_BUCKETS.DELIVERABLES;
+    if (file.role === "invoice") bucket = STORAGE_BUCKETS.INVOICES;
+
+    // Delete from storage
+    await deleteFile(bucket, file.storage_path);
+
+    // TODO: Implement with Convex
+    // const { error: deleteError } = await supabaseAdmin
+    //   .from('files')
+    //   .delete()
+    //   .eq('id', fileId);
+
+    // if (deleteError) throw deleteError;
+
+    res.json({ success: true });
   } catch (error: unknown) {
-    handleRouteError(error instanceof Error ? error : String(error), res, "Failed to delete file");
+    handleRouteError(error, res, "Failed to delete file");
   }
 });
 
