@@ -152,7 +152,9 @@ export const chartBundleOptimization = {
    */
   trackChartPerformance: (chartName: string, startTime: number) => {
     const renderTime = performance.now() - startTime;
-    console.log(`Chart ${chartName} rendered in ${renderTime.toFixed(2)}ms`);
+    if (import.meta.env.DEV) {
+      console.log(`Chart ${chartName} rendered in ${renderTime.toFixed(2)}ms`);
+    }
 
     // Track in analytics if available
     if (

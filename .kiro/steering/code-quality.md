@@ -4,6 +4,35 @@ inclusion: always
 
 # Code Quality & Error Prevention
 
+## Mandatory Refactoring Safety Rule
+
+**Before refactoring any configuration or file, ALWAYS preserve the original state and ensure existing functionality remains intact.**
+
+### Refactoring Workflow
+
+1. **Backup** - Read and store the complete original file content before any modifications
+2. **Analyze** - Understand what currently works and identify dependencies
+3. **Plan** - Document what will change and what must remain unchanged
+4. **Modify** - Make incremental changes while preserving working functionality
+5. **Verify** - Test that all existing features still work as expected
+6. **Rollback** - If anything breaks, immediately restore the original state
+
+### Why This Matters
+
+- Prevents breaking production functionality during improvements
+- Maintains system stability during refactoring
+- Allows safe rollback if issues arise
+- Preserves working code while adding new features
+- Reduces risk of introducing regressions
+
+### Critical Rules
+
+- Never remove working code without understanding its purpose
+- Always test existing functionality after refactoring
+- Keep configuration changes backward-compatible when possible
+- Document what was changed and why
+- If unsure about impact, ask before modifying
+
 ## Mandatory Error Fixing Rule
 
 **After creating a new file or writing new lines of code, ALWAYS fix any errors or warnings in the file before proceeding.**

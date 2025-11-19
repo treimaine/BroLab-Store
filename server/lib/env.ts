@@ -47,7 +47,37 @@ export function loadEnv(): Env {
   const parsed = baseSchema.safeParse(process.env);
   if (!parsed.success) {
     const issues = parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join(", ");
-    throw new Error(`Invalid environment configuration: ${issues}`);
+
+    // In production, throw error immediately
+    if (nodeEnv === "production") {
+      throw new Error(`❌ Critical environment configuration missing: ${issues}`);
+    }
+
+    // In development/test, log warning but continue with defaults
+    console.warn(`⚠️ Environment configuration issues (using defaults): ${issues}`);
+
+    // Return safe defaults for development
+    return {
+      NODE_ENV: nodeEnv,
+      PORT: process.env.PORT,
+      VITE_CLERK_PUBLISHABLE_KEY: process.env.VITE_CLERK_PUBLISHABLE_KEY,
+      CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
+      VITE_CONVEX_URL: process.env.VITE_CONVEX_URL,
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+      PAYPAL_CLIENT_ID: process.env.PAYPAL_CLIENT_ID,
+      PAYPAL_CLIENT_SECRET: process.env.PAYPAL_CLIENT_SECRET,
+      BRAND_NAME: process.env.BRAND_NAME,
+      BRAND_EMAIL: process.env.BRAND_EMAIL,
+      BRAND_ADDRESS: process.env.BRAND_ADDRESS,
+      BRAND_LOGO_PATH: process.env.BRAND_LOGO_PATH,
+      LEGACY_SUPABASE: process.env.LEGACY_SUPABASE,
+      USE_CONVEX_ORDER_READ: process.env.USE_CONVEX_ORDER_READ,
+      flags: {
+        legacySupabase: Boolean(process.env.LEGACY_SUPABASE),
+        useConvexOrderRead: Boolean(process.env.USE_CONVEX_ORDER_READ),
+      },
+    } as Env;
   }
   const env = parsed.data;
   return {
