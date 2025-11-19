@@ -15,7 +15,11 @@ router.get("/", async (_req, res) => {
     ];
     res.json(categories);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to fetch categories");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to fetch categories"
+    );
   }
 });
 

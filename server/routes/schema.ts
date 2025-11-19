@@ -149,7 +149,11 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
     res.setHeader("Cache-Control", "public, max-age=3600"); // Cache 1 heure
     res.send(schemaMarkup);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to generate beat schema markup");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to generate beat schema markup"
+    );
   }
 });
 
@@ -197,7 +201,11 @@ router.get("/beats-list", async (req, res): Promise<void> => {
     res.setHeader("Cache-Control", "public, max-age=1800"); // Cache 30 minutes
     res.send(schemaMarkup);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to generate beats list schema markup");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to generate beats list schema markup"
+    );
   }
 });
 
@@ -214,7 +222,11 @@ router.get("/organization", async (req, res): Promise<void> => {
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache 24 heures
     res.send(schemaMarkup);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to generate organization schema markup");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to generate organization schema markup"
+    );
   }
 });
 

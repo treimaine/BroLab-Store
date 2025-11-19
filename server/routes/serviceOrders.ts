@@ -17,7 +17,7 @@ router.post(
     try {
       const data = req.body; // Already validated by middleware
       const userId = (req as { user?: { id: string } }).user?.id || req.session?.userId;
-      const numericUserId = typeof userId === "string" ? parseInt(userId, 10) : userId;
+      const numericUserId = typeof userId === "string" ? Number.parseInt(userId, 10) : userId;
       if (typeof numericUserId !== "number" || Number.isNaN(numericUserId)) {
         res.status(401).json({ error: "Authentication required" });
         return;
@@ -25,7 +25,11 @@ router.post(
       const order = await createServiceOrder({ ...data, user_id: numericUserId });
       res.status(201).json(order);
     } catch (error: unknown) {
-      handleRouteError(error, res, "Failed to create service order");
+      handleRouteError(
+        error instanceof Error ? error : String(error),
+        res,
+        "Failed to create service order"
+      );
     }
   }
 );
@@ -34,7 +38,7 @@ router.post(
 router.get("/", isAuthenticated, async (req, res): Promise<void> => {
   try {
     const userId = (req as { user?: { id: string } }).user?.id || req.session?.userId;
-    const numericUserId = typeof userId === "string" ? parseInt(userId, 10) : userId;
+    const numericUserId = typeof userId === "string" ? Number.parseInt(userId, 10) : userId;
     if (typeof numericUserId !== "number" || Number.isNaN(numericUserId)) {
       res.status(401).json({ error: "Authentication required" });
       return;
@@ -42,7 +46,11 @@ router.get("/", isAuthenticated, async (req, res): Promise<void> => {
     const orders = await listServiceOrders(numericUserId);
     res.json(orders);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to list service orders");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to list service orders"
+    );
   }
 });
 

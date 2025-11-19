@@ -66,7 +66,11 @@ router.post(
 
       res.json({ success: true, message: "Status update email sent successfully" });
     } catch (error: unknown) {
-      handleRouteError(error, res, "Failed to send reservation status update email");
+      handleRouteError(
+        error instanceof Error ? error : String(error),
+        res,
+        "Failed to send reservation status update email"
+      );
     }
   }
 );
@@ -109,7 +113,11 @@ router.post(
 
       res.json({ success: true, message: "Admin notification sent successfully" });
     } catch (error: unknown) {
-      handleRouteError(error, res, "Failed to send admin notification");
+      handleRouteError(
+        error instanceof Error ? error : String(error),
+        res,
+        "Failed to send admin notification"
+      );
     }
   }
 );
@@ -129,16 +137,27 @@ router.post(
         return;
       }
 
-      const reservationData: ReservationEmailData[] = reservations.map((r: any) => ({
-        id: r.id,
-        serviceType: r.serviceType,
-        preferredDate: r.preferredDate,
-        durationMinutes: r.durationMinutes,
-        totalPrice: r.totalPrice,
-        status: r.status,
-        notes: r.notes,
-        details: r.details,
-      }));
+      const reservationData: ReservationEmailData[] = reservations.map(
+        (r: {
+          id: string;
+          serviceType: string;
+          preferredDate: string;
+          durationMinutes: number;
+          totalPrice: number;
+          status: string;
+          notes?: string;
+          details: Record<string, unknown>;
+        }) => ({
+          id: r.id,
+          serviceType: r.serviceType,
+          preferredDate: r.preferredDate,
+          durationMinutes: r.durationMinutes,
+          totalPrice: r.totalPrice,
+          status: r.status,
+          notes: r.notes,
+          details: r.details,
+        })
+      );
 
       const paymentData = {
         amount: payment.amount,
@@ -152,7 +171,11 @@ router.post(
 
       res.json({ success: true, message: "Payment confirmation email sent successfully" });
     } catch (error: unknown) {
-      handleRouteError(error, res, "Failed to send payment confirmation email");
+      handleRouteError(
+        error instanceof Error ? error : String(error),
+        res,
+        "Failed to send payment confirmation email"
+      );
     }
   }
 );
@@ -187,7 +210,11 @@ router.post(
 
       res.json({ success: true, message: "Reservation reminder email sent successfully" });
     } catch (error: unknown) {
-      handleRouteError(error, res, "Failed to send reservation reminder email");
+      handleRouteError(
+        error instanceof Error ? error : String(error),
+        res,
+        "Failed to send reservation reminder email"
+      );
     }
   }
 );

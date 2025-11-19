@@ -21,13 +21,19 @@ import { useInteractionPreloader } from "@/hooks/useInteractionPreloader";
 import { bundleOptimization, createLazyComponent } from "@/utils/lazyLoading";
 
 // Layout components - lazy loaded for better performance
-const Footer = createLazyComponent(() =>
-  import("@/components/layout/footer").then(m => ({ default: m.Footer }))
+// Defer non-critical components to mount after main content
+const Footer = createLazyComponent(
+  () => import("@/components/layout/footer").then(m => ({ default: m.Footer })),
+  { preloadDelay: 3000 } // Preload after 3 seconds
 );
-const MobileBottomNav = createLazyComponent(() =>
-  import("@/components/layout/MobileBottomNav").then(m => ({ default: m.MobileBottomNav }))
+const MobileBottomNav = createLazyComponent(
+  () => import("@/components/layout/MobileBottomNav").then(m => ({ default: m.MobileBottomNav })),
+  { preloadDelay: 2000 } // Preload after 2 seconds
 );
-const OfflineIndicator = createLazyComponent(() => import("@/components/loading/OfflineIndicator"));
+const OfflineIndicator = createLazyComponent(
+  () => import("@/components/loading/OfflineIndicator"),
+  { preloadDelay: 5000 } // Preload after 5 seconds - low priority
+);
 
 // Audio player - lazy loaded as it's heavy and not immediately needed
 const EnhancedGlobalAudioPlayer = createLazyComponent(

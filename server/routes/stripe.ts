@@ -191,7 +191,11 @@ router.post("/checkout", async (req, res): Promise<void> => {
 
     res.json({ url: session.url, id: session.id });
   } catch (error: unknown) {
-    handleRouteError(error, res, "Error creating checkout session");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Error creating checkout session"
+    );
   }
 });
 
@@ -222,7 +226,11 @@ const createPaymentIntent = async (req: Request, res: Response) => {
 
     res.json(response);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Error creating payment intent");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Error creating payment intent"
+    );
   }
 };
 
@@ -244,7 +252,11 @@ router.get("/payment-intent/:id", async (req, res): Promise<void> => {
       metadata: paymentIntent.metadata,
     });
   } catch (error: unknown) {
-    handleRouteError(error, res, "Error retrieving payment intent");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Error retrieving payment intent"
+    );
   }
 });
 

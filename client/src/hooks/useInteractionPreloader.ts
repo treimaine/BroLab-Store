@@ -12,7 +12,7 @@ export function useInteractionPreloader(): void {
     let interactionCount = 0;
     let debounceTimer: NodeJS.Timeout | null = null;
 
-    const preloadAudioPlayer = (): Promise<{ default: ComponentType<Record<string, unknown>> }> => {
+    const preloadAudioPlayer = (): Promise<{ default: ComponentType<unknown> }> => {
       return import("@/components/audio/EnhancedGlobalAudioPlayer").then(module => ({
         default: module.EnhancedGlobalAudioPlayer,
       }));

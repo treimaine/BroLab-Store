@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { isAuthenticated } from "../auth";
+import { getConvex } from "../lib/convex";
 import { handleRouteError } from "../types/routes";
-// Supabase removed - using Convex for data
 
 const router = Router();
+const convex = getConvex();
 
 // GET /api/activity - Get user's recent activity
 router.get("/", isAuthenticated, async (req, res): Promise<void> => {
@@ -14,31 +15,40 @@ router.get("/", isAuthenticated, async (req, res): Promise<void> => {
       return;
     }
 
-    // TODO: Implement with Convex
-    // For now, return empty activity list
-    const recentActivity: Array<{
-      id: string;
-      type: string;
-      description: string;
-      timestamp: string;
-      metadata?: Record<string, unknown>;
-    }> = [];
+    // Fetch recent activity from Convex
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const activities = (await (convex.query as any)("activity/getRecent", {})) as Array<{
+      _id: string;
+      action: string;
+      details?: Record<string, unknown>;
+      timestamp: number;
+    }>;
+
+    // Format activities for response
+    const recentActivity = activities.map(activity => ({
+      id: activity._id,
+      type: activity.action,
+      description: activity.details?.description || activity.action,
+      timestamp: new Date(activity.timestamp).toISOString(),
+      metadata: activity.details,
+    }));
 
     console.log("🔧 Activity API Debug:", {
       userId,
-      downloadsCount: 0,
-      ordersCount: 0,
-      activitiesCount: 0,
-      message: "Using Convex for data - TODO: implement",
+      activitiesCount: recentActivity.length,
+      message: "Activity data fetched from Convex",
     });
 
     res.json({
       success: true,
       activities: recentActivity,
-      message: "Activity data will be available via Convex",
     });
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to fetch activity");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to fetch activity"
+    );
   }
 });
 
