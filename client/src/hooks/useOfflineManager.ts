@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * Hook to detect online/offline status
@@ -7,30 +7,41 @@ export function useOfflineManager() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = (): void => setIsOnline(true);
+    const handleOffline = (): void => setIsOnline(false);
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    globalThis.addEventListener("online", handleOnline);
+    globalThis.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      globalThis.removeEventListener("online", handleOnline);
+      globalThis.removeEventListener("offline", handleOffline);
     };
   }, []);
 
-  return {
-    isOnline,
-    isOffline: !isOnline,
-    getOperationStats: () => ({
+  const getOperationStats = useCallback(
+    () => ({
       total: 0,
       pending: 0,
       syncing: 0,
       completed: 0,
       failed: 0,
     }),
-    getPendingUpdates: () => [],
-    syncNow: async () => {},
-    clearCompleted: () => {},
+    []
+  );
+
+  const getPendingUpdates = useCallback(() => [], []);
+
+  const syncNow = useCallback(async () => {}, []);
+
+  const clearCompleted = useCallback(() => {}, []);
+
+  return {
+    isOnline,
+    isOffline: !isOnline,
+    getOperationStats,
+    getPendingUpdates,
+    syncNow,
+    clearCompleted,
   };
 }

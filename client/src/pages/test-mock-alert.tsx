@@ -9,9 +9,9 @@ import { MockDataAlert } from "@/components/alerts/MockDataAlert";
 import { FixedAlert } from "@/components/layout/FixedAlert";
 import { MainContent } from "@/components/layout/MainContent";
 import { Button } from "@/components/ui/button";
-import React, { useState } from "react";
+import { useState } from "react";
 
-const TestMockAlertPage: React.FC = () => {
+export default function TestMockAlertPage() {
   const [showAlert, setShowAlert] = useState(true);
 
   // Mock data indicators for testing
@@ -151,6 +151,4 @@ const TestMockAlertPage: React.FC = () => {
       </div>
     </MainContent>
   );
-};
-
-export default TestMockAlertPage;
+}

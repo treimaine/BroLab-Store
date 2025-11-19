@@ -9,28 +9,80 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
+import type { BeatProduct } from "@shared/schema";
 import { Eye, Info, Music, TrendingUp } from "lucide-react";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
+
+// Loading skeleton component - extracted to avoid re-creation on each render
+interface LoadingSkeletonProps {
+  readonly count?: number;
+  readonly className?: string;
+}
+
+function LoadingSkeleton({ count = 3, className = "" }: LoadingSkeletonProps) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={`skeleton-${i}`} className={`card-dark p-6 animate-pulse ${className}`}>
+          <div className="w-full h-48 bg-[var(--medium-gray)] rounded-lg mb-4" />
+          <div className="h-4 bg-[var(--medium-gray)] rounded mb-2" />
+          <div className="h-3 bg-[var(--medium-gray)] rounded w-2/3" />
+        </div>
+      ))}
+    </>
+  );
+}
+
+// Helper function to check if a beat has real audio
+function hasRealAudio(beat: BeatProduct): boolean {
+  const audioUrl = beat.audio_url || beat.meta_data?.find(meta => meta.key === "audio_url")?.value;
+
+  return Boolean(audioUrl && audioUrl !== "/api/placeholder/audio.mp3");
+}
+
+// Helper function to get genre from beat
+function getBeatGenre(beat: BeatProduct): string {
+  return (
+    beat.categories?.[0]?.name ||
+    beat.categories?.find(cat => cat.name)?.name ||
+    String(beat.meta_data?.find(meta => meta.key === "genre")?.value ?? "") ||
+    String(beat.meta_data?.find(meta => meta.key === "category")?.value ?? "") ||
+    String(beat.meta_data?.find(meta => meta.key === "style")?.value ?? "") ||
+    beat.attributes?.find(attr => attr.name === "Genre")?.options?.[0] ||
+    beat.attributes?.find(attr => attr.name === "Style")?.options?.[0] ||
+    ""
+  );
+}
+
+// Helper function to check if beat is free
+function isBeatFree(beat: BeatProduct): boolean {
+  const priceValue = typeof beat.price === "string" ? Number.parseFloat(beat.price) : beat.price;
+
+  return (
+    beat.is_free ||
+    beat.tags?.some(tag => (typeof tag === "string" ? tag : tag.name).toLowerCase() === "free") ||
+    priceValue === 0 ||
+    false
+  );
+}
 
 export default function Home() {
   useScrollToTop();
   const { useProducts } = useWooCommerce();
 
-  // État local pour éviter les suspensions synchrones
-  const [localBeats, setLocalBeats] = useState<any[]>([]);
+  // Local state to avoid synchronous suspensions
+  const [localBeats, setLocalBeats] = useState<BeatProduct[]>([]);
   const [localIsLoading, setLocalIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
 
-  // Utiliser useMemo pour éviter les recalculs inutiles
+  // Use useMemo to avoid unnecessary recalculations
   const { data: beats, isLoading, error } = useProducts();
 
-  // Synchroniser les données avec startTransition de manière plus sûre
+  // Synchronize data with startTransition in a safer way
   useEffect(() => {
     if (error) {
       console.warn("Error loading products:", error);
       startTransition(() => {
-        setHasError(true);
         setLocalIsLoading(false);
       });
       return;
@@ -39,23 +91,11 @@ export default function Home() {
     startTransition(() => {
       setLocalBeats(beats || []);
       setLocalIsLoading(isLoading);
-      setHasError(false);
     });
   }, [beats, isLoading, error]);
 
-  // Fonction pour vérifier si un produit a de l'audio réel
-  const hasRealAudio = useMemo(
-    () => (beat: any) => {
-      const audioUrl =
-        beat.audio_url || beat.meta_data?.find((meta: any) => meta.key === "audio_url")?.value;
-
-      return audioUrl && audioUrl !== "/api/placeholder/audio.mp3";
-    },
-    []
-  );
-
-  // Get featured and trending beats avec useMemo
-  const { featuredBeats, trendingBeats, trendingDisplayBeats } = useMemo(() => {
+  // Get featured and trending beats with useMemo
+  const { featuredBeats, trendingDisplayBeats } = useMemo(() => {
     const featured = localBeats?.slice(0, 3) || [];
     const trending = localBeats?.slice(3, 9) || [];
     const remaining = localBeats?.slice(9, 15) || [];
@@ -63,29 +103,9 @@ export default function Home() {
 
     return {
       featuredBeats: featured,
-      trendingBeats: trending,
       trendingDisplayBeats: trendingDisplay,
     };
   }, [localBeats]);
-
-  // Composant de chargement optimisé
-  const LoadingSkeleton = ({
-    count = 3,
-    className = "",
-  }: {
-    count?: number;
-    className?: string;
-  }) => (
-    <>
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className={`card-dark p-6 animate-pulse ${className}`}>
-          <div className="w-full h-48 bg-[var(--medium-gray)] rounded-lg mb-4" />
-          <div className="h-4 bg-[var(--medium-gray)] rounded mb-2" />
-          <div className="h-3 bg-[var(--medium-gray)] rounded w-2/3" />
-        </div>
-      ))}
-    </>
-  );
 
   return (
     <div className="min-h-screen bg-[var(--deep-black)]">
@@ -103,7 +123,7 @@ export default function Home() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center">
             <h1 className="text-5xl lg:text-7xl font-bold text-white mb-6 leading-tight">
-              Independency by
+              Independency by{" "}
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent-purple)] to-[var(--accent-cyan)]">
                 You For You
               </span>
@@ -150,7 +170,7 @@ export default function Home() {
             {localIsLoading || !localBeats || localBeats.length === 0 ? (
               <LoadingSkeleton count={3} />
             ) : (
-              featuredBeats.map((beat: any) => (
+              featuredBeats.map(beat => (
                 <Card
                   key={beat.id}
                   className="bg-[var(--dark-gray)] border-[var(--medium-gray)] overflow-hidden hover:border-[var(--accent-purple)] transition-all duration-300 group"
@@ -159,7 +179,7 @@ export default function Home() {
                     <div className="relative">
                       <img
                         src={beat.images?.[0]?.src || "/api/placeholder/400/250"}
-                        alt={beat.name}
+                        alt={beat.name || beat.title}
                         className="w-full h-48 object-cover"
                       />
                       {hasRealAudio(beat) && (
@@ -167,13 +187,14 @@ export default function Home() {
                           <HoverPlayButton
                             audioUrl={
                               beat.audio_url ||
-                              beat.meta_data?.find((meta: any) => meta.key === "audio_url")
-                                ?.value ||
+                              String(
+                                beat.meta_data?.find(meta => meta.key === "audio_url")?.value ?? ""
+                              ) ||
                               "/api/placeholder/audio.mp3"
                             }
                             productId={beat.id.toString()}
-                            productName={beat.name}
-                            imageUrl={beat.images?.[0]?.src || beat.image_url || beat.image}
+                            productName={beat.name || beat.title}
+                            imageUrl={beat.images?.[0]?.src || beat.image_url || beat.image || ""}
                             size="lg"
                           />
                         </div>
@@ -183,35 +204,17 @@ export default function Home() {
                       </Badge>
                     </div>
                     <div className="p-6">
-                      <h3 className="text-xl font-bold text-white mb-2">{beat.name}</h3>
-                      <p className="text-gray-400 mb-4">
-                        {beat.categories?.[0]?.name ||
-                          beat.categories?.find((cat: any) => cat.name)?.name ||
-                          beat.meta_data?.find((meta: any) => meta.key === "genre")?.value ||
-                          beat.meta_data?.find((meta: any) => meta.key === "category")?.value ||
-                          beat.meta_data?.find((meta: any) => meta.key === "style")?.value ||
-                          beat.attributes?.find((attr: any) => attr.name === "Genre")
-                            ?.options?.[0] ||
-                          beat.attributes?.find((attr: any) => attr.name === "Style")
-                            ?.options?.[0] ||
-                          ""}
-                      </p>
+                      <h3 className="text-xl font-bold text-white mb-2">
+                        {beat.name || beat.title}
+                      </h3>
+                      <p className="text-gray-400 mb-4">{getBeatGenre(beat)}</p>
                       <div className="flex items-center justify-between">
                         <span className="text-2xl font-bold text-[var(--accent-purple)]">
-                          {(() => {
-                            const isFree =
-                              beat.is_free ||
-                              beat.tags?.some((tag: any) => tag.name.toLowerCase() === "free") ||
-                              beat.price === 0 ||
-                              beat.price === "0" ||
-                              parseFloat(beat.price) === 0 ||
-                              false;
-                            return isFree ? (
-                              <span className="text-[var(--accent-cyan)]">FREE</span>
-                            ) : (
-                              `$${beat.price || "29.99"}`
-                            );
-                          })()}
+                          {isBeatFree(beat) ? (
+                            <span className="text-[var(--accent-cyan)]">FREE</span>
+                          ) : (
+                            `$${beat.price || "29.99"}`
+                          )}
                         </span>
                         <Link href={`/product/${beat.id}`}>
                           <Button
@@ -231,13 +234,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* Recently Viewed Beats */}
-      {/* <section className="py-20 bg-[var(--deep-black)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <RecentlyViewedBeats maxDisplay={6} />
-        </div>
-      </section> */}
 
       {/* Social Proof Strip */}
       <SocialProofStrip />
@@ -269,8 +265,8 @@ export default function Home() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {localIsLoading
-              ? Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="card-dark p-4 animate-pulse">
+              ? Array.from({ length: 6 }, (_, i) => (
+                <div key={`trending-skeleton-${i}`} className="card-dark p-4 animate-pulse">
                   <div className="flex items-center space-x-4">
                     <div className="w-16 h-16 bg-gray-700/50 rounded-lg" />
                     <div className="flex-1">
@@ -280,7 +276,7 @@ export default function Home() {
                   </div>
                 </div>
                 ))
-              : trendingDisplayBeats.map((beat: any, index: number) => (
+              : trendingDisplayBeats.map(beat => (
                 <Card
                   key={beat.id}
                   className="bg-[var(--dark-gray)] border-[var(--medium-gray)] hover:border-[var(--accent-purple)] transition-all duration-300 group"
@@ -290,7 +286,7 @@ export default function Home() {
                       <div className="relative">
                         <img
                           src={beat.images?.[0]?.src || "/api/placeholder/64/64"}
-                          alt={beat.name}
+                          alt={beat.name || beat.title}
                           className="w-16 h-16 rounded-lg object-cover"
                         />
                         {hasRealAudio(beat) && (
@@ -298,24 +294,19 @@ export default function Home() {
                           <HoverPlayButton
                             audioUrl={
                                   beat.audio_url ||
-                                  beat.meta_data?.find((meta: any) => meta.key === "audio_url")
-                                    ?.value ||
+                                  String(
+                                    beat.meta_data?.find(meta => meta.key === "audio_url")?.value ??
+                                      ""
+                                  ) ||
                                   "/api/placeholder/audio.mp3"
                                 }
                             productId={beat.id.toString()}
-                            productName={beat.name}
-                            imageUrl={beat.images?.[0]?.src || beat.image_url || beat.image}
-                            price={beat.price}
-                            isFree={
-                                  beat.is_free ||
-                                  beat.tags?.some(
-                                    (tag: any) => tag.name.toLowerCase() === "free"
-                                  ) ||
-                                  beat.price === 0 ||
-                                  beat.price === "0" ||
-                                  parseFloat(beat.price) === 0 ||
-                                  false
+                            productName={beat.name || beat.title}
+                            imageUrl={
+                                  beat.images?.[0]?.src || beat.image_url || beat.image || ""
                                 }
+                            price={beat.price}
+                            isFree={isBeatFree(beat)}
                             size="sm"
                             className="bg-black bg-opacity-60 hover:bg-[var(--accent-purple)]"
                           />
@@ -323,37 +314,17 @@ export default function Home() {
                           )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-white truncate">{beat.name}</h4>
-                        <p className="text-sm text-gray-400">
-                          {beat.categories?.[0]?.name ||
-                              beat.categories?.find((cat: any) => cat.name)?.name ||
-                              beat.meta_data?.find((meta: any) => meta.key === "genre")?.value ||
-                              beat.meta_data?.find((meta: any) => meta.key === "category")?.value ||
-                              beat.meta_data?.find((meta: any) => meta.key === "style")?.value ||
-                              beat.attributes?.find((attr: any) => attr.name === "Genre")
-                                ?.options?.[0] ||
-                              beat.attributes?.find((attr: any) => attr.name === "Style")
-                                ?.options?.[0] ||
-                              ""}
-                        </p>
+                        <h4 className="font-bold text-white truncate">
+                          {beat.name || beat.title}
+                        </h4>
+                        <p className="text-sm text-gray-400">{getBeatGenre(beat)}</p>
                         <div className="flex items-center justify-between mt-2">
                           <span className="text-[var(--accent-purple)] font-bold">
-                            {(() => {
-                                const isFree =
-                                  beat.is_free ||
-                                  beat.tags?.some(
-                                    (tag: any) => tag.name.toLowerCase() === "free"
-                                  ) ||
-                                  beat.price === 0 ||
-                                  beat.price === "0" ||
-                                  parseFloat(beat.price) === 0 ||
-                                  false;
-                                return isFree ? (
-                                  <span className="text-[var(--accent-cyan)]">FREE</span>
-                                ) : (
-                                  `$${beat.price || "29.99"}`
-                                );
-                              })()}
+                            {isBeatFree(beat) ? (
+                              <span className="text-[var(--accent-cyan)]">FREE</span>
+                              ) : (
+                                `$${beat.price || "29.99"}`
+                              )}
                           </span>
                           <div className="flex items-center text-xs text-gray-400">
                             <Eye className="w-3 h-3 mr-1" />
@@ -368,6 +339,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-[var(--accent-purple)] to-[var(--accent-cyan)]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
