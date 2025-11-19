@@ -130,7 +130,9 @@ export const useConfigStore = create<ConfigState & ConfigActions>(set => ({
         error: null,
       });
 
-      console.log("Configuration refreshed successfully");
+      if (import.meta.env.DEV) {
+        console.log("Configuration refreshed successfully");
+      }
     } catch (error) {
       const errorInstance = error instanceof Error ? error : new Error("Unknown error");
       console.error("Failed to refresh configuration:", errorInstance);

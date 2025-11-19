@@ -9,8 +9,8 @@
  * 5. CDN Cache (Static assets)
  */
 
-import { QueryClient } from "@tanstack/react-query";
 import { cacheManager } from "@shared/utils/cache-manager";
+import { QueryClient } from "@tanstack/react-query";
 import { queryClient } from "../lib/queryClient";
 
 // Cache strategy types
@@ -310,7 +310,9 @@ export class CachingStrategyService {
           const cached = await this.getCachedData(key, dataType);
           if (!cached) {
             // In a real implementation, you'd call the actual API
-            console.log(`Preloading ${key} for ${dataType}`);
+            if (import.meta.env.DEV) {
+              console.log(`Preloading ${key} for ${dataType}`);
+            }
           }
         })
       );

@@ -107,13 +107,15 @@ export class ConsistencyChecker {
   ): void {
     if (!this.DEBUG_MODE) return;
 
-    console.group("🔍 Dashboard Data Consistency Validation");
-    console.log("Validating data at:", new Date().toISOString());
-    console.log("Environment:", environment);
-    console.log("Skip time-based validations:", options.skipTimeBasedValidations);
-    console.log("Skip hash validation:", options.skipHashValidation);
-    console.log("Allow test hashes:", options.allowTestHashes);
-    console.log("Data sections:", Object.keys(data));
+    if (import.meta.env.DEV) {
+      console.group("🔍 Dashboard Data Consistency Validation");
+      console.log("Validating data at:", new Date().toISOString());
+      console.log("Environment:", environment);
+      console.log("Skip time-based validations:", options.skipTimeBasedValidations);
+      console.log("Skip hash validation:", options.skipHashValidation);
+      console.log("Allow test hashes:", options.allowTestHashes);
+      console.log("Data sections:", Object.keys(data));
+    }
   }
 
   /**
@@ -123,7 +125,7 @@ export class ConsistencyChecker {
     data: DashboardData,
     skipTimeBasedValidations: boolean
   ): void {
-    if (!this.DEBUG_MODE) return;
+    if (!this.DEBUG_MODE || !import.meta.env.DEV) return;
 
     console.log("📊 Validating stats consistency...");
     console.log("Stats:", data.stats);
@@ -562,7 +564,7 @@ export class ConsistencyChecker {
           actualValue: data.stats.monthlyDownloads,
         });
       }
-    } else if (this.DEBUG_MODE) {
+    } else if (this.DEBUG_MODE && import.meta.env.DEV) {
       console.log("⏭️ Skipping monthly statistics validation (test environment)");
     }
 
@@ -623,7 +625,7 @@ export class ConsistencyChecker {
   private static validateDataFreshness(data: DashboardData, timestamp: number): Inconsistency[] {
     const inconsistencies: Inconsistency[] = [];
 
-    if (this.DEBUG_MODE) {
+    if (this.DEBUG_MODE && import.meta.env.DEV) {
       console.log("⏰ Validating data freshness...");
     }
 
@@ -750,7 +752,7 @@ export class ConsistencyChecker {
     timestamp: number,
     allowTestHashes: boolean = false
   ): Inconsistency[] {
-    if (this.DEBUG_MODE) {
+    if (this.DEBUG_MODE && import.meta.env.DEV) {
       console.log("🔐 Validating hash consistency...");
       console.log("Allow test hashes:", allowTestHashes);
     }
@@ -789,7 +791,7 @@ export class ConsistencyChecker {
       inconsistencies
     );
 
-    if (this.DEBUG_MODE) {
+    if (this.DEBUG_MODE && import.meta.env.DEV) {
       console.log("Section hashes:", sectionHashes);
     }
 
@@ -818,7 +820,7 @@ export class ConsistencyChecker {
     const isTestHash = this.isTestHash(expectedHash);
 
     if (isTestHash && allowTestHashes) {
-      if (this.DEBUG_MODE) {
+      if (this.DEBUG_MODE && import.meta.env.DEV) {
         console.log("✅ Test hash accepted:", expectedHash);
       }
       return;
@@ -868,7 +870,7 @@ export class ConsistencyChecker {
   private static validateDuplicateData(data: DashboardData, timestamp: number): Inconsistency[] {
     const inconsistencies: Inconsistency[] = [];
 
-    if (this.DEBUG_MODE) {
+    if (this.DEBUG_MODE && import.meta.env.DEV) {
       console.log("🔍 Checking for duplicate data...");
     }
 
@@ -956,6 +958,8 @@ export class ConsistencyChecker {
    * Log debug validation results
    */
   private static logDebugValidationResults(result: CrossValidationResult, duration: number): void {
+    if (!import.meta.env.DEV) return;
+
     if (result.consistent) {
       console.log("✅ Data consistency validation passed");
     } else {
@@ -1343,14 +1347,16 @@ export class ConsistencyMonitor {
   ): void {
     if (!this.DEBUG_MODE || inconsistencies.length === 0) return;
 
-    console.group("📝 Recording inconsistencies");
-    console.log(`Timestamp: ${new Date(timestamp).toISOString()}`);
-    console.log(`Count: ${inconsistencies.length}`);
-    console.log(`Data hash: ${dataHash}`);
-    for (const [index, inc] of inconsistencies.entries()) {
-      console.log(`  ${index + 1}. [${inc.severity}] ${inc.type}: ${inc.description}`);
+    if (import.meta.env.DEV) {
+      console.group("📝 Recording inconsistencies");
+      console.log(`Timestamp: ${new Date(timestamp).toISOString()}`);
+      console.log(`Count: ${inconsistencies.length}`);
+      console.log(`Data hash: ${dataHash}`);
+      for (const [index, inc] of inconsistencies.entries()) {
+        console.log(`  ${index + 1}. [${inc.severity}] ${inc.type}: ${inc.description}`);
+      }
+      console.groupEnd();
     }
-    console.groupEnd();
   }
 
   /**
@@ -1363,7 +1369,7 @@ export class ConsistencyMonitor {
       record.resolvedAt = Date.now();
       record.resolutionMethod = resolutionMethod;
 
-      if (this.DEBUG_MODE) {
+      if (this.DEBUG_MODE && import.meta.env.DEV) {
         const resolutionTime = record.resolvedAt - record.timestamp;
         console.log(`✅ Inconsistencies resolved via ${resolutionMethod} in ${resolutionTime}ms`);
       }
@@ -1519,7 +1525,7 @@ export class ConsistencyMonitor {
   static clearHistory(): void {
     this.inconsistencyHistory = [];
 
-    if (this.DEBUG_MODE) {
+    if (this.DEBUG_MODE && import.meta.env.DEV) {
       console.log("🗑️ Inconsistency history cleared");
     }
   }
@@ -1593,7 +1599,7 @@ export class ConsistencyMonitor {
     failed: number;
     errors: string[];
   }): void {
-    if (this.DEBUG_MODE && (result.resolved > 0 || result.failed > 0)) {
+    if (this.DEBUG_MODE && import.meta.env.DEV && (result.resolved > 0 || result.failed > 0)) {
       console.log(
         `🔧 Auto-resolution results: ${result.resolved} resolved, ${result.failed} failed`
       );

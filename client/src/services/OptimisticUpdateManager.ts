@@ -563,7 +563,9 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
   }
 
   private log(message: string, data?: unknown): void {
-    console.log(`[OptimisticUpdateManager] ${message}`, data || "");
+    if (import.meta.env.DEV) {
+      console.log(`[OptimisticUpdateManager] ${message}`, data || "");
+    }
   }
 }
 

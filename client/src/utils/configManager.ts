@@ -74,7 +74,9 @@ class ConfigurationManager {
         this.notifySubscribers();
       }
 
-      console.log("Configuration updated successfully");
+      if (import.meta.env.DEV) {
+        console.log("Configuration updated successfully");
+      }
       return true;
     } catch (error) {
       console.error("Failed to update configuration:", error);
@@ -118,7 +120,9 @@ class ConfigurationManager {
       this.config = getDashboardConfig();
       this.clearPersistedOverrides();
       this.notifySubscribers();
-      console.log("Configuration reset to defaults");
+      if (import.meta.env.DEV) {
+        console.log("Configuration reset to defaults");
+      }
       return true;
     } catch (error) {
       console.error("Failed to reset configuration:", error);
@@ -151,7 +155,7 @@ class ConfigurationManager {
   isFeatureEnabled(feature: keyof typeof FEATURE_FLAGS): boolean {
     // Check if the feature is in the dashboard config features
     if (feature in this.config.features) {
-      return (this.config.features as any)[feature];
+      return (this.config.features as unknown)[feature];
     }
     // Fall back to the global feature flags
     return FEATURE_FLAGS[feature];
@@ -234,7 +238,9 @@ class ConfigurationManager {
       const overrides = this.getStoredOverrides();
       if (Object.keys(overrides).length > 0) {
         this.updateConfig(overrides, { persist: false, broadcast: false });
-        console.log("Loaded persisted configuration overrides");
+        if (import.meta.env.DEV) {
+          console.log("Loaded persisted configuration overrides");
+        }
       }
     } catch (error) {
       console.error("Failed to load persisted configuration overrides:", error);

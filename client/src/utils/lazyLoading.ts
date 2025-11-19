@@ -142,7 +142,9 @@ export const bundleOptimization = {
 export const lazyLoadingMetrics = {
   trackComponentLoad: (componentName: string, startTime: number) => {
     const loadTime = performance.now() - startTime;
-    console.log(`Component ${componentName} loaded in ${loadTime.toFixed(2)}ms`);
+    if (import.meta.env.DEV) {
+      console.log(`Component ${componentName} loaded in ${loadTime.toFixed(2)}ms`);
+    }
 
     // Track in analytics if available
     if (typeof window !== "undefined" && "gtag" in window && typeof window.gtag === "function") {

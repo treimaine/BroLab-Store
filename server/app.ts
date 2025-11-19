@@ -2,6 +2,15 @@ import express, { Request } from "express";
 import { registerAuthRoutes, setupAuth } from "./auth";
 import { env } from "./lib/env";
 import { logger } from "./lib/logger";
+import {
+  apiRateLimiter,
+  authRateLimiter,
+  bodySizeLimits,
+  compressionMiddleware,
+  downloadRateLimiter,
+  helmetMiddleware,
+  paymentRateLimiter,
+} from "./middleware/security";
 import activityRouter from "./routes/activity";
 import avatarRouter from "./routes/avatar";
 import categoriesRouter from "./routes/categories";
@@ -28,7 +37,13 @@ import wooRouter from "./routes/woo";
 import wpRouter from "./routes/wp";
 
 const app = express();
-app.use(express.json());
+
+// Security middleware - helmet, compression, body-size limits
+app.use(helmetMiddleware);
+app.use(compressionMiddleware);
+app.use(bodySizeLimits);
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
 // Debug structured env log (without secrets)
 logger.info("Server starting", {
@@ -57,38 +72,38 @@ app.use((_req, res, next) => {
   next();
 });
 
-// API Routes
-app.use("/api/activity", activityRouter);
-app.use("/api/avatar", avatarRouter);
-app.use("/api/downloads", downloadsRouter);
-app.use("/api/email", emailRouter);
-app.use("/api/monitoring", monitoringRouter);
-app.use("/api/opengraph", openGraphRouter);
-app.use("/api/orders", ordersRouter);
-app.use("/api/payment/paypal", paypalRouter);
-app.use("/api/payment/stripe", stripeRouter);
-app.use("/api/clerk", clerkRouter);
-app.use("/api/payments", paymentsRouter);
+// API Routes with rate limiting
+app.use("/api/activity", apiRateLimiter, activityRouter);
+app.use("/api/avatar", apiRateLimiter, avatarRouter);
+app.use("/api/downloads", downloadRateLimiter, downloadsRouter);
+app.use("/api/email", authRateLimiter, emailRouter);
+app.use("/api/monitoring", monitoringRouter); // No rate limit for monitoring
+app.use("/api/opengraph", apiRateLimiter, openGraphRouter);
+app.use("/api/orders", apiRateLimiter, ordersRouter);
+app.use("/api/payment/paypal", paymentRateLimiter, paypalRouter);
+app.use("/api/payment/stripe", paymentRateLimiter, stripeRouter);
+app.use("/api/clerk", apiRateLimiter, clerkRouter); // Use general API limiter (1000/15min) for Clerk
+app.use("/api/payments", paymentRateLimiter, paymentsRouter);
 
-// Clerk Billing webhook - handles subscription and invoice events
+// Clerk Billing webhook - handles subscription and invoice events (no rate limit for webhooks)
 app.use("/api/webhooks/clerk-billing", clerkBillingRouter);
 
-app.use("/api/schema", schemaRouter);
-app.use("/api/security", securityRouter);
-app.use("/api/service-orders", serviceOrdersRouter);
-app.use("/api/storage", storageRouter);
-app.use("/api/uploads", uploadsRouter);
-app.use("/api/wishlist", wishlistRouter);
-app.use("/api/woo", wooRouter);
-app.use("/api/wp", wpRouter);
-app.use("/api/sync", syncRouter);
-app.use("/api/categories", categoriesRouter);
-app.use("/api/reservations", reservationsRouter);
+app.use("/api/schema", apiRateLimiter, schemaRouter);
+app.use("/api/security", apiRateLimiter, securityRouter);
+app.use("/api/service-orders", apiRateLimiter, serviceOrdersRouter);
+app.use("/api/storage", apiRateLimiter, storageRouter);
+app.use("/api/uploads", apiRateLimiter, uploadsRouter);
+app.use("/api/wishlist", apiRateLimiter, wishlistRouter);
+app.use("/api/woo", apiRateLimiter, wooRouter);
+app.use("/api/wp", apiRateLimiter, wpRouter);
+app.use("/api/sync", apiRateLimiter, syncRouter);
+app.use("/api/categories", apiRateLimiter, categoriesRouter);
+app.use("/api/reservations", apiRateLimiter, reservationsRouter);
 
 // WordPress and WooCommerce routes
-app.use("/api/products", wooRouter);
-app.use("/api/woo", wooRouter);
-app.use("/api/woocommerce", wooRouter);
+app.use("/api/products", apiRateLimiter, wooRouter);
+app.use("/api/woo", apiRateLimiter, wooRouter);
+app.use("/api/woocommerce", apiRateLimiter, wooRouter);
 
 // Sitemap and other routes
 app.use("/", sitemapRouter);

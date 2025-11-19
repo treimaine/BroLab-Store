@@ -115,7 +115,7 @@ export const measureWebVitals = () => {
   // Measure First Contentful Paint (FCP)
   const observer = new PerformanceObserver(list => {
     for (const entry of list.getEntries()) {
-      if (entry.name === "first-contentful-paint") {
+      if (entry.name === "first-contentful-paint" && import.meta.env.DEV) {
         console.log(`FCP: ${entry.startTime}ms`);
       }
     }
@@ -126,7 +126,9 @@ export const measureWebVitals = () => {
   // Measure Largest Contentful Paint (LCP)
   const lcpObserver = new PerformanceObserver(list => {
     for (const entry of list.getEntries()) {
-      console.log(`LCP: ${entry.startTime}ms`);
+      if (import.meta.env.DEV) {
+        console.log(`LCP: ${entry.startTime}ms`);
+      }
     }
   });
 
@@ -157,7 +159,7 @@ export const isSlowConnection = (): boolean => {
 
 // Bundle size analysis helper
 export const logBundleAnalysis = () => {
-  if (process.env.NODE_ENV === "development") {
+  if (import.meta.env.DEV) {
     console.log("Bundle optimization tips:");
     console.log("- Use React.lazy() for heavy components");
     console.log("- Implement code splitting for routes");

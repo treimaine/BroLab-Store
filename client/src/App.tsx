@@ -204,8 +204,6 @@ function useNewsletterModalLazy() {
 function App() {
   const { isOpen, closeModal } = useNewsletterModalLazy();
 
-  console.log("🎨 App component rendering...");
-
   // Use interaction-based preloading
   useInteractionPreloader();
 
@@ -218,7 +216,11 @@ function App() {
     bundleOptimization.preloadOnUserInteraction();
 
     // Warm cache with critical data
-    warmCache().catch(console.error);
+    warmCache().catch(error => {
+      if (import.meta.env.DEV) {
+        console.error("Cache warming failed:", error);
+      }
+    });
   }, []);
 
   return (

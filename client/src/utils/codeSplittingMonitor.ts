@@ -91,7 +91,9 @@ class CodeSplittingMonitor {
 
   trackChunkLoad(metric: ChunkLoadMetric): void {
     this.metrics.chunksLoaded.push(metric);
-    console.log(`📦 Chunk loaded: ${metric.chunkName} (${metric.loadTime.toFixed(2)}ms)`);
+    if (import.meta.env.DEV) {
+      console.log(`📦 Chunk loaded: ${metric.chunkName} (${metric.loadTime.toFixed(2)}ms)`);
+    }
   }
 
   trackComponentRender(componentName: string, renderTime: number, isLazyLoaded = false): void {
@@ -104,7 +106,7 @@ class CodeSplittingMonitor {
 
     this.metrics.componentsRendered.push(metric);
 
-    if (isLazyLoaded) {
+    if (isLazyLoaded && import.meta.env.DEV) {
       console.log(`🚀 Lazy component rendered: ${componentName} (${renderTime.toFixed(2)}ms)`);
     }
   }
@@ -123,6 +125,8 @@ class CodeSplittingMonitor {
   }
 
   private reportMetrics(): void {
+    if (!import.meta.env.DEV) return;
+
     const metrics = this.getMetrics();
 
     console.group("📊 Code Splitting Performance Report");
