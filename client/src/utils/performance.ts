@@ -10,7 +10,7 @@ export const preloadCriticalResources = () => {
   ];
 
   // Only preload if not already in HTML
-  criticalImages.forEach(({ src, type }) => {
+  for (const { src, type } of criticalImages) {
     // Check if already preloaded in HTML
     const existing = document.querySelector(`link[rel="preload"][href="${src}"]`);
     if (!existing) {
@@ -23,14 +23,14 @@ export const preloadCriticalResources = () => {
       }
       document.head.appendChild(link);
     }
-  });
+  }
 };
 
 // Lazy load images with intersection observer
 export const lazyLoadImages = () => {
-  if ("IntersectionObserver" in window) {
+  if ("IntersectionObserver" in globalThis) {
     const imageObserver = new IntersectionObserver((entries, observer) => {
-      entries.forEach(entry => {
+      for (const entry of entries) {
         if (entry.isIntersecting) {
           const img = entry.target as HTMLImageElement;
           if (img.dataset.src) {
@@ -39,17 +39,17 @@ export const lazyLoadImages = () => {
             observer.unobserve(img);
           }
         }
-      });
+      }
     });
 
-    document.querySelectorAll("img[data-src]").forEach(img => {
+    for (const img of document.querySelectorAll("img[data-src]")) {
       imageObserver.observe(img);
-    });
+    }
   }
 };
 
 // Debounce function for search and scroll events
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: never[]) => unknown>(
   func: T,
   wait: number,
   immediate?: boolean
@@ -71,7 +71,7 @@ export function debounce<T extends (...args: any[]) => any>(
 }
 
 // Throttle function for resize and scroll events
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: never[]) => unknown>(
   func: T,
   limit: number
 ): (...args: Parameters<T>) => void {
@@ -88,7 +88,7 @@ export function throttle<T extends (...args: any[]) => any>(
 
 // Check if user prefers reduced motion
 export const prefersReducedMotion = (): boolean => {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
 };
 
 // Optimize scroll performance
@@ -107,57 +107,60 @@ export const optimizeScrolling = () => {
     }
   };
 
-  window.addEventListener("scroll", requestScrollUpdate, { passive: true });
+  globalThis.addEventListener("scroll", requestScrollUpdate, { passive: true });
 };
 
-// Web Vitals monitoring
+// Web Vitals monitoring (logs only in development)
 export const measureWebVitals = () => {
-  // Measure First Contentful Paint (FCP)
-  const observer = new PerformanceObserver(list => {
-    for (const entry of list.getEntries()) {
-      if (entry.name === "first-contentful-paint") {
-        console.log(`FCP: ${entry.startTime}ms`);
+  if (import.meta.env.DEV) {
+    // Measure First Contentful Paint (FCP)
+    const observer = new PerformanceObserver(list => {
+      for (const entry of list.getEntries()) {
+        if (entry.name === "first-contentful-paint") {
+          console.log(`FCP: ${entry.startTime}ms`);
+        }
       }
-    }
-  });
+    });
 
-  observer.observe({ entryTypes: ["paint"] });
+    observer.observe({ entryTypes: ["paint"] });
 
-  // Measure Largest Contentful Paint (LCP)
-  const lcpObserver = new PerformanceObserver(list => {
-    for (const entry of list.getEntries()) {
-      console.log(`LCP: ${entry.startTime}ms`);
-    }
-  });
+    // Measure Largest Contentful Paint (LCP)
+    const lcpObserver = new PerformanceObserver(list => {
+      for (const entry of list.getEntries()) {
+        console.log(`LCP: ${entry.startTime}ms`);
+      }
+    });
 
-  lcpObserver.observe({ entryTypes: ["largest-contentful-paint"] });
+    lcpObserver.observe({ entryTypes: ["largest-contentful-paint"] });
+  }
 };
 
 // Memory management for audio players
 export const cleanupAudioResources = () => {
   // Clean up any active audio instances
   const audioElements = document.querySelectorAll("audio");
-  audioElements.forEach(audio => {
+  for (const audio of audioElements) {
     if (!audio.paused) {
       audio.pause();
     }
     audio.src = "";
     audio.load();
-  });
+  }
 };
 
 // Network-aware loading
 export const isSlowConnection = (): boolean => {
-  const connection = (navigator as any).connection;
+  const connection = (navigator as Navigator & { connection?: { effectiveType: string } })
+    .connection;
   if (connection) {
     return connection.effectiveType === "slow-2g" || connection.effectiveType === "2g";
   }
   return false;
 };
 
-// Bundle size analysis helper
+// Bundle size analysis helper (development only)
 export const logBundleAnalysis = () => {
-  if (process.env.NODE_ENV === "development") {
+  if (import.meta.env.DEV) {
     console.log("Bundle optimization tips:");
     console.log("- Use React.lazy() for heavy components");
     console.log("- Implement code splitting for routes");

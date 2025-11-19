@@ -3,19 +3,18 @@
  * Shows offline status and pending operations to users
  */
 
-import { AlertCircle, CheckCircle, Clock, RefreshCw, Wifi, WifiOff } from "lucide-react";
-import React, { useEffect, useState } from "react";
 import { useOfflineManager } from "@/hooks/useOfflineManager";
+import { AlertCircle, CheckCircle, Clock, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface OfflineIndicatorProps {
-  className?: string;
-  showDetails?: boolean;
+  readonly className?: string;
+  readonly showDetails?: boolean;
 }
 
-export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
-  className = "",
-  showDetails = false,
-}) => {
+export default function OfflineIndicator(props: unknown = {}) {
+  const typedProps = (props || {}) as OfflineIndicatorProps;
+  const { className = "", showDetails = false } = typedProps;
   const { isOnline, getOperationStats, getPendingUpdates, syncNow, clearCompleted } =
     useOfflineManager();
 
@@ -33,12 +32,10 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
 
   // Update stats periodically
   useEffect(() => {
-    const updateStats = async () => {
+    const updateStats = (): void => {
       try {
-        const [operationStats, updates] = await Promise.all([
-          getOperationStats(),
-          getPendingUpdates(),
-        ]);
+        const operationStats = getOperationStats();
+        const updates = getPendingUpdates();
 
         setStats(operationStats);
         setPendingUpdates(updates.length);
@@ -68,9 +65,9 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
   };
 
   // Handle clear completed
-  const handleClearCompleted = async () => {
+  const handleClearCompleted = (): void => {
     try {
-      await clearCompleted();
+      clearCompleted();
     } catch (error) {
       console.error("Failed to clear completed operations:", error);
     }
@@ -86,7 +83,8 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
   return (
     <div className={`offline-indicator ${className}`}>
       {/* Main indicator */}
-      <div
+      <button
+        type="button"
         className={`
           flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all
           ${
@@ -97,6 +95,9 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
           ${showDetails ? "hover:bg-opacity-30" : ""}
         `}
         onClick={() => showDetails && setIsExpanded(!isExpanded)}
+        disabled={!showDetails}
+        aria-label={`${isOnline ? "Online" : "Offline"} status indicator${showDetails ? ", click to expand details" : ""}`}
+        aria-expanded={showDetails ? isExpanded : undefined}
       >
         {/* Status icon */}
         {isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
@@ -136,7 +137,7 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
 
         {/* Expand indicator */}
         {showDetails && <div className="text-xs opacity-60">{isExpanded ? "▼" : "▶"}</div>}
-      </div>
+      </button>
 
       {/* Detailed view */}
       {showDetails && isExpanded && (
@@ -261,6 +262,4 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
       )}
     </div>
   );
-};
-
-export default OfflineIndicator;
+}

@@ -45,14 +45,7 @@ export {
 } from "../hooks/useDashboardConfig";
 
 // Configuration context
-export {
-  ConfigProvider,
-  useConfig,
-  useConfigContext,
-  useConfigReady,
-  useConfigValidation,
-  withConfig,
-} from "../contexts/ConfigContext";
+export { ConfigProvider } from "../contexts/ConfigContext";
 
 // Configuration management
 export {
@@ -96,7 +89,7 @@ export {
 
 // Type exports
 export type { DashboardConfig } from "@shared/types/dashboard";
-export type { ConfigContextValue, ConfigProviderProps } from "../contexts/ConfigContext";
+export type { ConfigProviderProps } from "../contexts/ConfigContextTypes";
 export type { ConfigSubscriber, ConfigUpdateOptions } from "../utils/configManager";
 export type { ConfigValidationOptions, ValidationResult } from "../utils/configValidator";
 export type { CurrencyFormatterOptions } from "../utils/currency";

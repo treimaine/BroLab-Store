@@ -1,23 +1,111 @@
 import { useCartContext } from "@/components/cart/cart-provider";
 import { EnhancedPaymentForm } from "@/components/payments/EnhancedPaymentForm";
+import { StandardHero } from "@/components/ui/StandardHero";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { StandardHero } from "@/components/ui/StandardHero";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, CheckCircle, CreditCard, ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+
+// ================================
+// TYPES
+// ================================
+
+interface PendingService {
+  clientSecret?: string;
+  service: string;
+  serviceName: string;
+  serviceDetails: string;
+  price: number;
+  quantity: number;
+  reservationId: string;
+}
+
+type PaymentStatus = "idle" | "processing" | "succeeded" | "failed";
+
+// ================================
+// HELPER FUNCTIONS
+// ================================
+
+/**
+ * Get display name for a service type
+ */
+function getServiceDisplayName(service: PendingService): string {
+  if (service.serviceName) {
+    return service.serviceName;
+  }
+
+  const serviceType = service.service;
+
+  switch (serviceType) {
+    case "mixing":
+      return "Professional Mixing";
+    case "mastering":
+      return "Audio Mastering";
+    case "mixing_mastering":
+      return "Mixing + Mastering";
+    case "recording":
+      return "Recording Session";
+    case "consultation":
+      return "Production Consultation";
+    case "custom_beat":
+      return "Custom Beat Production";
+    default:
+      return "Service";
+  }
+}
+
+/**
+ * Calculate total price for services
+ */
+function calculateServicesTotal(services: PendingService[]): number {
+  return services.reduce((sum, service) => sum + (service.price || 0), 0);
+}
+
+/**
+ * Calculate total price for cart items
+ */
+function calculateCartTotal(items: Array<{ price?: number; quantity: number }>): number {
+  return items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+}
+
+/**
+ * Format item count text
+ */
+function formatItemCount(count: number, singular: string): string {
+  return `${count} ${singular}${count > 1 ? "s" : ""}`;
+}
+
+/**
+ * Create order description for payment metadata
+ */
+function createOrderDescription(servicesCount: number, beatsCount: number): string {
+  const parts: string[] = [];
+
+  if (servicesCount > 0) {
+    parts.push(formatItemCount(servicesCount, "service"));
+  }
+
+  if (beatsCount > 0) {
+    parts.push(formatItemCount(beatsCount, "beat"));
+  }
+
+  return `BroLab Purchase - ${parts.join(" ")}`.trim();
+}
+
+// ================================
+// COMPONENT
+// ================================
 
 export default function Checkout() {
   const { cart, clearCart } = useCartContext();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const [pendingServices, setPendingServices] = useState<any[]>([]);
-  const [paymentStatus, setPaymentStatus] = useState<
-    "idle" | "processing" | "succeeded" | "failed"
-  >("idle");
+  const [pendingServices, setPendingServices] = useState<PendingService[]>([]);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("idle");
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isCartReady, setIsCartReady] = useState(false);
 
@@ -37,10 +125,11 @@ export default function Checkout() {
     const storedServices = sessionStorage.getItem("pendingServices");
 
     if (storedServices) {
-      setPendingServices(JSON.parse(storedServices));
+      const services = JSON.parse(storedServices) as PendingService[];
+      setPendingServices(services);
     } else if (storedPayment) {
       // Migration: convert single payment to services array
-      const singleService = JSON.parse(storedPayment);
+      const singleService = JSON.parse(storedPayment) as PendingService;
       setPendingServices([singleService]);
       // Update storage format
       sessionStorage.setItem("pendingServices", JSON.stringify([singleService]));
@@ -53,19 +142,13 @@ export default function Checkout() {
 
   // Calculate total (cumulative: services + cart items)
   const total = useMemo(() => {
-    const cartTotal = cart.items.reduce((sum, item) => {
-      return sum + (item.price || 0) * item.quantity;
-    }, 0);
-
-    const servicesTotal = pendingServices.reduce((sum, service) => {
-      return sum + (service.price || 0);
-    }, 0);
-
+    const cartTotal = calculateCartTotal(cart.items);
+    const servicesTotal = calculateServicesTotal(pendingServices);
     return cartTotal + servicesTotal;
   }, [cart.items, pendingServices]);
 
   // Handle successful payment
-  const handlePaymentSuccess = (paymentData: any) => {
+  const handlePaymentSuccess = (): void => {
     setPaymentStatus("succeeded");
     toast({
       title: "Payment Successful!",
@@ -86,7 +169,7 @@ export default function Checkout() {
   };
 
   // Handle payment error
-  const handlePaymentError = (error: string) => {
+  const handlePaymentError = (error: string): void => {
     setPaymentStatus("failed");
     toast({
       title: "Payment Error",
@@ -137,7 +220,10 @@ export default function Checkout() {
     );
   }
 
-  console.log("✅ Checkout: Rendering checkout page");
+  // Remove production render logging - only log in development
+  if (process.env.NODE_ENV === "development") {
+    console.log("✅ Checkout: Rendering checkout page");
+  }
 
   return (
     <div className="min-h-screen bg-[var(--deep-black)]">
@@ -198,28 +284,13 @@ export default function Checkout() {
 
             <div className="space-y-4 mb-6">
               {/* Display all services */}
-              {pendingServices.map((service, index) => (
+              {pendingServices.map(service => (
                 <div
-                  key={`service-${index}-${service.reservationId}`}
+                  key={`service-${service.reservationId}`}
                   className="flex items-center justify-between p-4 bg-[var(--card-bg)] rounded-lg"
                 >
                   <div className="flex-1">
-                    <h3 className="font-semibold text-white">
-                      {service.serviceName ||
-                        (service.service === "mixing"
-                          ? "Professional Mixing"
-                          : service.service === "mastering"
-                            ? "Audio Mastering"
-                            : service.service === "mixing_mastering"
-                              ? "Mixing + Mastering"
-                              : service.service === "recording"
-                                ? "Recording Session"
-                                : service.service === "consultation"
-                                  ? "Production Consultation"
-                                  : service.service === "custom_beat"
-                                    ? "Custom Beat Production"
-                                    : "Service")}
-                    </h3>
+                    <h3 className="font-semibold text-white">{getServiceDisplayName(service)}</h3>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge variant="secondary" className="bg-purple-500/20 text-purple-300">
                         Service
@@ -240,7 +311,7 @@ export default function Checkout() {
               ))}
 
               {/* Display cart items */}
-              {cart.items.map((item, index) => (
+              {cart.items.map(item => (
                 <div
                   key={`${item.beatId}-${item.licenseType}`}
                   className="flex items-center justify-between p-4 bg-[var(--card-bg)] rounded-lg"
@@ -269,27 +340,12 @@ export default function Checkout() {
               {pendingServices.length > 0 && cart.items.length > 0 && (
                 <>
                   <div className="flex justify-between text-gray-300">
-                    <span>
-                      Services ({pendingServices.length} item{pendingServices.length > 1 ? "s" : ""}
-                      )
-                    </span>
-                    <span>
-                      $
-                      {pendingServices
-                        .reduce((sum, service) => sum + (service.price || 0), 0)
-                        .toFixed(2)}
-                    </span>
+                    <span>Services ({formatItemCount(pendingServices.length, "item")})</span>
+                    <span>${calculateServicesTotal(pendingServices).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-gray-300">
-                    <span>
-                      Beats ({cart.items.length} item{cart.items.length > 1 ? "s" : ""})
-                    </span>
-                    <span>
-                      $
-                      {cart.items
-                        .reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0)
-                        .toFixed(2)}
-                    </span>
+                    <span>Beats ({formatItemCount(cart.items.length, "item")})</span>
+                    <span>${calculateCartTotal(cart.items).toFixed(2)}</span>
                   </div>
                 </>
               )}
@@ -327,16 +383,11 @@ export default function Checkout() {
                 pendingServices={pendingServices}
                 metadata={{
                   services_count: pendingServices.length.toString(),
-                  services_total: pendingServices
-                    .reduce((sum, s) => sum + (s.price || 0), 0)
-                    .toString(),
+                  services_total: calculateServicesTotal(pendingServices).toString(),
                   cart_count: cart.items.length.toString(),
-                  cart_total: cart.items
-                    .reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0)
-                    .toString(),
+                  cart_total: calculateCartTotal(cart.items).toString(),
                   order_total: total.toString(),
-                  description:
-                    `BroLab Purchase - ${pendingServices.length > 0 ? `${pendingServices.length} service(s)` : ""} ${cart.items.length > 0 ? `${cart.items.length} beat(s)` : ""}`.trim(),
+                  description: createOrderDescription(pendingServices.length, cart.items.length),
                 }}
                 onSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}
