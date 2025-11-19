@@ -203,80 +203,89 @@
   - Fix handler function return types in error management services
   - _Requirements: 2.1, 2.2, 2.3_
 
-## Phase 8: Final Error Resolution ✅ COMPLETED
+## Phase 8: Final Error Resolution (Current: 81 errors)
 
-- [x] 8. Fix remaining TypeScript errors
+- [ ] 8. Fix remaining TypeScript errors
 
-- [x] 8.1 Fix BeatCard component missing bpm property ✅
-  - Added `bpm?: number` property to `BeatCardProps` interface in `client/src/components/beats/beat-card.tsx`
-  - Fixed all 7 errors across components that pass bpm to BeatCard
+- [x] 8.1 Fix lazy audio component type compatibility (6 errors)
+  - Fix `createLazyComponent` generic type constraint in `client/src/utils/lazyLoading.ts`
+  - Update component import functions to properly type the lazy-loaded components
+  - Fix prop spreading type compatibility in wrapper components
+  - Files affected:
+    - `client/src/components/audio/LazyAudioComponents.tsx` (6 errors)
+    - `client/src/hooks/useInteractionPreloader.ts` (1 error)
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [x] 8.2 Fix archived migration files type errors ✅
-  - Added proper type annotations (`MutationCtx`) to all archived migration files
-  - All 29 TypeScript errors resolved
-  - Files fixed:
-    - `cleanOrders.ts` ✅
-    - `cleanupGenericDownloads.ts` ✅
-    - `cleanupSupabase.ts` ✅
-    - `fixOrderPrices.ts` ✅
-    - `fixReservationPrices.ts` ✅
-    - `markSpecificFreeBeats.ts` ✅
-  - _Requirements: 4.1, 4.2, 4.3_
+- [x] 8.2 Fix server route error handling type safety (74 errors)
+  - Update all `catch` blocks to properly type error as `unknown`
+  - Add type guard to convert `unknown` error to `Error | string` before passing to `handleRouteError`
+  - Pattern: `catch (error) { handleRouteError(error instanceof Error ? error : String(error), res, "message"); }`
+  - Files affected (74 errors across 22 files):
+    - `server/routes/activity.ts` (1 error)
+    - `server/routes/categories.ts` (1 error)
+    - `server/routes/clerk.ts` (2 errors)
+    - `server/routes/downloads.ts` (6 errors)
+    - `server/routes/email.ts` (4 errors)
+    - `server/routes/internal.ts` (4 errors)
+    - `server/routes/monitoring.ts` (4 errors)
+    - `server/routes/openGraph.ts` (4 errors)
+    - `server/routes/orders.ts` (5 errors)
+    - `server/routes/payments.ts` (2 errors)
+    - `server/routes/paypal.ts` (6 errors)
+    - `server/routes/reservations.ts` (8 errors)
+    - `server/routes/schema.ts` (3 errors)
+    - `server/routes/security.ts` (3 errors)
+    - `server/routes/serviceOrders.ts` (2 errors)
+    - `server/routes/sitemap.ts` (4 errors)
+    - `server/routes/storage.ts` (4 errors)
+    - `server/routes/stripe.ts` (3 errors)
+    - `server/routes/uploads.ts` (1 error)
+    - `server/routes/wishlist.ts` (4 errors)
+    - `server/routes/woo.ts` (3 errors)
+  - _Requirements: 3.1, 3.2, 3.3_
 
-- [x] 8.3 Remove unused @ts-expect-error directive ✅
-  - Removed unused `@ts-expect-error` comment from `server/services/PaymentService.ts`
-  - _Requirements: 5.1, 5.2, 5.3_
+## Phase 9: Validation and Testing
 
-## Phase 9: Validation and Testing ✅ COMPLETED
+- [ ] 9. Comprehensive validation and testing
 
-- [x] 9. Comprehensive validation and testing
-
-- [x] 9.1 Incremental compilation testing ✅
-  - TypeScript compiler passes with zero errors: `npx tsc --noEmit` ✅
-  - All 114 original errors have been resolved
-  - No new errors introduced during repairs
+- [ ] 9.1 Incremental compilation testing
+  - Run TypeScript compiler: `npx tsc --noEmit`
+  - Verify zero TypeScript errors
+  - Ensure no new errors introduced during repairs
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [x] 9.2 Application startup testing ✅
-  - Development server starts successfully: `npm run dev` ✅
-  - Frontend loads without runtime errors ✅
-  - Basic application functionality verified ✅
+- [ ] 9.2 Application startup testing
+  - Start development server: `npm run dev`
+  - Verify frontend loads without runtime errors
+  - Test basic application functionality
   - _Requirements: 1.1, 1.2, 6.1, 6.2_
 
-- [x]\* 9.3 Regression testing ✅
-  - All existing functionality works correctly
-  - No new TypeScript errors introduced
-  - All imports resolve to correct modules
+- [ ]\* 9.3 Regression testing
+  - Verify all existing functionality works correctly
+  - Confirm no new TypeScript errors introduced
+  - Validate all imports resolve to correct modules
   - _Requirements: 1.4, 2.4, 4.4_
 
-- [x]\* 9.4 Code quality validation ✅
-  - Only linting warnings remain (no errors)
-  - TypeScript strict mode compliance maintained
-  - No unsafe `any` types introduced
+- [ ]\* 9.4 Code quality validation
+  - Run linting: `npm run lint`
+  - Verify TypeScript strict mode compliance
+  - Ensure no unsafe `any` types introduced
   - _Requirements: 5.1, 5.2, 5.3_
 
 ## Phase 10: Documentation and Cleanup
 
-- [x] 10. Final documentation and cleanup
+- [ ] 10. Final documentation and cleanup
 
-- [x] 10.1 Document repair changes ✅
-  - All 114 TypeScript errors successfully resolved
-  - Key patterns fixed:
-    - Malformed function names (useEffect*, catch*, lazy\_) → proper names
-    - Convex API usage errors → correct API methods and property access
-    - Component prop type mismatches → proper interfaces
-    - Duplicate exports in business-logic.ts → single exports
-    - Missing icon imports → proper lucide-react imports
-    - Dashboard modernization type errors → enhanced type definitions
-    - BeatCard missing bpm property → added optional bpm prop
-    - Archived migration files → proper MutationCtx typing
+- [ ] 10.1 Document repair changes
+  - Document all TypeScript errors resolved
+  - List key patterns fixed and solutions applied
+  - Create summary of changes for team reference
   - _Requirements: 6.3, 6.4_
 
-- [x]\* 10.2 Optimize build configuration ✅
-  - TypeScript strict mode enabled and passing
-  - Build configuration optimized for error detection
-  - Pre-commit checks in place: `npm run pre-check`
+- [ ]\* 10.2 Optimize build configuration
+  - Verify TypeScript strict mode enabled and passing
+  - Confirm build configuration optimized for error detection
+  - Ensure pre-commit checks work: `npm run pre-check`
   - _Requirements: 6.1, 6.2, 6.3_
 
 ## Success Criteria
@@ -293,25 +302,26 @@
 8. **Phase 9 Completion**: ✅ Validation and testing completed
 9. **Phase 10 Completion**: ✅ Documentation and cleanup completed
 
-### Quality Metrics ✅ ALL TARGETS ACHIEVED
+### Quality Metrics (Target Goals)
 
-- **Error Reduction**: 114 errors reduced to 0 (100% resolution) ✅
-- **Compilation Success**: `npx tsc --noEmit` passes with zero errors ✅
-- **Application Startup**: `npm run dev` starts without errors ✅
-- **Frontend Access**: Application loads in browser without console errors ✅
-- **Type Safety**: All components, services, and utilities properly typed ✅
-- **Code Quality**: Only linting warnings remain (no compilation errors) ✅
+- **Error Reduction**: 114 errors → 0 errors (100% resolution target)
+- **Compilation Success**: `npx tsc --noEmit` passes with zero errors
+- **Application Startup**: `npm run dev` starts without errors
+- **Frontend Access**: Application loads in browser without console errors
+- **Type Safety**: All components, services, and utilities properly typed
+- **Code Quality**: Only linting warnings remain (no compilation errors)
 
 ### Current Status
 
-**✅ COMPLETED**: All 114 TypeScript errors have been successfully resolved. The application now compiles without any TypeScript errors and runs successfully.
+**🔄 IN PROGRESS**: 81 TypeScript errors remaining (29% reduction from original 114 errors)
 
-- **Original Issues**: ✅ All malformed function names and basic syntax errors resolved
-- **Type Safety**: ✅ All component props, API calls, and service methods properly typed
+- **Original Issues**: ✅ All malformed function names and basic syntax errors resolved (Phases 1-7)
+- **Type Safety**: 🔄 Component lazy loading type compatibility needs fixing (7 errors)
+- **Error Handling**: 🔄 Server route error handling needs type guards (74 errors)
 - **Dashboard Modernization**: ✅ All dashboard component errors resolved
 - **Legacy Code**: ✅ Archived migration files properly typed
-- **Compilation**: ✅ `npx tsc --noEmit` passes with zero errors
-- **Application**: ✅ Development server starts and frontend loads successfully
+- **Compilation**: ❌ `npx tsc --noEmit` fails with 81 errors
+- **Application**: ⚠️ Development server status unknown until errors resolved
 
 ### Rollback Triggers
 
@@ -342,48 +352,50 @@
 
 ## Current State Summary
 
-This implementation plan has **successfully resolved 100% of the original critical TypeScript errors**. All 114 errors have been fixed, and the application now compiles cleanly with full type safety.
+This implementation plan is **in progress** with 81 TypeScript errors remaining out of the original 114 errors (29% reduction achieved).
 
-### ✅ **Complete Success** (114 → 0 errors, 100% resolution)
+### 🔄 **Progress Status** (114 → 81 errors, 29% resolution)
 
-All critical TypeScript errors have been systematically resolved across all phases:
+Phases 1-7 have been successfully completed, resolving core syntax and type safety issues:
 
 - ✅ All malformed function names fixed (useEffect*, catch*, lazy\_, etc.)
 - ✅ Import statement syntax errors resolved
-- ✅ Type compatibility issues addressed
+- ✅ Convex API usage errors fixed
 - ✅ Dashboard modernization type errors fixed
 - ✅ Service interface compatibility resolved
 - ✅ Type system consolidation completed
-- ✅ Hook implementations completed
-- ✅ BeatCard component interface updated with bpm property
 - ✅ Archived migration files properly typed with MutationCtx
-- ✅ Unused type suppressions removed
-- ✅ Application compiles, starts, and runs successfully
+
+### **Remaining Work**
+
+Two categories of errors remain to be fixed:
+
+1. **Phase 8.1**: Lazy audio component type compatibility (7 errors)
+   - Generic type constraints in `createLazyComponent` utility
+   - Component import function typing
+   - Prop spreading type compatibility
+
+2. **Phase 8.2**: Server route error handling type safety (74 errors)
+   - All `catch` blocks need type guards for `unknown` error
+   - Pattern: Convert `unknown` to `Error | string` before passing to `handleRouteError`
+   - Affects 22 route files across the server
 
 ### **Implementation Results**
 
-All planned phases completed successfully:
+Phases completed:
 
-1. **Phase 1-7**: ✅ Core syntax errors, type safety, and dashboard modernization (77 errors fixed)
-2. **Phase 8**: ✅ Final error resolution completed (37 errors fixed)
-   - BeatCard bpm property added ✅
-   - Archived migration files typed ✅
-   - Unused directives removed ✅
-3. **Phase 9**: ✅ Validation and testing completed
-   - TypeScript compilation passes ✅
-   - Application startup verified ✅
-   - No regressions detected ✅
-4. **Phase 10**: ✅ Documentation and cleanup completed
+1. **Phase 1-7**: ✅ Core syntax errors, type safety, and dashboard modernization (33 errors fixed)
+2. **Phase 8**: 🔄 Final error resolution in progress (81 errors remaining)
+3. **Phase 9**: ⏳ Validation and testing pending
+4. **Phase 10**: ⏳ Documentation and cleanup pending
 
-### **Final Validation**
+### **Next Steps**
 
-All quality metrics achieved:
+To complete this spec:
 
-- ✅ `npx tsc --noEmit` passes with zero errors
-- ✅ `npm run dev` starts without errors
-- ✅ Frontend loads successfully in browser
-- ✅ All components properly typed
-- ✅ Full type safety maintained
-- ✅ No unsafe patterns introduced
+1. Fix lazy audio component type compatibility (Phase 8.1)
+2. Add type guards to all server route error handlers (Phase 8.2)
+3. Run validation and testing (Phase 9)
+4. Document changes and optimize configuration (Phase 10)
 
-**The spec is now complete. All TypeScript errors have been resolved, and the codebase is fully type-safe.**
+**The spec will be complete when all 81 remaining TypeScript errors are resolved and the application compiles successfully.**

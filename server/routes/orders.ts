@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { OrderStatus } from "../../shared/types/Order";
 import type {
   CreateOrderResponse,
   GetInvoiceResponse,
@@ -49,6 +50,22 @@ const ordersRouter = Router();
 // SECURITY: Use lazy initialization with proper validation
 import { getConvex } from "../lib/convex";
 const convex = getConvex();
+
+// Helper function to safely extract userId as string
+const getUserIdAsString = (userId: unknown): string | null => {
+  if (!userId) return null;
+  if (typeof userId === "string") return userId;
+  if (typeof userId === "number") return userId.toString();
+  // Handle Convex ID objects that have a custom toString method
+  if (
+    typeof userId === "object" &&
+    userId !== null &&
+    typeof (userId as { toString?: () => string }).toString === "function"
+  ) {
+    return (userId as { toString: () => string }).toString();
+  }
+  return null;
+};
 
 // Wrapper functions to avoid complex Convex type access
 const createOrderIdempotent = async (
@@ -129,7 +146,7 @@ const createOrder: CreateOrderHandler = async (req, res) => {
     };
     res.status(201).json(response);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to create order");
+    handleRouteError(error instanceof Error ? error : String(error), res, "Failed to create order");
   }
 };
 
@@ -138,7 +155,7 @@ ordersRouter.post("/", validateBody(CreateOrderSchema), createOrder as never);
 // GET /api/orders/me
 const getMyOrders: GetMyOrdersHandler = async (req, res) => {
   try {
-    const { page, limit } = req.query as { page: number; limit: number }; // Already validated by middleware
+    const { page = 1, limit = 10 } = req.query as { page?: number; limit?: number }; // Already validated by middleware
     const { items, cursor, hasMore } = await listOrders({ limit });
 
     const response: GetMyOrdersResponse = {
@@ -151,7 +168,7 @@ const getMyOrders: GetMyOrdersHandler = async (req, res) => {
     };
     res.json(response);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to fetch orders");
+    handleRouteError(error instanceof Error ? error : String(error), res, "Failed to fetch orders");
   }
 };
 
@@ -160,7 +177,7 @@ ordersRouter.get("/me", validateQuery(CommonQueries.pagination), getMyOrders as 
 // GET /api/orders/:id
 const getOrder: GetOrderHandler = async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const { id } = req.params;
     const data = await getOrderWithRelations({ orderId: id });
 
     const user = req.user;
@@ -168,21 +185,71 @@ const getOrder: GetOrderHandler = async (req, res) => {
       user?.role === "admin" ||
       user?.email === "admin@brolabentertainment.com" ||
       user?.username === "admin";
-    const isOwner = data?.order?.userId && String(data.order.userId) === String(user?.id);
+
+    // Safely convert userId to string for comparison
+    const orderUserId = getUserIdAsString(data?.order?.userId);
+    const currentUserId = getUserIdAsString(user?.id);
+    const isOwner = orderUserId && currentUserId && orderUserId === currentUserId;
 
     if (!isAdmin && !isOwner) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
 
+    // Build status history from order data
+    const statusHistory: Array<{
+      status: OrderStatus;
+      timestamp: string;
+      comment?: string;
+    }> = [];
+
+    if (data?.order) {
+      const order = data.order as {
+        status?: string;
+        createdAt?: number;
+        updatedAt?: number;
+      };
+
+      // Add creation status
+      if (order.createdAt) {
+        statusHistory.push({
+          status: OrderStatus.DRAFT,
+          timestamp: new Date(order.createdAt).toISOString(),
+        });
+      }
+
+      // Add current status if different from draft
+      if (order.status && order.status !== OrderStatus.DRAFT && order.updatedAt) {
+        // Map string status to OrderStatus enum
+        const statusMap: Record<string, OrderStatus> = {
+          draft: OrderStatus.DRAFT,
+          pending: OrderStatus.PENDING,
+          processing: OrderStatus.PROCESSING,
+          paid: OrderStatus.PAID,
+          completed: OrderStatus.COMPLETED,
+          failed: OrderStatus.FAILED,
+          payment_failed: OrderStatus.PAYMENT_FAILED,
+          refunded: OrderStatus.REFUNDED,
+          cancelled: OrderStatus.CANCELLED,
+          partially_refunded: OrderStatus.PARTIALLY_REFUNDED,
+        };
+
+        const mappedStatus = statusMap[order.status] || OrderStatus.PENDING;
+        statusHistory.push({
+          status: mappedStatus,
+          timestamp: new Date(order.updatedAt).toISOString(),
+        });
+      }
+    }
+
     const response: GetOrderResponse = {
       order: data?.order as unknown as GetOrderResponse["order"],
       items: (data?.items || []) as unknown as GetOrderResponse["items"],
-      statusHistory: [], // TODO: Implement status history
+      statusHistory,
     };
     res.json(response);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to get order");
+    handleRouteError(error instanceof Error ? error : String(error), res, "Failed to get order");
   }
 };
 
@@ -192,7 +259,7 @@ ordersRouter.get("/:id", validateParams(CommonParams.id), getOrder as never);
 // Signed URL already attached on order after webhook pipeline; just return stored URL
 const getInvoice: GetInvoiceHandler = async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const { id } = req.params;
     const data = await getOrderWithRelations({ orderId: id });
 
     const user = req.user;
@@ -200,7 +267,12 @@ const getInvoice: GetInvoiceHandler = async (req, res) => {
       user?.role === "admin" ||
       user?.email === "admin@brolabentertainment.com" ||
       user?.username === "admin";
-    const isOwner = data?.order?.userId && String(data.order.userId) === String(user?.id);
+
+    // Safely convert userId to string for comparison
+    const orderUserId = getUserIdAsString(data?.order?.userId);
+    const currentUserId = getUserIdAsString(user?.id);
+    const isOwner = orderUserId && currentUserId && orderUserId === currentUserId;
+
     if (!isAdmin && !isOwner) {
       res.status(403).json({ error: "Forbidden" });
       return;
@@ -215,7 +287,7 @@ const getInvoice: GetInvoiceHandler = async (req, res) => {
     const response: GetInvoiceResponse = { url: invoiceUrl };
     res.json(response);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to get invoice");
+    handleRouteError(error instanceof Error ? error : String(error), res, "Failed to get invoice");
   }
 };
 
@@ -224,7 +296,7 @@ ordersRouter.get("/:id/invoice", validateParams(CommonParams.id), getInvoice as 
 // GET /api/orders/:id/invoice/download
 ordersRouter.get("/:id/invoice/download", validateParams(CommonParams.id), async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const { id } = req.params;
     const data = await getOrderWithRelations({ orderId: id });
 
     const user = req.user;
@@ -232,7 +304,12 @@ ordersRouter.get("/:id/invoice/download", validateParams(CommonParams.id), async
       user?.role === "admin" ||
       user?.email === "admin@brolabentertainment.com" ||
       user?.username === "admin";
-    const isOwner = data?.order?.userId && String(data.order.userId) === String(user?.id);
+
+    // Safely convert userId to string for comparison
+    const orderUserId = getUserIdAsString(data?.order?.userId);
+    const currentUserId = getUserIdAsString(user?.id);
+    const isOwner = orderUserId && currentUserId && orderUserId === currentUserId;
+
     if (!isAdmin && !isOwner) {
       res.status(403).json({ error: "Forbidden" });
       return;
@@ -245,7 +322,11 @@ ordersRouter.get("/:id/invoice/download", validateParams(CommonParams.id), async
     }
     res.redirect(invoice.invoice.pdfUrl);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to download invoice");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to download invoice"
+    );
   }
 });
 

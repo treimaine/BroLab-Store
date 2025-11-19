@@ -2,6 +2,7 @@ import express, { Request } from "express";
 import { registerAuthRoutes, setupAuth } from "./auth";
 import { env } from "./lib/env";
 import { logger } from "./lib/logger";
+import { setupSecurityMiddleware } from "./middleware/security";
 import activityRouter from "./routes/activity";
 import avatarRouter from "./routes/avatar";
 import categoriesRouter from "./routes/categories";
@@ -28,7 +29,9 @@ import wooRouter from "./routes/woo";
 import wpRouter from "./routes/wp";
 
 const app = express();
-app.use(express.json());
+
+// Security middleware - MUST be first (helmet, compression, rate limiting, body limits)
+setupSecurityMiddleware(app);
 
 // Debug structured env log (without secrets)
 logger.info("Server starting", {
@@ -85,10 +88,19 @@ app.use("/api/sync", syncRouter);
 app.use("/api/categories", categoriesRouter);
 app.use("/api/reservations", reservationsRouter);
 
-// WordPress and WooCommerce routes
-app.use("/api/products", wooRouter);
-app.use("/api/woo", wooRouter);
+// WordPress and WooCommerce routes - consolidated to single canonical path
+// Primary route: /api/woocommerce (canonical)
 app.use("/api/woocommerce", wooRouter);
+
+// Legacy redirects for backward compatibility
+app.use("/api/woo", (req, res) => {
+  const newPath = req.path.replace(/^\//, "/api/woocommerce/");
+  res.redirect(301, newPath + (req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : ""));
+});
+app.use("/api/products", (req, res) => {
+  const newPath = req.path.replace(/^\//, "/api/woocommerce/");
+  res.redirect(301, newPath + (req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : ""));
+});
 
 // Sitemap and other routes
 app.use("/", sitemapRouter);

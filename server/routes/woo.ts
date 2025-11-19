@@ -254,7 +254,11 @@ router.get("/products", async (req: Request, res: Response) => {
 
     res.json(beats);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to fetch products");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to fetch products"
+    );
   }
 });
 
@@ -429,7 +433,11 @@ router.get("/products/:id", async (req, res, next): Promise<void> => {
 
     res.json(beat);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to fetch product");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to fetch product"
+    );
   }
 });
 
@@ -458,7 +466,11 @@ router.get("/categories", async (_req, res, next) => {
     const cats = await fetchWooCategories();
     res.json({ categories: cats });
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to fetch categories");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to fetch categories"
+    );
   }
 });
 

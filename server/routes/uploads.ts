@@ -108,7 +108,7 @@ router.post(
         },
       });
     } catch (error: unknown) {
-      handleRouteError(error, res, "File upload failed");
+      handleRouteError(error instanceof Error ? error : String(error), res, "File upload failed");
     }
   }
 );

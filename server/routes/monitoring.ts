@@ -18,7 +18,7 @@ router.get("/health", apiRateLimit, async (req, res): Promise<void> => {
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
-    handleRouteError(error, res, "Health check failed");
+    handleRouteError(error instanceof Error ? error : String(error), res, "Health check failed");
   }
 });
 
@@ -47,7 +47,11 @@ router.get("/metrics", apiRateLimit, async (req, res): Promise<void> => {
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to collect metrics");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to collect metrics"
+    );
   }
 });
 
@@ -68,7 +72,11 @@ router.get("/status", async (req, res): Promise<void> => {
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to get system status");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to get system status"
+    );
   }
 });
 
@@ -106,7 +114,11 @@ router.post("/health/check", apiRateLimit, async (req, res): Promise<void> => {
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
-    handleRouteError(error, res, "Manual health check failed");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Manual health check failed"
+    );
   }
 });
 

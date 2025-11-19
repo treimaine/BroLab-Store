@@ -30,7 +30,11 @@ router.get("/", isAuthenticated, async (req, res): Promise<void> => {
     // res.json(data || []);
     res.json([]);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to fetch wishlist");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to fetch wishlist"
+    );
   }
 });
 
@@ -82,7 +86,11 @@ router.post("/", isAuthenticated, async (req, res): Promise<void> => {
 
     res.status(201).json({ message: "Added to wishlist successfully" });
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to add to wishlist");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to add to wishlist"
+    );
   }
 });
 
@@ -117,7 +125,11 @@ router.delete("/:beatId", isAuthenticated, async (req, res): Promise<void> => {
 
     res.json({ message: "Removed from wishlist successfully" });
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to remove from wishlist");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to remove from wishlist"
+    );
   }
 });
 
@@ -144,7 +156,11 @@ router.delete("/", isAuthenticated, async (req, res): Promise<void> => {
 
     res.json({ message: "Wishlist cleared successfully" });
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to clear wishlist");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to clear wishlist"
+    );
   }
 });
 

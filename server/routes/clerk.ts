@@ -435,7 +435,11 @@ router.post("/create-checkout-session", async (req, res): Promise<void> => {
       errorStack: error instanceof Error ? error.stack : undefined,
     });
 
-    handleRouteError(error, res, "Failed to create checkout session");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to create checkout session"
+    );
   }
 });
 
@@ -510,7 +514,11 @@ router.get("/checkout-session/:id", async (req, res): Promise<void> => {
       return;
     }
 
-    handleRouteError(error, res, "Failed to retrieve checkout session");
+    handleRouteError(
+      error instanceof Error ? error : String(error),
+      res,
+      "Failed to retrieve checkout session"
+    );
   }
 });
 
