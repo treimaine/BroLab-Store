@@ -1,9 +1,7 @@
-import { ReservationErrorBoundary } from "@/components/reservations/ReservationErrorBoundary";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import FileUpload from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -52,12 +50,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import {
-  buildReservationNotes,
-  getInputClassName,
-  getPlaceholderText,
-} from "./mixing-mastering-helpers";
-import { createRenderHelpers } from "./mixing-mastering-render-helpers";
+import FileUpload from "@/components/ui/file-upload";
+import { ReservationErrorBoundary } from "@/components/reservations/ReservationErrorBoundary";
 
 const services = [
   {
@@ -126,7 +120,7 @@ const convertTimeSlotTo24Hour = (timeSlot: string): string => {
   return timeMap[timeSlot] || "09:00";
 };
 
-function MixingMasteringContent(): JSX.Element {
+function MixingMasteringContent() {
   const componentMountTimer = startTimer("mixing_mastering_component_mount");
   const [, setLocation] = useLocation();
   const { user: clerkUser, isLoaded: clerkLoaded, isSignedIn } = useUser();
@@ -149,7 +143,7 @@ function MixingMasteringContent(): JSX.Element {
       message: "Mixing & Mastering page loaded",
       level: "info",
       data: {
-        url: globalThis.location.href,
+        url: window.location.href,
         mountTime,
       },
     });
@@ -163,15 +157,10 @@ function MixingMasteringContent(): JSX.Element {
   }, [componentMountTimer]);
 
   // Authentication state management - non-blocking approach
-  const [authState, setAuthState] = useState<{
-    isLoading: boolean;
-    hasError: boolean;
-    errorMessage: string | null;
-    isAuthenticated: boolean;
-  }>({
+  const [authState, setAuthState] = useState({
     isLoading: !clerkLoaded,
     hasError: false,
-    errorMessage: null,
+    errorMessage: null as string | null,
     isAuthenticated: false,
   });
 
@@ -227,7 +216,7 @@ function MixingMasteringContent(): JSX.Element {
   }, [clerkLoaded, isSignedIn, clerkUser]);
 
   // Enhanced error handler that doesn't block page rendering
-  const handleApiError = useCallback((error: Error, context?: string): void => {
+  const handleApiError = useCallback((error: Error, context?: string) => {
     // Track the error with comprehensive context
     const errorId = errorTracker.trackError(error, {
       errorType: context === "authentication" ? "authentication" : "api",
@@ -285,7 +274,7 @@ function MixingMasteringContent(): JSX.Element {
 
   // Safely query user data with error handling - non-blocking
   // Temporarily disabled due to type instantiation issues
-  const convexUser = null;
+  const convexUser = null; // useQuery(api.users.getUserByClerkId, clerkUser && !authState.hasError ? { clerkId: clerkUser.id } : "skip");
 
   const [selectedService, setSelectedService] = useState("mixing-mastering");
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -348,7 +337,7 @@ function MixingMasteringContent(): JSX.Element {
 
   // Auto-scroll to top when page loads
   useEffect(() => {
-    globalThis.scrollTo(0, 0);
+    window.scrollTo(0, 0);
   }, []);
 
   // Auto-fill form data when user data is available - with proper error handling
@@ -366,6 +355,15 @@ function MixingMasteringContent(): JSX.Element {
 
         // If convexUser is available, use that data too (with fallback)
         // Temporarily disabled due to type issues
+        // if (convexUser) {
+        //   const convexName =
+        //     convexUser.firstName && convexUser.lastName
+        //       ? `${convexUser.firstName} ${convexUser.lastName}`.trim()
+        //       : "";
+
+        //   autoFillData.name = convexName || autoFillData.name;
+        //   autoFillData.email = convexUser.email || autoFillData.email;
+        // }
 
         // Only update fields that are currently empty to avoid overwriting user input
         const fieldsToUpdate = {
@@ -448,27 +446,7 @@ function MixingMasteringContent(): JSX.Element {
 
   const selectedServiceData = services.find(s => s.id === selectedService);
 
-  // Initialize render helpers
-  const {
-    renderButtonContent,
-    renderAuthStatus,
-    renderFormValidationStatus,
-    renderSubmissionStatus,
-    renderFileUploadStatus,
-    renderFormCompletionProgress,
-  } = createRenderHelpers({
-    isSubmitting,
-    isValidating,
-    authState,
-    selectedServiceData,
-    hasBeenSubmitted,
-    isFormValid,
-    fileUploadErrors,
-    uploadedFiles,
-    formData,
-  });
-
-  const handleInputChange = (field: keyof MixingMasteringSubmissionInput, value: string): void => {
+  const handleInputChange = (field: keyof MixingMasteringSubmissionInput, value: string) => {
     // Log form field changes for debugging
     logUserAction(`Form field changed: ${field}`, {
       component: "mixing_mastering",
@@ -486,7 +464,7 @@ function MixingMasteringContent(): JSX.Element {
     updateField(field, value);
   };
 
-  const handleFileRemove = (index: number): void => {
+  const handleFileRemove = (index: number) => {
     const fileToRemove = uploadedFiles[index];
 
     // Log file removal
@@ -520,7 +498,7 @@ function MixingMasteringContent(): JSX.Element {
   };
 
   const handleSubmit = createSubmitHandler(
-    async (validatedData: MixingMasteringSubmissionInput): Promise<void> => {
+    async (validatedData: MixingMasteringSubmissionInput) => {
       const submissionTimer = startTimer("form_submission");
 
       try {
@@ -591,8 +569,8 @@ function MixingMasteringContent(): JSX.Element {
         const reservationData = {
           serviceType:
             validatedData.selectedService === "mixing-mastering"
-              ? ("mixing" as const)
-              : validatedData.selectedService,
+              ? "mixing"
+              : (validatedData.selectedService as "mixing" | "mastering"),
           clientInfo: {
             firstName: validatedData.name.split(" ")[0] || validatedData.name,
             lastName: validatedData.name.split(" ").slice(1).join(" ") || "User",
@@ -604,18 +582,29 @@ function MixingMasteringContent(): JSX.Element {
           ).toISOString(),
           preferredDuration: 180, // 3 hours default for mixing/mastering
           serviceDetails: {
-            trackCount: Number.parseInt(validatedData.trackCount || "1", 10) || 1,
+            trackCount: parseInt(validatedData.trackCount || "1", 10) || 1,
             genre: validatedData.genre || undefined,
             includeRevisions: 3,
             rushDelivery: false,
           },
-          notes: buildReservationNotes(
-            validatedData.projectDetails,
-            validatedData.specialRequests || "",
-            validatedData.reference || "",
-            uploadedFiles,
-            fileUploadErrors
-          ),
+          notes: (() => {
+            let notes = `${validatedData.projectDetails}\n\nSpecial Requests: ${validatedData.specialRequests}\n\nReference Track: ${validatedData.reference}`;
+
+            // Add file upload status to notes for better service delivery
+            if (uploadedFiles.length > 0) {
+              notes += `\n\nFiles Uploaded: ${uploadedFiles.map(f => f.name).join(", ")} (${uploadedFiles.length} file${uploadedFiles.length > 1 ? "s" : ""})`;
+            } else {
+              notes +=
+                "\n\nFiles: Client will provide files via email or cloud storage after booking confirmation.";
+            }
+
+            // Add file upload error context if any occurred
+            if (fileUploadErrors.length > 0) {
+              notes += `\n\nNote: Client experienced file upload issues during booking but chose to proceed. Files can be sent separately.`;
+            }
+
+            return notes.trim();
+          })(),
           budget: (selectedServiceData?.price || 0) * 100, // Convert to cents
           acceptTerms: true,
         };
@@ -1022,17 +1011,16 @@ function MixingMasteringContent(): JSX.Element {
                       value={formData.name}
                       onChange={e => handleInputChange("name", e.target.value)}
                       onBlur={() => handleBlur("name")}
-                      className={getInputClassName(
-                        authState.isLoading,
-                        authState.isAuthenticated,
-                        !!formData.name,
-                        !!getFieldError("name")
-                      )}
-                      placeholder={getPlaceholderText(
-                        authState.isLoading,
-                        authState.isAuthenticated,
-                        "name"
-                      )}
+                      className={`pl-10 ${authState.isLoading ? "pr-10" : ""} bg-[var(--medium-gray)] border-gray-600 text-white ${
+                        getFieldError("name") ? "border-red-500" : ""
+                      } ${authState.isAuthenticated && formData.name && !getFieldError("name") ? "border-green-500/50 bg-green-900/10" : ""}`}
+                      placeholder={
+                        authState.isLoading
+                          ? "Loading your information..."
+                          : authState.isAuthenticated
+                            ? "Your name will be auto-filled"
+                            : "Enter your full name"
+                      }
                       disabled={authState.isLoading || isValidating}
                     />
                   </div>
@@ -1065,17 +1053,16 @@ function MixingMasteringContent(): JSX.Element {
                       value={formData.email}
                       onChange={e => handleInputChange("email", e.target.value)}
                       onBlur={() => handleBlur("email")}
-                      className={getInputClassName(
-                        authState.isLoading,
-                        authState.isAuthenticated,
-                        !!formData.email,
-                        !!getFieldError("email")
-                      )}
-                      placeholder={getPlaceholderText(
-                        authState.isLoading,
-                        authState.isAuthenticated,
-                        "email"
-                      )}
+                      className={`pl-10 ${authState.isLoading ? "pr-10" : ""} bg-[var(--medium-gray)] border-gray-600 text-white ${
+                        getFieldError("email") ? "border-red-500" : ""
+                      } ${authState.isAuthenticated && formData.email && !getFieldError("email") ? "border-green-500/50 bg-green-900/10" : ""}`}
+                      placeholder={
+                        authState.isLoading
+                          ? "Loading your email..."
+                          : authState.isAuthenticated
+                            ? "Your email will be auto-filled"
+                            : "your@email.com"
+                      }
                       disabled={authState.isLoading || isValidating}
                     />
                   </div>
@@ -1107,17 +1094,16 @@ function MixingMasteringContent(): JSX.Element {
                       value={formData.phone || ""}
                       onChange={e => handleInputChange("phone", e.target.value)}
                       onBlur={() => handleBlur("phone")}
-                      className={getInputClassName(
-                        authState.isLoading,
-                        authState.isAuthenticated,
-                        !!formData.phone,
-                        !!getFieldError("phone")
-                      )}
-                      placeholder={getPlaceholderText(
-                        authState.isLoading,
-                        authState.isAuthenticated,
-                        "phone"
-                      )}
+                      className={`pl-10 ${authState.isLoading ? "pr-10" : ""} bg-[var(--medium-gray)] border-gray-600 text-white ${
+                        getFieldError("phone") ? "border-red-500" : ""
+                      } ${authState.isAuthenticated && formData.phone && !getFieldError("phone") ? "border-green-500/50 bg-green-900/10" : ""}`}
+                      placeholder={
+                        authState.isLoading
+                          ? "Loading your phone..."
+                          : authState.isAuthenticated
+                            ? "Your phone will be auto-filled"
+                            : "(123) 456-7890"
+                      }
                       disabled={authState.isLoading || isValidating}
                     />
                   </div>
@@ -1322,40 +1308,39 @@ function MixingMasteringContent(): JSX.Element {
                         variant: "default",
                       });
                     }}
-                    onUploadError={fileError => {
+                    onUploadError={error => {
                       // Enhanced file upload error handling - graceful degradation
-                      const standardError = new Error(fileError.message);
 
                       // Log file upload error with comprehensive context
-                      logFileUploadError("File upload failed", standardError, {
+                      logFileUploadError("File upload failed", error, {
                         component: "mixing_mastering",
                         action: "file_upload_error",
-                        errorCode: fileError.code,
-                        severity: fileError.severity,
-                        recoverable: fileError.recoverable,
+                        errorCode: error.code,
+                        severity: error.severity,
+                        recoverable: error.recoverable,
                         formCanStillSubmit: true,
                       });
 
                       // Track the error
-                      const errorId = errorTracker.trackError(standardError, {
+                      const errorId = errorTracker.trackError(error, {
                         errorType: "file_upload",
                         component: "mixing_mastering",
                         action: "file_upload_failed",
-                        errorCode: fileError.code,
-                        recoverable: fileError.recoverable || true,
-                        severity: fileError.severity,
+                        errorCode: error.code,
+                        recoverable: error.recoverable || true,
+                        severity: error.severity,
                       });
 
                       // Add error breadcrumb
                       addBreadcrumb({
                         category: "error",
-                        message: `File upload failed: ${fileError.message}`,
-                        level: fileError.severity === "warning" ? "warning" : "error",
+                        message: `File upload failed: ${error.message}`,
+                        level: error.severity === "warning" ? "warning" : "error",
                         data: {
-                          errorCode: fileError.code,
-                          errorMessage: fileError.message,
-                          severity: fileError.severity,
-                          recoverable: fileError.recoverable,
+                          errorCode: error.code,
+                          errorMessage: error.message,
+                          severity: error.severity,
+                          recoverable: error.recoverable,
                           errorId,
                         },
                       });
@@ -1363,24 +1348,23 @@ function MixingMasteringContent(): JSX.Element {
                       // Track file upload error performance
                       performanceMonitor.recordMetric("file_upload_error", 1, "count", {
                         component: "file_upload",
-                        errorCode: fileError.code,
-                        severity: fileError.severity,
+                        errorCode: error.code,
+                        severity: error.severity,
                       });
 
                       // Don't call handleApiError for file upload errors as they shouldn't affect auth state
-                      const toastVariant =
-                        fileError.severity === "warning" ? "default" : "destructive";
+                      const toastVariant = error.severity === "warning" ? "default" : "destructive";
                       const toastTitle =
-                        fileError.severity === "warning" ? "Upload Warning" : "Upload Failed";
+                        error.severity === "warning" ? "Upload Warning" : "Upload Failed";
 
                       toast({
                         title: toastTitle,
-                        description: fileError.message,
+                        description: error.message,
                         variant: toastVariant,
                       });
 
                       // Track file upload errors for form submission context
-                      setFileUploadErrors(prev => [...prev, fileError.message]);
+                      setFileUploadErrors(prev => [...prev, error.message]);
                     }}
                     acceptedFileTypes={["audio/*", ".zip", ".rar", ".7z"]}
                     maxFileSize={100 * 1024 * 1024} // 100MB
@@ -1477,15 +1461,137 @@ function MixingMasteringContent(): JSX.Element {
                   }
                   className="btn-primary px-8 py-3 text-lg min-w-[280px] relative"
                 >
-                  {renderButtonContent()}
+                  {isSubmitting ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Processing Reservation...</span>
+                    </div>
+                  ) : isValidating ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Validating Form...</span>
+                    </div>
+                  ) : authState.isLoading ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Loading Authentication...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      <ArrowRight className="w-5 h-5" />
+                      <span>Reserve Session - ${selectedServiceData?.price}</span>
+                    </div>
+                  )}
                 </Button>
                 {/* Enhanced Form Status Messages */}
                 <div className="mt-4 space-y-2">
-                  {renderAuthStatus()}
-                  {renderFormValidationStatus()}
-                  {renderSubmissionStatus()}
-                  {renderFileUploadStatus()}
-                  {renderFormCompletionProgress()}
+                  {/* Authentication Status */}
+                  {authState.isLoading && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-blue-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Loading your account information...</span>
+                    </div>
+                  )}
+
+                  {!authState.isLoading && !authState.isAuthenticated && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                      <Info className="w-4 h-4" />
+                      <span>
+                        You&apos;ll be prompted to sign in before completing your reservation.
+                      </span>
+                    </div>
+                  )}
+
+                  {authState.isAuthenticated && !hasBeenSubmitted && !isSubmitting && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-green-400">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Ready to book! We&apos;ll contact you within 24 hours to confirm.</span>
+                    </div>
+                  )}
+
+                  {/* Form Validation Status */}
+                  {hasBeenSubmitted && !isFormValid && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-red-400">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>Please fix the errors above before submitting.</span>
+                    </div>
+                  )}
+
+                  {isValidating && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-blue-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Validating your information...</span>
+                    </div>
+                  )}
+
+                  {/* Submission Status */}
+                  {isSubmitting && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-purple-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Creating your reservation and preparing checkout...</span>
+                    </div>
+                  )}
+
+                  {/* File Upload Status Messages */}
+                  {fileUploadErrors.length > 0 && !isSubmitting && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-yellow-400">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>
+                        File upload issues detected, but you can still submit your reservation.
+                      </span>
+                    </div>
+                  )}
+
+                  {uploadedFiles.length > 0 && !isSubmitting && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-green-400">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>
+                        {uploadedFiles.length} file{uploadedFiles.length > 1 ? "s" : ""} ready to
+                        include with your reservation.
+                      </span>
+                    </div>
+                  )}
+
+                  {uploadedFiles.length === 0 &&
+                    fileUploadErrors.length === 0 &&
+                    !isSubmitting &&
+                    !authState.isLoading && (
+                      <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+                        <Info className="w-4 h-4" />
+                        <span>
+                          Files are optional - you can send them later via email or cloud storage.
+                        </span>
+                      </div>
+                    )}
+
+                  {/* Progress Indicator for Form Completion */}
+                  {!authState.isLoading && !isSubmitting && (
+                    <div className="mt-4 p-3 bg-gray-900/30 rounded-lg">
+                      <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                        <span>Form Completion</span>
+                        <span>
+                          {Math.round(
+                            (((formData.name ? 1 : 0) +
+                              (formData.email ? 1 : 0) +
+                              (formData.preferredDate ? 1 : 0) +
+                              (formData.timeSlot ? 1 : 0) +
+                              (formData.projectDetails ? 1 : 0)) /
+                              5) *
+                              100
+                          )}
+                          %
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-700 rounded-full h-1.5">
+                        <div
+                          className="bg-gradient-to-r from-[var(--accent-purple)] to-blue-500 h-1.5 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${(((formData.name ? 1 : 0) + (formData.email ? 1 : 0) + (formData.preferredDate ? 1 : 0) + (formData.timeSlot ? 1 : 0) + (formData.projectDetails ? 1 : 0)) / 5) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </form>
@@ -1497,11 +1603,11 @@ function MixingMasteringContent(): JSX.Element {
 }
 
 // Main component with safe error boundary
-export default function MixingMastering(): JSX.Element {
+export default function MixingMastering() {
   return (
     <ReservationErrorBoundary
       serviceName="Mixing & Mastering"
-      onGoBack={() => globalThis.history.back()}
+      onGoBack={() => window.history.back()}
     >
       <MixingMasteringContent />
     </ReservationErrorBoundary>

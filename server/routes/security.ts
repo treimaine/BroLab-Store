@@ -19,11 +19,7 @@ router.post("/admin/rls/initialize", requireAuth, requireAdmin, async (req, res)
       message: "Security handled by Convex",
     });
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Security initialization failed"
-    );
+    handleRouteError(error, res, "Security initialization failed");
   }
 });
 
@@ -36,11 +32,7 @@ router.post("/admin/rls/apply-policies", requireAuth, requireAdmin, async (req, 
       message: "Security handled by Convex",
     });
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Security policy application failed"
-    );
+    handleRouteError(error, res, "Security policy application failed");
   }
 });
 
@@ -53,11 +45,7 @@ router.get("/admin/rls/verify", requireAuth, requireAdmin, async (req, res) => {
       message: "Security handled by Convex",
     });
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Security verification failed"
-    );
+    handleRouteError(error, res, "Security verification failed");
   }
 });
 

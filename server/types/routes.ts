@@ -398,7 +398,7 @@ export function createSuccessResponse<T>(data?: T, message?: string): RouteSucce
  * Handle async route errors
  */
 export function handleRouteError(
-  error: Error | string,
+  error: Error | string | unknown,
   res: Response,
   customMessage?: string
 ): void {

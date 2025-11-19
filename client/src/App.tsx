@@ -8,7 +8,7 @@ import {
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Route, Switch } from "wouter";
 import { queryClient, warmCache } from "./lib/queryClient";
@@ -18,28 +18,37 @@ import { Navbar } from "@/components/layout/navbar";
 
 import { ComponentPreloader } from "@/components/loading/ComponentPreloader";
 import { useInteractionPreloader } from "@/hooks/useInteractionPreloader";
-import { bundleOptimization, createLazyComponent } from "@/utils/lazyLoading";
+import {
+  bundleOptimization,
+  createLazyComponent,
+  createRouteLazyComponent,
+} from "@/utils/lazyLoading";
 
 // Layout components - lazy loaded for better performance
-// Defer non-critical components to mount after main content
-const Footer = createLazyComponent(
-  () => import("@/components/layout/footer").then(m => ({ default: m.Footer })),
-  { preloadDelay: 3000 } // Preload after 3 seconds
+const Footer = createLazyComponent(() =>
+  import("@/components/layout/footer").then(module => ({ default: module.Footer }))
 );
-const MobileBottomNav = createLazyComponent(
-  () => import("@/components/layout/MobileBottomNav").then(m => ({ default: m.MobileBottomNav })),
-  { preloadDelay: 2000 } // Preload after 2 seconds
+const MobileBottomNav = createLazyComponent(() =>
+  import("@/components/layout/MobileBottomNav").then(module => ({
+    default: module.MobileBottomNav,
+  }))
 );
-const OfflineIndicator = createLazyComponent(
-  () => import("@/components/loading/OfflineIndicator"),
-  { preloadDelay: 5000 } // Preload after 5 seconds - low priority
+const OfflineIndicator = createLazyComponent(() =>
+  import("@/components/loading/OfflineIndicator").then(module => ({
+    default: module.OfflineIndicator,
+  }))
+);
+const NewsletterModal = createLazyComponent(() =>
+  import("@/components/newsletter/NewsletterModal").then(module => ({
+    default: module.NewsletterModal,
+  }))
 );
 
 // Audio player - lazy loaded as it's heavy and not immediately needed
 const EnhancedGlobalAudioPlayer = createLazyComponent(
   () =>
-    import("@/components/audio/EnhancedGlobalAudioPlayer").then(m => ({
-      default: m.EnhancedGlobalAudioPlayer,
+    import("@/components/audio/EnhancedGlobalAudioPlayer").then(module => ({
+      default: module.EnhancedGlobalAudioPlayer,
     })),
   { preloadDelay: 2000 } // Preload after 2 seconds
 );
@@ -47,80 +56,84 @@ const EnhancedGlobalAudioPlayer = createLazyComponent(
 // Core pages - only Home loaded immediately, others lazy loaded for better initial load
 import Home from "@/pages/home";
 
-// Import route chunking utilities
-import { featureFlags } from "@/config/featureFlags";
-import { createChunkedRoute } from "@/config/routeChunks";
+// High-priority pages - route-based lazy loading with preloading
+const Shop = createRouteLazyComponent(() => import("@/pages/shop"), "/shop");
+const Product = createRouteLazyComponent(() => import("@/pages/product"), "/product");
+const Cart = createRouteLazyComponent(() => import("@/pages/cart"), "/cart");
+const Login = createRouteLazyComponent(() => import("@/pages/login"), "/login");
+const Dashboard = createRouteLazyComponent(() => import("@/pages/dashboard"), "/dashboard");
 
-// High-priority pages - route-based lazy loading with chunking
-const Shop = createChunkedRoute(() => import("@/pages/shop"), "/shop");
-const Product = createChunkedRoute(() => import("@/pages/product"), "/product/:id");
-const Cart = createChunkedRoute(() => import("@/pages/cart"), "/cart");
-const Login = createChunkedRoute(() => import("@/pages/login"), "/login");
-const Dashboard = createChunkedRoute(() => import("@/pages/dashboard"), "/dashboard");
-
-// Info pages - grouped in low-traffic chunk
-const About = createChunkedRoute(() => import("@/pages/about"), "/about");
-const Contact = createChunkedRoute(() => import("@/pages/contact"), "/contact");
-const FAQ = createChunkedRoute(() => import("@/pages/faq"), "/faq");
-const MembershipPage = createChunkedRoute(
+// Secondary pages - route-based lazy loading with error handling
+const About = createRouteLazyComponent(() => import("@/pages/about"), "/about");
+const Contact = createRouteLazyComponent(() => import("@/pages/contact"), "/contact");
+const Copyright = createRouteLazyComponent(() => import("@/pages/copyright"), "/copyright");
+const FAQ = createRouteLazyComponent(() => import("@/pages/faq"), "/faq");
+const Licensing = createRouteLazyComponent(() => import("@/pages/licensing"), "/licensing");
+const MembershipPage = createRouteLazyComponent(
   () => import("@/pages/MembershipPageFixed"),
   "/membership"
 );
-const WishlistPage = createChunkedRoute(() => import("@/pages/wishlist"), "/wishlist");
+const Privacy = createRouteLazyComponent(() => import("@/pages/privacy"), "/privacy");
+const Refund = createRouteLazyComponent(() => import("@/pages/refund"), "/refund");
+const Terms = createRouteLazyComponent(() => import("@/pages/terms"), "/terms");
+const WishlistPage = createRouteLazyComponent(() => import("@/pages/wishlist"), "/wishlist");
 
-// Legal pages - grouped in low-traffic chunk
-const Copyright = createChunkedRoute(() => import("@/pages/copyright"), "/copyright");
-const Licensing = createChunkedRoute(() => import("@/pages/licensing"), "/licensing");
-const Privacy = createChunkedRoute(() => import("@/pages/privacy"), "/privacy");
-const Refund = createChunkedRoute(() => import("@/pages/refund"), "/refund");
-const Terms = createChunkedRoute(() => import("@/pages/terms"), "/terms");
-
-// Service pages - grouped in medium-traffic chunk, gated by feature flags
-const CustomBeats = featureFlags.enableCustomBeats
-  ? createChunkedRoute(() => import("@/pages/custom-beats"), "/custom-beats")
-  : null;
-const MixingMastering = featureFlags.enableMixingMastering
-  ? createChunkedRoute(() => import("@/pages/mixing-mastering"), "/mixing-mastering")
-  : null;
-const PremiumDownloads = createChunkedRoute(
+// Service pages - route-based lazy loading with error handling
+const CustomBeats = createRouteLazyComponent(() => import("@/pages/custom-beats"), "/custom-beats");
+const MixingMastering = createRouteLazyComponent(
+  () => import("@/pages/mixing-mastering"),
+  "/mixing-mastering"
+);
+const PremiumDownloads = createRouteLazyComponent(
   () => import("@/pages/premium-downloads"),
   "/premium-downloads"
 );
-const ProductionConsultation = featureFlags.enableProductionConsultation
-  ? createChunkedRoute(() => import("@/pages/production-consultation"), "/production-consultation")
-  : null;
-const RecordingSessions = featureFlags.enableRecordingSessions
-  ? createChunkedRoute(() => import("@/pages/recording-sessions"), "/recording-sessions")
-  : null;
+const ProductionConsultation = createRouteLazyComponent(
+  () => import("@/pages/production-consultation"),
+  "/production-consultation"
+);
+const RecordingSessions = createRouteLazyComponent(
+  () => import("@/pages/recording-sessions"),
+  "/recording-sessions"
+);
 
-// Auth pages - grouped in auth chunk
-const ResetPasswordPage = createChunkedRoute(
+// Auth pages - route-based lazy loading with error handling
+const ResetPasswordPage = createRouteLazyComponent(
   () => import("@/pages/reset-password"),
   "/reset-password"
 );
-const VerifyEmailPage = createChunkedRoute(() => import("@/pages/verify-email"), "/verify-email");
+const VerifyEmailPage = createRouteLazyComponent(
+  () => import("@/pages/verify-email"),
+  "/verify-email"
+);
 
-// Checkout pages - grouped in commerce chunk
-const Checkout = createChunkedRoute(() => import("@/pages/checkout"), "/checkout");
-const OrderConfirmation = createChunkedRoute(
+// Checkout pages - route-based lazy loading with error handling
+const Checkout = createRouteLazyComponent(() => import("@/pages/checkout"), "/checkout");
+const OrderConfirmation = createRouteLazyComponent(
   () => import("@/pages/order-confirmation"),
   "/order-confirmation"
 );
-const ClerkCheckout = createChunkedRoute(() => import("@/pages/clerk-checkout"), "/clerk-checkout");
-const CheckoutSuccess = createChunkedRoute(
+const ClerkCheckout = createRouteLazyComponent(
+  () => import("@/pages/clerk-checkout"),
+  "/clerk-checkout"
+);
+const CheckoutSuccess = createRouteLazyComponent(
   () => import("@/pages/checkout-success"),
   "/checkout-success"
 );
-const PaymentSuccess = createChunkedRoute(
+const PaymentSuccess = createRouteLazyComponent(
   () => import("@/pages/payment-success"),
   "/payment/success"
 );
-const PaymentCancel = createChunkedRoute(() => import("@/pages/payment-cancel"), "/payment/cancel");
+const PaymentCancel = createRouteLazyComponent(
+  () => import("@/pages/payment-cancel"),
+  "/payment/cancel"
+);
 
-// Admin and test pages - grouped in low-traffic admin chunk
-const AdminFiles = createChunkedRoute(() => import("@/pages/admin/files"), "/admin/files");
-const TestConvex = createChunkedRoute(() => import("@/pages/test-convex"), "/test-convex");
-const TestMockAlert = createChunkedRoute(
+// Admin and test pages - route-based lazy loading with error handling
+const AdminFiles = createRouteLazyComponent(() => import("@/pages/admin/files"), "/admin/files");
+const TestConvex = createRouteLazyComponent(() => import("@/pages/test-convex"), "/test-convex");
+const TestMockAlert = createRouteLazyComponent(
   () => import("@/pages/test-mock-alert"),
   "/test-mock-alert"
 );
@@ -159,25 +172,15 @@ function Router() {
       <Route path="/membership" component={MembershipPage} />
       <Route path="/wishlist" component={WishlistPage} />
 
-      {/* Service routes - gated by feature flags */}
-      {featureFlags.enableMixingMastering && MixingMastering && (
-        <Route path="/mixing-mastering" component={MixingMastering} />
-      )}
-      {featureFlags.enableRecordingSessions && RecordingSessions && (
-        <Route path="/recording-sessions" component={RecordingSessions} />
-      )}
-      {featureFlags.enableCustomBeats && CustomBeats && (
-        <Route path="/custom-beats" component={CustomBeats} />
-      )}
-      {featureFlags.enableProductionConsultation && ProductionConsultation && (
-        <Route path="/production-consultation" component={ProductionConsultation} />
-      )}
-
+      <Route path="/mixing-mastering" component={MixingMastering} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/checkout-success" component={CheckoutSuccess} />
       <Route path="/payment/success" component={PaymentSuccess} />
       <Route path="/payment/cancel" component={PaymentCancel} />
       <Route path="/premium-downloads" component={PremiumDownloads} />
+      <Route path="/recording-sessions" component={RecordingSessions} />
+      <Route path="/custom-beats" component={CustomBeats} />
+      <Route path="/production-consultation" component={ProductionConsultation} />
 
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
@@ -191,44 +194,31 @@ function Router() {
   );
 }
 
+// Custom hook for newsletter modal with lazy loading
+function useNewsletterModalLazy() {
+  const [isOpen, setIsOpen] = useState(false);
+  const closeModal = () => setIsOpen(false);
+  return { isOpen, closeModal };
+}
+
 function App() {
-  // Remove production render logging - only log in development
-  if (process.env.NODE_ENV === "development") {
-    console.log("🎨 App component rendering...");
-  }
+  const { isOpen, closeModal } = useNewsletterModalLazy();
+
+  console.log("🎨 App component rendering...");
 
   // Use interaction-based preloading
   useInteractionPreloader();
 
   // Initialize performance optimizations
   useEffect(() => {
-    // Gate preloading and cache warming by checking if user is likely authenticated
-    // This prevents unnecessary preloads for anonymous users
-    const initializeOptimizations = async () => {
-      // Check if user has session indicators (Clerk session, tokens, etc.)
-      const hasSession =
-        document.cookie.includes("__session") ||
-        document.cookie.includes("__clerk") ||
-        localStorage.getItem("clerk-db-jwt");
+    // Preload critical components after initial render
+    bundleOptimization.preloadCriticalComponents();
 
-      if (hasSession) {
-        // Only preload authenticated user features if session exists
-        bundleOptimization.preloadCriticalComponents();
-        bundleOptimization.preloadOnUserInteraction();
+    // Setup user interaction-based preloading
+    bundleOptimization.preloadOnUserInteraction();
 
-        // Warm cache with critical data only for authenticated users
-        await warmCache().catch(error => {
-          if (process.env.NODE_ENV === "development") {
-            console.error("Cache warming failed:", error);
-          }
-        });
-      } else {
-        // For anonymous users, only preload public pages
-        bundleOptimization.preloadPublicPages();
-      }
-    };
-
-    initializeOptimizations();
+    // Warm cache with critical data
+    warmCache().catch(console.error);
   }, []);
 
   return (
@@ -251,14 +241,12 @@ function App() {
                   {/* Global loading indicator */}
                   <GlobalLoadingIndicator />
 
-                  {/* Offline indicator - lazy loaded and gated by feature flag */}
-                  {featureFlags.enableOfflineMode && (
-                    <div className="fixed bottom-4 right-4 z-40">
-                      <Suspense fallback={null}>
-                        <OfflineIndicator />
-                      </Suspense>
-                    </div>
-                  )}
+                  {/* Offline indicator - lazy loaded */}
+                  <div className="fixed bottom-4 right-4 z-40">
+                    <Suspense fallback={null}>
+                      <OfflineIndicator showDetails />
+                    </Suspense>
+                  </div>
 
                   {/* Navbar always visible for navigation */}
                   <Navbar />
@@ -271,9 +259,13 @@ function App() {
                       {/* Component preloader for route-based optimization */}
                       <ComponentPreloader />
 
-                      {/* Performance monitoring - gated by feature flags */}
-                      {featureFlags.enablePerformanceMonitoring && <PerformanceMonitor />}
-                      {featureFlags.enableBundleAnalyzer && <BundleSizeAnalyzer />}
+                      {/* Performance monitoring (development only) */}
+                      {process.env.NODE_ENV === "development" && (
+                        <>
+                          <PerformanceMonitor />
+                          <BundleSizeAnalyzer />
+                        </>
+                      )}
                     </ErrorBoundary>
                   </main>
 
@@ -292,8 +284,12 @@ function App() {
                     <EnhancedGlobalAudioPlayer />
                   </Suspense>
 
-                  {/* Newsletter modal - lazy loaded and gated by feature flag */}
-                  {/* Disabled for now - modal state management needs refactoring */}
+                  {/* Newsletter modal - lazy loaded */}
+                  {isOpen && (
+                    <Suspense fallback={null}>
+                      <NewsletterModal isOpen={isOpen} onClose={closeModal} />
+                    </Suspense>
+                  )}
 
                   {/* Toaster for notifications */}
                   <Toaster />

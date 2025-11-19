@@ -3,18 +3,19 @@
  * Shows offline status and pending operations to users
  */
 
-import { useOfflineManager } from "@/hooks/useOfflineManager";
 import { AlertCircle, CheckCircle, Clock, RefreshCw, Wifi, WifiOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useOfflineManager } from "@/hooks/useOfflineManager";
 
 interface OfflineIndicatorProps {
-  readonly className?: string;
-  readonly showDetails?: boolean;
+  className?: string;
+  showDetails?: boolean;
 }
 
-export default function OfflineIndicator(props: unknown = {}) {
-  const typedProps = (props || {}) as OfflineIndicatorProps;
-  const { className = "", showDetails = false } = typedProps;
+export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
+  className = "",
+  showDetails = false,
+}) => {
   const { isOnline, getOperationStats, getPendingUpdates, syncNow, clearCompleted } =
     useOfflineManager();
 
@@ -32,10 +33,12 @@ export default function OfflineIndicator(props: unknown = {}) {
 
   // Update stats periodically
   useEffect(() => {
-    const updateStats = (): void => {
+    const updateStats = async () => {
       try {
-        const operationStats = getOperationStats();
-        const updates = getPendingUpdates();
+        const [operationStats, updates] = await Promise.all([
+          getOperationStats(),
+          getPendingUpdates(),
+        ]);
 
         setStats(operationStats);
         setPendingUpdates(updates.length);
@@ -65,9 +68,9 @@ export default function OfflineIndicator(props: unknown = {}) {
   };
 
   // Handle clear completed
-  const handleClearCompleted = (): void => {
+  const handleClearCompleted = async () => {
     try {
-      clearCompleted();
+      await clearCompleted();
     } catch (error) {
       console.error("Failed to clear completed operations:", error);
     }
@@ -83,8 +86,7 @@ export default function OfflineIndicator(props: unknown = {}) {
   return (
     <div className={`offline-indicator ${className}`}>
       {/* Main indicator */}
-      <button
-        type="button"
+      <div
         className={`
           flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all
           ${
@@ -95,9 +97,6 @@ export default function OfflineIndicator(props: unknown = {}) {
           ${showDetails ? "hover:bg-opacity-30" : ""}
         `}
         onClick={() => showDetails && setIsExpanded(!isExpanded)}
-        disabled={!showDetails}
-        aria-label={`${isOnline ? "Online" : "Offline"} status indicator${showDetails ? ", click to expand details" : ""}`}
-        aria-expanded={showDetails ? isExpanded : undefined}
       >
         {/* Status icon */}
         {isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
@@ -137,7 +136,7 @@ export default function OfflineIndicator(props: unknown = {}) {
 
         {/* Expand indicator */}
         {showDetails && <div className="text-xs opacity-60">{isExpanded ? "▼" : "▶"}</div>}
-      </button>
+      </div>
 
       {/* Detailed view */}
       {showDetails && isExpanded && (
@@ -262,4 +261,6 @@ export default function OfflineIndicator(props: unknown = {}) {
       )}
     </div>
   );
-}
+};
+
+export default OfflineIndicator;

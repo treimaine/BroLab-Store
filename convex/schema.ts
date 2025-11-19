@@ -545,4 +545,25 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_expires", ["expiresAt"])
     .index("by_used", ["used"]),
+
+  // Files - File storage metadata
+  files: defineTable({
+    userId: v.id("users"),
+    filename: v.string(),
+    originalName: v.string(),
+    storagePath: v.string(),
+    mimeType: v.string(),
+    size: v.number(),
+    role: v.union(v.literal("upload"), v.literal("deliverable"), v.literal("invoice")),
+    reservationId: v.optional(v.id("reservations")),
+    orderId: v.optional(v.id("orders")),
+    ownerId: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_owner", ["ownerId"])
+    .index("by_role", ["role"])
+    .index("by_reservation", ["reservationId"])
+    .index("by_order", ["orderId"])
+    .index("by_user_role", ["userId", "role"]),
 });

@@ -3,63 +3,35 @@ import { ComponentType, useEffect } from "react";
 
 /**
  * Hook to preload components on user interaction
- * Preloads heavy components on first meaningful user interaction with throttling
- * to prevent excessive CPU/network churn before meaningful engagement
+ * Preloads heavy components on first user interaction (mousedown, touchstart, keydown)
  */
 export function useInteractionPreloader(): void {
   useEffect(() => {
     let hasPreloaded = false;
-    let interactionCount = 0;
-    let debounceTimer: NodeJS.Timeout | null = null;
 
-    const preloadAudioPlayer = (): Promise<{ default: ComponentType<unknown> }> => {
+    const preloadAudioPlayer = (): Promise<{ default: ComponentType<Record<string, unknown>> }> => {
       return import("@/components/audio/EnhancedGlobalAudioPlayer").then(module => ({
         default: module.EnhancedGlobalAudioPlayer,
       }));
     };
 
     const preloadHeavyComponents = (): void => {
-      // Check if user has session before preloading authenticated features
-      const hasSession =
-        document.cookie.includes("__session") ||
-        document.cookie.includes("__clerk") ||
-        localStorage.getItem("clerk-db-jwt");
-
-      // Preload audio player for all users
+      // Preload heavy components on first user interaction
       preloadComponent(preloadAudioPlayer);
-
-      // Only preload dashboard for authenticated users
-      if (hasSession) {
-        preloadComponent(() => import("@/pages/dashboard"));
-      }
+      preloadComponent(() => import("@/pages/dashboard"));
     };
 
     const handleInteraction = (): void => {
       if (hasPreloaded) return;
+      hasPreloaded = true;
 
-      // Increment interaction count
-      interactionCount++;
+      preloadHeavyComponents();
 
-      // Clear existing debounce timer
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
-
-      // Only trigger preload after first meaningful input with debounce
-      // This prevents preloading on accidental touches or mouse movements
-      debounceTimer = setTimeout(() => {
-        if (interactionCount > 0 && !hasPreloaded) {
-          hasPreloaded = true;
-          preloadHeavyComponents();
-          removeListeners();
-        }
-      }, 300); // 300ms debounce to ensure meaningful engagement
+      // Remove event listeners after first interaction
+      removeListeners();
     };
 
     const removeListeners = (): void => {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
       document.removeEventListener("mousedown", handleInteraction);
       document.removeEventListener("touchstart", handleInteraction);
       document.removeEventListener("keydown", handleInteraction);

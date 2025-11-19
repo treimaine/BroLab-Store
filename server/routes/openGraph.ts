@@ -100,7 +100,7 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
       throw error;
     }
 
-    if (!product?.id) {
+    if (!product || !product.id) {
       res.status(404).json({ error: "Beat not found" });
       return;
     }
@@ -108,7 +108,7 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
     // Helper function to extract BPM from meta data
     const extractBpmFromMeta = (metaData: WooCommerceMetaData[]): number | undefined => {
       const bpmMeta = metaData.find((meta: WooCommerceMetaData) => meta.key === "bpm");
-      return bpmMeta?.value ? Number.parseInt(bpmMeta.value.toString(), 10) : undefined;
+      return bpmMeta?.value ? parseInt(bpmMeta.value.toString()) : undefined;
     };
 
     // Helper function to extract string value from meta data
@@ -117,14 +117,6 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
       return meta?.value?.toString() || null;
     };
 
-    // Extract BPM value
-    let bpmValue: number | undefined;
-    if (product.bpm) {
-      bpmValue = Number.parseInt(product.bpm.toString(), 10);
-    } else if (product.meta_data) {
-      bpmValue = extractBpmFromMeta(product.meta_data);
-    }
-
     // Transformer les données WooCommerce
     const beat: ProcessedBeatData = {
       id: product.id,
@@ -132,13 +124,17 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
       name: product.name, // Alias for compatibility
       description: product.description,
       genre: product.categories?.[0]?.name || "Unknown",
-      bpm: bpmValue,
+      bpm: product.bpm
+        ? parseInt(product.bpm.toString())
+        : product.meta_data
+          ? extractBpmFromMeta(product.meta_data)
+          : undefined,
       key:
         product.key || (product.meta_data ? extractStringFromMeta(product.meta_data, "key") : null),
       mood:
         product.mood ||
         (product.meta_data ? extractStringFromMeta(product.meta_data, "mood") : null),
-      price: Number.parseFloat(product.price) || 0,
+      price: parseFloat(product.price) || 0,
       image_url: product.images?.[0]?.src,
       image: product.images?.[0]?.src, // Alias for compatibility
       images: product.images?.map((img: WooCommerceImage) => ({ src: img.src, alt: img.alt })),
@@ -149,7 +145,7 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
         name: cat.name,
       })),
       meta_data: product.meta_data,
-      duration: product.duration ? Number.parseFloat(product.duration.toString()) : undefined,
+      duration: product.duration ? parseFloat(product.duration.toString()) : undefined,
       downloads: Array.isArray(product.downloads)
         ? product.downloads.length
         : product.downloads || 0,
@@ -164,11 +160,7 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
     res.setHeader("Cache-Control", "public, max-age=3600"); // Cache 1 heure
     res.send(openGraphHTML);
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to generate Open Graph for beat"
-    );
+    handleRouteError(error, res, "Failed to generate Open Graph for beat");
   }
 });
 
@@ -185,11 +177,7 @@ router.get("/shop", async (req, res): Promise<void> => {
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(openGraphHTML);
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to generate Open Graph for shop"
-    );
+    handleRouteError(error, res, "Failed to generate Open Graph for shop");
   }
 });
 
@@ -206,11 +194,7 @@ router.get("/home", async (req, res): Promise<void> => {
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(openGraphHTML);
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to generate Open Graph for home"
-    );
+    handleRouteError(error, res, "Failed to generate Open Graph for home");
   }
 });
 
@@ -236,11 +220,7 @@ router.get("/page/:pageName", async (req, res): Promise<void> => {
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(openGraphHTML);
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to generate Open Graph for page"
-    );
+    handleRouteError(error, res, "Failed to generate Open Graph for page");
   }
 });
 

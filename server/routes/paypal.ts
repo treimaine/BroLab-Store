@@ -43,7 +43,7 @@ router.get("/test", async (req: Request, res: Response) => {
 
     res.json(testResponse);
   } catch (error: unknown) {
-    handleRouteError(error instanceof Error ? error : String(error), res, "PayPal test failed");
+    handleRouteError(error, res, "PayPal test failed");
   }
 });
 
@@ -71,11 +71,7 @@ router.get("/test-auth", requireAuth, async (req: AuthenticatedRequest, res: Res
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "PayPal auth test failed"
-    );
+    handleRouteError(error, res, "PayPal auth test failed");
   }
 });
 
@@ -141,11 +137,7 @@ router.post("/create-order", requireAuth, async (req: AuthenticatedRequest, res:
       });
     }
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to create PayPal order"
-    );
+    handleRouteError(error, res, "Failed to create PayPal order");
   }
 });
 
@@ -188,11 +180,7 @@ router.post("/capture-payment", requireAuth, async (req: AuthenticatedRequest, r
       });
     }
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to capture PayPal payment"
-    );
+    handleRouteError(error, res, "Failed to capture PayPal payment");
   }
 });
 
@@ -277,11 +265,7 @@ router.get("/order/:orderId", requireAuth, async (req: AuthenticatedRequest, res
       order: orderDetails,
     });
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to get PayPal order details"
-    );
+    handleRouteError(error, res, "Failed to get PayPal order details");
   }
 });
 
@@ -298,11 +282,7 @@ router.get("/health", async (req: Request, res: Response) => {
       environment: process.env.PAYPAL_MODE || "sandbox",
     });
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "PayPal service is unhealthy"
-    );
+    handleRouteError(error, res, "PayPal service is unhealthy");
   }
 });
 

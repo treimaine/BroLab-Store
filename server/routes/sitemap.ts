@@ -72,11 +72,11 @@ router.get("/sitemap.xml", async (_req, res) => {
       // Extract BPM from product or meta_data
       let bpm: number | undefined;
       if (product.bpm) {
-        bpm = Number.parseInt(product.bpm.toString(), 10);
+        bpm = parseInt(product.bpm.toString());
       } else {
         const bpmMeta = product.meta_data?.find(meta => meta.key === "bpm");
         if (bpmMeta?.value) {
-          bpm = Number.parseInt(bpmMeta.value.toString(), 10);
+          bpm = parseInt(bpmMeta.value.toString());
         }
       }
 
@@ -95,7 +95,7 @@ router.get("/sitemap.xml", async (_req, res) => {
           product.mood ||
           product.meta_data?.find(meta => meta.key === "mood")?.value?.toString() ||
           null,
-        price: Number.parseFloat(product.price) || 0,
+        price: parseFloat(product.price) || 0,
         image_url: product.images?.[0]?.src,
         image: product.images?.[0]?.src, // Alias for compatibility
         images: product.images,
@@ -103,7 +103,7 @@ router.get("/sitemap.xml", async (_req, res) => {
         tags: product.tags?.map(tag => tag.name) || [],
         categories: product.categories,
         meta_data: product.meta_data,
-        duration: product.duration ? Number.parseFloat(product.duration.toString()) : undefined,
+        duration: product.duration ? parseFloat(product.duration.toString()) : undefined,
         downloads: product.downloads || 0,
       };
     });
@@ -121,11 +121,7 @@ router.get("/sitemap.xml", async (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=3600"); // Cache 1 heure
     res.send(sitemapXML);
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to generate sitemap"
-    );
+    handleRouteError(error, res, "Failed to generate sitemap");
   }
 });
 
@@ -143,11 +139,7 @@ router.get("/sitemap-index.xml", async (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(sitemapIndexXML);
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to generate sitemap index"
-    );
+    handleRouteError(error, res, "Failed to generate sitemap index");
   }
 });
 
@@ -163,11 +155,7 @@ router.get("/robots.txt", async (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache 24 heures
     res.send(robotsTxt);
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to generate robots.txt"
-    );
+    handleRouteError(error, res, "Failed to generate robots.txt");
   }
 });
 
@@ -183,11 +171,11 @@ router.get("/sitemap-beats.xml", async (_req, res) => {
       // Extract BPM from product or meta_data
       let bpm: number | undefined;
       if (product.bpm) {
-        bpm = Number.parseInt(product.bpm.toString(), 10);
+        bpm = parseInt(product.bpm.toString());
       } else {
         const bpmMeta = product.meta_data?.find(meta => meta.key === "bpm");
         if (bpmMeta?.value) {
-          bpm = Number.parseInt(bpmMeta.value.toString(), 10);
+          bpm = parseInt(bpmMeta.value.toString());
         }
       }
 
@@ -206,7 +194,7 @@ router.get("/sitemap-beats.xml", async (_req, res) => {
           product.mood ||
           product.meta_data?.find(meta => meta.key === "mood")?.value?.toString() ||
           null,
-        price: Number.parseFloat(product.price) || 0,
+        price: parseFloat(product.price) || 0,
         image_url: product.images?.[0]?.src,
         image: product.images?.[0]?.src, // Alias for compatibility
         images: product.images,
@@ -214,7 +202,7 @@ router.get("/sitemap-beats.xml", async (_req, res) => {
         tags: product.tags?.map(tag => tag.name) || [],
         categories: product.categories,
         meta_data: product.meta_data,
-        duration: product.duration ? Number.parseFloat(product.duration.toString()) : undefined,
+        duration: product.duration ? parseFloat(product.duration.toString()) : undefined,
         downloads: product.downloads || 0,
       };
     });
@@ -230,11 +218,7 @@ router.get("/sitemap-beats.xml", async (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=1800"); // Cache 30 minutes
     res.send(sitemapXML);
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to generate beats sitemap"
-    );
+    handleRouteError(error, res, "Failed to generate beats sitemap");
   }
 });
 

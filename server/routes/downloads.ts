@@ -60,14 +60,11 @@ router.post(
       });
 
       // Log download with Convex (use string literal to avoid deep type instantiation)
-      const download = await (convex.mutation as (name: string, args: unknown) => Promise<unknown>)(
-        "downloads:recordDownload",
-        {
-          beatId: Number(productId),
-          licenseType: String(license),
-          downloadUrl: undefined,
-        }
-      );
+      const download = await (convex as any).mutation("downloads:recordDownload", {
+        beatId: Number(productId),
+        licenseType: String(license),
+        downloadUrl: undefined,
+      });
 
       if (download) {
         res.json({
@@ -85,7 +82,7 @@ router.post(
         res.status(500).json({ error: "Failed to log download" });
       }
     } catch (error: unknown) {
-      handleRouteError(error instanceof Error ? error : String(error), res, "Download failed");
+      handleRouteError(error, res, "Download failed");
     }
   }
 );
@@ -106,10 +103,8 @@ router.get("/", isAuthenticated, async (req, res): Promise<void> => {
       return;
     }
 
-    const downloads = (await (convex.query as (name: string, args: unknown) => Promise<unknown>)(
-      "downloads:getUserDownloads",
-      {}
-    )) as DownloadRecord[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const downloads = await (convex as any).query("downloads:getUserDownloads", {});
 
     res.json({
       downloads: downloads.map((download: DownloadRecord) => ({
@@ -121,11 +116,7 @@ router.get("/", isAuthenticated, async (req, res): Promise<void> => {
       })),
     });
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to list downloads"
-    );
+    handleRouteError(error, res, "Failed to list downloads");
   }
 });
 
@@ -145,10 +136,8 @@ router.get("/export", isAuthenticated, async (req, res): Promise<void> => {
       return;
     }
 
-    const downloads = (await (convex.query as (name: string, args: unknown) => Promise<unknown>)(
-      "downloads:getUserDownloads",
-      {}
-    )) as DownloadRecord[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const downloads = await (convex as any).query("downloads:getUserDownloads", {});
 
     // Prepare CSV data
     const csvData = downloads.map((download: DownloadRecord) => ({
@@ -172,11 +161,7 @@ router.get("/export", isAuthenticated, async (req, res): Promise<void> => {
 
     res.send(csv);
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to export downloads"
-    );
+    handleRouteError(error, res, "Failed to export downloads");
   }
 });
 
@@ -197,10 +182,7 @@ router.get("/quota", isAuthenticated, async (req, res): Promise<void> => {
     }
 
     // For now, return a basic quota response since checkDownloadQuota returns unlimited
-    const downloads = (await (convex.query as (name: string, args: unknown) => Promise<unknown>)(
-      "downloads:getUserDownloads",
-      {}
-    )) as DownloadRecord[];
+    const downloads = await (convex as any).query("downloads:getUserDownloads", {});
 
     const downloadsUsed = downloads.length;
     const quota = 10; // Basic quota
@@ -217,11 +199,7 @@ router.get("/quota", isAuthenticated, async (req, res): Promise<void> => {
       licenseType: "basic",
     });
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to fetch download quota"
-    );
+    handleRouteError(error, res, "Failed to fetch download quota");
   }
 });
 
@@ -258,11 +236,7 @@ router.get("/quota/test", async (req, res): Promise<void> => {
       message: "Test endpoint - authentication required for actual data",
     });
   } catch (error: unknown) {
-    handleRouteError(
-      error instanceof Error ? error : String(error),
-      res,
-      "Failed to fetch test download quota"
-    );
+    handleRouteError(error, res, "Failed to fetch test download quota");
   }
 });
 
@@ -282,7 +256,7 @@ router.get("/file/:productId/:type", async (req, res): Promise<void> => {
       note: "This is a placeholder. In production, this would serve the actual file.",
     });
   } catch (error: unknown) {
-    handleRouteError(error instanceof Error ? error : String(error), res, "File download failed");
+    handleRouteError(error, res, "File download failed");
   }
 });
 
