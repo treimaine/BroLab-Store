@@ -337,6 +337,53 @@ export const getOrderWithRelations = query({
   },
 });
 
+// Get order status history from activity logs
+export const getOrderStatusHistory = query({
+  args: { orderId: v.id("orders") },
+  handler: async (ctx, { orderId }) => {
+    const order = await ctx.db.get(orderId);
+    if (!order) return [];
+
+    // Get activity logs related to order status changes
+    const activities = await ctx.db
+      .query("activityLog")
+      .filter(q =>
+        q.and(
+          q.eq(q.field("userId"), order.userId),
+          q.or(
+            q.eq(q.field("action"), "order_created"),
+            q.eq(q.field("action"), "order_status_updated"),
+            q.eq(q.field("action"), "payment_succeeded"),
+            q.eq(q.field("action"), "payment_failed")
+          )
+        )
+      )
+      .order("desc")
+      .collect();
+
+    // Filter activities related to this specific order and format
+    return activities
+      .filter(activity => {
+        const details = activity.details as { orderId?: string } | undefined;
+        return details?.orderId === orderId;
+      })
+      .map(activity => {
+        const details = activity.details as
+          | {
+              status?: string;
+              oldStatus?: string;
+              newStatus?: string;
+            }
+          | undefined;
+        return {
+          timestamp: activity.timestamp,
+          status: details?.newStatus || details?.status || "unknown",
+          action: activity.action,
+        };
+      });
+  },
+});
+
 // Admin listing with filters
 export const listOrdersAdmin = query({
   args: {
