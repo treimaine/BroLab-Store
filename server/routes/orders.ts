@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { OrderStatus } from "../../shared/types/Order";
 import type {
   CreateOrderResponse,
   GetInvoiceResponse,
@@ -93,6 +94,15 @@ const getOrderWithRelations = async (args: {
   };
 };
 
+const getOrderStatusHistory = async (args: {
+  orderId: string;
+}): Promise<Array<{ timestamp: number; status: string; action: string }>> => {
+  return (await (convex.query as (name: string, args: unknown) => Promise<unknown>)(
+    "orders:getOrderStatusHistory",
+    args
+  )) as Array<{ timestamp: number; status: string; action: string }>;
+};
+
 // Remove the old schema - using shared validation now
 
 ordersRouter.use(isAuthenticated);
@@ -160,7 +170,7 @@ ordersRouter.get("/me", validateQuery(CommonQueries.pagination), getMyOrders as 
 // GET /api/orders/:id
 const getOrder: GetOrderHandler = async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const id = req.params.id;
     const data = await getOrderWithRelations({ orderId: id });
 
     const user = req.user;
@@ -168,17 +178,25 @@ const getOrder: GetOrderHandler = async (req, res) => {
       user?.role === "admin" ||
       user?.email === "admin@brolabentertainment.com" ||
       user?.username === "admin";
-    const isOwner = data?.order?.userId && String(data.order.userId) === String(user?.id);
+    const orderUserId = data?.order?.userId as string | undefined;
+    const isOwner = orderUserId && orderUserId === String(user?.id);
 
     if (!isAdmin && !isOwner) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
 
+    // Fetch status history
+    const statusHistory = await getOrderStatusHistory({ orderId: id });
+
     const response: GetOrderResponse = {
       order: data?.order as unknown as GetOrderResponse["order"],
       items: (data?.items || []) as unknown as GetOrderResponse["items"],
-      statusHistory: [], // TODO: Implement status history
+      statusHistory: statusHistory.map(h => ({
+        status: h.status as OrderStatus,
+        timestamp: new Date(h.timestamp).toISOString(),
+        comment: h.action,
+      })),
     };
     res.json(response);
   } catch (error: unknown) {
@@ -192,7 +210,7 @@ ordersRouter.get("/:id", validateParams(CommonParams.id), getOrder as never);
 // Signed URL already attached on order after webhook pipeline; just return stored URL
 const getInvoice: GetInvoiceHandler = async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const id = req.params.id;
     const data = await getOrderWithRelations({ orderId: id });
 
     const user = req.user;
@@ -200,7 +218,8 @@ const getInvoice: GetInvoiceHandler = async (req, res) => {
       user?.role === "admin" ||
       user?.email === "admin@brolabentertainment.com" ||
       user?.username === "admin";
-    const isOwner = data?.order?.userId && String(data.order.userId) === String(user?.id);
+    const orderUserId = data?.order?.userId as string | undefined;
+    const isOwner = orderUserId && orderUserId === String(user?.id);
     if (!isAdmin && !isOwner) {
       res.status(403).json({ error: "Forbidden" });
       return;
@@ -224,7 +243,7 @@ ordersRouter.get("/:id/invoice", validateParams(CommonParams.id), getInvoice as 
 // GET /api/orders/:id/invoice/download
 ordersRouter.get("/:id/invoice/download", validateParams(CommonParams.id), async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const id = req.params.id;
     const data = await getOrderWithRelations({ orderId: id });
 
     const user = req.user;
@@ -232,7 +251,8 @@ ordersRouter.get("/:id/invoice/download", validateParams(CommonParams.id), async
       user?.role === "admin" ||
       user?.email === "admin@brolabentertainment.com" ||
       user?.username === "admin";
-    const isOwner = data?.order?.userId && String(data.order.userId) === String(user?.id);
+    const orderUserId = data?.order?.userId as string | undefined;
+    const isOwner = orderUserId && orderUserId === String(user?.id);
     if (!isAdmin && !isOwner) {
       res.status(403).json({ error: "Forbidden" });
       return;

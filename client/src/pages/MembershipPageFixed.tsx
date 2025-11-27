@@ -1,78 +1,31 @@
 import { Badge } from "@/components/ui/badge";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { useToast } from "@/hooks/use-toast";
-import { PricingTable, useUser } from "@clerk/clerk-react";
+import { PricingTable } from "@clerk/clerk-react";
 import { Download, Music, Zap } from "lucide-react";
 import { startTransition, useEffect, useState } from "react";
-import { useLocation } from "wouter";
 
-// Composant de chargement pour PricingTable
-const PricingTableFallback = () => (
-  <div className="max-w-4xl mx-auto">
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      {[1, 2, 3].map(i => (
-        <div
-          key={i}
-          className="bg-[var(--medium-gray)] border border-[var(--medium-gray)] rounded-xl p-6 animate-pulse"
-        >
-          <div className="h-8 bg-gray-600 rounded mb-4" />
-          <div className="h-12 bg-gray-600 rounded mb-6" />
-          <div className="space-y-3">
-            {[1, 2, 3, 4].map(j => (
-              <div key={j} className="h-4 bg-gray-600 rounded" />
-            ))}
-          </div>
-          <div className="h-12 bg-gray-600 rounded mt-8" />
-        </div>
-      ))}
-    </div>
-  </div>
-);
+interface OrderItem {
+  title: string;
+  licenseType: string;
+  price: number;
+}
 
-// Composant d'erreur Clerk
-const ClerkErrorFallback = () => (
-  <div className="max-w-4xl mx-auto text-center">
-    <div className="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-8">
-      <h3 className="text-2xl font-bold text-yellow-200 mb-4">
-        Subscription system temporarily unavailable
-      </h3>
-      <p className="text-yellow-200 mb-6">
-        We are currently resolving a technical issue with our Clerk subscription system. Please try
-        again in a few minutes or contact us if the problem persists.
-      </p>
-      <button
-        onClick={() => window.location.reload()}
-        className="bg-[var(--accent-purple)] hover:bg-[var(--accent-purple)]/90 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-      >
-        Try again
-      </button>
-    </div>
-  </div>
-);
+interface OrderDetails {
+  orderId: string;
+  amount: number;
+  items: OrderItem[];
+}
 
-export default function MembershipPage() {
-  const [location] = useLocation();
+export default function MembershipPage(): JSX.Element {
   const { toast } = useToast();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [isOneTimePurchase, setIsOneTimePurchase] = useState(false);
-  const [orderDetails, setOrderDetails] = useState<any>(null);
-  const { isLoaded, user } = useUser();
-  const [clerkError, setClerkError] = useState(false);
-
-  // Détection d'erreur Clerk
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!isLoaded) {
-        setClerkError(true);
-      }
-    }, 5000);
-
-    return () => clearTimeout(timer);
-  }, [isLoaded]);
+  const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
 
   // Check if user came from canceled subscription or one-time purchase
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(globalThis.location.search);
 
     if (urlParams.get("canceled") === "true") {
       startTransition(() => {
@@ -94,8 +47,8 @@ export default function MembershipPage() {
         setIsOneTimePurchase(true);
         setOrderDetails({
           orderId,
-          amount: parseFloat(amount),
-          items: JSON.parse(decodeURIComponent(items)),
+          amount: Number.parseFloat(amount),
+          items: JSON.parse(decodeURIComponent(items)) as OrderItem[],
         });
 
         toast({
@@ -129,8 +82,11 @@ export default function MembershipPage() {
           <div className="bg-[var(--medium-gray)] rounded-lg p-6 mb-8">
             <h2 className="text-2xl font-bold text-white mb-4">Purchase Summary</h2>
             <div className="space-y-2">
-              {orderDetails.items.map((item: any, index: number) => (
-                <div key={index} className="flex justify-between items-center">
+              {orderDetails.items.map((item: OrderItem) => (
+                <div
+                  key={`${item.title}-${item.licenseType}`}
+                  className="flex justify-between items-center"
+                >
                   <div>
                     <p className="text-white font-medium">{item.title}</p>
                     <p className="text-gray-400 text-sm">{item.licenseType} License</p>

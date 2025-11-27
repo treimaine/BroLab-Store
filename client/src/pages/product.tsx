@@ -1,27 +1,61 @@
-import { LazyBeatSimilarityRecommendations } from "@/components/loading/LazyComponents";
+import { useCartContext } from "@/components/cart/cart-provider";
 import { LicensePreviewModal } from "@/components/licenses/LicensePreviewModal";
+import { LazyBeatSimilarityRecommendations } from "@/components/loading/LazyComponents";
 import { OpenGraphMeta } from "@/components/seo/OpenGraphMeta";
 import { SchemaMarkup } from "@/components/seo/SchemaMarkup";
-import { useCartContext } from "@/components/cart/cart-provider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
-// useClerkBilling supprimé - utilisation de l'interface Clerk native
 import { useClerkSync } from "@/hooks/useClerkSync";
 import { useDownloads } from "@/hooks/useDownloads";
 import { useWishlist } from "@/hooks/useWishlist";
 import { LicensePricing, LicenseTypeEnum } from "@shared/schema";
+import { LicenseType } from "@shared/types/Beat";
 import { ArrowLeft, Download, FileText, Heart, Music, ShoppingCart } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRoute } from "wouter";
 
-export default function Product() {
+interface Tag {
+  name: string;
+}
+
+interface MetaData {
+  key: string;
+  value: string | number | boolean | string[] | null;
+}
+
+interface SimilarProduct {
+  id: number;
+  name: string;
+  price: number | string;
+  images?: Array<{ src: string }>;
+  bpm?: number;
+  categories?: Array<{ name: string }>;
+  meta_data?: MetaData[];
+  tags?: Array<string | Tag>;
+}
+
+export default function Product(): JSX.Element {
   const [, params] = useRoute("/product/:id");
-  const productId = params?.id ? parseInt(params.id) : 0;
+  const productId = params?.id ? Number.parseInt(params.id, 10) : 0;
   const [selectedLicense, setSelectedLicense] = useState<LicenseTypeEnum>("basic");
   const [showLicensePreview, setShowLicensePreview] = useState(false);
+
+  // Convert LicenseTypeEnum to LicenseType enum for components that need it
+  const getLicenseTypeEnum = (license: LicenseTypeEnum): LicenseType => {
+    switch (license) {
+      case "basic":
+        return LicenseType.BASIC;
+      case "premium":
+        return LicenseType.PREMIUM;
+      case "unlimited":
+        return LicenseType.UNLIMITED;
+      default:
+        return LicenseType.BASIC;
+    }
+  };
 
   const { useProduct, useSimilarProducts } = useWooCommerce();
   const { data: product, isLoading, error, refetch } = useProduct(productId.toString());
@@ -43,12 +77,9 @@ export default function Product() {
   const { addItem } = useCartContext();
   const { toast } = useToast();
   const { logDownload } = useDownloads();
-  // Vérification des permissions via Clerk native (à implémenter si nécessaire)
-  const canDownload = (licenseType: string) => true; // Temporaire - Clerk gère les permissions
-  const hasPlan = (plan: string) => false; // Temporaire - Clerk gère les plans
   const { syncUser } = useClerkSync();
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (): void => {
     if (!product) return;
 
     addItem({
@@ -58,7 +89,7 @@ export default function Product() {
       imageUrl: product.images?.[0]?.src,
       licenseType: selectedLicense,
       quantity: 1,
-      isFree: isFree, // Ajouter le paramètre isFree
+      isFree,
     });
 
     toast({
@@ -67,43 +98,33 @@ export default function Product() {
     });
   };
 
-  // Fonction pour télécharger directement les produits gratuits
-  const handleFreeDownload = async () => {
+  // Function to download free products directly
+  const handleFreeDownload = async (): Promise<void> => {
     if (!product) return;
 
-    // Vérifier les permissions de téléchargement
-    if (!canDownload(selectedLicense)) {
-      toast({
-        title: "Download Permission Required",
-        description: `You need a ${selectedLicense} plan or higher to download this product.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
     try {
-      // Synchroniser l'utilisateur si nécessaire
+      // Sync user if necessary
       await syncUser();
 
-      // Logger le téléchargement via Convex
+      // Log download via Convex
       await logDownload({
         productId: product.id,
         productName: product.name,
         license: selectedLicense,
-        price: 0, // Gratuit
+        price: 0,
       });
 
       // Trigger download success event for dashboard refresh
-      window.dispatchEvent(new CustomEvent("download-success"));
+      globalThis.dispatchEvent(new CustomEvent("download-success"));
 
-      // Ensuite télécharger le fichier
+      // Then download the file
       const downloadUrl = product.audio_url || `/api/downloads/file/${product.id}/free`;
       const link = document.createElement("a");
       link.href = downloadUrl;
       link.download = `${product.name}.mp3`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
 
       toast({
         title: "Download Started",
@@ -121,7 +142,7 @@ export default function Product() {
         });
         // Optionally redirect to login page
         setTimeout(() => {
-          window.location.href = "/login";
+          globalThis.location.href = "/login";
         }, 2000);
       } else {
         toast({
@@ -135,7 +156,7 @@ export default function Product() {
 
   const { addFavorite, removeFavorite, isFavorite } = useWishlist();
 
-  const handleAddToWishlist = async () => {
+  const handleAddToWishlist = async (): Promise<void> => {
     if (!product) return;
 
     try {
@@ -155,11 +176,6 @@ export default function Product() {
     } catch (error) {
       console.error("Wishlist error:", error);
     }
-  };
-
-  const handleSelectLicense = (licenseType: string) => {
-    setSelectedLicense(licenseType as LicenseTypeEnum);
-    setShowLicensePreview(false);
   };
 
   if (isLoading) {
@@ -187,7 +203,7 @@ export default function Product() {
     );
   }
 
-  if (!product || error || productId === 0 || isNaN(productId)) {
+  if (!product || error || productId === 0 || Number.isNaN(productId)) {
     return (
       <div className="pt-16 bg-[var(--dark-gray)] min-h-screen">
         <SchemaMarkup type="beat" beatId={productId} />
@@ -196,9 +212,9 @@ export default function Product() {
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white mb-4">Beat not found</h1>
             <p className="text-gray-300 mb-6">
-              The beat you're looking for doesn't exist or may have been removed.
+              The beat you&apos;re looking for doesn&apos;t exist or may have been removed.
             </p>
-            <Button onClick={() => window.history.back()} className="btn-primary">
+            <Button onClick={() => globalThis.history.back()} className="btn-primary">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Go Back
             </Button>
@@ -208,33 +224,35 @@ export default function Product() {
     );
   }
 
-  const audioUrl =
-    product.audio_url ||
-    product.meta_data?.find((meta: any) => meta.key === "audio_url")?.value ||
-    "/api/placeholder/audio.mp3";
-
   const isFree =
     product.is_free ||
-    product.tags?.some((tag: any) => tag.name.toLowerCase() === "free") ||
+    product.tags?.some((tag: string | Tag) =>
+      typeof tag === "string" ? tag.toLowerCase() === "free" : tag.name.toLowerCase() === "free"
+    ) ||
     product.price === 0 ||
     product.price === "0" ||
     false;
 
-  const licenseOptions = [
+  const licenseOptions: Array<{
+    type: LicenseTypeEnum;
+    name: string;
+    description: string;
+    price: number;
+  }> = [
     {
-      type: "basic" as LicenseTypeEnum,
+      type: "basic",
       name: "Basic License (MP3)",
       description: "Up to 50,000 streams/downloads",
       price: LicensePricing.basic,
     },
     {
-      type: "premium" as LicenseTypeEnum,
+      type: "premium",
       name: "Premium License (WAV)",
       description: "Up to 150,000 streams/downloads",
       price: LicensePricing.premium,
     },
     {
-      type: "unlimited" as LicenseTypeEnum,
+      type: "unlimited",
       name: "Unlimited License",
       description: "Unlimited streams/downloads",
       price: LicensePricing.unlimited,
@@ -243,15 +261,11 @@ export default function Product() {
 
   const selectedPrice = LicensePricing[selectedLicense];
 
-  const handleLicenseSelect = (licenseId: string) => {
-    setSelectedLicense(licenseId as LicenseTypeEnum);
-  };
-
   return (
     <>
       {showLicensePreview && (
         <LicensePreviewModal
-          licenseType={selectedLicense}
+          licenseType={getLicenseTypeEnum(selectedLicense)}
           beatTitle={product.name}
           producer="BroLab Entertainment"
           isOpen={showLicensePreview}
@@ -263,7 +277,7 @@ export default function Product() {
         <OpenGraphMeta type="beat" beatId={productId} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Button
-            onClick={() => window.history.back()}
+            onClick={() => globalThis.history.back()}
             variant="ghost"
             className="mb-6 text-white hover:text-[var(--accent-purple)]"
           >
@@ -294,12 +308,14 @@ export default function Product() {
                 <p className="text-gray-300 text-lg">
                   {product.categories?.[0]?.name || "Unknown"}
                 </p>
-                {/* Afficher le prix ou FREE */}
+                {/* Display price or FREE */}
                 <div className="mt-2">
                   {isFree ? (
                     <span className="text-2xl font-bold text-[var(--accent-green)]">FREE</span>
                   ) : (
-                    <span className="text-2xl font-bold text-white">${product.price}</span>
+                    <span className="text-2xl font-bold text-white">
+                      ${typeof product.price === "number" ? product.price : 0}
+                    </span>
                   )}
                 </div>
               </div>
@@ -420,35 +436,44 @@ export default function Product() {
                 currentBeat={{
                   id: Number(product?.id) || 1,
                   title: product?.name || "",
-                  price: product?.price || 0,
+                  price: typeof product?.price === "number" ? product.price : 0,
                   image: product?.images?.[0]?.src || "/api/placeholder/400/400",
                   bpm: product?.bpm || null,
                   genre: product?.categories?.[0]?.name || "Unknown",
-                  mood: product?.meta_data?.find((meta: any) => meta.key === "mood")?.value || null,
-                  key: product?.meta_data?.find((meta: any) => meta.key === "key")?.value || null,
-                  tags: product?.tags?.map((tag: any) => tag.name) || [],
+                  mood:
+                    product?.meta_data?.find((meta: MetaData) => meta.key === "mood")?.value ||
+                    null,
+                  key:
+                    product?.meta_data?.find((meta: MetaData) => meta.key === "key")?.value || null,
+                  tags:
+                    product?.tags?.map((tag: string | Tag) =>
+                      typeof tag === "string" ? tag : tag.name
+                    ) || [],
                 }}
                 recommendations={
-                  similarProducts?.map((similarProduct: any) => ({
+                  similarProducts?.map((similarProduct: SimilarProduct) => ({
                     id: similarProduct.id,
                     title: similarProduct.name,
-                    price: similarProduct.price,
+                    price: typeof similarProduct.price === "number" ? similarProduct.price : 0,
                     image: similarProduct.images?.[0]?.src || "/api/placeholder/400/400",
                     bpm: similarProduct.bpm || null,
                     genre: similarProduct.categories?.[0]?.name || "Unknown",
                     mood:
-                      similarProduct.meta_data?.find((meta: any) => meta.key === "mood")?.value ||
-                      null,
+                      similarProduct.meta_data?.find((meta: MetaData) => meta.key === "mood")
+                        ?.value || null,
                     key:
-                      similarProduct.meta_data?.find((meta: any) => meta.key === "key")?.value ||
-                      null,
-                    tags: similarProduct.tags?.map((tag: any) => tag.name) || [],
+                      similarProduct.meta_data?.find((meta: MetaData) => meta.key === "key")
+                        ?.value || null,
+                    tags:
+                      similarProduct.tags?.map((tag: string | Tag) =>
+                        typeof tag === "string" ? tag : tag.name
+                      ) || [],
                   })) || []
                 }
-                onBeatSelect={(beat: { id: number }) => {
-                  console.log("Beat selected:", beat);
+                onBeatSelect={(selectedBeat: { id: number }): void => {
+                  console.log("Beat selected:", selectedBeat);
                   // Navigate to the selected beat
-                  window.location.href = `/product/${beat.id}`;
+                  globalThis.location.href = `/product/${selectedBeat.id}`;
                 }}
                 isLoading={isLoadingSimilar}
               />
