@@ -100,7 +100,7 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
       throw error;
     }
 
-    if (!product || !product.id) {
+    if (!product?.id) {
       res.status(404).json({ error: "Beat not found" });
       return;
     }
@@ -108,7 +108,7 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
     // Helper function to extract BPM from meta data
     const extractBpmFromMeta = (metaData: WooCommerceMetaData[]): number | undefined => {
       const bpmMeta = metaData.find((meta: WooCommerceMetaData) => meta.key === "bpm");
-      return bpmMeta?.value ? parseInt(bpmMeta.value.toString()) : undefined;
+      return bpmMeta?.value ? Number.parseInt(bpmMeta.value.toString()) : undefined;
     };
 
     // Helper function to extract string value from meta data
@@ -124,17 +124,21 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
       name: product.name, // Alias for compatibility
       description: product.description,
       genre: product.categories?.[0]?.name || "Unknown",
-      bpm: product.bpm
-        ? parseInt(product.bpm.toString())
-        : product.meta_data
-          ? extractBpmFromMeta(product.meta_data)
-          : undefined,
+      bpm: (() => {
+        if (product.bpm) {
+          return Number.parseInt(product.bpm.toString());
+        }
+        if (product.meta_data) {
+          return extractBpmFromMeta(product.meta_data);
+        }
+        return undefined;
+      })(),
       key:
         product.key || (product.meta_data ? extractStringFromMeta(product.meta_data, "key") : null),
       mood:
         product.mood ||
         (product.meta_data ? extractStringFromMeta(product.meta_data, "mood") : null),
-      price: parseFloat(product.price) || 0,
+      price: Number.parseFloat(product.price) || 0,
       image_url: product.images?.[0]?.src,
       image: product.images?.[0]?.src, // Alias for compatibility
       images: product.images?.map((img: WooCommerceImage) => ({ src: img.src, alt: img.alt })),
@@ -145,7 +149,7 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
         name: cat.name,
       })),
       meta_data: product.meta_data,
-      duration: product.duration ? parseFloat(product.duration.toString()) : undefined,
+      duration: product.duration ? Number.parseFloat(product.duration.toString()) : undefined,
       downloads: Array.isArray(product.downloads)
         ? product.downloads.length
         : product.downloads || 0,
@@ -168,7 +172,7 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
  * GET /api/opengraph/shop
  * Génère les meta tags Open Graph pour la page shop
  */
-router.get("/shop", async (req, res): Promise<void> => {
+router.get("/shop", async (_req, res): Promise<void> => {
   try {
     const openGraphMeta = generateShopOpenGraph(openGraphConfig);
     const openGraphHTML = generateOpenGraphHTML(openGraphMeta);
@@ -185,7 +189,7 @@ router.get("/shop", async (req, res): Promise<void> => {
  * GET /api/opengraph/home
  * Génère les meta tags Open Graph pour la page d'accueil
  */
-router.get("/home", async (req, res): Promise<void> => {
+router.get("/home", async (_req, res): Promise<void> => {
   try {
     const openGraphMeta = generateHomeOpenGraph(openGraphConfig);
     const openGraphHTML = generateOpenGraphHTML(openGraphMeta);

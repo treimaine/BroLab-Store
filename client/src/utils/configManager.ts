@@ -20,8 +20,8 @@ export interface ConfigSubscriber {
 
 class ConfigurationManager {
   private config: DashboardConfig;
-  private subscribers: Map<string, ConfigSubscriber> = new Map();
-  private storageKey = "dashboard-config-overrides";
+  private readonly subscribers: Map<string, ConfigSubscriber> = new Map();
+  private readonly storageKey = "dashboard-config-overrides";
 
   constructor() {
     this.config = getDashboardConfig();
@@ -155,7 +155,7 @@ class ConfigurationManager {
   isFeatureEnabled(feature: keyof typeof FEATURE_FLAGS): boolean {
     // Check if the feature is in the dashboard config features
     if (feature in this.config.features) {
-      return (this.config.features as unknown)[feature];
+      return (this.config.features as Record<string, boolean>)[feature] ?? false;
     }
     // Fall back to the global feature flags
     return FEATURE_FLAGS[feature];
