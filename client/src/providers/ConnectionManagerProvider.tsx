@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Provider pattern exports both provider component and context hook/HOC */
 /**
  * Connection Manager Provider
  *

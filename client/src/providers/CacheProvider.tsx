@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Provider pattern exports both provider component and debug components */
 /**
  * Cache Provider Component
  *
@@ -5,15 +6,17 @@
  * Handles cache warming, monitoring, and optimization.
  */
 
-import { ReactNode, createContext, useEffect, useState } from "react";
 import { useCache } from "@/hooks/useCache";
 import { useCacheWarming } from "@/hooks/useCachingStrategy";
+import { ReactNode, createContext, useCallback, useEffect, useMemo, useState } from "react";
 import { DataType, cachingStrategy } from "../services/cachingStrategy";
+
+type CacheHealthStatus = "excellent" | "good" | "fair" | "poor";
 
 interface CacheContextValue {
   isInitialized: boolean;
   isWarming: boolean;
-  cacheHealth: "excellent" | "good" | "fair" | "poor";
+  cacheHealth: CacheHealthStatus;
   metrics: {
     hitRate: number;
     totalQueries: number;
@@ -29,13 +32,13 @@ interface CacheContextValue {
 export const CacheContext = createContext<CacheContextValue | null>(null);
 
 interface CacheProviderProps {
-  children: ReactNode;
+  readonly children: ReactNode;
 }
 
-export function CacheProvider({ children }: CacheProviderProps) {
+export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isWarming, setIsWarming] = useState(false);
-  const [cacheHealth, setCacheHealth] = useState<"excellent" | "good" | "fair" | "poor">("good");
+  const [cacheHealth, setCacheHealth] = useState<CacheHealthStatus>("good");
   const [metrics, setMetrics] = useState({
     hitRate: 0,
     totalQueries: 0,
@@ -79,6 +82,30 @@ export function CacheProvider({ children }: CacheProviderProps) {
   // Use cache warming hook
   useCacheWarming(criticalWarmingData);
 
+  // Update cache metrics and health - defined before useEffect that uses it
+  const updateMetrics = useCallback(() => {
+    try {
+      const performanceMetrics = cachingStrategy.getPerformanceMetrics();
+
+      setMetrics({
+        hitRate: performanceMetrics.cacheHitRate,
+        totalQueries: performanceMetrics.cacheSize,
+        cacheSize: performanceMetrics.cacheSize,
+      });
+
+      // Determine cache health based on metrics
+      const health = calculateCacheHealth(
+        performanceMetrics.cacheHitRate,
+        performanceMetrics.averageResponseTime
+      );
+
+      setCacheHealth(health);
+    } catch (error) {
+      console.error("Failed to update cache metrics:", error);
+      setCacheHealth("poor");
+    }
+  }, []);
+
   // Initialize cache and start monitoring
   useEffect(() => {
     const initializeCache = async () => {
@@ -121,87 +148,72 @@ export function CacheProvider({ children }: CacheProviderProps) {
       clearInterval(metricsInterval);
       clearInterval(optimizationInterval);
     };
-  }, []);
+  }, [updateMetrics]);
 
-  // Update cache metrics and health
-  const updateMetrics = () => {
+  // Cache actions - memoized to prevent unnecessary re-renders
+  const warmCache = useCallback(async () => {
+    setIsWarming(true);
     try {
-      const performanceMetrics = cachingStrategy.getPerformanceMetrics();
-
-      setMetrics({
-        hitRate: performanceMetrics.cacheHitRate,
-        totalQueries: performanceMetrics.cacheSize,
-        cacheSize: performanceMetrics.cacheSize,
-      });
-
-      // Determine cache health based on metrics
-      let health: "excellent" | "good" | "fair" | "poor" = "excellent";
-
-      if (performanceMetrics.cacheHitRate < 50 || performanceMetrics.averageResponseTime > 1000) {
-        health = "poor";
-      } else if (
-        performanceMetrics.cacheHitRate < 70 ||
-        performanceMetrics.averageResponseTime > 500
-      ) {
-        health = "fair";
-      } else if (
-        performanceMetrics.cacheHitRate < 85 ||
-        performanceMetrics.averageResponseTime > 200
-      ) {
-        health = "good";
-      }
-
-      setCacheHealth(health);
+      await cachingStrategy.preloadCriticalData();
+      updateMetrics();
     } catch (error) {
-      console.error("Failed to update cache metrics:", error);
-      setCacheHealth("poor");
+      console.error("Failed to warm cache:", error);
+    } finally {
+      setIsWarming(false);
     }
-  };
+  }, [updateMetrics]);
 
-  // Cache actions
-  const actions = {
-    warmCache: async () => {
-      setIsWarming(true);
-      try {
-        await cachingStrategy.preloadCriticalData();
-        updateMetrics();
-      } catch (error) {
-        console.error("Failed to warm cache:", error);
-      } finally {
-        setIsWarming(false);
-      }
-    },
+  const clearCache = useCallback(async () => {
+    try {
+      await cachingStrategy.invalidateCache("manual_clear");
+      updateMetrics();
+      console.log("Cache cleared successfully");
+    } catch (error) {
+      console.error("Failed to clear cache:", error);
+    }
+  }, [updateMetrics]);
 
-    clearCache: async () => {
-      try {
-        await cachingStrategy.invalidateCache("manual_clear");
-        updateMetrics();
-        console.log("Cache cleared successfully");
-      } catch (error) {
-        console.error("Failed to clear cache:", error);
-      }
-    },
+  const optimizeCache = useCallback(async () => {
+    try {
+      await cachingStrategy.optimizeCache();
+      updateMetrics();
+      console.log("Cache optimized successfully");
+    } catch (error) {
+      console.error("Failed to optimize cache:", error);
+    }
+  }, [updateMetrics]);
 
-    optimizeCache: async () => {
-      try {
-        await cachingStrategy.optimizeCache();
-        updateMetrics();
-        console.log("Cache optimized successfully");
-      } catch (error) {
-        console.error("Failed to optimize cache:", error);
-      }
-    },
-  };
+  const actions = useMemo(
+    () => ({ warmCache, clearCache, optimizeCache }),
+    [warmCache, clearCache, optimizeCache]
+  );
 
-  const contextValue: CacheContextValue = {
-    isInitialized,
-    isWarming,
-    cacheHealth,
-    metrics,
-    actions,
-  };
+  const contextValue = useMemo<CacheContextValue>(
+    () => ({
+      isInitialized,
+      isWarming,
+      cacheHealth,
+      metrics,
+      actions,
+    }),
+    [isInitialized, isWarming, cacheHealth, metrics, actions]
+  );
 
   return <CacheContext.Provider value={contextValue}>{children}</CacheContext.Provider>;
+}
+
+// Helper function to calculate cache health
+function calculateCacheHealth(hitRate: number, responseTime: number): CacheHealthStatus {
+  if (hitRate < 50 || responseTime > 1000) {
+    return "poor";
+  }
+  if (hitRate < 70 || responseTime > 500) {
+    return "fair";
+  }
+  if (hitRate < 85 || responseTime > 200) {
+    return "good";
+  }
+  return "excellent";
 }
 
 // Cache status indicator component
@@ -256,6 +268,20 @@ export function CacheStatusIndicator() {
   );
 }
 
+// Helper function to get health color class
+function getHealthColorClass(health: CacheHealthStatus): string {
+  switch (health) {
+    case "excellent":
+      return "text-green-400";
+    case "good":
+      return "text-blue-400";
+    case "fair":
+      return "text-yellow-400";
+    case "poor":
+      return "text-red-400";
+  }
+}
+
 // Cache debug panel for development
 export function CacheDebugPanel() {
   const { metrics, actions, cacheHealth, isWarming } = useCache();
@@ -264,6 +290,8 @@ export function CacheDebugPanel() {
     return null;
   }
 
+  const healthColorClass = getHealthColorClass(cacheHealth);
+
   return (
     <div className="fixed top-4 right-4 z-50 bg-black/90 text-white p-4 rounded-lg text-sm max-w-xs">
       <h3 className="font-bold mb-2">Cache Debug Panel</h3>
@@ -271,19 +299,7 @@ export function CacheDebugPanel() {
       <div className="space-y-2">
         <div>
           <strong>Health:</strong>
-          <span
-            className={`ml-2 ${
-              cacheHealth === "excellent"
-                ? "text-green-400"
-                : cacheHealth === "good"
-                  ? "text-blue-400"
-                  : cacheHealth === "fair"
-                    ? "text-yellow-400"
-                    : "text-red-400"
-            }`}
-          >
-            {cacheHealth}
-          </span>
+          <span className={`ml-2 ${healthColorClass}`}>{cacheHealth}</span>
         </div>
 
         <div>

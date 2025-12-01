@@ -1,9 +1,9 @@
-import { IncomingMessage, Server } from "http";
+import { IncomingMessage, Server } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 
 export interface WebSocketMessage {
   type: string;
-  payload: any;
+  payload: unknown;
   timestamp: number;
   source: "client" | "server";
   id: string;
@@ -23,7 +23,7 @@ export interface ClientConnection {
  */
 export class WebSocketManager {
   private wss: WebSocketServer | null = null;
-  private clients = new Map<string, ClientConnection>();
+  private readonly clients = new Map<string, ClientConnection>();
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly heartbeatTimeout = 60000; // 1 minute
   private readonly heartbeatCheckInterval = 30000; // 30 seconds
@@ -170,7 +170,8 @@ export class WebSocketManager {
     const client = this.clients.get(clientId);
     if (!client) return;
 
-    const { topics } = message.payload;
+    const payload = message.payload as { topics?: string[] };
+    const { topics } = payload;
     if (Array.isArray(topics)) {
       topics.forEach(topic => client.subscriptions.add(topic));
     }
@@ -191,7 +192,8 @@ export class WebSocketManager {
     const client = this.clients.get(clientId);
     if (!client) return;
 
-    const { topics } = message.payload;
+    const payload = message.payload as { topics?: string[] };
+    const { topics } = payload;
     if (Array.isArray(topics)) {
       topics.forEach(topic => client.subscriptions.delete(topic));
     }
@@ -274,7 +276,7 @@ export class WebSocketManager {
   public broadcast(message: WebSocketMessage, excludeClientId?: string): number {
     let sentCount = 0;
 
-    for (const [clientId, client] of this.clients) {
+    for (const [clientId, _client] of this.clients) {
       if (excludeClientId && clientId === excludeClientId) continue;
 
       if (this.sendToClient(clientId, message)) {
@@ -345,9 +347,9 @@ export class WebSocketManager {
 
     staleClients.forEach(clientId => {
       console.log(`Removing stale client: ${clientId}`);
-      const client = this.clients.get(clientId);
-      if (client) {
-        client.socket.terminate();
+      const staleClient = this.clients.get(clientId);
+      if (staleClient) {
+        staleClient.socket.terminate();
         this.clients.delete(clientId);
       }
     });
@@ -390,21 +392,21 @@ export class WebSocketManager {
    * Generate unique client ID
    */
   private generateClientId(): string {
-    return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `client_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
    * Generate unique message ID
    */
   private generateMessageId(): string {
-    return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
    * Generate data hash for consistency validation
    */
   private generateDataHash(): string {
-    return `hash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `hash_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
@@ -458,9 +460,7 @@ export class WebSocketManager {
 let wsManagerInstance: WebSocketManager | null = null;
 
 export const getWebSocketManager = (): WebSocketManager => {
-  if (!wsManagerInstance) {
-    wsManagerInstance = new WebSocketManager();
-  }
+  wsManagerInstance ??= new WebSocketManager();
   return wsManagerInstance;
 };
 

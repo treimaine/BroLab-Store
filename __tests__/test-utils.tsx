@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Test utilities file exports both components and utilities intentionally */
 import { RenderOptions, render } from "@testing-library/react";
 import React, { ReactElement } from "react";
 

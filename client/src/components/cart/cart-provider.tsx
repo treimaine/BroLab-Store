@@ -1,6 +1,7 @@
+/* eslint-disable react-refresh/only-export-components -- Provider pattern requires exporting both provider component and context hook */
 import { useCart } from "@/hooks/use-cart";
 import { Cart, CartItem } from "@/lib/cart";
-import { ReactNode, createContext, useContext } from "react";
+import { ReactNode, createContext, useContext, useMemo } from "react";
 
 interface CartContextType {
   cart: Cart;
@@ -14,16 +15,23 @@ interface CartContextType {
   getItemCount: () => number;
 }
 
+interface CartProviderProps {
+  readonly children: ReactNode;
+}
+
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-export function CartProvider({ children }: { children: ReactNode }) {
+export function CartProvider({ children }: CartProviderProps): JSX.Element {
   const cartHook = useCart();
 
-  // Add addToCart alias for compatibility
-  const contextValue = {
-    ...cartHook,
-    addToCart: cartHook.addItem,
-  };
+  // Add addToCart alias for compatibility - memoized to prevent unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({
+      ...cartHook,
+      addToCart: cartHook.addItem,
+    }),
+    [cartHook]
+  );
 
   return <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>;
 }

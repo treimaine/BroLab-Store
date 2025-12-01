@@ -2,20 +2,48 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 export interface WaveformAudioPlayerProps {
-  src: string;
-  title?: string;
-  artist?: string;
-  className?: string;
-  showControls?: boolean;
-  showWaveform?: boolean;
-  previewOnly?: boolean;
-  autoPlay?: boolean;
-  onPlay?: () => void;
-  onPause?: () => void;
-  onEnded?: () => void;
+  readonly src: string;
+  readonly title?: string;
+  readonly artist?: string;
+  readonly className?: string;
+  readonly showControls?: boolean;
+  readonly showWaveform?: boolean;
+  readonly previewOnly?: boolean;
+  readonly autoPlay?: boolean;
+  readonly onPlay?: () => void;
+  readonly onPause?: () => void;
+  readonly onEnded?: () => void;
+}
+
+// Helper component to avoid nested ternary
+function WaveformPlayPauseIcon({
+  isLoading,
+  isPlaying,
+  size,
+}: {
+  readonly isLoading: boolean;
+  readonly isPlaying: boolean;
+  readonly size: "sm" | "lg";
+}): React.JSX.Element {
+  const iconSize = size === "sm" ? "w-3 h-3" : "w-5 h-5";
+  const spinnerSize = size === "sm" ? "w-3 h-3" : "w-5 h-5";
+
+  if (isLoading) {
+    return (
+      <div
+        className={`${spinnerSize} border-2 border-white border-t-transparent rounded-full animate-spin`}
+      />
+    );
+  }
+
+  if (isPlaying) {
+    return <Pause className={`${iconSize} text-white`} />;
+  }
+
+  return <Play className={`${iconSize} text-white ml-0.5`} />;
 }
 
 export function WaveformAudioPlayer({
@@ -30,7 +58,7 @@ export function WaveformAudioPlayer({
   onPlay,
   onPause,
   onEnded,
-}: WaveformAudioPlayerProps) {
+}: Readonly<WaveformAudioPlayerProps>): React.JSX.Element {
   const audioRef = useRef<HTMLAudioElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const waveformContainerRef = useRef<HTMLDivElement>(null);
@@ -53,10 +81,9 @@ export function WaveformAudioPlayer({
     if (!showWaveform || !audioRef.current) return;
 
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      }
+      audioContextRef.current ??= new (globalThis.AudioContext ||
+        (globalThis as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext)();
       if (!mediaSourceRef.current && audioRef.current) {
         mediaSourceRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
       }
@@ -210,7 +237,7 @@ export function WaveformAudioPlayer({
       } else {
         // Resume audio context if suspended
         const ctx = audioContextRef.current;
-        if (ctx && ctx.state === "suspended") {
+        if (ctx?.state === "suspended") {
           await ctx.resume();
         }
         await audioRef.current.play();
@@ -218,13 +245,6 @@ export function WaveformAudioPlayer({
     } catch (error) {
       console.warn("Playback error:", error);
     }
-  };
-
-  const _handleSeek = (value: number[]) => {
-    if (!audioRef.current) return;
-    const seekTime = (value[0] / 100) * duration;
-    audioRef.current.currentTime = seekTime;
-    setCurrentTime(seekTime);
   };
 
   const handleVolumeChange = (value: number[]) => {
@@ -253,13 +273,13 @@ export function WaveformAudioPlayer({
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
-  const _progress = duration ? (currentTime / duration) * 100 : 0;
-
   // Compact table layout for smaller displays
   if (className?.includes("h-8") || className?.includes("h-10")) {
     return (
       <div className={cn("bg-transparent", className)}>
-        <audio ref={audioRef} src={src} preload="metadata" />
+        <audio ref={audioRef} src={src} preload="metadata">
+          <track kind="captions" />
+        </audio>
 
         {/* Compact Table Row Layout */}
         <div className="flex items-center space-x-3">
@@ -271,13 +291,7 @@ export function WaveformAudioPlayer({
             size="sm"
             className="w-8 h-8 rounded-full bg-cyan-500/80 hover:bg-cyan-500 flex items-center justify-center p-0 shrink-0"
           >
-            {isLoading ? (
-              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : isPlaying ? (
-              <Pause className="w-3 h-3 text-white" />
-            ) : (
-              <Play className="w-3 h-3 text-white ml-0.5" />
-            )}
+            <WaveformPlayPauseIcon isLoading={isLoading} isPlaying={isPlaying} size="sm" />
           </Button>
 
           {/* Compact Waveform */}
@@ -314,7 +328,9 @@ export function WaveformAudioPlayer({
 
   return (
     <div className={cn("bg-transparent", className)}>
-      <audio ref={audioRef} src={src} preload="metadata" />
+      <audio ref={audioRef} src={src} preload="metadata">
+        <track kind="captions" />
+      </audio>
 
       {/* Clean Professional Layout */}
       <div className="space-y-4">
@@ -379,13 +395,7 @@ export function WaveformAudioPlayer({
             disabled={isLoading}
             className="w-12 h-12 rounded-full bg-cyan-500 hover:bg-cyan-600 flex items-center justify-center p-0 shadow-lg transition-all transform hover:scale-105"
           >
-            {isLoading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : isPlaying ? (
-              <Pause className="w-5 h-5 text-white" />
-            ) : (
-              <Play className="w-5 h-5 text-white ml-0.5" />
-            )}
+            <WaveformPlayPauseIcon isLoading={isLoading} isPlaying={isPlaying} size="lg" />
           </Button>
 
           {/* Next Button (Optional) */}

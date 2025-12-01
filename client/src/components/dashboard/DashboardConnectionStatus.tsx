@@ -57,12 +57,10 @@ export const DashboardConnectionStatus: React.FC<DashboardConnectionStatusProps>
     try {
       if (onRefresh) {
         await onRefresh();
+      } else if (isConnected) {
+        await reconnect();
       } else {
-        if (isConnected) {
-          await reconnect();
-        } else {
-          await connect();
-        }
+        await connect();
       }
       clearError();
     } catch (err) {

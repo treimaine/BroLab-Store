@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Re-export file for backward compatibility */
 /**
  * Re-export for backward compatibility
  * This file maintains legacy import paths after code reorganization

@@ -174,13 +174,13 @@
   - Fix unused `user` in `client/src/components/layout/MobileBottomNav.tsx`
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [-] 18. Fix unused variables in Convex files
+- [x] 18. Fix unused variables in Convex files
   - Fix unused `ctx` in `convex/lib/dashboardConfig.ts`
   - Fix unused `user` in `convex/lib/dashboardConfig.ts`
   - Fix unused `identity` in `convex/lib/dashboardConfig.ts`
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 19. Fix unused variables in server files
+- [x] 19. Fix unused variables in server files
   - Fix unused `client` in `server/services/WebSocketManager.ts`
   - _Requirements: 3.1, 3.2, 3.3_
 
@@ -212,7 +212,7 @@
   - Replace `any` types with proper Convex types
   - _Requirements: 8.1, 8.3, 8.4_
 
-- [ ] 23. Fix React Hook dependency warnings
+- [x] 23. Fix React Hook dependency warnings
   - Fix missing dependency `mockNotifications` in `client/src/components/alerts/NotificationCenter.tsx`
   - Fix missing dependency `currentTrack` in `client/src/components/audio/GlobalAudioPlayer.tsx` (2 instances)
   - Fix missing dependencies in `client/src/components/audio/SimpleAudioPlayer.tsx` (2 instances)
@@ -221,7 +221,7 @@
 - [x] 24. Fix React unescaped entities warnings
   - _Requirements: 3.1, 3.2_
 
-- [ ] 25. Fix react-refresh/only-export-components warnings
+- [x] 25. Fix react-refresh/only-export-components warnings
   - Fix in `__tests__/test-utils.tsx` (3 instances)
   - Fix in `client/src/components/cart/cart-provider.tsx` (2 instances)
   - Fix in `client/src/components/kokonutui/file-upload.tsx` (1 instance)

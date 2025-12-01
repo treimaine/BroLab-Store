@@ -1,19 +1,66 @@
+/* eslint-disable react-refresh/only-export-components -- Example file demonstrates multiple usage patterns */
 /**
  * Example: Using ConnectionManager with Clerk Authentication
  *
  * This file demonstrates how to integrate Clerk authentication
  * with the ConnectionManager for secure real-time sync.
+ *
+ * NOTE: This is an example/documentation file. The mock functions below
+ * intentionally throw errors - replace them with actual implementations
+ * from @/services/ConnectionManager and @/providers/ConnectionManagerProvider
  */
 
-import { getConnectionManager } from "@/services/ConnectionManager";
 import { useAuth } from "@clerk/clerk-react";
 import { useEffect, useState } from "react";
+
+// Type definitions for the ConnectionManager (implement in your project)
+interface ConnectionManagerConfig {
+  pollingUrl?: string;
+  websocketUrl?: string;
+}
+
+interface ConnectionManager {
+  setAuthToken: (token: string) => void;
+  connect: () => Promise<void>;
+  disconnect: () => void;
+  reconnect: () => Promise<void>;
+  onMessage: (callback: (message: unknown) => void) => void;
+  on: (event: string, callback: (data: { error: Error }) => void) => void;
+}
+
+/**
+ * Mock function - replace with actual implementation from @/services/ConnectionManager
+ * In production, import: import { getConnectionManager } from "@/services/ConnectionManager";
+ */
+function getConnectionManager(_config?: ConnectionManagerConfig): ConnectionManager {
+  // Example implementation - replace with actual service
+  return {
+    setAuthToken: (_token: string) => {
+      /* Set auth token */
+    },
+    connect: async () => {
+      /* Connect to server */
+    },
+    disconnect: () => {
+      /* Disconnect from server */
+    },
+    reconnect: async () => {
+      /* Reconnect to server */
+    },
+    onMessage: (_callback: (message: unknown) => void) => {
+      /* Register message handler */
+    },
+    on: (_event: string, _callback: (data: { error: Error }) => void) => {
+      /* Register event handler */
+    },
+  };
+}
 
 // ============================================================================
 // Example 1: Basic Setup with Clerk Token
 // ============================================================================
 
-export function DashboardWithAuth() {
+export function DashboardWithAuth(): JSX.Element {
   const { getToken, isSignedIn } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
 
@@ -22,7 +69,7 @@ export function DashboardWithAuth() {
       return; // Don't connect if not signed in
     }
 
-    const initConnection = async () => {
+    const initConnection = async (): Promise<void> => {
       try {
         // Get Clerk token
         const token = await getToken();
@@ -46,7 +93,7 @@ export function DashboardWithAuth() {
         setIsConnected(true);
 
         // Listen for messages
-        manager.onMessage(message => {
+        manager.onMessage((message: unknown) => {
           console.log("Message received:", message);
         });
       } catch (error) {
@@ -74,17 +121,17 @@ export function DashboardWithAuth() {
 // Example 2: Auto Token Refresh
 // ============================================================================
 
-export function DashboardWithTokenRefresh() {
+export function DashboardWithTokenRefresh(): JSX.Element {
   const { getToken, isSignedIn } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     if (!isSignedIn) return;
 
-    let manager: ReturnType<typeof getConnectionManager> | null = null;
+    let manager: ConnectionManager | null = null;
     let refreshInterval: NodeJS.Timeout | null = null;
 
-    const initConnection = async () => {
+    const initConnection = async (): Promise<void> => {
       const token = await getToken();
       if (!token) return;
 
@@ -128,7 +175,7 @@ export function DashboardWithTokenRefresh() {
 // Example 3: Custom Hook with Auth
 // ============================================================================
 
-export function useAuthenticatedConnection() {
+export function useAuthenticatedConnection(): { isConnected: boolean; error: string | null } {
   const { getToken, isSignedIn } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,9 +186,9 @@ export function useAuthenticatedConnection() {
       return;
     }
 
-    let manager: ReturnType<typeof getConnectionManager> | null = null;
+    let manager: ConnectionManager | null = null;
 
-    const connect = async () => {
+    const connect = async (): Promise<void> => {
       try {
         const token = await getToken();
         if (!token) {
@@ -174,7 +221,7 @@ export function useAuthenticatedConnection() {
 }
 
 // Usage
-export function MyDashboard() {
+export function MyDashboard(): JSX.Element {
   const { isConnected, error } = useAuthenticatedConnection();
 
   if (error) {
@@ -188,7 +235,7 @@ export function MyDashboard() {
 // Example 4: Handling 401 Errors
 // ============================================================================
 
-export function DashboardWithErrorHandling() {
+export function DashboardWithErrorHandling(): JSX.Element {
   const { getToken, isSignedIn, signOut } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
 
@@ -197,7 +244,7 @@ export function DashboardWithErrorHandling() {
 
     const manager = getConnectionManager();
 
-    const initConnection = async () => {
+    const initConnection = async (): Promise<void> => {
       try {
         const token = await getToken();
         if (!token) return;
@@ -210,8 +257,8 @@ export function DashboardWithErrorHandling() {
         manager.on("connection_error", async (event: { error: Error }) => {
           const error = event.error;
 
-          // Check if it's a 401 error
-          if (error.message.includes("401") || error.message.includes("Non autorisé")) {
+          // Check if it's a 401 error (Unauthorized)
+          if (error.message.includes("401") || error.message.includes("Unauthorized")) {
             console.log("Authentication failed, trying to refresh token...");
 
             try {
@@ -250,9 +297,41 @@ export function DashboardWithErrorHandling() {
 // Example 5: Provider Pattern with Auth
 // ============================================================================
 
-import { ConnectionManagerProvider } from "@/providers/ConnectionManagerProvider";
+// NOTE: ConnectionManagerProvider should be implemented in @/providers/ConnectionManagerProvider
+// This example shows the expected usage pattern
 
-export function AuthenticatedDashboardApp() {
+interface ConnectionManagerProviderProps {
+  autoConnect?: boolean;
+  config?: ConnectionManagerConfig;
+  onConnected?: () => void;
+  onError?: (error: Error) => void;
+  children: React.ReactNode;
+}
+
+/**
+ * Mock provider component - implement in your project
+ * In production, import: import { ConnectionManagerProvider } from "@/providers/ConnectionManagerProvider";
+ */
+function ConnectionManagerProvider({
+  children,
+  autoConnect: _autoConnect,
+  config: _config,
+  onConnected: _onConnected,
+  onError: _onError,
+}: ConnectionManagerProviderProps): JSX.Element {
+  return <>{children}</>;
+}
+
+/**
+ * Mock context hook - implement in your project
+ * In production, import: import { useConnectionManagerContext } from "@/providers/ConnectionManagerProvider";
+ */
+function useConnectionManagerContext(): { connectionManager: ConnectionManager } {
+  // Return mock connection manager for example purposes
+  return { connectionManager: getConnectionManager() };
+}
+
+export function AuthenticatedDashboardApp(): JSX.Element {
   const { getToken, isSignedIn } = useAuth();
   const [authToken, setAuthToken] = useState<string | null>(null);
 
@@ -279,7 +358,7 @@ export function AuthenticatedDashboardApp() {
       onConnected={() => {
         console.log("Dashboard connected with authentication");
       }}
-      onError={error => {
+      onError={(error: Error) => {
         console.error("Dashboard connection error:", error);
       }}
     >
@@ -288,7 +367,7 @@ export function AuthenticatedDashboardApp() {
   );
 }
 
-function DashboardContent({ authToken }: { authToken: string }) {
+function DashboardContent({ authToken }: Readonly<{ authToken: string }>): JSX.Element {
   const { connectionManager } = useConnectionManagerContext();
 
   useEffect(() => {
@@ -299,16 +378,11 @@ function DashboardContent({ authToken }: { authToken: string }) {
   return <div>Dashboard content...</div>;
 }
 
-// Mock import for documentation
-function useConnectionManagerContext() {
-  throw new Error("Use actual import from @/providers/ConnectionManagerProvider");
-}
-
 // ============================================================================
 // Example 6: Testing with Mock Token
 // ============================================================================
 
-export function TestDashboard() {
+export function TestDashboard(): JSX.Element {
   useEffect(() => {
     const manager = getConnectionManager();
 
