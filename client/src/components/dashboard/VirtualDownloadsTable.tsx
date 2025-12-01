@@ -91,25 +91,41 @@ const VirtualDownloadRow = memo<{
     const percentage = Math.min((download.downloadCount / download.maxDownloads) * 100, 100);
     const isNearLimit = percentage >= 80;
 
+    const getProgressColor = (): string => {
+      if (isAtLimit) return "bg-red-500";
+      if (isNearLimit) return "bg-orange-500";
+      return "bg-green-500";
+    };
+
     return (
       <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
         <div
-          className={`h-1.5 rounded-full ${
-            isAtLimit ? "bg-red-500" : isNearLimit ? "bg-orange-500" : "bg-green-500"
-          }`}
+          className={`h-1.5 rounded-full ${getProgressColor()}`}
           style={{ width: `${percentage}%` }}
         />
       </div>
     );
   };
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onDownload(download);
+      }
+    },
+    [download, onDownload]
+  );
+
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        "flex items-center justify-between p-3 sm:p-4 border-b border-gray-700/30 hover:bg-gray-800/30 transition-colors cursor-pointer",
+        "flex items-center justify-between p-3 sm:p-4 border-b border-gray-700/30 hover:bg-gray-800/30 transition-colors cursor-pointer w-full text-left",
         !isAvailable && "opacity-60"
       )}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
     >
       {/* Beat Info */}
       <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -154,13 +170,17 @@ const VirtualDownloadRow = memo<{
       <div className="flex flex-col items-center px-4">
         <div className="flex items-center gap-1">
           <span
-            className={`font-medium text-sm ${
-              isAtLimit
-                ? "text-red-600"
-                : download.maxDownloads && download.downloadCount >= download.maxDownloads * 0.8
-                  ? "text-orange-600"
-                  : "text-green-600"
-            }`}
+            className={cn(
+              "font-medium text-sm",
+              isAtLimit && "text-red-600",
+              !isAtLimit &&
+                download.maxDownloads &&
+                download.downloadCount >= download.maxDownloads * 0.8 &&
+                "text-orange-600",
+              !isAtLimit &&
+                !(download.maxDownloads && download.downloadCount >= download.maxDownloads * 0.8) &&
+                "text-green-600"
+            )}
           >
             {download.downloadCount}
           </span>
@@ -181,7 +201,7 @@ const VirtualDownloadRow = memo<{
           })}
         </span>
       </div>
-    </div>
+    </button>
   );
 });
 
@@ -212,7 +232,7 @@ export const VirtualDownloadsTable = memo<VirtualDownloadsTableProps>(
       link.style.visibility = "hidden";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
 
       toast.success(`Downloading "${download.beatTitle}" started`);
     }, []);
@@ -256,8 +276,11 @@ export const VirtualDownloadsTable = memo<VirtualDownloadsTableProps>(
           </CardHeader>
           <CardContent className="p-4 sm:p-6">
             <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-3 animate-pulse">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div
+                  key={`skeleton-download-${i}`}
+                  className="flex items-center space-x-3 animate-pulse"
+                >
                   <div className="w-8 h-8 bg-gray-700 rounded" />
                   <div className="flex-1 space-y-2">
                     <div className="h-4 bg-gray-700 rounded w-3/4" />

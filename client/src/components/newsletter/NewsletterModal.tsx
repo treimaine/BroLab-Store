@@ -1,13 +1,14 @@
+/* eslint-disable react-refresh/only-export-components -- Modal component exports both component and management hook */
 import { Button } from "@/components/ui/button";
 import { Gift, Mail, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface NewsletterModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
 }
 
-export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps) {
+export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps): JSX.Element | null {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -46,7 +47,12 @@ export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close modal"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm border-none cursor-default"
+        onClick={onClose}
+      />
 
       {/* Modal */}
       <div className="relative bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-2xl p-8 max-w-md w-full mx-4 animate-fadeIn">
@@ -58,7 +64,19 @@ export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps) {
           <X className="w-5 h-5" />
         </button>
 
-        {!isSubmitted ? (
+        {isSubmitted ? (
+          /* Success state */
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Gift className="w-8 h-8 text-green-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Welcome to the family!</h2>
+            <p className="text-gray-300 mb-4">
+              Check your email for your free beat pack and exclusive producer content.
+            </p>
+            <div className="w-8 h-8 border-2 border-[var(--accent-purple)]/30 border-t-[var(--accent-purple)] rounded-full animate-spin mx-auto" />
+          </div>
+        ) : (
           <>
             {/* Header */}
             <div className="text-center mb-6">
@@ -107,18 +125,6 @@ export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps) {
               No spam, ever. Unsubscribe anytime with one click.
             </p>
           </>
-        ) : (
-          /* Success state */
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Gift className="w-8 h-8 text-green-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Welcome to the family!</h2>
-            <p className="text-gray-300 mb-4">
-              Check your email for your free beat pack and exclusive producer content.
-            </p>
-            <div className="w-8 h-8 border-2 border-[var(--accent-purple)]/30 border-t-[var(--accent-purple)] rounded-full animate-spin mx-auto" />
-          </div>
         )}
       </div>
     </div>

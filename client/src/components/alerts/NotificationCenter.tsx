@@ -54,76 +54,74 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<"all" | "unread">("all");
 
-  // Notifications simulées (à remplacer par des données réelles)
-  const mockNotifications: Notification[] = [
-    {
-      id: "1",
-      type: "order",
-      title: "Commande confirmée",
-      message: "Votre commande #1234 a été confirmée et sera traitée sous peu.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 min ago
-      read: false,
-      actionUrl: "/orders/1234",
-      actionLabel: "Voir la commande",
-      metadata: {
-        orderId: "1234",
-        amount: 29.99,
-      },
-    },
-    {
-      id: "2",
-      type: "beat",
-      title: "Nouveau beat disponible",
-      message: 'Un nouveau beat "Urban Vibes" correspond à vos préférences.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2h ago
-      read: false,
-      actionUrl: "/beats/urban-vibes",
-      actionLabel: "Écouter",
-      metadata: {
-        beatId: "urban-vibes",
-        beatTitle: "Urban Vibes",
-      },
-    },
-    {
-      id: "3",
-      type: "download",
-      title: "Téléchargement prêt",
-      message: 'Votre beat "Chill Hop" est prêt à être téléchargé.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(), // 4h ago
-      read: true,
-      actionUrl: "/downloads",
-      actionLabel: "Télécharger",
-      metadata: {
-        beatTitle: "Chill Hop",
-      },
-    },
-    {
-      id: "4",
-      type: "success",
-      title: "Paiement réussi",
-      message: "Votre paiement de 49.99€ a été traité avec succès.",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(), // 6h ago
-      read: true,
-      metadata: {
-        amount: 49.99,
-      },
-    },
-    {
-      id: "5",
-      type: "favorite",
-      title: "Beat ajouté aux favoris",
-      message: 'Le beat "Trap Nation" a été ajouté à vos favoris.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-      read: true,
-      metadata: {
-        beatTitle: "Trap Nation",
-      },
-    },
-  ];
-
   useEffect(() => {
-    // Simuler le chargement des notifications
-    setNotifications(mockNotifications);
+    // Load initial notifications
+    const initialNotifications: Notification[] = [
+      {
+        id: "1",
+        type: "order",
+        title: "Commande confirmée",
+        message: "Votre commande #1234 a été confirmée et sera traitée sous peu.",
+        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+        read: false,
+        actionUrl: "/orders/1234",
+        actionLabel: "Voir la commande",
+        metadata: {
+          orderId: "1234",
+          amount: 29.99,
+        },
+      },
+      {
+        id: "2",
+        type: "beat",
+        title: "Nouveau beat disponible",
+        message: 'Un nouveau beat "Urban Vibes" correspond à vos préférences.',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+        read: false,
+        actionUrl: "/beats/urban-vibes",
+        actionLabel: "Écouter",
+        metadata: {
+          beatId: "urban-vibes",
+          beatTitle: "Urban Vibes",
+        },
+      },
+      {
+        id: "3",
+        type: "download",
+        title: "Téléchargement prêt",
+        message: 'Votre beat "Chill Hop" est prêt à être téléchargé.',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
+        read: true,
+        actionUrl: "/downloads",
+        actionLabel: "Télécharger",
+        metadata: {
+          beatTitle: "Chill Hop",
+        },
+      },
+      {
+        id: "4",
+        type: "success",
+        title: "Paiement réussi",
+        message: "Votre paiement de 49.99€ a été traité avec succès.",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
+        read: true,
+        metadata: {
+          amount: 49.99,
+        },
+      },
+      {
+        id: "5",
+        type: "favorite",
+        title: "Beat ajouté aux favoris",
+        message: 'Le beat "Trap Nation" a été ajouté à vos favoris.',
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+        read: true,
+        metadata: {
+          beatTitle: "Trap Nation",
+        },
+      },
+    ];
+    setNotifications(initialNotifications);
   }, []);
 
   const getNotificationIcon = useCallback((type: Notification["type"]) => {
@@ -303,7 +301,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ delay: index * 0.05 }}
                     className={`p-4 border-b last:border-b-0 hover:bg-muted/50 transition-colors ${
-                      !notification.read ? "bg-blue-50/50" : ""
+                      notification.read ? "" : "bg-blue-50/50"
                     }`}
                   >
                     <div className="flex items-start space-x-3">

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Example file demonstrates multiple usage patterns */
 /**
  * Query Helpers Usage Examples
  *

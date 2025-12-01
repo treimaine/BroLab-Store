@@ -60,7 +60,7 @@ export const DataFreshnessIndicator: React.FC<DataFreshnessIndicatorProps> = ({
   const [freshnessStatus, setFreshnessStatus] = useState<FreshnessMonitoringStatus | null>(null);
   const [integrityReport, setIntegrityReport] = useState<DataIntegrityReport | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [_lastUpdateTime, setLastUpdateTime] = useState<string>("");
+  const lastUpdateTimeRef = React.useRef<string>("");
 
   const data = useDashboardStore(state => state.data);
   const syncStatus = useDashboardStore(state => state.syncStatus);
@@ -88,7 +88,7 @@ export const DataFreshnessIndicator: React.FC<DataFreshnessIndicatorProps> = ({
 
       // Update last update time
       const freshness = validationService.getDataFreshnessIndicator(report);
-      setLastUpdateTime(freshness.lastUpdated);
+      lastUpdateTimeRef.current = freshness.lastUpdated;
     } catch (error) {
       console.error("Failed to update freshness status:", error);
     }
@@ -297,8 +297,13 @@ const FreshnessStatusDisplay: React.FC<FreshnessStatusDisplayProps> = ({
 // SECTION DETAILS COMPONENT
 // ================================
 
+interface SectionStatus {
+  status: string;
+  age: number;
+}
+
 interface SectionFreshnessDetailsProps {
-  sections: Record<string, unknown>;
+  sections: Record<string, SectionStatus>;
 }
 
 const SectionFreshnessDetails: React.FC<SectionFreshnessDetailsProps> = ({ sections }) => {

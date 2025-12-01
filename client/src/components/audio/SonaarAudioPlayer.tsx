@@ -1,16 +1,44 @@
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Pause, Play, Volume2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+
+// Helper component to avoid nested ternary
+function PlayPauseIcon({
+  isLoading,
+  isPlaying,
+  size,
+}: {
+  readonly isLoading: boolean;
+  readonly isPlaying: boolean;
+  readonly size: "sm" | "md";
+}): React.JSX.Element {
+  const iconSize = size === "sm" ? "w-3 h-3" : "w-4 h-4";
+  const spinnerSize = size === "sm" ? "w-3 h-3" : "w-4 h-4";
+
+  if (isLoading) {
+    return (
+      <div
+        className={`${spinnerSize} border-2 border-white border-t-transparent rounded-full animate-spin`}
+      />
+    );
+  }
+
+  if (isPlaying) {
+    return <Pause className={iconSize} />;
+  }
+
+  return <Play className={`${iconSize} ml-0.5`} />;
+}
 
 interface SonaarAudioPlayerProps {
-  src: string;
-  title?: string;
-  artist?: string;
-  className?: string;
-  autoPlay?: boolean;
-  showControls?: boolean;
-  compact?: boolean;
+  readonly src: string;
+  readonly title?: string;
+  readonly artist?: string;
+  readonly className?: string;
+  readonly autoPlay?: boolean;
+  readonly showControls?: boolean;
+  readonly compact?: boolean;
 }
 
 export function SonaarAudioPlayer({
@@ -21,7 +49,7 @@ export function SonaarAudioPlayer({
   autoPlay: _autoPlay = false,
   showControls = true,
   compact = false,
-}: SonaarAudioPlayerProps) {
+}: Readonly<SonaarAudioPlayerProps>): React.JSX.Element {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -95,20 +123,16 @@ export function SonaarAudioPlayer({
   if (compact) {
     return (
       <div className={`sonaar-player-compact ${className}`}>
-        <audio ref={audioRef} src={src} preload="metadata" />
+        <audio ref={audioRef} src={src} preload="metadata">
+          <track kind="captions" />
+        </audio>
         <Button
           onClick={togglePlay}
           size="sm"
           disabled={isLoading}
           className="bg-[var(--accent-purple)] hover:bg-purple-600 rounded-full w-10 h-10 p-0"
         >
-          {isLoading ? (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : isPlaying ? (
-            <Pause className="w-4 h-4" />
-          ) : (
-            <Play className="w-4 h-4 ml-0.5" />
-          )}
+          <PlayPauseIcon isLoading={isLoading} isPlaying={isPlaying} size="md" />
         </Button>
       </div>
     );
@@ -118,7 +142,9 @@ export function SonaarAudioPlayer({
     <div
       className={`sonaar-player bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-lg p-4 ${className}`}
     >
-      <audio ref={audioRef} src={src} preload="metadata" />
+      <audio ref={audioRef} src={src} preload="metadata">
+        <track kind="captions" />
+      </audio>
 
       {/* Track Info */}
       <div className="flex items-center justify-between mb-4">
@@ -152,13 +178,7 @@ export function SonaarAudioPlayer({
               disabled={isLoading}
               className="bg-[var(--accent-purple)] hover:bg-purple-600 rounded-full w-8 h-8 p-0"
             >
-              {isLoading ? (
-                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : isPlaying ? (
-                <Pause className="w-3 h-3" />
-              ) : (
-                <Play className="w-3 h-3 ml-0.5" />
-              )}
+              <PlayPauseIcon isLoading={isLoading} isPlaying={isPlaying} size="sm" />
             </Button>
           </div>
 

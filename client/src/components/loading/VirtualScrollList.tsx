@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Virtual scroll utilities export both components and hooks by design */
 /**
  * Virtual Scrolling Component for Performance Optimization
  *
@@ -14,14 +15,15 @@ import { cn } from "@/lib/utils";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface VirtualScrollListProps<T> {
-  items: T[];
-  itemHeight: number;
-  containerHeight: number;
-  renderItem: (item: T, index: number) => React.ReactNode;
-  overscan?: number; // Number of items to render outside visible area
-  className?: string;
-  onScroll?: (scrollTop: number) => void;
-  getItemKey?: (item: T, index: number) => string | number;
+  readonly items: T[];
+  readonly itemHeight: number;
+  readonly containerHeight: number;
+  readonly renderItem: (item: T, index: number) => React.ReactNode;
+  /** Number of items to render outside visible area (buffer) */
+  readonly bufferSize?: number;
+  readonly className?: string;
+  readonly onScroll?: (scrollTop: number) => void;
+  readonly getItemKey?: (item: T, index: number) => string | number;
 }
 
 function VirtualScrollListInner<T>({
@@ -29,11 +31,11 @@ function VirtualScrollListInner<T>({
   itemHeight,
   containerHeight,
   renderItem,
-  overscan = 5,
+  bufferSize = 5,
   className,
   onScroll,
   getItemKey = (_, index) => index,
-}: VirtualScrollListProps<T>) {
+}: VirtualScrollListProps<T>): JSX.Element {
   const [scrollTop, setScrollTop] = useState(0);
   const scrollElementRef = useRef<HTMLDivElement>(null);
 
@@ -45,12 +47,12 @@ function VirtualScrollListInner<T>({
       items.length - 1
     );
 
-    // Add overscan
-    const start = Math.max(0, visibleStart - overscan);
-    const end = Math.min(items.length - 1, visibleEnd + overscan);
+    // Add buffer for smoother scrolling
+    const start = Math.max(0, visibleStart - bufferSize);
+    const end = Math.min(items.length - 1, visibleEnd + bufferSize);
 
     return { start, end };
-  }, [scrollTop, itemHeight, containerHeight, items.length, overscan]);
+  }, [scrollTop, itemHeight, containerHeight, items.length, bufferSize]);
 
   // Get visible items
   const visibleItems = useMemo(() => {
@@ -120,8 +122,15 @@ export function useVirtualScroll<T>(
   items: T[],
   itemHeight: number,
   containerHeight: number,
-  overscan = 5
-) {
+  bufferSize = 5
+): {
+  scrollTop: number;
+  setScrollTop: React.Dispatch<React.SetStateAction<number>>;
+  visibleRange: { start: number; end: number };
+  visibleItems: T[];
+  totalHeight: number;
+  offsetY: number;
+} {
   const [scrollTop, setScrollTop] = useState(0);
 
   const visibleRange = useMemo(() => {
@@ -131,11 +140,11 @@ export function useVirtualScroll<T>(
       items.length - 1
     );
 
-    const start = Math.max(0, visibleStart - overscan);
-    const end = Math.min(items.length - 1, visibleEnd + overscan);
+    const start = Math.max(0, visibleStart - bufferSize);
+    const end = Math.min(items.length - 1, visibleEnd + bufferSize);
 
     return { start, end };
-  }, [scrollTop, itemHeight, containerHeight, items.length, overscan]);
+  }, [scrollTop, itemHeight, containerHeight, items.length, bufferSize]);
 
   const visibleItems = useMemo(() => {
     return items.slice(visibleRange.start, visibleRange.end + 1);
@@ -155,17 +164,21 @@ export function useVirtualScroll<T>(
 }
 
 // Optimized list item wrapper
-export const VirtualListItem = memo<{
-  children: React.ReactNode;
-  height: number;
-  className?: string;
-}>(({ children, height, className }) => {
-  return (
-    <div className={cn("w-full flex-shrink-0", className)} style={{ height }}>
-      {children}
-    </div>
-  );
-});
+interface VirtualListItemProps {
+  readonly children: React.ReactNode;
+  readonly height: number;
+  readonly className?: string;
+}
+
+export const VirtualListItem = memo<VirtualListItemProps>(
+  ({ children, height, className }): JSX.Element => {
+    return (
+      <div className={cn("w-full flex-shrink-0", className)} style={{ height }}>
+        {children}
+      </div>
+    );
+  }
+);
 
 VirtualListItem.displayName = "VirtualListItem";
 
@@ -173,7 +186,7 @@ VirtualListItem.displayName = "VirtualListItem";
 export function useIntersectionObserver(
   targetRef: React.RefObject<HTMLElement>,
   options: IntersectionObserverInit = {}
-) {
+): boolean {
   const [isIntersecting, setIsIntersecting] = useState(false);
 
   useEffect(() => {

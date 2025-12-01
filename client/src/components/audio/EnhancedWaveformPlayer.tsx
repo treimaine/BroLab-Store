@@ -1,19 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Download, Heart, Pause, Play, Volume2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 
 interface EnhancedWaveformPlayerProps {
-  src: string;
-  title: string;
-  artist: string;
-  duration?: string;
-  bpm?: number;
-  genre?: string;
-  onLike?: () => void;
-  onDownload?: () => void;
-  liked?: boolean;
+  readonly src: string;
+  readonly title: string;
+  readonly artist: string;
+  readonly duration?: string;
+  readonly bpm?: number;
+  readonly genre?: string;
+  readonly onLike?: () => void;
+  readonly onDownload?: () => void;
+  readonly liked?: boolean;
 }
 
 export function EnhancedWaveformPlayer({
@@ -26,7 +26,7 @@ export function EnhancedWaveformPlayer({
   onLike,
   onDownload,
   liked = false,
-}: EnhancedWaveformPlayerProps) {
+}: Readonly<EnhancedWaveformPlayerProps>): React.ReactElement {
   const waveformRef = useRef<HTMLDivElement>(null);
   const waveSurferRef = useRef<WaveSurfer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);

@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+type FileRole = "upload" | "deliverable" | "invoice";
+
 interface FileRecord {
   id: string;
   owner_id: number;
@@ -36,16 +38,16 @@ interface FileRecord {
   storage_path: string;
   mime_type?: string;
   size_bytes?: number;
-  role: "upload" | "deliverable" | "invoice";
+  role: FileRole;
   created_at: string;
 }
 
 interface FileUploadProps {
-  onUploadSuccess: () => void;
+  readonly onUploadSuccess: () => void;
 }
 
-function FileUploadComponent({ onUploadSuccess }: FileUploadProps) {
-  const [role, setRole] = useState<"upload" | "deliverable" | "invoice">("upload");
+function FileUploadComponent({ onUploadSuccess }: Readonly<FileUploadProps>): React.JSX.Element {
+  const [role, setRole] = useState<FileRole>("upload");
   const [reservationId, setReservationId] = useState("");
   const [orderId, setOrderId] = useState("");
   const { toast } = useToast();
@@ -77,16 +79,17 @@ function FileUploadComponent({ onUploadSuccess }: FileUploadProps) {
       setReservationId("");
       setOrderId("");
       onUploadSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       toast({
         title: "Erreur d'upload",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
-  const handleUploadError = (error: any) => {
+  const handleUploadError = (error: { message: string; code: string }): void => {
     toast({
       title: "Erreur de validation",
       description: error.message,
@@ -105,7 +108,10 @@ function FileUploadComponent({ onUploadSuccess }: FileUploadProps) {
       <CardContent className="space-y-4">
         <div>
           <Label htmlFor="role">Type de fichier</Label>
-          <Select value={role} onValueChange={(value: any) => setRole(value)}>
+          <Select
+            value={role}
+            onValueChange={(value: "upload" | "deliverable" | "invoice") => setRole(value)}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Sélectionner le type" />
             </SelectTrigger>
@@ -185,7 +191,7 @@ function FileList() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/storage/files"] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Erreur de suppression",
         description: error.message,
@@ -206,10 +212,11 @@ function FileList() {
         title: "Téléchargement initié",
         description: `Téléchargement de "${fileName}" en cours`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       toast({
         title: "Erreur de téléchargement",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -265,77 +272,107 @@ function FileList() {
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="text-center py-8">Chargement des fichiers...</div>
-        ) : files.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">Aucun fichier trouvé</div>
-        ) : (
-          <div className="space-y-3">
-            {files.map((file: FileRecord) => (
-              <div
-                key={file.id}
-                className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {getFileIcon(file.mime_type)}
-                    <div>
-                      <div className="font-medium">{file.storage_path.split("/").pop()}</div>
-                      <div className="text-sm text-gray-500 flex items-center gap-4">
-                        <span className="flex items-center gap-1">
-                          <User className="w-3 h-3" />
-                          User {file.owner_id}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(file.created_at).toLocaleDateString("fr-FR")}
-                        </span>
-                        <span>{formatFileSize(file.size_bytes)}</span>
-                        {file.reservation_id && (
-                          <span className="flex items-center gap-1">
-                            <Hash className="w-3 h-3" />
-                            Rés: {file.reservation_id.slice(0, 8)}...
-                          </span>
-                        )}
-                        {file.order_id && (
-                          <span className="flex items-center gap-1">
-                            <Hash className="w-3 h-3" />
-                            Cmd: {file.order_id}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Badge className={`text-white ${getRoleBadgeColor(file.role)}`}>
-                      {file.role}
-                    </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        downloadFile(file.id, file.storage_path.split("/").pop() || "file")
-                      }
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate(file.id)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <FileListContent
+          isLoading={isLoading}
+          files={files}
+          getFileIcon={getFileIcon}
+          formatFileSize={formatFileSize}
+          getRoleBadgeColor={getRoleBadgeColor}
+          downloadFile={downloadFile}
+          deleteMutation={deleteMutation}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+interface FileListContentProps {
+  readonly isLoading: boolean;
+  readonly files: FileRecord[];
+  readonly getFileIcon: (mimeType?: string) => React.JSX.Element;
+  readonly formatFileSize: (bytes?: number) => string;
+  readonly getRoleBadgeColor: (role: string) => string;
+  readonly downloadFile: (fileId: string, fileName: string) => Promise<void>;
+  readonly deleteMutation: ReturnType<typeof useMutation<unknown, Error, string>>;
+}
+
+function FileListContent({
+  isLoading,
+  files,
+  getFileIcon,
+  formatFileSize,
+  getRoleBadgeColor,
+  downloadFile,
+  deleteMutation,
+}: FileListContentProps): React.JSX.Element {
+  if (isLoading) {
+    return <div className="text-center py-8">Chargement des fichiers...</div>;
+  }
+
+  if (files.length === 0) {
+    return <div className="text-center py-8 text-gray-500">Aucun fichier trouvé</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {files.map((file: FileRecord) => (
+        <div
+          key={file.id}
+          className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {getFileIcon(file.mime_type)}
+              <div>
+                <div className="font-medium">{file.storage_path.split("/").pop()}</div>
+                <div className="text-sm text-gray-500 flex items-center gap-4">
+                  <span className="flex items-center gap-1">
+                    <User className="w-3 h-3" />
+                    User {file.owner_id}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {new Date(file.created_at).toLocaleDateString("fr-FR")}
+                  </span>
+                  <span>{formatFileSize(file.size_bytes)}</span>
+                  {file.reservation_id && (
+                    <span className="flex items-center gap-1">
+                      <Hash className="w-3 h-3" />
+                      Rés: {file.reservation_id.slice(0, 8)}...
+                    </span>
+                  )}
+                  {file.order_id && (
+                    <span className="flex items-center gap-1">
+                      <Hash className="w-3 h-3" />
+                      Cmd: {file.order_id}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Badge className={`text-white ${getRoleBadgeColor(file.role)}`}>{file.role}</Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => downloadFile(file.id, file.storage_path.split("/").pop() || "file")}
+              >
+                <Download className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => deleteMutation.mutate(file.id)}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

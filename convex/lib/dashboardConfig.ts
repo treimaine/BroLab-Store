@@ -92,7 +92,7 @@ function getEnvironmentConfig(): Partial<DashboardConfig> {
  */
 export const getDashboardConfig = query({
   args: {},
-  handler: async (ctx): Promise<DashboardConfig> => {
+  handler: async (_ctx): Promise<DashboardConfig> => {
     const envConfig = getEnvironmentConfig();
 
     // Merge default config with environment-specific overrides
@@ -225,11 +225,8 @@ export const isFeatureEnabled = query({
       return config.features[feature];
     }
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
+    // User lookup reserved for future user-specific feature flags
+    // Currently returns base config for authenticated users
     const envConfig = getEnvironmentConfig();
     const config = {
       ui: { ...DEFAULT_CONFIG.ui, ...envConfig.ui },
@@ -251,9 +248,8 @@ export const getPerformanceConfig = query({
       v.union(v.literal("slow"), v.literal("fast"), v.literal("unknown"))
     ),
   },
-  handler: async (ctx, { deviceType, connectionSpeed }): Promise<Partial<DashboardConfig>> => {
-    // Get base config inline
-    const identity = await ctx.auth.getUserIdentity();
+  handler: async (_ctx, { deviceType, connectionSpeed }): Promise<Partial<DashboardConfig>> => {
+    // Get base config inline (ctx reserved for future user-specific performance settings)
     const envConfig = getEnvironmentConfig();
     const baseConfig = {
       ui: { ...DEFAULT_CONFIG.ui, ...envConfig.ui },
@@ -324,7 +320,7 @@ export const getCurrencyConfig = query({
     const identity = await ctx.auth.getUserIdentity();
 
     // Default to USD
-    let currency = "USD";
+    const currency = "USD";
     let locale = "en-US";
 
     if (identity) {
@@ -346,8 +342,7 @@ export const getCurrencyConfig = query({
 
         const config = languageMap[user.preferences.language] || languageMap["en"];
         locale = config.locale;
-        // Always use USD as base currency per requirements
-        currency = "USD";
+        // Currency stays as USD per requirements (already set above)
       }
     }
 

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Provider pattern exports both provider component and context hooks/HOC */
 import { EventBus, getEventBus } from "@/services/EventBus";
 import React, { createContext, useContext, useEffect, useMemo, useRef } from "react";
 

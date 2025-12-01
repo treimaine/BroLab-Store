@@ -194,8 +194,11 @@ export const VirtualActivityFeed = memo<VirtualActivityFeedProps>(
           )}
           <CardContent className="p-4 sm:p-6">
             <div className="space-y-3">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-2 sm:space-x-3 animate-pulse">
+              {Array.from({ length: 3 }, (_, i) => (
+                <div
+                  key={`skeleton-activity-${i}`}
+                  className="flex items-center space-x-2 sm:space-x-3 animate-pulse"
+                >
                   <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-700 rounded-full" />
                   <div className="flex-1 space-y-2">
                     <div className="h-3 sm:h-4 bg-gray-700 rounded w-3/4" />

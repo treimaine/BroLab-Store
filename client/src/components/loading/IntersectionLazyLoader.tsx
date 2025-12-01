@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- Lazy loading utilities export both components and helper functions by design */
 import { Loader2 } from "lucide-react";
 import React, { ComponentType, Suspense, useEffect, useRef, useState } from "react";
 /**
@@ -7,32 +8,32 @@ import React, { ComponentType, Suspense, useEffect, useRef, useState } from "rea
  * only when they're about to become visible, improving initial page load performance.
  */
 
-interface IntersectionLazyLoaderProps<T = Record<string, any>> {
+interface IntersectionLazyLoaderProps<T = Record<string, unknown>> {
   /** The component to lazy load */
-  component: () => Promise<{ default: ComponentType<T> }>;
+  readonly component: () => Promise<{ default: ComponentType<T> }>;
   /** Props to pass to the lazy loaded component */
-  componentProps?: T;
+  readonly componentProps?: T;
   /** Loading fallback component */
-  fallback?: React.ReactNode;
+  readonly fallback?: React.ReactNode;
   /** Root margin for intersection observer (default: "100px") */
-  rootMargin?: string;
+  readonly rootMargin?: string;
   /** Threshold for intersection observer (default: 0.1) */
-  threshold?: number;
+  readonly threshold?: number;
   /** Minimum height for the placeholder (default: "200px") */
-  minHeight?: string;
+  readonly minHeight?: string;
   /** Whether to load immediately on mount (default: false) */
-  loadImmediately?: boolean;
+  readonly loadImmediately?: boolean;
   /** Custom placeholder content */
-  placeholder?: React.ReactNode;
+  readonly placeholder?: React.ReactNode;
   /** Callback when component starts loading */
-  onLoadStart?: () => void;
+  readonly onLoadStart?: () => void;
   /** Callback when component finishes loading */
-  onLoadComplete?: () => void;
+  readonly onLoadComplete?: () => void;
   /** Callback when loading fails */
-  onLoadError?: (error: Error) => void;
+  readonly onLoadError?: (error: Error) => void;
 }
 
-const DefaultFallback = ({ minHeight }: { minHeight: string }) => (
+const DefaultFallback = ({ minHeight }: Readonly<{ minHeight: string }>): JSX.Element => (
   <div
     className="flex items-center justify-center bg-gray-900/50 border border-gray-700/50 rounded-lg"
     style={{ minHeight }}
@@ -44,7 +45,7 @@ const DefaultFallback = ({ minHeight }: { minHeight: string }) => (
   </div>
 );
 
-const DefaultPlaceholder = ({ minHeight }: { minHeight: string }) => (
+const DefaultPlaceholder = ({ minHeight }: Readonly<{ minHeight: string }>): JSX.Element => (
   <div className="bg-gray-800/30 border border-gray-700/30 rounded-lg" style={{ minHeight }}>
     <div className="p-4">
       <div className="h-4 bg-gray-700/50 rounded w-1/3 mb-3 animate-pulse" />
@@ -57,7 +58,7 @@ const DefaultPlaceholder = ({ minHeight }: { minHeight: string }) => (
   </div>
 );
 
-export function IntersectionLazyLoader<T = Record<string, any>>({
+export function IntersectionLazyLoader<T = Record<string, unknown>>({
   component,
   componentProps,
   fallback,
@@ -69,7 +70,7 @@ export function IntersectionLazyLoader<T = Record<string, any>>({
   onLoadStart,
   onLoadComplete,
   onLoadError,
-}: IntersectionLazyLoaderProps<T>) {
+}: IntersectionLazyLoaderProps<T>): JSX.Element {
   const [shouldLoad, setShouldLoad] = useState(loadImmediately);
   const [LazyComponent, setLazyComponent] = useState<ComponentType<T> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -153,14 +154,14 @@ export function IntersectionLazyLoader<T = Record<string, any>>({
   if (LazyComponent) {
     return (
       <Suspense fallback={fallback || <DefaultFallback minHeight={minHeight} />}>
-        <LazyComponent {...(componentProps as any)} />
+        <LazyComponent {...(componentProps as T & JSX.IntrinsicAttributes)} />
       </Suspense>
     );
   }
 
   // Render loading state
   if (isLoading) {
-    return fallback || <DefaultFallback minHeight={minHeight} />;
+    return <>{fallback || <DefaultFallback minHeight={minHeight} />}</>;
   }
 
   // Render placeholder
@@ -171,26 +172,30 @@ export function IntersectionLazyLoader<T = Record<string, any>>({
 
 /**
  * Hook for creating intersection-based lazy loaders
+ * Returns a component factory function for the given lazy-loaded component
  */
-export function useIntersectionLazyLoader<T = Record<string, any>>(
+export function useIntersectionLazyLoader<T = Record<string, unknown>>(
   component: () => Promise<{ default: ComponentType<T> }>,
   options: Omit<IntersectionLazyLoaderProps<T>, "component"> = {}
-) {
-  return (props: T) => (
+): (props: T) => React.ReactElement {
+  return (props: T): React.ReactElement => (
     <IntersectionLazyLoader<T> component={component} componentProps={props} {...options} />
   );
 }
 
 /**
  * Higher-order component for intersection-based lazy loading
+ * Wraps a component with intersection observer for deferred loading
  */
-export function withIntersectionLazyLoading<T = Record<string, any>>(
+export function withIntersectionLazyLoading<T = Record<string, unknown>>(
   component: () => Promise<{ default: ComponentType<T> }>,
   options: Omit<IntersectionLazyLoaderProps<T>, "component" | "componentProps"> = {}
-) {
-  return (props: T) => (
+): React.FC<T> {
+  const WrappedComponent: React.FC<T> = (props: T): React.ReactElement => (
     <IntersectionLazyLoader<T> component={component} componentProps={props} {...options} />
   );
+  WrappedComponent.displayName = "WithIntersectionLazyLoading";
+  return WrappedComponent;
 }
 
 /**
@@ -201,19 +206,19 @@ export function withIntersectionLazyLoading<T = Record<string, any>>(
 export function createLazyLoader<T>(
   importFn: () => Promise<{ default: ComponentType<T> }>,
   options: Omit<IntersectionLazyLoaderProps<T>, "component" | "componentProps"> = {}
-) {
-  return (props: T) => (
+): (props: T) => JSX.Element {
+  return (props: T): JSX.Element => (
     <IntersectionLazyLoader<T> component={importFn} componentProps={props} {...options} />
   );
 }
 
 // Helper function for named exports
 export function createNamedLazyLoader<T>(
-  importFn: () => Promise<any>,
+  importFn: () => Promise<Record<string, ComponentType<T>>>,
   exportName: string,
   options: Omit<IntersectionLazyLoaderProps<T>, "component" | "componentProps"> = {}
-) {
-  return (props: T) => (
+): (props: T) => JSX.Element {
+  return (props: T): JSX.Element => (
     <IntersectionLazyLoader<T>
       component={() => importFn().then(m => ({ default: m[exportName] }))}
       componentProps={props}

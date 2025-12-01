@@ -6,7 +6,7 @@ import { useIsMobile } from "@/hooks/useBreakpoint";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { cn } from "@/lib/utils";
 import { Heart, Music } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 
 import type { BeatProduct as Beat } from "@shared/schema";
 
@@ -21,10 +21,10 @@ const normalizeTags = (tags?: Array<string | { name: string }> | null): string[]
 };
 
 interface ResponsiveBeatCardProps {
-  beat: Beat;
-  className?: string;
-  productId?: string;
-  productName?: string;
+  readonly beat: Beat;
+  readonly className?: string;
+  readonly productId?: string;
+  readonly productName?: string;
 }
 
 export function ResponsiveBeatCard({
@@ -32,7 +32,7 @@ export function ResponsiveBeatCard({
   className = "",
   productId: _productId,
   productName: _productName,
-}: ResponsiveBeatCardProps) {
+}: Readonly<ResponsiveBeatCardProps>): React.JSX.Element {
   const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -45,7 +45,7 @@ export function ResponsiveBeatCard({
   };
 
   return (
-    <div
+    <article
       className={cn(
         "group relative bg-[var(--dark-gray)] rounded-xl overflow-hidden border border-[var(--medium-gray)] transition-all duration-200",
         !prefersReducedMotion &&
@@ -55,6 +55,8 @@ export function ResponsiveBeatCard({
       )}
       onMouseEnter={() => !isMobile && setIsHovered(true)}
       onMouseLeave={() => !isMobile && setIsHovered(false)}
+      onFocus={() => !isMobile && setIsHovered(true)}
+      onBlur={() => !isMobile && setIsHovered(false)}
     >
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden">
@@ -82,7 +84,9 @@ export function ResponsiveBeatCard({
         <div
           className={cn(
             "absolute inset-0 flex items-center justify-center transition-opacity duration-200",
-            isMobile ? "opacity-100" : isHovered ? "opacity-100" : "opacity-0"
+            isMobile && "opacity-100",
+            !isMobile && isHovered && "opacity-100",
+            !isMobile && !isHovered && "opacity-0"
           )}
         >
           <div className="w-full h-full flex items-center justify-center p-4">
@@ -182,7 +186,7 @@ export function ResponsiveBeatCard({
           <>
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-white text-white text-lg leading-tight line-clamp-2">
+                <h3 className="font-semibold text-white text-lg leading-tight line-clamp-2">
                   {beat.title}
                 </h3>
                 {beat.categories?.[0]?.name && (
@@ -244,6 +248,6 @@ export function ResponsiveBeatCard({
           </>
         )}
       </div>
-    </div>
+    </article>
   );
 }
