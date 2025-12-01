@@ -17,7 +17,7 @@ export interface UseFormValidationOptions<T> {
   debounceMs?: number;
 }
 
-export function useFormValidation<T extends Record<string, any>>({
+export function useFormValidation<T extends Record<string, unknown>>({
   schema,
   initialData,
   validateOnChange = true,

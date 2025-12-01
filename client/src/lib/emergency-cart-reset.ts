@@ -1,5 +1,19 @@
+// Extend globalThis interface for debugging utilities
+declare global {
+  var emergencyCartReset: typeof emergencyCartResetFn | undefined;
+
+  var validateCartPricing: typeof validateCartPricingFn | undefined;
+}
+
+// Cart item interface for validation
+interface CartItem {
+  title?: string;
+  price?: number;
+  licenseType?: string;
+}
+
 // Emergency cart reset utility
-export const emergencyCartReset = () => {
+const emergencyCartResetFn = (): void => {
   // Clear all possible cart storage
   localStorage.removeItem("brolab_cart");
   localStorage.removeItem("cart");
@@ -15,21 +29,25 @@ export const emergencyCartReset = () => {
   console.log("🚨 Emergency cart reset completed");
 
   // Reload the page to ensure clean state
-  window.location.reload();
+  globalThis.location.reload();
 };
 
 // Test current cart pricing
-export const validateCartPricing = () => {
+const validateCartPricingFn = (): boolean => {
   const storedCart = localStorage.getItem("brolab_cart");
   if (storedCart) {
     try {
-      const cartData = JSON.parse(storedCart);
+      const cartData = JSON.parse(storedCart) as CartItem[];
       console.log("Current cart data:", cartData);
 
-      cartData.forEach((item: any, index: number) => {
-        console.log(`Item ${index}: ${item.title} - $${item.price} (${item.licenseType})`);
-        if (item.price < 29.99) {
-          console.error(`❌ INVALID PRICING: $${item.price} for ${item.licenseType}`);
+      cartData.forEach((item: CartItem, index: number) => {
+        console.log(
+          `Item ${index}: ${item.title ?? "Unknown"} - ${item.price ?? 0} (${item.licenseType ?? "Unknown"})`
+        );
+        if ((item.price ?? 0) < 29.99) {
+          console.error(
+            `❌ INVALID PRICING: ${item.price ?? 0} for ${item.licenseType ?? "Unknown"}`
+          );
         }
       });
       return true;
@@ -41,8 +59,12 @@ export const validateCartPricing = () => {
   return true;
 };
 
+// Export the functions
+export const emergencyCartReset = emergencyCartResetFn;
+export const validateCartPricing = validateCartPricingFn;
+
 // Make these available globally for debugging
-if (typeof window !== "undefined") {
-  (window as any).emergencyCartReset = emergencyCartReset;
-  (window as any).validateCartPricing = validateCartPricing;
+if (typeof globalThis !== "undefined") {
+  globalThis.emergencyCartReset = emergencyCartResetFn;
+  globalThis.validateCartPricing = validateCartPricingFn;
 }

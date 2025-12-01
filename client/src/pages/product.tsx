@@ -70,9 +70,12 @@ function getTagName(tag: string | Tag): string {
   return typeof tag === "string" ? tag : tag.name;
 }
 
-// Helper to get meta value
-function getMetaValue(metaData: MetaData[] | undefined, key: string): unknown {
-  return metaData?.find((meta: MetaData) => meta.key === key)?.value ?? null;
+// Helper to get meta value as string
+function getMetaValue(metaData: MetaData[] | undefined, key: string): string | null {
+  const value = metaData?.find((meta: MetaData) => meta.key === key)?.value;
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return value;
+  return String(value);
 }
 
 // License options configuration
@@ -501,7 +504,7 @@ export default function Product(): JSX.Element {
                   title: product?.name || "",
                   price: typeof product?.price === "number" ? product.price : 0,
                   image: product?.images?.[0]?.src || "/api/placeholder/400/400",
-                  bpm: product?.bpm || null,
+                  bpm: product?.bpm ?? undefined,
                   genre: product?.categories?.[0]?.name || "Unknown",
                   mood: getMetaValue(product?.meta_data, "mood"),
                   key: getMetaValue(product?.meta_data, "key"),
@@ -513,7 +516,7 @@ export default function Product(): JSX.Element {
                     title: similarProduct.name,
                     price: typeof similarProduct.price === "number" ? similarProduct.price : 0,
                     image: similarProduct.images?.[0]?.src || "/api/placeholder/400/400",
-                    bpm: similarProduct.bpm || null,
+                    bpm: similarProduct.bpm ?? undefined,
                     genre: similarProduct.categories?.[0]?.name || "Unknown",
                     mood: getMetaValue(similarProduct.meta_data, "mood"),
                     key: getMetaValue(similarProduct.meta_data, "key"),

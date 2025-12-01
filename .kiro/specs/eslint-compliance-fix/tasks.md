@@ -41,7 +41,7 @@
 - [x] 8. Replace `any` types in test mock functions (partial)
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 9. Replace `any` types in hooks and utilities
+- [x] 9. Replace `any` types in hooks and utilities
   - Fix `any` types in `client/src/hooks/useDownloads.ts` (5 instances + @ts-nocheck)
   - Fix `any` types in `client/src/hooks/useFormValidation.ts` (1 instance)
   - Fix `any` types in `client/src/lib/api.ts` (2 instances)

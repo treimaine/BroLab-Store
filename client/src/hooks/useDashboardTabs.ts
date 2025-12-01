@@ -8,8 +8,20 @@
  * - 4.1: Real-time updates without full page refreshes
  */
 
-import { useRealtimeContext, type RealtimeEventType } from "@/providers/DashboardRealtimeProvider";
-import { useCallback, useEffect, useState } from "react";
+import { RealtimeContext, type RealtimeEventType } from "@/providers/DashboardRealtimeProvider";
+import { useCallback, useContext, useEffect, useState } from "react";
+
+// Local hook to access RealtimeContext
+function useRealtimeContext(): { setActiveTab: (tab: string) => void } {
+  const context = useContext(RealtimeContext);
+  if (!context) {
+    // Return a mock context when not inside provider
+    return {
+      setActiveTab: (_tab: string) => {},
+    };
+  }
+  return context;
+}
 
 export type DashboardTab =
   | "overview"
@@ -129,10 +141,12 @@ export function useDashboardTabs(initialTab: DashboardTab = "overview"): Dashboa
     if (tabHistory.length > 1) {
       const newHistory = [...tabHistory];
       newHistory.pop(); // Remove current tab
-      const previousTab = newHistory[newHistory.length - 1];
+      const previousTab = newHistory.at(-1);
 
-      setTabHistory(newHistory);
-      setActiveTabState(previousTab);
+      if (previousTab) {
+        setTabHistory(newHistory);
+        setActiveTabState(previousTab);
+      }
     }
   }, [tabHistory]);
 

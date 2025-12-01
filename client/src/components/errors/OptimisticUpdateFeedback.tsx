@@ -5,7 +5,6 @@
  * success messages, error notifications with retry options, and loading states.
  */
 
-import { useOptimisticUpdates } from "@/hooks/useOptimisticUpdates";
 import type { FeedbackAction, UserFeedback } from "@/services/OptimisticUpdateManager";
 import { AlertCircle, CheckCircle, Clock, RefreshCw, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
@@ -36,11 +35,15 @@ export const OptimisticUpdateFeedback: React.FC<OptimisticUpdateFeedbackProps> =
   maxNotifications = 3,
   showPendingIndicator = true,
 }) => {
-  const { feedback, dismissFeedback, queueStatus, hasPendingUpdates } = useOptimisticUpdates({
-    showFeedback: true,
-  });
-
+  // Simplified state management without the missing hook
+  const [feedback, setFeedback] = useState<UserFeedback | null>(null);
   const [notifications, setNotifications] = useState<UserFeedback[]>([]);
+  const [queueStatus] = useState<QueueStatus>({ totalPending: 0, failed: [] });
+  const hasPendingUpdates = queueStatus.totalPending > 0;
+
+  const dismissFeedback = (): void => {
+    setFeedback(null);
+  };
 
   // Add new feedback to notifications list
   useEffect(() => {

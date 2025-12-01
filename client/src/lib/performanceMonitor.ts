@@ -5,10 +5,13 @@
 
 import { logger, type LogContext } from "./logger";
 
+// Type alias for metric units
+export type MetricUnit = "ms" | "bytes" | "count";
+
 export interface PerformanceMetric {
   name: string;
   value: number;
-  unit: "ms" | "bytes" | "count";
+  unit: MetricUnit;
   timestamp: string;
   context?: LogContext;
   tags?: string[];
@@ -42,12 +45,12 @@ export interface UserInteractionMetric {
 class PerformanceMonitor {
   private static instance: PerformanceMonitor;
   private metrics: PerformanceMetric[] = [];
-  private componentMetrics: Map<string, ComponentPerformance> = new Map();
+  private readonly componentMetrics: Map<string, ComponentPerformance> = new Map();
   private apiMetrics: ApiPerformance[] = [];
   private userInteractions: UserInteractionMetric[] = [];
-  private timers: Map<string, number> = new Map();
+  private readonly timers: Map<string, number> = new Map();
   private observers: PerformanceObserver[] = [];
-  private maxMetrics = 1000;
+  private readonly maxMetrics = 1000;
 
   private constructor() {
     this.initializePerformanceMonitoring();
@@ -84,26 +87,29 @@ class PerformanceMonitor {
   }
 
   private trackNavigationTiming(): void {
-    if (!window.performance || !window.performance.timing) {
+    // Use modern Navigation Timing API (Level 2)
+    if (typeof globalThis.addEventListener !== "function") {
       return;
     }
 
-    window.addEventListener("load", () => {
+    globalThis.addEventListener("load", () => {
       setTimeout(() => {
-        const timing = window.performance.timing;
-        const navigationStart = timing.navigationStart;
+        const entries = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
+        if (entries.length === 0) return;
+
+        const nav = entries[0];
 
         const metrics = [
-          { name: "dns_lookup", value: timing.domainLookupEnd - timing.domainLookupStart },
-          { name: "tcp_connection", value: timing.connectEnd - timing.connectStart },
-          { name: "request_time", value: timing.responseStart - timing.requestStart },
-          { name: "response_time", value: timing.responseEnd - timing.responseStart },
+          { name: "dns_lookup", value: nav.domainLookupEnd - nav.domainLookupStart },
+          { name: "tcp_connection", value: nav.connectEnd - nav.connectStart },
+          { name: "request_time", value: nav.responseStart - nav.requestStart },
+          { name: "response_time", value: nav.responseEnd - nav.responseStart },
           {
             name: "dom_processing",
-            value: timing.domContentLoadedEventEnd - timing.domContentLoadedEventStart,
+            value: nav.domContentLoadedEventEnd - nav.domContentLoadedEventStart,
           },
-          { name: "load_event", value: timing.loadEventEnd - timing.loadEventStart },
-          { name: "total_load_time", value: timing.loadEventEnd - navigationStart },
+          { name: "load_event", value: nav.loadEventEnd - nav.loadEventStart },
+          { name: "total_load_time", value: nav.loadEventEnd - nav.startTime },
         ];
 
         metrics.forEach(metric => {
@@ -118,7 +124,7 @@ class PerformanceMonitor {
   }
 
   private trackResourceTiming(): void {
-    if (!window.performance || !window.performance.getEntriesByType) {
+    if (!performance?.getEntriesByType) {
       return;
     }
 
@@ -146,7 +152,7 @@ class PerformanceMonitor {
   }
 
   private trackPaintTiming(): void {
-    if (!window.performance || !window.performance.getEntriesByType) {
+    if (!performance?.getEntriesByType) {
       return;
     }
 
@@ -165,8 +171,14 @@ class PerformanceMonitor {
   }
 
   private trackLayoutShifts(): void {
-    if (!window.performance || !("PerformanceObserver" in window)) {
+    if (typeof PerformanceObserver === "undefined") {
       return;
+    }
+
+    // Interface for layout shift entries (not in standard PerformanceEntry)
+    interface LayoutShiftEntry extends PerformanceEntry {
+      hadRecentInput?: boolean;
+      value?: number;
     }
 
     try {
@@ -174,8 +186,9 @@ class PerformanceMonitor {
         let cumulativeScore = 0;
 
         list.getEntries().forEach(entry => {
-          if (entry.entryType === "layout-shift" && !(entry as any).hadRecentInput) {
-            cumulativeScore += (entry as any).value;
+          const layoutEntry = entry as LayoutShiftEntry;
+          if (entry.entryType === "layout-shift" && !layoutEntry.hadRecentInput) {
+            cumulativeScore += layoutEntry.value ?? 0;
           }
         });
 
@@ -197,13 +210,14 @@ class PerformanceMonitor {
   }
 
   private trackLongTasks(): void {
-    if (!window.performance || !("PerformanceObserver" in window)) {
+    if (typeof PerformanceObserver === "undefined") {
       return;
     }
 
     try {
       const observer = new PerformanceObserver(list => {
         list.getEntries().forEach(entry => {
+          // Entry type for long tasks
           if (entry.entryType === "longtask") {
             this.recordMetric("long_task", entry.duration, "ms", {
               component: "main_thread_blocking",
@@ -224,12 +238,25 @@ class PerformanceMonitor {
   }
 
   private trackMemoryUsage(): void {
-    if (!(window.performance as any)?.memory) {
+    // Chrome-specific memory API interface
+    interface PerformanceMemory {
+      usedJSHeapSize: number;
+      totalJSHeapSize: number;
+      jsHeapSizeLimit: number;
+    }
+
+    interface PerformanceWithMemory extends Performance {
+      memory?: PerformanceMemory;
+    }
+
+    const perfWithMemory = performance as PerformanceWithMemory;
+    if (!perfWithMemory?.memory) {
       return;
     }
 
-    const trackMemory = () => {
-      const memory = (window.performance as any).memory;
+    const trackMemory = (): void => {
+      const memory = perfWithMemory.memory;
+      if (!memory) return;
 
       this.recordMetric("memory_used", memory.usedJSHeapSize, "bytes", {
         component: "memory_usage",
@@ -258,14 +285,14 @@ class PerformanceMonitor {
     });
 
     // Track when all resources are loaded
-    window.addEventListener("load", () => {
+    globalThis.addEventListener("load", () => {
       this.recordMetric("window_load", performance.now(), "ms", {
         component: "page_load",
       });
     });
 
     // Track first interaction
-    const trackFirstInteraction = () => {
+    const trackFirstInteraction = (): void => {
       this.recordMetric("first_interaction", performance.now(), "ms", {
         component: "user_interaction",
       });
@@ -284,8 +311,10 @@ class PerformanceMonitor {
   private getResourceType(url: string): string {
     if (url.includes(".js")) return "javascript";
     if (url.includes(".css")) return "stylesheet";
-    if (url.match(/\.(png|jpg|jpeg|gif|svg|webp)$/)) return "image";
-    if (url.match(/\.(woff|woff2|ttf|eot)$/)) return "font";
+    const imageRegex = /\.(png|jpg|jpeg|gif|svg|webp)$/;
+    const fontRegex = /\.(woff|woff2|ttf|eot)$/;
+    if (imageRegex.exec(url)) return "image";
+    if (fontRegex.exec(url)) return "font";
     if (url.includes("/api/")) return "api";
     return "other";
   }
@@ -293,7 +322,7 @@ class PerformanceMonitor {
   public recordMetric(
     name: string,
     value: number,
-    unit: "ms" | "bytes" | "count",
+    unit: MetricUnit,
     context?: LogContext,
     tags?: string[]
   ): void {
@@ -498,15 +527,10 @@ class PerformanceMonitor {
     const memoryMetrics = this.metrics.filter(m => m.name.startsWith("memory_"));
     if (memoryMetrics.length === 0) return null;
 
-    // Find the latest metric by timestamp (kept for potential future use)
-    const _latest = memoryMetrics.reduce((acc, current) =>
-      new Date(current.timestamp) > new Date(acc.timestamp) ? current : acc
-    );
-
     return {
-      used: memoryMetrics.find(m => m.name === "memory_used")?.value || 0,
-      total: memoryMetrics.find(m => m.name === "memory_total")?.value || 0,
-      limit: memoryMetrics.find(m => m.name === "memory_limit")?.value || 0,
+      used: memoryMetrics.find(m => m.name === "memory_used")?.value ?? 0,
+      total: memoryMetrics.find(m => m.name === "memory_total")?.value ?? 0,
+      limit: memoryMetrics.find(m => m.name === "memory_limit")?.value ?? 0,
     };
   }
 
@@ -539,18 +563,18 @@ export const performanceMonitor = PerformanceMonitor.getInstance();
 export const recordMetric = (
   name: string,
   value: number,
-  unit: "ms" | "bytes" | "count",
+  unit: MetricUnit,
   context?: LogContext,
   tags?: string[]
-) => performanceMonitor.recordMetric(name, value, unit, context, tags);
+): void => performanceMonitor.recordMetric(name, value, unit, context, tags);
 
-export const startTimer = (name: string) => performanceMonitor.startTimer(name);
+export const startTimer = (name: string): (() => number) => performanceMonitor.startTimer(name);
 
 export const trackComponentPerformance = (
   componentName: string,
   renderTime: number,
   isMount?: boolean
-) => performanceMonitor.trackComponentPerformance(componentName, renderTime, isMount);
+): void => performanceMonitor.trackComponentPerformance(componentName, renderTime, isMount);
 
 export const trackApiPerformance = (
   endpoint: string,
@@ -558,24 +582,41 @@ export const trackApiPerformance = (
   responseTime: number,
   status: number,
   retryCount?: number
-) => performanceMonitor.trackApiPerformance(endpoint, method, responseTime, status, retryCount);
+): void =>
+  performanceMonitor.trackApiPerformance(endpoint, method, responseTime, status, retryCount);
 
 export const trackUserInteraction = (
   action: string,
   element: string,
   responseTime?: number,
   context?: Record<string, unknown>
-) => performanceMonitor.trackUserInteraction(action, element, responseTime, context);
+): void => performanceMonitor.trackUserInteraction(action, element, responseTime, context);
 
 export const getPerformanceMetrics = (
   filter?: Parameters<typeof performanceMonitor.getMetrics>[0]
-) => performanceMonitor.getMetrics(filter);
+): PerformanceMetric[] => performanceMonitor.getMetrics(filter);
 
-export const getPerformanceSummary = () => performanceMonitor.getPerformanceSummary();
+export const getPerformanceSummary = (): Record<string, unknown> =>
+  performanceMonitor.getPerformanceSummary();
+
+// Performance monitor debug interface
+interface PerformanceMonitorDebug {
+  getMetrics: typeof getPerformanceMetrics;
+  getSummary: typeof getPerformanceSummary;
+  getComponentMetrics: () => ComponentPerformance[];
+  getApiMetrics: () => ApiPerformance[];
+  getUserInteractions: () => UserInteractionMetric[];
+  clearMetrics: () => void;
+}
+
+// Extend globalThis interface for performance monitor
+declare global {
+  var performanceMonitor: PerformanceMonitorDebug | undefined;
+}
 
 // Make performance monitor available globally in development
 if (process.env.NODE_ENV === "development") {
-  (window as any).performanceMonitor = {
+  globalThis.performanceMonitor = {
     getMetrics: getPerformanceMetrics,
     getSummary: getPerformanceSummary,
     getComponentMetrics: () => performanceMonitor.getComponentMetrics(),

@@ -399,7 +399,14 @@ export const debugUtils = {
   getPageLoadTime: () => logger.getPageLoadTime(),
 };
 
+// Extend Window interface for debug utilities
+declare global {
+  interface Window {
+    mixingMasteringDebug?: typeof debugUtils;
+  }
+}
+
 // Make debug utils available globally in development
 if (process.env.NODE_ENV === "development") {
-  (window as any).mixingMasteringDebug = debugUtils;
+  window.mixingMasteringDebug = debugUtils;
 }

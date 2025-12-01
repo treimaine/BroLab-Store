@@ -1,7 +1,12 @@
-// Configuration Clerk optimisée pour l'environnement Replit
+// Extend globalThis interface for Clerk
+declare global {
+  var Clerk: unknown;
+}
+
+// Clerk configuration optimized for the environment
 export const clerkConfig = {
-  publishableKey: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY!,
-  // Configuration spéciale pour éviter les erreurs réseau en dev
+  publishableKey: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+  // Special configuration to avoid network errors in dev
   appearance: {
     baseTheme: "dark" as const,
     variables: {
@@ -10,18 +15,18 @@ export const clerkConfig = {
       colorText: "#ffffff",
     },
   },
-  // Désactiver certaines fonctionnalités qui causent des erreurs réseau
+  // Disable features that cause network errors
   telemetry: false,
   isSatellite: false,
-  domain: undefined, // Laisser Clerk détecter automatiquement
+  domain: undefined, // Let Clerk detect automatically
   proxyUrl: undefined,
 };
 
-// Vérifier si Clerk peut s'initialiser correctement
+// Check if Clerk can initialize correctly
 export const isClerkAvailable = (): boolean => {
   try {
-    // Check if Clerk is available on window object or if we have a publishable key
-    return !!(window as any).Clerk || !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+    // Check if Clerk is available on globalThis or if we have a publishable key
+    return !!globalThis.Clerk || !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   } catch {
     return false;
   }
