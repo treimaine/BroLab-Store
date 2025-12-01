@@ -1,38 +1,90 @@
-import { apiRequest } from './queryClient';
+import { apiRequest } from "./queryClient";
 
 // Newsletter API
 export const newsletterApi = {
-  subscribe: async (email: string) => {
-    return apiRequest('POST', '/api/newsletter/subscribe', { email });
+  subscribe: async (email: string): Promise<Response> => {
+    return apiRequest("POST", "/api/newsletter/subscribe", { email });
   },
 };
 
 // Contact API
 export const contactApi = {
-  submit: async (data: { name: string; email: string; subject: string; message: string }) => {
-    return apiRequest('POST', '/api/contact', data);
+  submit: async (data: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }): Promise<Response> => {
+    return apiRequest("POST", "/api/contact", data);
   },
 };
 
 // WordPress API helpers
 export const wordpressApi = {
-  getPage: async (slug: string) => {
+  getPage: async (slug: string): Promise<unknown> => {
     const response = await fetch(`/api/wordpress/pages/${slug}`);
-    if (!response.ok) throw new Error('Failed to fetch page');
-    return response.json();
+    if (!response.ok) throw new Error("Failed to fetch page");
+    return response.json() as Promise<unknown>;
   },
-  
-  getPosts: async (params?: { per_page?: number; page?: number; search?: string }) => {
+
+  getPosts: async (params?: {
+    per_page?: number;
+    page?: number;
+    search?: string;
+  }): Promise<unknown> => {
     const searchParams = new URLSearchParams();
-    if (params?.per_page) searchParams.append('per_page', params.per_page.toString());
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.search) searchParams.append('search', params.search);
-    
+    if (params?.per_page) searchParams.append("per_page", params.per_page.toString());
+    if (params?.page) searchParams.append("page", params.page.toString());
+    if (params?.search) searchParams.append("search", params.search);
+
     const response = await fetch(`/api/wordpress/posts?${searchParams}`);
-    if (!response.ok) throw new Error('Failed to fetch posts');
-    return response.json();
+    if (!response.ok) throw new Error("Failed to fetch posts");
+    return response.json() as Promise<unknown>;
   },
 };
+
+// WooCommerce order data interface
+export interface WooCommerceOrderData {
+  payment_method?: string;
+  payment_method_title?: string;
+  set_paid?: boolean;
+  billing?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    phone?: string;
+    address_1?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+  };
+  line_items?: Array<{
+    product_id: number;
+    quantity: number;
+    meta_data?: Array<{ key: string; value: string }>;
+  }>;
+  meta_data?: Array<{ key: string; value: string }>;
+}
+
+// WooCommerce customer data interface
+export interface WooCommerceCustomerData {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  billing?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    phone?: string;
+    address_1?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+  };
+}
 
 // WooCommerce API helpers
 export const wooCommerceApi = {
@@ -45,39 +97,39 @@ export const wooCommerceApi = {
     page?: number;
     orderby?: string;
     order?: string;
-  }) => {
+  }): Promise<unknown> => {
     const params = new URLSearchParams();
-    if (filters?.category) params.append('category', filters.category);
-    if (filters?.search) params.append('search', filters.search);
-    if (filters?.min_price) params.append('min_price', filters.min_price.toString());
-    if (filters?.max_price) params.append('max_price', filters.max_price.toString());
-    if (filters?.per_page) params.append('per_page', filters.per_page.toString());
-    if (filters?.page) params.append('page', filters.page.toString());
-    if (filters?.orderby) params.append('orderby', filters.orderby);
-    if (filters?.order) params.append('order', filters.order);
-    
+    if (filters?.category) params.append("category", filters.category);
+    if (filters?.search) params.append("search", filters.search);
+    if (filters?.min_price) params.append("min_price", filters.min_price.toString());
+    if (filters?.max_price) params.append("max_price", filters.max_price.toString());
+    if (filters?.per_page) params.append("per_page", filters.per_page.toString());
+    if (filters?.page) params.append("page", filters.page.toString());
+    if (filters?.orderby) params.append("orderby", filters.orderby);
+    if (filters?.order) params.append("order", filters.order);
+
     const response = await fetch(`/api/woocommerce/products?${params}`);
-    if (!response.ok) throw new Error('Failed to fetch products');
-    return response.json();
+    if (!response.ok) throw new Error("Failed to fetch products");
+    return response.json() as Promise<unknown>;
   },
 
-  getProduct: async (id: string) => {
+  getProduct: async (id: string): Promise<unknown> => {
     const response = await fetch(`/api/woocommerce/products/${id}`);
-    if (!response.ok) throw new Error('Failed to fetch product');
-    return response.json();
+    if (!response.ok) throw new Error("Failed to fetch product");
+    return response.json() as Promise<unknown>;
   },
 
-  getCategories: async () => {
-    const response = await fetch('/api/woocommerce/categories');
-    if (!response.ok) throw new Error('Failed to fetch categories');
-    return response.json();
+  getCategories: async (): Promise<unknown> => {
+    const response = await fetch("/api/woocommerce/categories");
+    if (!response.ok) throw new Error("Failed to fetch categories");
+    return response.json() as Promise<unknown>;
   },
 
-  createOrder: async (orderData: any) => {
-    return apiRequest('POST', '/api/woocommerce/orders', orderData);
+  createOrder: async (orderData: WooCommerceOrderData): Promise<Response> => {
+    return apiRequest("POST", "/api/woocommerce/orders", orderData);
   },
 
-  createCustomer: async (customerData: any) => {
-    return apiRequest('POST', '/api/woocommerce/customers', customerData);
+  createCustomer: async (customerData: WooCommerceCustomerData): Promise<Response> => {
+    return apiRequest("POST", "/api/woocommerce/customers", customerData);
   },
 };

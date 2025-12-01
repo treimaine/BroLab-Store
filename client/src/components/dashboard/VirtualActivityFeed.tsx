@@ -241,7 +241,7 @@ export const VirtualActivityFeed = memo<VirtualActivityFeedProps>(
               containerHeight={containerHeight}
               renderItem={renderActivity}
               getItemKey={getActivityKey}
-              overscan={3}
+              bufferSize={3}
               className="px-4 sm:px-6 pb-4 sm:pb-6"
             />
           ) : (

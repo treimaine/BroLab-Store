@@ -1,14 +1,10 @@
-// @ts-nocheck
 import {
   useConvexAuth,
   useMutation as useConvexMutation,
   useQuery as useConvexQuery,
 } from "convex/react";
-// Casting Convex generated API to any to avoid deep instantiation issues in React hooks
-// See known issue note in project rules for similar workaround
-import { api as generatedApi } from "../../../convex/_generated/api";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const api: any = generatedApi as any;
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 export interface DownloadData {
   productId: number;
@@ -17,17 +13,49 @@ export interface DownloadData {
   price: number;
 }
 
+// Type for download records returned from Convex (matches schema)
+export interface DownloadRecord {
+  _id: Id<"downloads">;
+  _creationTime: number;
+  userId: Id<"users">;
+  beatId: number;
+  licenseType: string;
+  downloadUrl?: string;
+  fileSize?: number;
+  downloadCount?: number;
+  expiresAt?: number;
+  ipAddress?: string;
+  userAgent?: string;
+  timestamp: number;
+}
+
+// Type for mutation arguments
+interface LogDownloadArgs {
+  productId: number;
+  productName: string;
+  license: string;
+  price: number;
+}
+
+// Type for the mutation function
+type LogDownloadMutation = (args: LogDownloadArgs) => Promise<DownloadRecord | null>;
+
 export function useDownloads() {
   const { isAuthenticated } = useConvexAuth();
 
   // Lister les téléchargements avec Convex
-  // Avoid TS2589 by relaxing types for generated query and args
-  const downloads = useConvexQuery(api.downloads.getUserDownloads as any, {} as any) as any;
+  // Type assertion needed due to Convex deep type instantiation issue
+  const downloads = useConvexQuery(api.downloads.getUserDownloads, {}) as
+    | DownloadRecord[]
+    | undefined;
 
   // Logger un téléchargement avec Convex
-  const logDownloadMutation = useConvexMutation(api.downloads.logDownload as any) as any;
+  // Type assertion needed due to Convex deep type instantiation issue
+  const logDownloadMutation = useConvexMutation(
+    api.downloads.logDownload
+  ) as unknown as LogDownloadMutation;
 
-  const logDownload = async (downloadData: DownloadData) => {
+  const logDownload = async (downloadData: DownloadData): Promise<DownloadRecord | null> => {
     if (!isAuthenticated) {
       throw new Error("Vous devez être connecté pour télécharger");
     }
@@ -49,7 +77,7 @@ export function useDownloads() {
   };
 
   return {
-    downloads: downloads || [],
+    downloads: downloads ?? [],
     isLoading: downloads === undefined,
     logDownload,
     isAuthenticated,

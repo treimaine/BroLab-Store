@@ -165,24 +165,41 @@ export interface ConvexRealtimeData {
   }>;
 }
 
+// Interface for Convex errors
+interface ConvexErrorLike {
+  message?: string;
+}
+
 // Fonction utilitaire pour gérer les erreurs Convex
-export function handleConvexError(error: any, context: string) {
+export function handleConvexError(error: unknown, context: string): string {
   console.error(`❌ Convex error in ${context}:`, error);
 
+  const errorMessage = (error as ConvexErrorLike)?.message || "";
+
   // Retourner un message d'erreur utilisateur-friendly
-  if (error.message?.includes("network")) {
+  if (errorMessage.includes("network")) {
     return "Erreur de connexion. Vérifiez votre connexion internet.";
-  } else if (error.message?.includes("timeout")) {
+  } else if (errorMessage.includes("timeout")) {
     return "La requête a pris trop de temps. Veuillez réessayer.";
-  } else if (error.message?.includes("unauthorized")) {
+  } else if (errorMessage.includes("unauthorized")) {
     return "Vous devez être connecté pour accéder à cette fonctionnalité.";
   } else {
     return "Une erreur inattendue s'est produite. Veuillez réessayer.";
   }
 }
 
+// Options for optimizing Convex queries
+export interface ConvexQueryOptions {
+  staleTime?: number;
+  retry?: number;
+  retryDelay?: number;
+  timeout?: number;
+  refetchInterval?: number;
+  enabled?: boolean;
+}
+
 // Fonction pour optimiser les requêtes Convex
-export function optimizeConvexQuery(queryKey: string[], options: any = {}) {
+export function optimizeConvexQuery(queryKey: string[], options: ConvexQueryOptions = {}) {
   return {
     queryKey,
     staleTime: options.staleTime || defaultQueryConfig.staleTime,

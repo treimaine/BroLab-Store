@@ -384,7 +384,7 @@ export const VirtualDownloadsTable = memo<VirtualDownloadsTableProps>(
                   containerHeight={containerHeight}
                   renderItem={renderDownload}
                   getItemKey={getDownloadKey}
-                  overscan={3}
+                  bufferSize={3}
                 />
               </>
             ) : (
