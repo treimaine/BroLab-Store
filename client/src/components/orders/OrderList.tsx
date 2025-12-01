@@ -1,16 +1,21 @@
 import { Button } from "@/components/ui/button";
 import { useOrders } from "@/hooks/useOrders";
+import type { Order } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 import { OrderCard } from "./OrderCard";
 
 interface OrderListProps {
-  page?: number;
-  limit?: number;
-  onPageChange?: (page: number) => void;
-  onOrderClick?: (orderId: number) => void;
+  readonly page?: number;
+  readonly limit?: number;
+  readonly onPageChange?: (page: number) => void;
+  readonly onOrderClick?: (orderId: number) => void;
 }
 
-export function OrderList({ page = 1, limit = 10, onPageChange, onOrderClick }: OrderListProps) {
+export function OrderList({
+  page = 1,
+  onPageChange,
+  onOrderClick,
+}: Readonly<OrderListProps>): JSX.Element {
   const { orders, isLoading } = useOrders();
 
   // Orders is already an array from useOrders hook
@@ -34,7 +39,7 @@ export function OrderList({ page = 1, limit = 10, onPageChange, onOrderClick }: 
         <Button
           variant="outline"
           className="mt-4 border-gray-600 text-gray-300 hover:text-white"
-          onClick={() => window.location.reload()}
+          onClick={() => globalThis.location.reload()}
         >
           Réessayer
         </Button>
@@ -53,24 +58,37 @@ export function OrderList({ page = 1, limit = 10, onPageChange, onOrderClick }: 
   return (
     <div className="space-y-6">
       <div className="grid gap-4">
-        {data.orders.map((order: any) => (
-          <OrderCard
-            key={(order.id || order._id) as any}
-            order={
-              {
-                id: (order.id || order._id) as any,
-                created_at: new Date(order._creationTime || Date.now()).toISOString(),
-                email: order.email || "",
-                items: order.items || [],
-                invoice_pdf_url: undefined,
-                invoice_number: undefined,
-                status: order.status || "pending",
-                total: order.total || 0,
-              } as any
-            }
-            onOrderClick={onOrderClick}
-          />
-        ))}
+        {data.orders.map(order => {
+          const convexOrder = order as unknown as {
+            _id: string;
+            _creationTime: number;
+            id?: number;
+            email: string;
+            items: Order["items"];
+            status: string;
+            total: number;
+            invoice_number?: string;
+            invoice_pdf_url?: string;
+          };
+          const orderId = convexOrder.id ?? Number.parseInt(convexOrder._id, 10);
+
+          return (
+            <OrderCard
+              key={convexOrder._id}
+              order={{
+                id: orderId,
+                created_at: new Date(convexOrder._creationTime).toISOString(),
+                email: convexOrder.email,
+                items: convexOrder.items,
+                invoice_pdf_url: convexOrder.invoice_pdf_url,
+                invoice_number: convexOrder.invoice_number,
+                status: convexOrder.status as Order["status"],
+                total: convexOrder.total,
+              }}
+              onOrderClick={onOrderClick}
+            />
+          );
+        })}
       </div>
 
       {data.totalPages > 1 && (

@@ -6,12 +6,12 @@
  */
 
 export class BrowserEventEmitter {
-  private listeners = new Map<string, Array<(...args: any[]) => void>>();
+  private readonly listeners = new Map<string, Array<(...args: unknown[]) => void>>();
 
   /**
    * Add an event listener
    */
-  on(event: string, listener: (...args: any[]) => void): this {
+  on(event: string, listener: (...args: unknown[]) => void): this {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
@@ -22,14 +22,14 @@ export class BrowserEventEmitter {
   /**
    * Add an event listener (alias for on)
    */
-  addListener(event: string, listener: (...args: any[]) => void): this {
+  addListener(event: string, listener: (...args: unknown[]) => void): this {
     return this.on(event, listener);
   }
 
   /**
    * Add an event listener to the beginning of the listeners array
    */
-  prependListener(event: string, listener: (...args: any[]) => void): this {
+  prependListener(event: string, listener: (...args: unknown[]) => void): this {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
@@ -40,8 +40,8 @@ export class BrowserEventEmitter {
   /**
    * Add a one-time event listener
    */
-  once(event: string, listener: (...args: any[]) => void): this {
-    const onceWrapper = (...args: any[]) => {
+  once(event: string, listener: (...args: unknown[]) => void): this {
+    const onceWrapper = (...args: unknown[]) => {
       this.removeListener(event, onceWrapper);
       listener(...args);
     };
@@ -51,7 +51,7 @@ export class BrowserEventEmitter {
   /**
    * Emit an event to all listeners
    */
-  emit(event: string, ...args: any[]): boolean {
+  emit(event: string, ...args: unknown[]): boolean {
     const eventListeners = this.listeners.get(event);
     if (!eventListeners || eventListeners.length === 0) {
       return false;
@@ -71,7 +71,7 @@ export class BrowserEventEmitter {
   /**
    * Remove a specific event listener
    */
-  removeListener(event: string, listener: (...args: any[]) => void): this {
+  removeListener(event: string, listener: (...args: unknown[]) => void): this {
     const eventListeners = this.listeners.get(event);
     if (eventListeners) {
       const index = eventListeners.indexOf(listener);
@@ -112,7 +112,7 @@ export class BrowserEventEmitter {
   /**
    * Alias for removeListener for compatibility
    */
-  off(event: string, listener: (...args: any[]) => void): this {
+  off(event: string, listener: (...args: unknown[]) => void): this {
     return this.removeListener(event, listener);
   }
 
@@ -120,7 +120,7 @@ export class BrowserEventEmitter {
    * Set maximum number of listeners (Node.js EventEmitter compatibility)
    * In browser environment, this is a no-op for compatibility
    */
-  setMaxListeners(n: number): this {
+  setMaxListeners(_n: number): this {
     // No-op in browser environment, just for compatibility
     return this;
   }

@@ -7,6 +7,7 @@ import {
 // Casting Convex generated API to any to avoid deep instantiation issues in React hooks
 // See known issue note in project rules for similar workaround
 import { api as generatedApi } from "../../../convex/_generated/api";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api: any = generatedApi as any;
 
 export interface DownloadData {

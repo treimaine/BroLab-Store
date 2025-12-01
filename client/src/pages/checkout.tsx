@@ -9,12 +9,22 @@ import { ArrowLeft, CheckCircle, CreditCard, ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
-export default function Checkout() {
+interface PaymentService {
+  clientSecret?: string;
+  service: string;
+  serviceName: string;
+  serviceDetails: string;
+  price: number;
+  quantity: number;
+  reservationId: string;
+}
+
+export default function Checkout(): JSX.Element {
   const { cart, clearCart } = useCartContext();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const [pendingServices, setPendingServices] = useState<any[]>([]);
+  const [pendingServices, setPendingServices] = useState<PaymentService[]>([]);
   const [paymentStatus, setPaymentStatus] = useState<
     "idle" | "processing" | "succeeded" | "failed"
   >("idle");
@@ -37,10 +47,10 @@ export default function Checkout() {
     const storedServices = sessionStorage.getItem("pendingServices");
 
     if (storedServices) {
-      setPendingServices(JSON.parse(storedServices));
+      setPendingServices(JSON.parse(storedServices) as PaymentService[]);
     } else if (storedPayment) {
       // Migration: convert single payment to services array
-      const singleService = JSON.parse(storedPayment);
+      const singleService = JSON.parse(storedPayment) as PaymentService;
       setPendingServices([singleService]);
       // Update storage format
       sessionStorage.setItem("pendingServices", JSON.stringify([singleService]));
@@ -57,7 +67,7 @@ export default function Checkout() {
       return sum + (item.price || 0) * item.quantity;
     }, 0);
 
-    const servicesTotal = pendingServices.reduce((sum, service) => {
+    const servicesTotal = pendingServices.reduce((sum, service: PaymentService) => {
       return sum + (service.price || 0);
     }, 0);
 
@@ -65,7 +75,8 @@ export default function Checkout() {
   }, [cart.items, pendingServices]);
 
   // Handle successful payment
-  const handlePaymentSuccess = (paymentData: any) => {
+  const handlePaymentSuccess = (paymentData: unknown): void => {
+    const _data = paymentData; // Acknowledge parameter
     setPaymentStatus("succeeded");
     toast({
       title: "Payment Successful!",
@@ -198,49 +209,57 @@ export default function Checkout() {
 
             <div className="space-y-4 mb-6">
               {/* Display all services */}
-              {pendingServices.map((service, index) => (
-                <div
-                  key={`service-${index}-${service.reservationId}`}
-                  className="flex items-center justify-between p-4 bg-[var(--card-bg)] rounded-lg"
-                >
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-white">
-                      {service.serviceName ||
-                        (service.service === "mixing"
-                          ? "Professional Mixing"
-                          : service.service === "mastering"
-                            ? "Audio Mastering"
-                            : service.service === "mixing_mastering"
-                              ? "Mixing + Mastering"
-                              : service.service === "recording"
-                                ? "Recording Session"
-                                : service.service === "consultation"
-                                  ? "Production Consultation"
-                                  : service.service === "custom_beat"
-                                    ? "Custom Beat Production"
-                                    : "Service")}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="bg-purple-500/20 text-purple-300">
-                        Service
-                      </Badge>
-                      {service.serviceDetails && (
-                        <span className="text-gray-400 text-sm">{service.serviceDetails}</span>
-                      )}
-                      <span className="text-gray-400 text-sm">
-                        • ID: {service.reservationId?.slice(-8)}
-                      </span>
+              {pendingServices.map((service: PaymentService) => {
+                const getServiceName = (svc: PaymentService): string => {
+                  if (svc.serviceName) return svc.serviceName;
+
+                  switch (svc.service) {
+                    case "mixing":
+                      return "Professional Mixing";
+                    case "mastering":
+                      return "Audio Mastering";
+                    case "mixing_mastering":
+                      return "Mixing + Mastering";
+                    case "recording":
+                      return "Recording Session";
+                    case "consultation":
+                      return "Production Consultation";
+                    case "custom_beat":
+                      return "Custom Beat Production";
+                    default:
+                      return "Service";
+                  }
+                };
+
+                return (
+                  <div
+                    key={`service-${service.reservationId}`}
+                    className="flex items-center justify-between p-4 bg-[var(--card-bg)] rounded-lg"
+                  >
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-white">{getServiceName(service)}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="secondary" className="bg-purple-500/20 text-purple-300">
+                          Service
+                        </Badge>
+                        {service.serviceDetails && (
+                          <span className="text-gray-400 text-sm">{service.serviceDetails}</span>
+                        )}
+                        <span className="text-gray-400 text-sm">
+                          • ID: {service.reservationId.slice(-8)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-white">${service.price.toFixed(2)}</p>
+                      <p className="text-gray-400 text-sm">Qty: {service.quantity || 1}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-white">${service.price.toFixed(2)}</p>
-                    <p className="text-gray-400 text-sm">Qty: {service.quantity || 1}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* Display cart items */}
-              {cart.items.map((item, index) => (
+              {cart.items.map(item => (
                 <div
                   key={`${item.beatId}-${item.licenseType}`}
                   className="flex items-center justify-between p-4 bg-[var(--card-bg)] rounded-lg"
@@ -328,15 +347,20 @@ export default function Checkout() {
                 metadata={{
                   services_count: pendingServices.length.toString(),
                   services_total: pendingServices
-                    .reduce((sum, s) => sum + (s.price || 0), 0)
+                    .reduce((sum, s: PaymentService) => sum + (s.price || 0), 0)
                     .toString(),
                   cart_count: cart.items.length.toString(),
                   cart_total: cart.items
                     .reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0)
                     .toString(),
                   order_total: total.toString(),
-                  description:
-                    `BroLab Purchase - ${pendingServices.length > 0 ? `${pendingServices.length} service(s)` : ""} ${cart.items.length > 0 ? `${cart.items.length} beat(s)` : ""}`.trim(),
+                  description: [
+                    "BroLab Purchase",
+                    pendingServices.length > 0 ? `${pendingServices.length} service(s)` : "",
+                    cart.items.length > 0 ? `${cart.items.length} beat(s)` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" - "),
                 }}
                 onSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}

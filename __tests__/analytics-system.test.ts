@@ -39,8 +39,12 @@ const mockLocation = {
 };
 
 // Set up global mocks
-(global as any).document = mockDocument;
-(global as any).window = {
+interface GlobalWithMocks extends NodeJS.Global {
+  document: typeof mockDocument;
+  window: typeof mockWindow;
+}
+
+const mockWindow = {
   location: mockLocation,
   addEventListener: jest.fn(),
   removeEventListener: jest.fn(),
@@ -54,16 +58,19 @@ const mockLocation = {
   },
 };
 
+(global as unknown as GlobalWithMocks).document = mockDocument;
+(global as unknown as GlobalWithMocks).window = mockWindow;
+
 describe("Analytics Manager", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
 
     // Clear all analytics data
-    (analyticsManager as any).clearAllData();
+    (analyticsManager as unknown as { clearAllData: () => void }).clearAllData();
 
     // Reset navigator mock
-    (global as any).window.navigator.doNotTrack = "0";
+    (global as unknown as GlobalWithMocks).window.navigator.doNotTrack = "0";
 
     // Reset analytics manager state
     analyticsManager.configure({
@@ -107,7 +114,7 @@ describe("Analytics Manager", () => {
 
     it("should respect Do Not Track setting", async () => {
       // Mock Do Not Track enabled
-      (global as unknown).window.navigator.doNotTrack = "1";
+      (global as unknown as GlobalWithMocks).window.navigator.doNotTrack = "1";
 
       const config: Partial<AnalyticsConfig> = {
         privacy: {

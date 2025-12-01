@@ -5,22 +5,20 @@ import { AlertCircle, CheckCircle, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface ClerkPaymentFormProps {
-  amount: number;
-  currency?: string;
-  metadata?: Record<string, string>;
-  onSuccess: (paymentData: any) => void;
-  onError: (error: string) => void;
-  isLoading?: boolean;
+  readonly amount: number;
+  readonly currency?: string;
+  readonly metadata?: Record<string, string>;
+  readonly onError: (error: string) => void;
+  readonly isLoading?: boolean;
 }
 
 export function ClerkPaymentForm({
   amount,
   currency = "usd",
   metadata = {},
-  onSuccess,
   onError,
   isLoading = false,
-}: ClerkPaymentFormProps) {
+}: ClerkPaymentFormProps): JSX.Element {
   const { user, isLoaded } = useUser();
   const { toast } = useToast();
   const [paymentStatus, setPaymentStatus] = useState<
@@ -89,7 +87,7 @@ export function ClerkPaymentForm({
         );
 
         // Redirect to Stripe checkout
-        window.location.href = url;
+        globalThis.location.href = url;
       } else {
         throw new Error("No checkout URL received");
       }
@@ -125,7 +123,7 @@ export function ClerkPaymentForm({
         <AlertCircle className="w-16 h-16 text-orange-500 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-white mb-2">Authentication Required</h3>
         <p className="text-gray-300 mb-4">Please sign in to complete your purchase.</p>
-        <Button onClick={() => (window.location.href = "/sign-in")} className="btn-primary">
+        <Button onClick={() => (globalThis.location.href = "/sign-in")} className="btn-primary">
           Sign In
         </Button>
       </div>
@@ -138,7 +136,7 @@ export function ClerkPaymentForm({
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
         <h3 className="text-2xl font-bold text-white mb-2">Payment Successful!</h3>
         <p className="text-gray-300 mb-6">Your order has been processed successfully.</p>
-        <Button onClick={() => (window.location.href = "/dashboard")} className="btn-primary">
+        <Button onClick={() => (globalThis.location.href = "/dashboard")} className="btn-primary">
           Go to Dashboard
         </Button>
       </div>
@@ -219,7 +217,7 @@ export function ClerkPaymentForm({
           By completing this payment, you agree to our terms of service and privacy policy.
         </p>
         <p className="text-gray-500 text-xs mt-1">
-          You will be redirected to Stripe's secure checkout page.
+          You will be redirected to Stripe&apos;s secure checkout page.
         </p>
       </div>
     </div>

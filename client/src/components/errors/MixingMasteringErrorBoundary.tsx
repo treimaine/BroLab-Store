@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, Mail, RefreshCw, User } from "lucide-react";
 import { Component, ErrorInfo, ReactNode } from "react";
 
+type ErrorType = "authentication" | "network" | "general";
+
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
@@ -13,7 +15,7 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
-  errorType: "authentication" | "network" | "general";
+  errorType: ErrorType;
 }
 
 export class MixingMasteringErrorBoundary extends Component<Props, State> {
@@ -26,7 +28,7 @@ export class MixingMasteringErrorBoundary extends Component<Props, State> {
 
   public static getDerivedStateFromError(error: Error): Partial<State> {
     // Determine error type based on error message/name
-    let errorType: "authentication" | "network" | "general" = "general";
+    let errorType: ErrorType = "general";
 
     if (
       error.message.includes("Authentication") ||
@@ -64,7 +66,7 @@ export class MixingMasteringErrorBoundary extends Component<Props, State> {
       errorType: this.state.errorType,
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent,
-      url: window.location.href,
+      url: globalThis.location.href,
       error: {
         name: error.name,
         message: error.message,
@@ -86,14 +88,14 @@ export class MixingMasteringErrorBoundary extends Component<Props, State> {
     }
   }
 
-  private reportError = (errorContext: any) => {
+  private readonly reportError = (errorContext: Record<string, unknown>) => {
     // This would typically send to an error monitoring service like Sentry
     // For now, we'll just log it with a unique ID for tracking
-    const errorId = `mixing_mastering_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const errorId = `mixing_mastering_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     console.error(`Error ID: ${errorId}`, errorContext);
   };
 
-  private handleRetry = () => {
+  private readonly handleRetry = () => {
     this.setState({
       hasError: false,
       error: null,
@@ -102,16 +104,16 @@ export class MixingMasteringErrorBoundary extends Component<Props, State> {
     });
   };
 
-  private handleRefresh = () => {
-    window.location.reload();
+  private readonly handleRefresh = () => {
+    globalThis.location.reload();
   };
 
-  private handleSignIn = () => {
+  private readonly handleSignIn = () => {
     // Redirect to sign-in with return URL
-    window.location.href = "/login?redirect=/mixing-mastering";
+    globalThis.location.href = "/login?redirect=/mixing-mastering";
   };
 
-  private handleReportIssue = () => {
+  private readonly handleReportIssue = () => {
     const subject = encodeURIComponent("Mixing & Mastering Page Error");
     const body = encodeURIComponent(
       `I encountered an error on the Mixing & Mastering service page:\n\n` +
@@ -123,10 +125,10 @@ export class MixingMasteringErrorBoundary extends Component<Props, State> {
         `Please describe what you were trying to do when this error occurred:`
     );
 
-    window.open(`mailto:support@brolabentertainment.com?subject=${subject}&body=${body}`);
+    globalThis.open(`mailto:support@brolabentertainment.com?subject=${subject}&body=${body}`);
   };
 
-  private getErrorTitle = (): string => {
+  private readonly getErrorTitle = (): string => {
     switch (this.state.errorType) {
       case "authentication":
         return "Authentication Issue";
@@ -137,7 +139,7 @@ export class MixingMasteringErrorBoundary extends Component<Props, State> {
     }
   };
 
-  private getErrorMessage = (): string => {
+  private readonly getErrorMessage = (): string => {
     switch (this.state.errorType) {
       case "authentication":
         return "We encountered an issue with authentication. You can still view our services, but you'll need to sign in to make a reservation.";
@@ -148,7 +150,7 @@ export class MixingMasteringErrorBoundary extends Component<Props, State> {
     }
   };
 
-  private getErrorActions = () => {
+  private readonly getErrorActions = () => {
     const { errorType } = this.state;
 
     switch (errorType) {
@@ -174,26 +176,6 @@ export class MixingMasteringErrorBoundary extends Component<Props, State> {
         );
 
       case "network":
-        return (
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button
-              onClick={this.handleRetry}
-              className="bg-[var(--accent-purple)] hover:bg-[var(--accent-purple)]/80"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Try Again
-            </Button>
-            <Button
-              onClick={this.handleRefresh}
-              variant="outline"
-              className="border-gray-600 text-gray-300 hover:bg-gray-800"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh Page
-            </Button>
-          </div>
-        );
-
       default:
         return (
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -245,7 +227,7 @@ export class MixingMasteringErrorBoundary extends Component<Props, State> {
                   <div className="mt-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                     <p className="text-blue-300 text-sm">
                       💡 <strong>Good news:</strong> You can still browse our mixing & mastering
-                      services. Sign in when you're ready to make a reservation.
+                      services. Sign in when you&apos;re ready to make a reservation.
                     </p>
                   </div>
                 )}
@@ -318,11 +300,11 @@ export class MixingMasteringErrorBoundary extends Component<Props, State> {
 
 // Hook for error reporting from functional components within the mixing-mastering page
 export function useMixingMasteringErrorHandler() {
-  return (error: Error, context?: string) => {
+  return (error: Error, context?: string): ErrorType => {
     console.error(`Mixing & Mastering page error in ${context || "component"}:`, error);
 
     // Determine error type
-    let errorType: "authentication" | "network" | "general" = "general";
+    let errorType: ErrorType = "general";
 
     if (
       error.message.includes("Authentication") ||

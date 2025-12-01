@@ -240,25 +240,34 @@ const NetworkStatusIndicator: React.FC = () => {
 export const usePaymentErrorHandler = () => {
   const { addError } = useErrorHandler();
 
-  const handlePaymentError = (error: any, context?: string) => {
+  const handlePaymentError = (error: unknown, context?: string) => {
     let message = "Payment processing failed";
     let details = "";
 
+    // Type guard for error object
+    const isErrorObject = (
+      err: unknown
+    ): err is { type?: string; message?: string; code?: string } => {
+      return typeof err === "object" && err !== null;
+    };
+
     // Parse Stripe errors
-    if (error?.type === "card_error") {
-      message = error.message || "Card was declined";
-      details = `Code: ${error.code || "unknown"}`;
-    } else if (error?.message?.includes("amount")) {
-      message = "Invalid payment amount";
-      details = "Please check your cart and try again";
-    } else if (error?.message) {
-      message = error.message;
+    if (isErrorObject(error)) {
+      if (error.type === "card_error") {
+        message = error.message || "Card was declined";
+        details = `Code: ${error.code || "unknown"}`;
+      } else if (error.message?.includes("amount")) {
+        message = "Invalid payment amount";
+        details = "Please check your cart and try again";
+      } else if (error.message) {
+        message = error.message;
+      }
     }
 
     addError({
       type: ErrorType.PAYMENT,
       message: "Payment failed",
-      details: error?.message,
+      details: isErrorObject(error) ? error.message : undefined,
       retry: () => window.location.reload(),
       actionLabel: "Refresh Page",
       timestamp: new Date(), // Default fallback

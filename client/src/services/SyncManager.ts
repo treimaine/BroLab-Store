@@ -24,7 +24,7 @@ export interface SyncError {
   message: string;
   code?: string;
   timestamp: number;
-  context: any;
+  context: Record<string, unknown>;
   retryable: boolean;
   retryCount: number;
   maxRetries: number;
@@ -63,7 +63,7 @@ export interface ConnectionConfig {
 
 export interface SyncData {
   type: string;
-  payload: any;
+  payload: Record<string, unknown>;
   timestamp: number;
   source: "server" | "client";
   id: string;
@@ -83,14 +83,14 @@ export class SyncManager extends BrowserEventEmitter {
   private reconnectTimer: NodeJS.Timeout | null = null;
 
   private status: SyncStatus;
-  private config: ConnectionConfig;
+  private readonly config: ConnectionConfig;
   private reconnectAttempts = 0;
   private isDestroyed = false;
   private debugMode = false;
 
   // Metrics tracking
-  private syncStartTimes = new Map<string, number>();
-  private latencyHistory: number[] = [];
+  private readonly syncStartTimes = new Map<string, number>();
+  private readonly latencyHistory: number[] = [];
   private readonly maxLatencyHistory = 100;
 
   constructor(config: Partial<ConnectionConfig> = {}) {
@@ -308,7 +308,7 @@ export class SyncManager extends BrowserEventEmitter {
         this.websocket.onerror = error => {
           clearTimeout(timeout);
           this.handleWebSocketError(error);
-          reject(error);
+          reject(new Error("WebSocket connection error"));
         };
       } catch (error) {
         reject(error);
@@ -608,7 +608,7 @@ export class SyncManager extends BrowserEventEmitter {
   }
 
   private generateSyncId(): string {
-    return `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `sync_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private setupErrorHandling(): void {
@@ -629,9 +629,7 @@ export class SyncManager extends BrowserEventEmitter {
 let syncManagerInstance: SyncManager | null = null;
 
 export const getSyncManager = (config?: Partial<ConnectionConfig>): SyncManager => {
-  if (!syncManagerInstance) {
-    syncManagerInstance = new SyncManager(config);
-  }
+  syncManagerInstance ??= new SyncManager(config);
   return syncManagerInstance;
 };
 

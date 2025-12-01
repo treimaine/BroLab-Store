@@ -1,15 +1,16 @@
 import { Button } from "@/components/ui/button";
+import type { OrderDetails } from "@/types/cart";
 import { CheckCircle, Download, Home, Mail, ShoppingBag } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
+import { CartItem } from "../stores";
 
 export default function OrderConfirmation() {
-  const [location] = useLocation();
-  const [orderDetails, setOrderDetails] = useState<any>(null);
+  const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
 
   useEffect(() => {
     // Parse order details from URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(globalThis.location.search);
     const paymentIntentId = urlParams.get("payment_intent");
     const paymentIntentClientSecret = urlParams.get("payment_intent_client_secret");
     const cartData = urlParams.get("cart");
@@ -22,7 +23,10 @@ export default function OrderConfirmation() {
       if (cartData) {
         try {
           cartItems = JSON.parse(decodeURIComponent(cartData));
-          total = cartItems.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+          total = cartItems.reduce(
+            (sum: number, item: CartItem) => sum + item.price * item.quantity,
+            0
+          );
         } catch (e) {
           console.error("Failed to parse cart data from URL:", e);
         }
@@ -35,7 +39,7 @@ export default function OrderConfirmation() {
           if (stored) {
             cartItems = JSON.parse(stored);
             total = cartItems.reduce(
-              (sum: number, item: any) => sum + item.price * item.quantity,
+              (sum: number, item: CartItem) => sum + item.price * item.quantity,
               0
             );
           }
@@ -48,11 +52,11 @@ export default function OrderConfirmation() {
         id: paymentIntentId,
         status: "completed",
         total: total,
-        items: cartItems.map((item: any) => ({
-          title: item.title,
-          license: item.licenseType,
+        items: cartItems.map((item: CartItem) => ({
+          title: item.name,
+          license: item.licenseName,
           price: item.price,
-          beatId: item.beatId,
+          beatId: item.productId,
         })),
         customerEmail: "customer@example.com",
       });
@@ -103,8 +107,11 @@ export default function OrderConfirmation() {
               <div className="border-t border-gray-600 pt-4">
                 <h4 className="text-lg font-semibold text-white mb-4">Items Purchased</h4>
                 <div className="space-y-3">
-                  {orderDetails.items.map((item: any, index: number) => (
-                    <div key={index} className="flex justify-between items-center">
+                  {orderDetails.items.map((item: OrderDetails["items"][number]) => (
+                    <div
+                      key={`item-${item.beatId}-${item.license}`}
+                      className="flex justify-between items-center"
+                    >
                       <div>
                         <p className="text-white font-medium">{item.title}</p>
                         <p className="text-gray-400 text-sm">{item.license} License</p>
@@ -121,9 +128,9 @@ export default function OrderConfirmation() {
               <h3 className="text-xl font-bold text-white mb-6">Download Your Beats</h3>
 
               <div className="space-y-4 mb-6">
-                {orderDetails.items.map((item: any, index: number) => (
+                {orderDetails.items.map((item: OrderDetails["items"][number]) => (
                   <div
-                    key={index}
+                    key={`download-${item.beatId}-${item.license}`}
                     className="flex items-center justify-between p-4 bg-[var(--medium-gray)] rounded-lg"
                   >
                     <div className="flex items-center space-x-3">
@@ -140,14 +147,14 @@ export default function OrderConfirmation() {
                       className="btn-primary"
                       onClick={async () => {
                         try {
-                          // Appeler notre API pour enregistrer le téléchargement
+                          // Call API to log the download
                           const response = await fetch("/api/downloads", {
                             method: "POST",
                             headers: {
                               "Content-Type": "application/json",
                             },
                             body: JSON.stringify({
-                              productId: item.id || item.beatId,
+                              productId: item.beatId,
                               license: item.license.toLowerCase(),
                               price: item.price || 0,
                               productName: item.title,
@@ -157,21 +164,21 @@ export default function OrderConfirmation() {
                           if (response.ok) {
                             console.log("Download logged successfully");
                             // Trigger download success event for dashboard refresh
-                            window.dispatchEvent(new CustomEvent("download-success"));
+                            globalThis.dispatchEvent(new CustomEvent("download-success"));
                           }
 
-                          // Télécharger le fichier
+                          // Download the file
                           const downloadUrl = `/api/download/${item.license.toLowerCase()}/${item.title
-                            .replace(/\s+/g, "-")
+                            .replaceAll(/\s+/g, "-")
                             .toLowerCase()}`;
-                          window.open(downloadUrl, "_blank");
+                          globalThis.open(downloadUrl, "_blank");
                         } catch (error) {
                           console.error("Download tracking error:", error);
-                          // Télécharger quand même le fichier même si le tracking échoue
+                          // Download file even if tracking fails
                           const downloadUrl = `/api/download/${item.license.toLowerCase()}/${item.title
-                            .replace(/\s+/g, "-")
+                            .replaceAll(/\s+/g, "-")
                             .toLowerCase()}`;
-                          window.open(downloadUrl, "_blank");
+                          globalThis.open(downloadUrl, "_blank");
                         }
                       }}
                     >
@@ -198,7 +205,7 @@ export default function OrderConfirmation() {
 
         {/* Next Steps */}
         <div className="mt-12 text-center">
-          <h3 className="text-2xl font-bold text-white mb-6">What's Next?</h3>
+          <h3 className="text-2xl font-bold text-white mb-6">What&apos;s Next?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="card-dark p-6">
               <Download className="w-12 h-12 text-[var(--accent-purple)] mx-auto mb-4" />

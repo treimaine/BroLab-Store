@@ -1,10 +1,17 @@
 import { BeatCard } from "@/components/beats/beat-card";
-import { useCartContext } from "@/components/cart/cart-provider";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { useWishlist } from "@/hooks/useWishlist";
-import { LicenseTypeEnum } from "@shared/schema";
+import {
+  getAudioUrl,
+  getBpm,
+  getDuration,
+  getGenre,
+  getImageUrl,
+  getTags,
+  isFreeProduct,
+} from "@/utils/woocommerce-helpers";
+import type { BroLabWooCommerceProduct } from "@shared/types";
 import { ArrowLeft, Heart, ShoppingCart, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -13,18 +20,18 @@ export default function WishlistPage() {
   const [, setLocation] = useLocation();
   const { favorites, isLoading, isError, removeFavorite } = useWishlist();
   const { useProducts } = useWooCommerce();
-  const { addItem } = useCartContext();
-  const { toast } = useToast();
   const [removingItems, setRemovingItems] = useState<Set<number>>(new Set());
 
-  // Récupérer les détails des beats favoris
+  // Fetch favorite beat details
   const beatIds = favorites.map(item => item.beat_id);
   const { data: beats = [], isLoading: isLoadingBeats } = useProducts({
     per_page: 100,
   });
 
-  // Filtrer les beats pour ne garder que ceux qui sont dans les favoris
-  const favoriteBeats = beats.filter((beat: any) => favorites.some(fav => fav.beat_id === beat.id));
+  // Filter beats to keep only favorites
+  const favoriteBeats = beats.filter((beat: BroLabWooCommerceProduct) =>
+    favorites.some(fav => fav.beat_id === beat.id)
+  );
 
   const handleRemoveFromWishlist = async (beatId: number) => {
     setRemovingItems(prev => new Set(prev).add(beatId));
@@ -39,22 +46,6 @@ export default function WishlistPage() {
     }
   };
 
-  const handleAddToCart = (beat: any) => {
-    addItem({
-      beatId: beat.id,
-      title: beat.name,
-      genre: beat.categories?.[0]?.name || "Unknown",
-      imageUrl: beat.images?.[0]?.src,
-      licenseType: "basic" as LicenseTypeEnum,
-      quantity: 1,
-    });
-
-    toast({
-      title: "Added to Cart",
-      description: `${beat.name} has been added to your cart.`,
-    });
-  };
-
   const handleClearWishlist = async () => {
     if (!confirm("Are you sure you want to clear your entire wishlist?")) {
       return;
@@ -62,12 +53,8 @@ export default function WishlistPage() {
 
     setRemovingItems(new Set(beatIds));
     try {
-      // Supprimer tous les favoris
+      // Remove all favorites
       await Promise.all(beatIds.map(beatId => removeFavorite(beatId)));
-      toast({
-        title: "Wishlist Cleared",
-        description: "All items have been removed from your wishlist.",
-      });
     } finally {
       setRemovingItems(new Set());
     }
@@ -80,8 +67,8 @@ export default function WishlistPage() {
           <div className="animate-pulse">
             <div className="h-8 bg-[var(--medium-gray)] rounded w-1/3 mb-8" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="bg-[var(--medium-gray)] rounded-xl h-80" />
+              {Array.from({ length: 8 }, (_, i) => `skeleton-${i}`).map(key => (
+                <div key={key} className="bg-[var(--medium-gray)] rounded-xl h-80" />
               ))}
             </div>
           </div>
@@ -99,7 +86,7 @@ export default function WishlistPage() {
             <p className="text-gray-300 mb-6">
               There was an error loading your wishlist. Please try again.
             </p>
-            <Button onClick={() => window.location.reload()} className="btn-primary">
+            <Button onClick={() => globalThis.location.reload()} className="btn-primary">
               Retry
             </Button>
           </div>
@@ -163,27 +150,21 @@ export default function WishlistPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {favoriteBeats.map((beat: any) => (
+            {favoriteBeats.map((beat: BroLabWooCommerceProduct) => (
               <div key={beat.id} className="relative group">
                 <BeatCard
                   id={beat.id}
                   title={beat.name}
-                  genre={beat.categories?.[0]?.name || "Unknown"}
-                  bpm={beat.meta_data?.find((meta: any) => meta.key === "bpm")?.value || 0}
-                  price={parseFloat(beat.price)}
-                  imageUrl={beat.images?.[0]?.src}
-                  audioUrl={beat.meta_data?.find((meta: any) => meta.key === "audio_url")?.value}
-                  tags={beat.tags?.map((tag: any) => tag.name) || []}
+                  genre={getGenre(beat)}
+                  bpm={getBpm(beat)}
+                  price={Number.parseFloat(beat.price)}
+                  imageUrl={getImageUrl(beat)}
+                  audioUrl={getAudioUrl(beat)}
+                  tags={getTags(beat)}
                   featured={beat.featured}
                   downloads={beat.total_sales || 0}
-                  duration={beat.meta_data?.find((meta: any) => meta.key === "duration")?.value}
-                  isFree={
-                    beat.is_free ||
-                    beat.tags?.some((tag: any) => tag.name.toLowerCase() === "free") ||
-                    beat.price === 0 ||
-                    beat.price === "0" ||
-                    false
-                  }
+                  duration={getDuration(beat)}
+                  isFree={isFreeProduct(beat)}
                   onViewDetails={() => setLocation(`/product/${beat.id}`)}
                 />
 

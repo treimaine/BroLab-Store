@@ -1,7 +1,8 @@
 // __tests__/api-subscription.test.ts
 
-// Legacy supabase stub
-const supabaseAdmin = { from: jest.fn() } as any;
+// Legacy supabase stub - unused but kept for reference
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const supabaseAdmin = { from: jest.fn() } as { from: jest.Mock };
 
 describe.skip("GET /api/subscription/status (legacy Stripe/Supabase) — skipped: migrated to Clerk Billing", () => {
   it("should be replaced with Clerk Billing subscription status", () => {

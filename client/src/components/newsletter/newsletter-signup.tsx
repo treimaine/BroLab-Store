@@ -1,37 +1,41 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { X, Mail } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { Mail, X } from "lucide-react";
+import { useState } from "react";
 
 interface NewsletterSignupProps {
-  isOpen: boolean;
-  onClose: () => void;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
 }
 
-export function NewsletterSignup({ isOpen, onClose }: NewsletterSignupProps) {
-  const [email, setEmail] = useState('');
+export function NewsletterSignup({
+  isOpen,
+  onClose,
+}: Readonly<NewsletterSignupProps>): JSX.Element | null {
+  const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!email) return;
 
     setIsLoading(true);
     try {
-      await apiRequest('POST', '/api/newsletter/subscribe', { email });
+      await apiRequest("POST", "/api/newsletter/subscribe", { email });
       toast({
         title: "Success!",
         description: "You've been subscribed to our newsletter.",
       });
-      setEmail('');
+      setEmail("");
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to subscribe";
       toast({
         title: "Error",
-        description: error.message || "Failed to subscribe",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -68,16 +72,12 @@ export function NewsletterSignup({ isOpen, onClose }: NewsletterSignupProps) {
             type="email"
             placeholder="Enter your email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={e => setEmail(e.target.value)}
             className="w-full"
             required
           />
-          <Button
-            type="submit"
-            disabled={isLoading}
-            className="w-full btn-primary"
-          >
-            {isLoading ? 'Subscribing...' : 'Subscribe Now'}
+          <Button type="submit" disabled={isLoading} className="w-full btn-primary">
+            {isLoading ? "Subscribing..." : "Subscribe Now"}
           </Button>
         </form>
 

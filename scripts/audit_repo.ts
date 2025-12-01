@@ -1,8 +1,8 @@
+#!/usr/bin/env tsx
+// scripts/audit_repo.ts - Repository integrity audit with 95% safety checks
 import glob from "fast-glob";
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-#!/usr/bin/env tsx
-// scripts/audit_repo.ts - Repository integrity audit with 95% safety checks
 
 function run(cmd: string, cwd?: string): { success: boolean; output: string; error?: string } {
   try {
@@ -520,7 +520,7 @@ const confidenceScore = [
   heuristics.database.schemaDefinitions ? 15 : 0,
   heuristics.authSystem.userModel ? 10 : 0,
   heuristics.paymentSystem.stripeIntegration ? 10 : 0,
-].reduce(_(a, _b) => a + b, 0);
+].reduce((a, b) => a + b, 0);
 
 console.log(`\n🎯 Safety Confidence Score: ${confidenceScore}/100`);
 console.log(confidenceScore >= 95 ? "✅ SAFE TO PROCEED" : "⚠️  CAUTION REQUIRED");

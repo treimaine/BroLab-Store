@@ -1,62 +1,76 @@
-import { AddToCartButton } from "@/components/cart/AddToCartButton";
 import { HoverPlayButton } from "@/components/audio/HoverPlayButton";
+import { AddToCartButton } from "@/components/cart/AddToCartButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useAudioStore } from "@/stores/useAudioStore";
+import type {
+  BroLabWooCommerceProduct,
+  WooCommerceAttribute,
+  WooCommerceCategory,
+  WooCommerceMetaData,
+  WooCommerceTag,
+} from "@shared/types";
 import { Clock, Heart, Music, Share2 } from "lucide-react";
 import { useState } from "react";
 
 interface TableBeatViewProps {
-  products: any[];
-  onViewDetails?: (productId: number) => void;
+  readonly products: BroLabWooCommerceProduct[];
+  readonly onViewDetails?: (productId: number) => void;
 }
 
-export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
-  const { currentTrack, isPlaying } = useAudioStore();
+export function TableBeatView({
+  products,
+  onViewDetails,
+}: Readonly<TableBeatViewProps>): JSX.Element {
+  const { currentTrack } = useAudioStore();
   const { isFavorite, addToFavorites, removeFromFavorites } = useFavorites();
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
 
-  const formatDuration = (seconds?: number) => {
+  const formatDuration = (seconds?: number | string): string => {
     if (!seconds) return "";
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
+    const numSeconds = typeof seconds === "string" ? Number.parseFloat(seconds) : seconds;
+    if (Number.isNaN(numSeconds)) return "";
+    const minutes = Math.floor(numSeconds / 60);
+    const remainingSeconds = Math.floor(numSeconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
-  const getAudioUrl = (product: any) => {
-    const audioUrl =
+  const getAudioUrl = (product: BroLabWooCommerceProduct): string | null => {
+    const audioUrlValue =
       product.audio_url ||
-      product.meta_data?.find((meta: any) => meta.key === "audio_url")?.value ||
-      product.meta_data?.find((meta: any) => meta.key === "audio")?.value;
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "audio_url")?.value ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "audio")?.value;
+
+    const audioUrl = typeof audioUrlValue === "string" ? audioUrlValue : null;
 
     // Retourner null si aucun audio réel n'est trouvé
     return audioUrl && audioUrl !== "/api/placeholder/audio.mp3" ? audioUrl : null;
   };
 
-  const getBPM = (product: any) => {
-    const bpm =
+  const getBPM = (product: BroLabWooCommerceProduct): string => {
+    const bpmValue =
       product.bpm ||
-      product.attributes?.find((attr: any) => attr.name === "BPM")?.options?.[0] ||
-      product.meta_data?.find((meta: any) => meta.key === "bpm")?.value ||
-      product.meta_data?.find((meta: any) => meta.key === "BPM")?.value;
+      product.attributes?.find((attr: WooCommerceAttribute) => attr.name === "BPM")?.options?.[0] ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "bpm")?.value ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "BPM")?.value;
 
-    return bpm || "";
+    return typeof bpmValue === "string" || typeof bpmValue === "number" ? String(bpmValue) : "";
   };
 
-  const getGenre = (product: any) => {
+  const getGenre = (product: BroLabWooCommerceProduct): string => {
     // Essayer plusieurs sources pour récupérer le genre/catégorie
-    const genre =
+    const genreValue =
       // Catégories WooCommerce
       product.categories?.[0]?.name ||
-      product.categories?.find((cat: any) => cat.name)?.name ||
+      product.categories?.find((cat: WooCommerceCategory) => cat.name)?.name ||
       // Meta data pour le genre
-      product.meta_data?.find((meta: any) => meta.key === "genre")?.value ||
-      product.meta_data?.find((meta: any) => meta.key === "category")?.value ||
-      product.meta_data?.find((meta: any) => meta.key === "style")?.value ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "genre")?.value ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "category")?.value ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "style")?.value ||
       // Tags qui pourraient contenir le genre
       product.tags?.find(
-        (tag: any) =>
+        (tag: WooCommerceTag) =>
           tag.name.toLowerCase().includes("hip") ||
           tag.name.toLowerCase().includes("trap") ||
           tag.name.toLowerCase().includes("r&b") ||
@@ -64,46 +78,55 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
           tag.name.toLowerCase().includes("electronic")
       )?.name ||
       // Attributs WooCommerce
-      product.attributes?.find((attr: any) => attr.name === "Genre")?.options?.[0] ||
-      product.attributes?.find((attr: any) => attr.name === "Style")?.options?.[0] ||
-      // Fallback sur le nom de la catégorie principale
-      product.category?.name ||
-      product.primary_category?.name ||
-      // Si rien n'est trouvé, retourner une chaîne vide au lieu de "Unknown"
+      product.attributes?.find((attr: WooCommerceAttribute) => attr.name === "Genre")
+        ?.options?.[0] ||
+      product.attributes?.find((attr: WooCommerceAttribute) => attr.name === "Style")
+        ?.options?.[0] ||
+      // Genre field from BroLabProductExtensions
+      product.genre ||
+      // Si rien n'est trouvé, retourner une chaîne vide
       "";
 
-    return genre;
+    return typeof genreValue === "string" ? genreValue : "";
   };
 
-  const getProducer = (product: any) => {
-    return (
-      product.meta_data?.find((meta: any) => meta.key === "producer")?.value ||
-      product.meta_data?.find((meta: any) => meta.key === "artist")?.value ||
-      product.meta_data?.find((meta: any) => meta.key === "author")?.value ||
-      ""
-    );
+  const getProducer = (product: BroLabWooCommerceProduct): string => {
+    const producerValue =
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "producer")?.value ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "artist")?.value ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "author")?.value ||
+      product.producer_name ||
+      "";
+
+    return typeof producerValue === "string" ? producerValue : "";
   };
 
-  const getInstruments = (product: any) => {
+  const getInstruments = (product: BroLabWooCommerceProduct): string => {
     // Utiliser uniquement les données réelles de WooCommerce
-    const instruments =
-      product.meta_data?.find((meta: any) => meta.key === "instruments")?.value ||
-      product.meta_data?.find((meta: any) => meta.key === "instruments_used")?.value ||
-      product.meta_data?.find((meta: any) => meta.key === "tools")?.value ||
-      product.tags?.find((tag: any) => tag.name.toLowerCase().includes("instrument"))?.name;
+    const instrumentsValue =
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "instruments")?.value ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "instruments_used")
+        ?.value ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "tools")?.value ||
+      product.tags?.find((tag: WooCommerceTag) => tag.name.toLowerCase().includes("instrument"))
+        ?.name ||
+      product.instruments ||
+      "";
 
-    return instruments || "";
+    return typeof instrumentsValue === "string" ? instrumentsValue : "";
   };
 
-  const getMood = (product: any) => {
+  const getMood = (product: BroLabWooCommerceProduct): string => {
     // Utiliser uniquement les données réelles de WooCommerce
-    const mood =
-      product.meta_data?.find((meta: any) => meta.key === "mood")?.value ||
-      product.meta_data?.find((meta: any) => meta.key === "Mood")?.value ||
-      product.meta_data?.find((meta: any) => meta.key === "feeling")?.value ||
-      product.tags?.find((tag: any) => tag.name.toLowerCase().includes("mood"))?.name;
+    const moodValue =
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "mood")?.value ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "Mood")?.value ||
+      product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "feeling")?.value ||
+      product.tags?.find((tag: WooCommerceTag) => tag.name.toLowerCase().includes("mood"))?.name ||
+      product.mood ||
+      "";
 
-    return mood || "";
+    return typeof moodValue === "string" ? moodValue : "";
   };
 
   return (
@@ -119,7 +142,7 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
       </div>
 
       {/* Table Rows */}
-      {products.map((product: any, index: number) => {
+      {products.map((product: BroLabWooCommerceProduct) => {
         const audioUrl = getAudioUrl(product);
         const bpm = getBPM(product);
         const genre = getGenre(product);
@@ -127,12 +150,12 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
         const instruments = getInstruments(product);
         const mood = getMood(product);
         const isCurrentTrack = currentTrack?.id === product.id.toString();
-        const isCurrentlyPlaying = isCurrentTrack && isPlaying;
 
         return (
-          <div
+          <button
             key={product.id}
-            className={`grid grid-cols-12 gap-6 items-center px-6 py-4 rounded-lg transition-all duration-200 group cursor-pointer ${
+            type="button"
+            className={`grid grid-cols-12 gap-6 items-center px-6 py-4 rounded-lg transition-all duration-200 group cursor-pointer w-full text-left ${
               hoveredRow === product.id
                 ? "bg-gray-800/60 border border-gray-600/50"
                 : "bg-gray-800/20 hover:bg-gray-800/40 border border-transparent"
@@ -155,9 +178,15 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
                       audioUrl={audioUrl}
                       productId={product.id.toString()}
                       productName={product.name}
-                      imageUrl={product.images?.[0]?.src || product.imageUrl || product.image}
-                      price={product.price}
-                      isFree={product.is_free || product.price === 0 || product.price === "0"}
+                      imageUrl={product.images?.[0]?.src || ""}
+                      price={
+                        typeof product.price === "string" ? product.price : String(product.price)
+                      }
+                      isFree={
+                        product.is_free ||
+                        product.price === "0" ||
+                        Number.parseFloat(String(product.price)) === 0
+                      }
                       size="sm"
                       className="bg-black/70 hover:bg-[var(--accent-purple)]/80"
                     />
@@ -223,7 +252,10 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
                   title: product.name || "Untitled",
                   genre: getGenre(product) || "Unknown",
                   imageUrl: product.images?.[0]?.src || "",
-                  price: (product.price || 0) / 100,
+                  price:
+                    typeof product.price === "string"
+                      ? Number.parseFloat(product.price) / 100
+                      : (product.price || 0) / 100,
                 }}
                 variant="default"
                 size="sm"
@@ -261,7 +293,7 @@ export function TableBeatView({ products, onViewDetails }: TableBeatViewProps) {
                 <Heart className={`w-4 h-4 ${isFavorite(product.id) ? "fill-current" : ""}`} />
               </Button>
             </div>
-          </div>
+          </button>
         );
       })}
     </div>

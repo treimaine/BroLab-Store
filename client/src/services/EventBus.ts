@@ -76,6 +76,56 @@ export class EventBus extends BrowserEventEmitter {
   }
 
   /**
+   * Override on() to accept typed event callbacks
+   */
+  public override on<T = unknown>(
+    event: string,
+    listener: (event: DashboardEvent<T>) => void
+  ): this {
+    return super.on(event, listener as (...args: unknown[]) => void);
+  }
+
+  /**
+   * Override once() to accept typed event callbacks
+   */
+  public override once<T = unknown>(
+    event: string,
+    listener: (event: DashboardEvent<T>) => void
+  ): this {
+    return super.once(event, listener as (...args: unknown[]) => void);
+  }
+
+  /**
+   * Override prependListener() to accept typed event callbacks
+   */
+  public override prependListener<T = unknown>(
+    event: string,
+    listener: (event: DashboardEvent<T>) => void
+  ): this {
+    return super.prependListener(event, listener as (...args: unknown[]) => void);
+  }
+
+  /**
+   * Override addListener() to accept typed event callbacks
+   */
+  public override addListener<T = unknown>(
+    event: string,
+    listener: (event: DashboardEvent<T>) => void
+  ): this {
+    return super.addListener(event, listener as (...args: unknown[]) => void);
+  }
+
+  /**
+   * Override removeListener() to accept typed event callbacks
+   */
+  public override removeListener<T = unknown>(
+    event: string,
+    listener: (event: DashboardEvent<T>) => void
+  ): this {
+    return super.removeListener(event, listener as (...args: unknown[]) => void);
+  }
+
+  /**
    * Publish an event to all subscribers with deduplication and logging
    */
   public publish<T>(event: DashboardEvent<T>): void {
