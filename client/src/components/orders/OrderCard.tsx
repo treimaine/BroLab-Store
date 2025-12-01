@@ -4,25 +4,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import type { Order } from "@shared/schema";
 import { Download, ExternalLink } from "lucide-react";
-import { useLocation } from "wouter";
 
 interface OrderCardProps {
-  order: Order;
-  showDetails?: boolean;
-  onOrderClick?: (orderId: number) => void;
+  readonly order: Order;
+  readonly showDetails?: boolean;
+  readonly onOrderClick?: (orderId: number) => void;
 }
 
-export function OrderCard({ order, showDetails = true, onOrderClick }: OrderCardProps) {
-  const [, setLocation] = useLocation();
+export function OrderCard({ order, showDetails = true, onOrderClick }: Readonly<OrderCardProps>) {
   const { toast } = useToast();
-  const downloadInvoice = async () => {
-    return Promise.resolve();
+  const downloadInvoice = async (): Promise<void> => {
+    return;
   };
 
   const handleDownload = async () => {
     try {
       await downloadInvoice();
-    } catch (error) {
+    } catch {
       toast({
         title: "Erreur",
         description: "Impossible de télécharger la facture",

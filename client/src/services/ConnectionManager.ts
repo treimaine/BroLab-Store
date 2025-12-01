@@ -470,64 +470,78 @@ class PollingConnection implements Connection {
     }
   }
 
+  private buildHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (this.authToken) {
+      headers["Authorization"] = `Bearer ${this.authToken}`;
+    }
+    return headers;
+  }
+
+  private validateResponse(response: Response | undefined): void {
+    if (!response || typeof response !== "object") {
+      throw new Error(
+        "PollingConnection: Invalid or missing response during polling. The server may be unavailable."
+      );
+    }
+  }
+
+  private async handleResponseError(response: Response): Promise<void> {
+    let errorText = "Unknown error";
+    try {
+      errorText = await response.text();
+    } catch {
+      // If we can't read the error text, use the default
+    }
+    throw new Error(
+      `PollingConnection: Polling failed with status ${response.status} (${response.statusText}) - ${errorText}`
+    );
+  }
+
+  private processMessages(messages: ConnectionMessage[]): void {
+    for (const message of messages) {
+      this.stats.messagesReceived++;
+      for (const handler of this.messageHandlers) {
+        handler(message);
+      }
+    }
+  }
+
+  private async executePoll(): Promise<void> {
+    const pollStart = Date.now();
+    const headers = this.buildHeaders();
+
+    const response = await fetch(`${this.url}/poll?since=${this.lastPollTime}`, {
+      method: "GET",
+      headers,
+    });
+
+    this.validateResponse(response);
+
+    if (!response.ok) {
+      await this.handleResponseError(response);
+    }
+
+    const data = await response.json();
+    const latency = Date.now() - pollStart;
+
+    this.stats.averageLatency = (this.stats.averageLatency + latency) / 2;
+
+    if (data.messages && Array.isArray(data.messages)) {
+      this.processMessages(data.messages as ConnectionMessage[]);
+    }
+
+    this.lastPollTime = Date.now();
+  }
+
   private startPolling(): void {
     this.pollingInterval = setInterval(async () => {
       if (!this.isActive) return;
 
-      let response: Response | undefined;
-
       try {
-        const pollStart = Date.now();
-
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
-
-        if (this.authToken) {
-          headers["Authorization"] = `Bearer ${this.authToken}`;
-        }
-
-        response = await fetch(`${this.url}/poll?since=${this.lastPollTime}`, {
-          method: "GET",
-          headers,
-        });
-
-        // Validate response exists and is a valid object
-        if (!response || typeof response !== "object") {
-          throw new Error(
-            "PollingConnection: Invalid or missing response during polling. " +
-              "The server may be unavailable."
-          );
-        }
-
-        if (!response.ok) {
-          let errorText = "Unknown error";
-          try {
-            errorText = await response.text();
-          } catch {
-            // If we can't read the error text, use the default
-          }
-          throw new Error(
-            `PollingConnection: Polling failed with status ${response.status} (${response.statusText}) - ${errorText}`
-          );
-        }
-
-        const data = await response.json();
-        const latency = Date.now() - pollStart;
-
-        // Update average latency
-        this.stats.averageLatency = (this.stats.averageLatency + latency) / 2;
-
-        if (data.messages && Array.isArray(data.messages)) {
-          for (const message of data.messages as ConnectionMessage[]) {
-            this.stats.messagesReceived++;
-            for (const handler of this.messageHandlers) {
-              handler(message);
-            }
-          }
-        }
-
-        this.lastPollTime = Date.now();
+        await this.executePoll();
       } catch (error) {
         const pollingError =
           error instanceof Error

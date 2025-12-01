@@ -163,7 +163,7 @@
 
 ## Phase 3: Code Quality - Fix Unused Variables and Comments (~131 → ~4 warnings)
 
-- [ ] 17. Fix unused variables in components and pages
+- [x] 17. Fix unused variables in components and pages
   - Fix unused imports: `Button` in `LicensePicker.tsx`, `X` in `license-preview.tsx`
   - Fix unused variables in `client/src/components/layout/footer.tsx` (getFooterOpacity, opacity, borderOpacity)
   - Fix unused variables in `client/src/components/orders/OrderCard.tsx` (setLocation, error)
@@ -175,7 +175,7 @@
   - Fix unused variables in `client/src/pages/shop.tsx` (categories)
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 18. Fix unused variables in hooks and utilities
+- [x] 18. Fix unused variables in hooks and utilities
   - Fix unused variables in `client/src/hooks/use-loyalty.ts` (userId, rewardId parameters)
   - Fix unused variables in `client/src/hooks/use-toast.ts` (actionTypes)
   - Fix unused variables in `client/src/hooks/use-wordpress.ts` (WordPressPage, WordPressPost)

@@ -2,7 +2,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
 // SubscriptionBilling component removed - now handled by Clerk/Convex
 // PaymentPlanSelector supprimé - utilisation de l'interface Clerk native
 import {
@@ -18,8 +17,6 @@ import {
 } from "lucide-react";
 
 export default function PaymentDashboard() {
-  const [selectedPlan, setSelectedPlan] = useState(null);
-
   const features = [
     {
       icon: <CreditCard className="w-6 h-6" />,
@@ -87,9 +84,9 @@ export default function PaymentDashboard() {
 
         {/* Feature Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature, index) => (
+          {features.map(feature => (
             <Card
-              key={index}
+              key={feature.title}
               className="border-gray-600 bg-gray-800/50 hover:bg-gray-800/70 transition-colors"
             >
               <CardHeader className="pb-3">
@@ -159,7 +156,7 @@ export default function PaymentDashboard() {
                     Gestion des Plans via Clerk
                   </h3>
                   <p className="text-gray-400 mb-4">
-                    Utilisez l'interface Clerk native pour gérer vos abonnements.
+                    Utilisez l&apos;interface Clerk native pour gérer vos abonnements.
                   </p>
                   <p className="text-gray-500 text-sm">
                     Cliquez sur votre photo de profil dans le Dashboard.
@@ -270,20 +267,20 @@ export default function PaymentDashboard() {
         {/* Quick Actions */}
         <div className="flex flex-wrap gap-4 justify-center">
           <Button
-            onClick={() => (window.location.href = "/checkout")}
+            onClick={() => (globalThis.location.href = "/checkout")}
             className="bg-purple-600 hover:bg-purple-700"
           >
             Test Checkout Flow
           </Button>
           <Button
-            onClick={() => (window.location.href = "/subscribe")}
+            onClick={() => (globalThis.location.href = "/subscribe")}
             variant="outline"
             className="border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white"
           >
             View Subscription Plans
           </Button>
           <Button
-            onClick={() => (window.location.href = "/dashboard")}
+            onClick={() => (globalThis.location.href = "/dashboard")}
             variant="outline"
             className="border-gray-600 text-gray-300 hover:bg-gray-600 hover:text-white"
           >

@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle, Clock, Download, RefreshCw, XCircle } from "lucide-react";
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import InteractiveDataTable, { TableColumn, TableData } from "./InteractiveDataTable";
 
@@ -25,139 +25,142 @@ interface OrdersTableProps {
   className?: string;
 }
 
-const OrdersTable: React.FC<OrdersTableProps> = ({
+const OrdersTable = ({
   orders,
   isLoading = false,
   onRefresh,
   className,
-}) => {
+}: OrdersTableProps): React.ReactElement => {
   // Configuration des colonnes
-  const columns: TableColumn[] = [
-    {
-      key: "id",
-      label: "ID Commande",
-      sortable: true,
-      filterable: true,
-      render: (value: unknown) => {
-        const id = typeof value === "string" ? value : String(value);
-        return <span className="font-mono text-sm text-muted-foreground">#{id.slice(-8)}</span>;
+  const columns: TableColumn[] = useMemo(
+    () => [
+      {
+        key: "id",
+        label: "ID Commande",
+        sortable: true,
+        filterable: true,
+        render: (value: unknown) => {
+          const id = typeof value === "string" ? value : String(value);
+          return <span className="font-mono text-sm text-muted-foreground">#{id.slice(-8)}</span>;
+        },
       },
-    },
-    {
-      key: "beatTitle",
-      label: "Beat",
-      sortable: true,
-      filterable: true,
-      render: (value: unknown, row: TableData) => {
-        const title = typeof value === "string" ? value : String(value);
-        const order = row as unknown as Order;
-        return (
-          <div className="space-y-1">
-            <p className="font-medium">{title}</p>
-            {order.artist && <p className="text-sm text-muted-foreground">par {order.artist}</p>}
-          </div>
-        );
+      {
+        key: "beatTitle",
+        label: "Beat",
+        sortable: true,
+        filterable: true,
+        render: (value: unknown, row: TableData) => {
+          const title = typeof value === "string" ? value : String(value);
+          const order = row as unknown as Order;
+          return (
+            <div className="space-y-1">
+              <p className="font-medium">{title}</p>
+              {order.artist && <p className="text-sm text-muted-foreground">par {order.artist}</p>}
+            </div>
+          );
+        },
       },
-    },
-    {
-      key: "licenseType",
-      label: "Licence",
-      sortable: true,
-      filterable: true,
-      render: (value: unknown) => {
-        const license = typeof value === "string" ? value : String(value);
-        return (
-          <Badge variant="outline" className="capitalize">
-            {license || "Standard"}
-          </Badge>
-        );
+      {
+        key: "licenseType",
+        label: "Licence",
+        sortable: true,
+        filterable: true,
+        render: (value: unknown) => {
+          const license = typeof value === "string" ? value : String(value);
+          return (
+            <Badge variant="outline" className="capitalize">
+              {license || "Standard"}
+            </Badge>
+          );
+        },
       },
-    },
-    {
-      key: "amount",
-      label: "Montant",
-      type: "currency",
-      sortable: true,
-      render: (value: unknown) => {
-        const amount = typeof value === "number" ? value : Number(value);
-        return <span className="font-semibold text-green-600">${amount.toFixed(2)}</span>;
+      {
+        key: "amount",
+        label: "Montant",
+        type: "currency",
+        sortable: true,
+        render: (value: unknown) => {
+          const amount = typeof value === "number" ? value : Number(value);
+          return <span className="font-semibold text-green-600">${amount.toFixed(2)}</span>;
+        },
       },
-    },
-    {
-      key: "status",
-      label: "Statut",
-      sortable: true,
-      filterable: true,
-      render: (value: unknown) => {
-        const status = typeof value === "string" ? value : String(value);
-        const statusConfig = {
-          pending: {
-            variant: "secondary" as const,
-            icon: Clock,
-            label: "En attente",
-            className: "bg-yellow-100 text-yellow-800 border-yellow-200",
-          },
-          processing: {
-            variant: "secondary" as const,
-            icon: RefreshCw,
-            label: "En cours",
-            className: "bg-blue-100 text-blue-800 border-blue-200",
-          },
-          completed: {
-            variant: "default" as const,
-            icon: CheckCircle,
-            label: "Terminé",
-            className: "bg-green-100 text-green-800 border-green-200",
-          },
-          failed: {
-            variant: "destructive" as const,
-            icon: XCircle,
-            label: "Échoué",
-            className: "bg-red-100 text-red-800 border-red-200",
-          },
-        };
+      {
+        key: "status",
+        label: "Statut",
+        sortable: true,
+        filterable: true,
+        render: (value: unknown) => {
+          const status = typeof value === "string" ? value : String(value);
+          const statusConfig = {
+            pending: {
+              variant: "secondary" as const,
+              icon: Clock,
+              label: "En attente",
+              className: "bg-yellow-100 text-yellow-800 border-yellow-200",
+            },
+            processing: {
+              variant: "secondary" as const,
+              icon: RefreshCw,
+              label: "En cours",
+              className: "bg-blue-100 text-blue-800 border-blue-200",
+            },
+            completed: {
+              variant: "default" as const,
+              icon: CheckCircle,
+              label: "Terminé",
+              className: "bg-green-100 text-green-800 border-green-200",
+            },
+            failed: {
+              variant: "destructive" as const,
+              icon: XCircle,
+              label: "Échoué",
+              className: "bg-red-100 text-red-800 border-red-200",
+            },
+          };
 
-        const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-        const Icon = config.icon;
+          const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+          const Icon = config.icon;
 
-        return (
-          <Badge className={config.className}>
-            <Icon className="w-3 h-3 mr-1" />
-            {config.label}
-          </Badge>
-        );
+          return (
+            <Badge className={config.className}>
+              <Icon className="w-3 h-3 mr-1" />
+              {config.label}
+            </Badge>
+          );
+        },
       },
-    },
-    {
-      key: "paymentMethod",
-      label: "Paiement",
-      filterable: true,
-      render: (value: unknown) => {
-        const payment = typeof value === "string" ? value : String(value);
-        return <span className="text-sm capitalize">{payment || "Carte bancaire"}</span>;
+      {
+        key: "paymentMethod",
+        label: "Paiement",
+        filterable: true,
+        render: (value: unknown) => {
+          const payment = typeof value === "string" ? value : String(value);
+          return <span className="text-sm capitalize">{payment || "Carte bancaire"}</span>;
+        },
       },
-    },
-    {
-      key: "createdAt",
-      label: "Date",
-      type: "date",
-      sortable: true,
-      render: (value: unknown) => {
-        const date = typeof value === "string" ? value : String(value);
-        return (
-          <div className="space-y-1">
-            <p className="text-sm">{new Date(date).toLocaleDateString("fr-FR")}</p>
-            <p className="text-xs text-muted-foreground">
-              {new Date(date).toLocaleTimeString("fr-FR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </p>
-          </div>
-        );
+      {
+        key: "createdAt",
+        label: "Date",
+        type: "date",
+        sortable: true,
+        render: (value: unknown) => {
+          const date = typeof value === "string" ? value : String(value);
+          return (
+            <div className="space-y-1">
+              <p className="text-sm">{new Date(date).toLocaleDateString("fr-FR")}</p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(date).toLocaleTimeString("fr-FR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            </div>
+          );
+        },
       },
-    },
-  ];
+    ],
+    []
+  );
 
   // Gestion des actions sur les lignes
   const handleRowClick = useCallback((row: TableData) => {
@@ -195,7 +198,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
         link.style.visibility = "hidden";
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        link.remove();
 
         toast.success("Export CSV téléchargé");
       } else {

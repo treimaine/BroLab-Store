@@ -139,14 +139,15 @@ export const useEventSubscription = <T>(
   eventType: string,
   handler: (event: DashboardEvent<T>) => void,
   options?: SubscriptionOptions,
-  deps: React.DependencyList = []
+  _deps: React.DependencyList = []
 ): void => {
   const eventBus = getEventBus();
 
   useEffect(() => {
     const unsubscribe = eventBus.subscribe(eventType, handler, options);
     return unsubscribe;
-  }, [eventBus, eventType, ...deps]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventBus, eventType, ..._deps]);
 };
 
 /**
@@ -156,14 +157,15 @@ export const useTypedEventSubscription = <K extends keyof DashboardEventTypes>(
   eventType: K,
   handler: (event: DashboardEvent<DashboardEventTypes[K]>) => void,
   options?: SubscriptionOptions,
-  deps: React.DependencyList = []
+  _deps: React.DependencyList = []
 ): void => {
   const eventBus = getEventBus();
 
   useEffect(() => {
     const unsubscribe = eventBus.subscribeTyped(eventType, handler, options);
     return unsubscribe;
-  }, [eventBus, eventType, ...deps]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventBus, eventType, ..._deps]);
 };
 
 /**
@@ -173,14 +175,15 @@ export const useMultipleEventSubscription = <T>(
   eventTypes: string[],
   handler: (event: DashboardEvent<T>) => void,
   options?: SubscriptionOptions,
-  deps: React.DependencyList = []
+  _deps: React.DependencyList = []
 ): void => {
   const eventBus = getEventBus();
 
   useEffect(() => {
     const unsubscribe = eventBus.subscribeToMultiple(eventTypes, handler, options);
     return unsubscribe;
-  }, [eventBus, eventTypes, handler, options]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventBus, eventTypes, handler, options, ..._deps]);
 };
 
 /**

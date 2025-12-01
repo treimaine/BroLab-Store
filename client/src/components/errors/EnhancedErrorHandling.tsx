@@ -2,139 +2,27 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, RefreshCw, Wifi, WifiOff } from "lucide-react";
-import React, { useEffect, useState } from "react";
-
-// Error types for better categorization
-export enum ErrorType {
-  NETWORK = "network",
-  PAYMENT = "payment",
-  VALIDATION = "validation",
-  SERVER = "server",
-  AUTHENTICATION = "authentication",
-  GEOLOCATION = "geolocation",
-}
-
-interface ErrorInfo {
-  type: ErrorType;
-  message: string;
-  details?: string;
-  timestamp: Date;
-  retry?: () => void;
-  actionLabel?: string;
-}
-
-interface EnhancedErrorContextType {
-  errors: ErrorInfo[];
-  addError: (error: ErrorInfo) => void;
-  removeError: (index: number) => void;
-  clearErrors: () => void;
-  networkStatus: "online" | "offline" | "slow";
-}
-
-const EnhancedErrorContext = React.createContext<EnhancedErrorContextType>({
-  errors: [],
-  addError: () => {},
-  removeError: () => {},
-  clearErrors: () => {},
-  networkStatus: "online",
-});
-
-export const EnhancedErrorProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [errors, setErrors] = useState<ErrorInfo[]>([]);
-  const [networkStatus, setNetworkStatus] = useState<"online" | "offline" | "slow">("online");
-
-  // Monitor network status
-  useEffect(() => {
-    const handleOnline = () => setNetworkStatus("online");
-    const handleOffline = () => setNetworkStatus("offline");
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    // Check connection speed
-    const checkConnectionSpeed = () => {
-      const start = Date.now();
-      fetch("/api/health-check", { cache: "no-cache" })
-        .then(() => {
-          const duration = Date.now() - start;
-          setNetworkStatus(duration > 2000 ? "slow" : "online");
-        })
-        .catch(() => setNetworkStatus("offline"));
-    };
-
-    const speedCheckInterval = setInterval(checkConnectionSpeed, 30000);
-
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-      clearInterval(speedCheckInterval);
-    };
-  }, []);
-
-  // Auto-remove errors after 10 seconds (except critical ones)
-  useEffect(() => {
-    errors.forEach((error, index) => {
-      if (error.type !== ErrorType.PAYMENT && error.type !== ErrorType.AUTHENTICATION) {
-        setTimeout(() => {
-          removeError(index);
-        }, 10000);
-      }
-    });
-  }, [errors]);
-
-  const addError = (error: ErrorInfo) => {
-    setErrors(prev => [...prev, { ...error, timestamp: new Date() }]);
-  };
-
-  const removeError = (index: number) => {
-    setErrors(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const clearErrors = () => {
-    setErrors([]);
-  };
-
-  return (
-    <EnhancedErrorContext.Provider
-      value={{
-        errors,
-        addError,
-        removeError,
-        clearErrors,
-        networkStatus,
-      }}
-    >
-      {children}
-      <ErrorDisplay />
-      <NetworkStatusIndicator />
-    </EnhancedErrorContext.Provider>
-  );
-};
-
-export const useErrorHandler = () => {
-  const context = React.useContext(EnhancedErrorContext);
-  if (!context) {
-    throw new Error("useErrorHandler must be used within EnhancedErrorProvider");
-  }
-  return context;
-};
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { EnhancedErrorContext } from "./ErrorContext";
+import type { ErrorInfo } from "./ErrorTypes";
+import { ErrorType } from "./ErrorTypes";
+import { useErrorHandler } from "./useErrorHandlers";
 
 // Error Display Component
 const ErrorDisplay: React.FC = () => {
   const { errors, removeError } = useErrorHandler();
 
-  const getErrorIcon = (type: ErrorType) => {
+  const getErrorIcon = (type: ErrorType): React.ReactNode => {
     switch (type) {
       case ErrorType.NETWORK:
         return <WifiOff className="w-4 h-4" />;
       case ErrorType.PAYMENT:
-        return <AlertTriangle className="w-4 h-4" />;
       default:
         return <AlertTriangle className="w-4 h-4" />;
     }
   };
 
-  const getErrorColor = (type: ErrorType) => {
+  const getErrorColor = (type: ErrorType): string => {
     switch (type) {
       case ErrorType.NETWORK:
         return "border-orange-600 bg-orange-900/20 text-orange-300";
@@ -147,7 +35,7 @@ const ErrorDisplay: React.FC = () => {
     }
   };
 
-  const getErrorTitle = (type: ErrorType) => {
+  const getErrorTitle = (type: ErrorType): string => {
     switch (type) {
       case ErrorType.NETWORK:
         return "Connection Issue";
@@ -170,15 +58,18 @@ const ErrorDisplay: React.FC = () => {
 
   return (
     <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
-      {errors.map((error, index) => (
-        <Alert key={index} className={getErrorColor(error.type)}>
+      {errors.map((error: ErrorInfo) => (
+        <Alert
+          key={`${error.type}-${error.timestamp.getTime()}`}
+          className={getErrorColor(error.type)}
+        >
           {getErrorIcon(error.type)}
           <AlertDescription>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <strong>{getErrorTitle(error.type)}</strong>
                 <button
-                  onClick={() => removeError(index)}
+                  onClick={() => removeError(errors.indexOf(error))}
                   className="text-current hover:opacity-70"
                 >
                   ×
@@ -236,61 +127,83 @@ const NetworkStatusIndicator: React.FC = () => {
   );
 };
 
-// Payment Error Handler
-export const usePaymentErrorHandler = () => {
-  const { addError } = useErrorHandler();
+export const EnhancedErrorProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [errors, setErrors] = useState<ErrorInfo[]>([]);
+  const [networkStatus, setNetworkStatus] = useState<"online" | "offline" | "slow">("online");
 
-  const handlePaymentError = (error: unknown, context?: string) => {
-    let message = "Payment processing failed";
-    let details = "";
+  const removeError = useCallback((index: number): void => {
+    setErrors(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
-    // Type guard for error object
-    const isErrorObject = (
-      err: unknown
-    ): err is { type?: string; message?: string; code?: string } => {
-      return typeof err === "object" && err !== null;
+  // Monitor network status
+  useEffect(() => {
+    const handleOnline = (): void => setNetworkStatus("online");
+    const handleOffline = (): void => setNetworkStatus("offline");
+
+    globalThis.addEventListener("online", handleOnline);
+    globalThis.addEventListener("offline", handleOffline);
+
+    const checkConnectionSpeed = (): void => {
+      const start = Date.now();
+      fetch("/api/health-check", { cache: "no-cache" })
+        .then(() => {
+          const duration = Date.now() - start;
+          setNetworkStatus(duration > 2000 ? "slow" : "online");
+        })
+        .catch(() => setNetworkStatus("offline"));
     };
 
-    // Parse Stripe errors
-    if (isErrorObject(error)) {
-      if (error.type === "card_error") {
-        message = error.message || "Card was declined";
-        details = `Code: ${error.code || "unknown"}`;
-      } else if (error.message?.includes("amount")) {
-        message = "Invalid payment amount";
-        details = "Please check your cart and try again";
-      } else if (error.message) {
-        message = error.message;
+    const speedCheckInterval = setInterval(checkConnectionSpeed, 30000);
+
+    return () => {
+      globalThis.removeEventListener("online", handleOnline);
+      globalThis.removeEventListener("offline", handleOffline);
+      clearInterval(speedCheckInterval);
+    };
+  }, []);
+
+  // Auto-remove errors after 10 seconds (except critical ones)
+  useEffect(() => {
+    const timeouts: NodeJS.Timeout[] = [];
+    errors.forEach((error, index) => {
+      if (error.type !== ErrorType.PAYMENT && error.type !== ErrorType.AUTHENTICATION) {
+        const timeout = setTimeout(() => {
+          removeError(index);
+        }, 10000);
+        timeouts.push(timeout);
       }
-    }
-
-    addError({
-      type: ErrorType.PAYMENT,
-      message: "Payment failed",
-      details: isErrorObject(error) ? error.message : undefined,
-      retry: () => window.location.reload(),
-      actionLabel: "Refresh Page",
-      timestamp: new Date(), // Default fallback
     });
-  };
+    return () => {
+      timeouts.forEach(clearTimeout);
+    };
+  }, [errors, removeError]);
 
-  return { handlePaymentError };
-};
+  const addError = useCallback((error: ErrorInfo): void => {
+    setErrors(prev => [...prev, { ...error, timestamp: new Date() }]);
+  }, []);
 
-// Validation Error Handler
-export const useValidationErrorHandler = () => {
-  const { addError } = useErrorHandler();
+  const clearErrors = useCallback((): void => {
+    setErrors([]);
+  }, []);
 
-  const handleValidationError = (field: string, error: string) => {
-    addError({
-      type: ErrorType.VALIDATION,
-      message: "Validation error",
-      details: "Please correct the highlighted field and try again",
-      timestamp: new Date(),
-    });
-  };
+  const contextValue = useMemo(
+    () => ({
+      errors,
+      addError,
+      removeError,
+      clearErrors,
+      networkStatus,
+    }),
+    [errors, addError, removeError, clearErrors, networkStatus]
+  );
 
-  return { handleValidationError };
+  return (
+    <EnhancedErrorContext.Provider value={contextValue}>
+      {children}
+      <ErrorDisplay />
+      <NetworkStatusIndicator />
+    </EnhancedErrorContext.Provider>
+  );
 };
 
 // Global Error Boundary
@@ -303,15 +216,15 @@ export class ErrorBoundary extends React.Component<
     this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error: Error) {
+  static getDerivedStateFromError(error: Error): { hasError: boolean; error: Error } {
     return { hasError: true, error };
   }
 
-  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     console.error("Error Boundary caught an error:", error, errorInfo);
   }
 
-  override render() {
+  override render(): React.ReactNode {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-[var(--dark-bg)] flex items-center justify-center p-4">
@@ -328,14 +241,14 @@ export class ErrorBoundary extends React.Component<
               </p>
               <div className="space-y-2">
                 <Button
-                  onClick={() => window.location.reload()}
+                  onClick={() => globalThis.location.reload()}
                   className="w-full bg-red-600 hover:bg-red-700"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Refresh Page
                 </Button>
                 <Button
-                  onClick={() => (window.location.href = "/")}
+                  onClick={() => (globalThis.location.href = "/")}
                   variant="outline"
                   className="w-full border-red-600 text-red-300"
                 >

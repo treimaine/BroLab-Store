@@ -13,8 +13,7 @@ import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Cart() {
-  const { cart, updateQuantity, removeItem, updateLicense, refreshCartPricing, clearCart } =
-    useCartContext();
+  const { cart, updateQuantity, removeItem, updateLicense, clearCart } = useCartContext();
 
   if (cart.items.length === 0) {
     return (

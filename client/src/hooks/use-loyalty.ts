@@ -13,7 +13,7 @@ export function useLoyalty() {
   };
 }
 
-export function useLoyaltyPoints(userId?: number) {
+export function useLoyaltyPoints(_userId?: number) {
   return {
     points: {
       totalPoints: 0,
@@ -50,7 +50,7 @@ export function useRedeemReward() {
   };
 }
 
-export function useRewardEligibility(userId: number, rewardId: number) {
+export function useRewardEligibility(_userId: number, _rewardId: number) {
   return {
     eligibility: {
       canRedeem: false,
@@ -60,7 +60,7 @@ export function useRewardEligibility(userId: number, rewardId: number) {
   };
 }
 
-export function useLoyaltyTransactions(userId: number) {
+export function useLoyaltyTransactions(_userId: number) {
   return {
     transactions: [] as Array<{
       userId: number;

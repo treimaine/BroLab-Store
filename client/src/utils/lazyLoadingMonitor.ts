@@ -27,9 +27,17 @@ interface LazyLoadStats {
   totalChunkSize: number;
 }
 
+// Type for gtag function
+type GtagFunction = (command: string, action: string, params: Record<string, unknown>) => void;
+
+// Extend globalThis for our monitor
+declare global {
+  var __lazyLoadingMonitor: LazyLoadingMonitor | undefined;
+}
+
 class LazyLoadingMonitor {
-  private metrics: Map<string, LazyLoadMetric> = new Map();
-  private isProduction = process.env.NODE_ENV === "production";
+  private readonly metrics: Map<string, LazyLoadMetric> = new Map();
+  private readonly isProduction = process.env.NODE_ENV === "production";
   private reportingEnabled = true;
 
   /**
@@ -118,13 +126,15 @@ class LazyLoadingMonitor {
     const averageLoadTime =
       loadTimes.length > 0 ? loadTimes.reduce((sum, time) => sum + time, 0) / loadTimes.length : 0;
 
-    const slowestComponent =
-      successfulLoads.sort((a, b) => (b.loadDuration || 0) - (a.loadDuration || 0))[0]
-        ?.componentName || "";
+    const sortedBySlowest = successfulLoads.toSorted(
+      (a, b) => (b.loadDuration || 0) - (a.loadDuration || 0)
+    );
+    const slowestComponent = sortedBySlowest[0]?.componentName || "";
 
-    const fastestComponent =
-      successfulLoads.sort((a, b) => (a.loadDuration || 0) - (b.loadDuration || 0))[0]
-        ?.componentName || "";
+    const sortedByFastest = successfulLoads.toSorted(
+      (a, b) => (a.loadDuration || 0) - (b.loadDuration || 0)
+    );
+    const fastestComponent = sortedByFastest[0]?.componentName || "";
 
     const totalChunkSize = metrics.reduce((sum, m) => sum + (m.chunkSize || 0), 0);
 
@@ -148,8 +158,9 @@ class LazyLoadingMonitor {
     );
 
     // Send to monitoring service if available
-    if (typeof window !== "undefined" && "gtag" in window) {
-      (window as any).gtag("event", "slow_lazy_load", {
+    if (globalThis.window !== undefined && "gtag" in globalThis.window) {
+      const gtag = (globalThis.window as unknown as { gtag: GtagFunction }).gtag;
+      gtag("event", "slow_lazy_load", {
         event_category: "performance",
         event_label: metric.componentName,
         value: Math.round(metric.loadDuration!),
@@ -164,8 +175,9 @@ class LazyLoadingMonitor {
     console.error(`❌ Lazy load failed: ${metric.componentName} - ${metric.error}`);
 
     // Send to error tracking if available
-    if (typeof window !== "undefined" && "gtag" in window) {
-      (window as any).gtag("event", "lazy_load_error", {
+    if (globalThis.window !== undefined && "gtag" in globalThis.window) {
+      const gtag = (globalThis.window as unknown as { gtag: GtagFunction }).gtag;
+      gtag("event", "lazy_load_error", {
         event_category: "error",
         event_label: metric.componentName,
         value: metric.retryCount || 0,
@@ -177,8 +189,9 @@ class LazyLoadingMonitor {
    * Send metrics to analytics
    */
   private sendToAnalytics(metric: LazyLoadMetric): void {
-    if (typeof window !== "undefined" && "gtag" in window && metric.loadDuration) {
-      (window as any).gtag("event", "lazy_load_success", {
+    if (globalThis.window !== undefined && "gtag" in globalThis.window && metric.loadDuration) {
+      const gtag = (globalThis.window as unknown as { gtag: GtagFunction }).gtag;
+      gtag("event", "lazy_load_success", {
         event_category: "performance",
         event_label: metric.componentName,
         value: Math.round(metric.loadDuration),
@@ -260,7 +273,7 @@ export function createMonitoredLazyComponent<T>(
     maxRetries?: number;
   } = {}
 ) {
-  const { preloadDelay, retryOnError = true, maxRetries = 3 } = options;
+  const { preloadDelay: _preloadDelay, retryOnError = true, maxRetries = 3 } = options;
 
   return React.lazy(() => {
     lazyLoadingMonitor.startLoad(componentName);
@@ -296,6 +309,6 @@ export function createMonitoredLazyComponent<T>(
 }
 
 // Export for global access in development
-if (typeof window !== "undefined") {
-  (window as any).__lazyLoadingMonitor = lazyLoadingMonitor;
+if (globalThis.window !== undefined) {
+  globalThis.__lazyLoadingMonitor = lazyLoadingMonitor;
 }

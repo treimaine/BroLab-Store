@@ -1,39 +1,38 @@
-import { useState } from 'react';
-import { useWordPress } from '@/hooks/use-wordpress';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
-import { StandardHero } from '@/components/ui/StandardHero';
-import { Mail, Phone, MapPin, Send, Clock, MessageCircle, Headphones, Music } from 'lucide-react';
+import { StandardHero } from "@/components/ui/StandardHero";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { Headphones, Mail, MapPin, MessageCircle, Music, Phone } from "lucide-react";
+import { useState } from "react";
 
 export default function Contact() {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    subject: '',
-    message: '',
+    name: "",
+    email: "",
+    subject: "",
+    message: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { page } = useWordPress('contact');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     try {
-      await apiRequest('POST', '/api/contact', formData);
+      await apiRequest("POST", "/api/contact", formData);
       toast({
         title: "Message Sent!",
         description: "We'll get back to you as soon as possible.",
       });
-      setFormData({ name: '', email: '', subject: '', message: '' });
-    } catch (error: any) {
+      setFormData({ name: "", email: "", subject: "", message: "" });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send message";
       toast({
         title: "Error",
-        description: error.message || "Failed to send message",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -64,30 +63,38 @@ export default function Contact() {
               Choose the best way to reach us based on your needs
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-[var(--deep-black)] border border-[var(--medium-gray)] rounded-xl p-8 text-center hover:border-[var(--accent-purple)] transition-colors">
               <Music className="w-12 h-12 text-[var(--accent-purple)] mx-auto mb-4" />
               <h3 className="text-xl font-bold mb-3">Custom Beats</h3>
-              <p className="text-gray-300 text-sm">Need a unique sound? Let's create something tailored to your vision.</p>
+              <p className="text-gray-300 text-sm">
+                Need a unique sound? Let&apos;s create something tailored to your vision.
+              </p>
             </div>
-            
+
             <div className="bg-[var(--deep-black)] border border-[var(--medium-gray)] rounded-xl p-8 text-center hover:border-[var(--accent-purple)] transition-colors">
               <Headphones className="w-12 h-12 text-[var(--accent-purple)] mx-auto mb-4" />
               <h3 className="text-xl font-bold mb-3">Licensing Help</h3>
-              <p className="text-gray-300 text-sm">Questions about our licensing options? We'll help you choose the right fit.</p>
+              <p className="text-gray-300 text-sm">
+                Questions about our licensing options? We&apos;ll help you choose the right fit.
+              </p>
             </div>
-            
+
             <div className="bg-[var(--deep-black)] border border-[var(--medium-gray)] rounded-xl p-8 text-center hover:border-[var(--accent-purple)] transition-colors">
               <MessageCircle className="w-12 h-12 text-[var(--accent-purple)] mx-auto mb-4" />
               <h3 className="text-xl font-bold mb-3">General Support</h3>
-              <p className="text-gray-300 text-sm">Have questions about our beats or need technical assistance?</p>
+              <p className="text-gray-300 text-sm">
+                Have questions about our beats or need technical assistance?
+              </p>
             </div>
-            
+
             <div className="bg-[var(--deep-black)] border border-[var(--medium-gray)] rounded-xl p-8 text-center hover:border-[var(--accent-purple)] transition-colors">
               <Phone className="w-12 h-12 text-[var(--accent-purple)] mx-auto mb-4" />
               <h3 className="text-xl font-bold mb-3">Urgent Requests</h3>
-              <p className="text-gray-300 text-sm">Need immediate assistance? Call us directly for priority support.</p>
+              <p className="text-gray-300 text-sm">
+                Need immediate assistance? Call us directly for priority support.
+              </p>
             </div>
           </div>
         </div>
@@ -101,13 +108,18 @@ export default function Contact() {
             <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-6">
               <div className="mb-6">
                 <h2 className="text-2xl font-bold mb-3">Independency For You By You</h2>
-                <p className="text-gray-300 text-sm">Share your vision with us and let's create something extraordinary together.</p>
+                <p className="text-gray-300 text-sm">
+                  Share your vision with us and let&apos;s create something extraordinary together.
+                </p>
               </div>
-              
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-300">Full Name</label>
+                  <label htmlFor="name" className="block text-sm font-medium mb-2 text-gray-300">
+                    Full Name
+                  </label>
                   <Input
+                    id="name"
                     type="text"
                     name="name"
                     value={formData.name}
@@ -118,8 +130,11 @@ export default function Contact() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-300">E-mail</label>
+                  <label htmlFor="email" className="block text-sm font-medium mb-2 text-gray-300">
+                    E-mail
+                  </label>
                   <Input
+                    id="email"
                     type="email"
                     name="email"
                     value={formData.email}
@@ -130,8 +145,11 @@ export default function Contact() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-300">Message</label>
+                  <label htmlFor="message" className="block text-sm font-medium mb-2 text-gray-300">
+                    Message
+                  </label>
                   <Textarea
+                    id="message"
                     name="message"
                     value={formData.message}
                     onChange={handleChange}
@@ -152,9 +170,7 @@ export default function Contact() {
                       Sending...
                     </div>
                   ) : (
-                    <>
-                      Send
-                    </>
+                    <>Send</>
                   )}
                 </Button>
               </form>
@@ -174,22 +190,26 @@ export default function Contact() {
                       <p className="text-xs text-gray-400 mt-1">Best for detailed inquiries</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start gap-3 p-4 bg-[var(--deep-black)] rounded-lg">
                     <Phone className="w-5 h-5 text-[var(--accent-purple)] mt-1 flex-shrink-0" />
                     <div>
                       <h3 className="font-semibold mb-1">Phone Numbers</h3>
                       <p className="text-gray-300">(+33) 7 50 47 13 17</p>
-                      <p className="text-xs text-gray-400 mt-1">Available during business hours (CET)</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Available during business hours (CET)
+                      </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start gap-3 p-4 bg-[var(--deep-black)] rounded-lg">
                     <MapPin className="w-5 h-5 text-[var(--accent-purple)] mt-1 flex-shrink-0" />
                     <div>
                       <h3 className="font-semibold mb-1">Physical Address</h3>
                       <p className="text-gray-300">LILLE, FR</p>
-                      <p className="text-xs text-gray-400 mt-1">Studio visits by appointment only</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Studio visits by appointment only
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -200,16 +220,29 @@ export default function Contact() {
                 <h3 className="text-lg font-bold mb-3">Quick Answers</h3>
                 <div className="space-y-3">
                   <div className="border-b border-[var(--medium-gray)] pb-3">
-                    <h4 className="font-semibold mb-1 text-sm">How quickly can I get a custom beat?</h4>
-                    <p className="text-gray-300 text-xs">Custom beats typically take 3-7 business days depending on complexity.</p>
+                    <h4 className="font-semibold mb-1 text-sm">
+                      How quickly can I get a custom beat?
+                    </h4>
+                    <p className="text-gray-300 text-xs">
+                      Custom beats typically take 3-7 business days depending on complexity.
+                    </p>
                   </div>
                   <div className="border-b border-[var(--medium-gray)] pb-3">
-                    <h4 className="font-semibold mb-1 text-sm">What's included with each license?</h4>
-                    <p className="text-gray-300 text-xs">Each license includes WAV files, tracking stems, and usage rights as specified.</p>
+                    <h4 className="font-semibold mb-1 text-sm">
+                      What&apos;s included with each license?
+                    </h4>
+                    <p className="text-gray-300 text-xs">
+                      Each license includes WAV files, tracking stems, and usage rights as
+                      specified.
+                    </p>
                   </div>
                   <div>
-                    <h4 className="font-semibold mb-1 text-sm">Do you offer mixing and mastering?</h4>
-                    <p className="text-gray-300 text-xs">Yes! All our beats come professionally mixed and mastered.</p>
+                    <h4 className="font-semibold mb-1 text-sm">
+                      Do you offer mixing and mastering?
+                    </h4>
+                    <p className="text-gray-300 text-xs">
+                      Yes! All our beats come professionally mixed and mastered.
+                    </p>
                   </div>
                 </div>
               </div>

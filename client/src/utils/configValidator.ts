@@ -18,6 +18,120 @@ export interface ConfigValidationOptions {
   logResults?: boolean;
 }
 
+// Validation message collector
+interface ValidationCollector {
+  errors: string[];
+  warnings: string[];
+  addError: (message: string) => void;
+  addWarning: (message: string) => void;
+  addIssue: (message: string) => void;
+}
+
+// Create a strict validation collector (issues become errors)
+function createStrictCollector(errors: string[], warnings: string[]): ValidationCollector {
+  return {
+    errors,
+    warnings,
+    addError: (message: string) => errors.push(message),
+    addWarning: (message: string) => warnings.push(message),
+    addIssue: (message: string) => errors.push(message),
+  };
+}
+
+// Create a lenient validation collector (issues become warnings)
+function createLenientCollector(errors: string[], warnings: string[]): ValidationCollector {
+  return {
+    errors,
+    warnings,
+    addError: (message: string) => errors.push(message),
+    addWarning: (message: string) => warnings.push(message),
+    addIssue: (message: string) => warnings.push(message),
+  };
+}
+
+// Validate UI configuration
+function validateUIConfig(config: DashboardConfig, collector: ValidationCollector): void {
+  if (config.ui.animationDuration < 0 || config.ui.animationDuration > 5000) {
+    collector.addIssue(
+      `Invalid animation duration: ${config.ui.animationDuration}ms (should be 0-5000ms)`
+    );
+  }
+
+  if (config.ui.skeletonItems < 1 || config.ui.skeletonItems > 20) {
+    collector.addIssue(`Invalid skeleton items count: ${config.ui.skeletonItems} (should be 1-20)`);
+  }
+
+  if (config.ui.maxActivityItems < 1 || config.ui.maxActivityItems > 100) {
+    collector.addIssue(
+      `Invalid max activity items: ${config.ui.maxActivityItems} (should be 1-100)`
+    );
+  }
+}
+
+// Validate pagination configuration
+function validatePaginationConfig(config: DashboardConfig, collector: ValidationCollector): void {
+  if (config.pagination.ordersPerPage < 1 || config.pagination.ordersPerPage > 100) {
+    collector.addError(
+      `Invalid orders per page: ${config.pagination.ordersPerPage} (should be 1-100)`
+    );
+  }
+
+  if (config.pagination.downloadsPerPage < 1 || config.pagination.downloadsPerPage > 100) {
+    collector.addError(
+      `Invalid downloads per page: ${config.pagination.downloadsPerPage} (should be 1-100)`
+    );
+  }
+
+  if (config.pagination.activityPerPage < 1 || config.pagination.activityPerPage > 100) {
+    collector.addError(
+      `Invalid activity per page: ${config.pagination.activityPerPage} (should be 1-100)`
+    );
+  }
+}
+
+// Validate real-time configuration
+function validateRealtimeConfig(config: DashboardConfig, collector: ValidationCollector): void {
+  if (config.realtime.reconnectInterval < 1000 || config.realtime.reconnectInterval > 60000) {
+    collector.addIssue(
+      `Invalid reconnect interval: ${config.realtime.reconnectInterval}ms (should be 1000-60000ms)`
+    );
+  }
+
+  if (config.realtime.maxRetries < 0 || config.realtime.maxRetries > 50) {
+    collector.addError(`Invalid max retries: ${config.realtime.maxRetries} (should be 0-50)`);
+  }
+
+  if (config.realtime.heartbeatInterval < 5000 || config.realtime.heartbeatInterval > 300000) {
+    collector.addIssue(
+      `Invalid heartbeat interval: ${config.realtime.heartbeatInterval}ms (should be 5000-300000ms)`
+    );
+  }
+}
+
+// Validate feature flags
+function validateFeatureFlags(config: DashboardConfig, collector: ValidationCollector): void {
+  for (const [key, value] of Object.entries(config.features)) {
+    if (typeof value !== "boolean") {
+      collector.addError(`Feature flag '${key}' must be boolean, got ${typeof value}`);
+    }
+  }
+}
+
+// Log validation results
+function logValidationResults(errors: string[], warnings: string[]): void {
+  console.group("Dashboard Configuration Validation");
+
+  if (errors.length > 0) {
+    console.error("Configuration Errors:", errors);
+  }
+
+  if (warnings.length > 0) {
+    console.warn("Configuration Warnings:", warnings);
+  }
+
+  console.groupEnd();
+}
+
 /**
  * Validate dashboard configuration
  */
@@ -29,82 +143,15 @@ export function validateDashboardConfig(
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Validate UI configuration
-  if (config.ui.animationDuration < 0 || config.ui.animationDuration > 5000) {
-    const message = `Invalid animation duration: ${config.ui.animationDuration}ms (should be 0-5000ms)`;
-    if (strict) {
-      errors.push(message);
-    } else {
-      warnings.push(message);
-    }
-  }
+  const collector = strict
+    ? createStrictCollector(errors, warnings)
+    : createLenientCollector(errors, warnings);
 
-  if (config.ui.skeletonItems < 1 || config.ui.skeletonItems > 20) {
-    const message = `Invalid skeleton items count: ${config.ui.skeletonItems} (should be 1-20)`;
-    if (strict) {
-      errors.push(message);
-    } else {
-      warnings.push(message);
-    }
-  }
+  validateUIConfig(config, collector);
+  validatePaginationConfig(config, collector);
+  validateRealtimeConfig(config, collector);
+  validateFeatureFlags(config, collector);
 
-  if (config.ui.maxActivityItems < 1 || config.ui.maxActivityItems > 100) {
-    const message = `Invalid max activity items: ${config.ui.maxActivityItems} (should be 1-100)`;
-    if (strict) {
-      errors.push(message);
-    } else {
-      warnings.push(message);
-    }
-  }
-
-  // Validate pagination configuration
-  if (config.pagination.ordersPerPage < 1 || config.pagination.ordersPerPage > 100) {
-    errors.push(`Invalid orders per page: ${config.pagination.ordersPerPage} (should be 1-100)`);
-  }
-
-  if (config.pagination.downloadsPerPage < 1 || config.pagination.downloadsPerPage > 100) {
-    errors.push(
-      `Invalid downloads per page: ${config.pagination.downloadsPerPage} (should be 1-100)`
-    );
-  }
-
-  if (config.pagination.activityPerPage < 1 || config.pagination.activityPerPage > 100) {
-    errors.push(
-      `Invalid activity per page: ${config.pagination.activityPerPage} (should be 1-100)`
-    );
-  }
-
-  // Validate real-time configuration
-  if (config.realtime.reconnectInterval < 1000 || config.realtime.reconnectInterval > 60000) {
-    const message = `Invalid reconnect interval: ${config.realtime.reconnectInterval}ms (should be 1000-60000ms)`;
-    if (strict) {
-      errors.push(message);
-    } else {
-      warnings.push(message);
-    }
-  }
-
-  if (config.realtime.maxRetries < 0 || config.realtime.maxRetries > 50) {
-    errors.push(`Invalid max retries: ${config.realtime.maxRetries} (should be 0-50)`);
-  }
-
-  if (config.realtime.heartbeatInterval < 5000 || config.realtime.heartbeatInterval > 300000) {
-    const message = `Invalid heartbeat interval: ${config.realtime.heartbeatInterval}ms (should be 5000-300000ms)`;
-    if (strict) {
-      errors.push(message);
-    } else {
-      warnings.push(message);
-    }
-  }
-
-  // Validate feature flags (ensure they are boolean)
-  Object.entries(config.features).forEach(([key, value]) => {
-    if (typeof value !== "boolean") {
-      errors.push(`Feature flag '${key}' must be boolean, got ${typeof value}`);
-    }
-  });
-
-  // Environment validation
   if (checkEnvironment) {
     const envValidation = validateEnvironmentVariables();
     errors.push(...envValidation.errors);
@@ -118,17 +165,7 @@ export function validateDashboardConfig(
   };
 
   if (logResults && (errors.length > 0 || warnings.length > 0)) {
-    console.group("Dashboard Configuration Validation");
-
-    if (errors.length > 0) {
-      console.error("Configuration Errors:", errors);
-    }
-
-    if (warnings.length > 0) {
-      console.warn("Configuration Warnings:", warnings);
-    }
-
-    console.groupEnd();
+    logValidationResults(errors, warnings);
   }
 
   return result;
@@ -180,7 +217,7 @@ export function validateEnvironmentVariables(): ValidationResult {
 
   numericEnvVars.forEach(envVar => {
     const value = import.meta.env[envVar];
-    if (value && (isNaN(Number(value)) || Number(value) < 0)) {
+    if (value && (Number.isNaN(Number(value)) || Number(value) < 0)) {
       errors.push(`Invalid numeric value for ${envVar}: ${value}`);
     }
   });
@@ -282,7 +319,9 @@ export function validateCurrencyConfig(): ValidationResult {
 /**
  * Validate all configurations
  */
-export function validateAllConfigurations(options: ConfigValidationOptions = {}): ValidationResult {
+export function validateAllConfigurations(
+  _options: ConfigValidationOptions = {}
+): ValidationResult {
   const results = [
     validateEnvironmentVariables(),
     validatePerformanceConfig(),
