@@ -54,7 +54,7 @@ export function UnifiedFilterDemo() {
               <p className="text-muted-foreground mb-4">
                 Impossible de charger les produits. Veuillez réessayer.
               </p>
-              <Button onClick={() => window.location.reload()}>
+              <Button onClick={() => globalThis.location.reload()}>
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Recharger
               </Button>
@@ -179,12 +179,13 @@ export function UnifiedFilterDemo() {
 
       {/* Contenu principal */}
       <div className="space-y-6">
-        {isLoading ? (
+        {isLoading && (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
             <p className="text-muted-foreground">Chargement des produits...</p>
           </div>
-        ) : products.length === 0 ? (
+        )}
+        {!isLoading && products.length === 0 && (
           <Card className="card-dark">
             <CardContent className="p-12 text-center">
               <h3 className="text-xl font-semibold mb-2">Aucun produit trouvé</h3>
@@ -200,7 +201,8 @@ export function UnifiedFilterDemo() {
               )}
             </CardContent>
           </Card>
-        ) : (
+        )}
+        {!isLoading && products.length > 0 && (
           <>
             {/* Affichage des produits */}
             {viewMode === "grid" ? (

@@ -1,11 +1,13 @@
 import BrowserEventEmitter from "@/utils/BrowserEventEmitter";
 
 // Core event interfaces
+export type EventSource = "user" | "server" | "system";
+
 export interface DashboardEvent<T = unknown> {
   type: string;
   payload: T;
   timestamp: number;
-  source: "user" | "server" | "system";
+  source: EventSource;
   id: string;
   correlationId?: string;
 }
@@ -269,13 +271,10 @@ export class EventBus extends BrowserEventEmitter {
     // Add listener with priority support
     if (once) {
       this.once(eventType, wrappedHandler);
+    } else if (priority > 0) {
+      this.prependListener(eventType, wrappedHandler);
     } else {
-      // For priority support, we need to manage listener order
-      if (priority > 0) {
-        this.prependListener(eventType, wrappedHandler);
-      } else {
-        this.addListener(eventType, wrappedHandler);
-      }
+      this.addListener(eventType, wrappedHandler);
     }
 
     this.updateSubscriberMetrics();
@@ -350,7 +349,7 @@ export class EventBus extends BrowserEventEmitter {
    * Get all event types that have subscribers
    */
   public getActiveEventTypes(): string[] {
-    return this.eventNames() as string[];
+    return this.eventNames();
   }
 
   /**
@@ -403,7 +402,7 @@ export class EventBus extends BrowserEventEmitter {
   public createEvent<K extends keyof DashboardEventTypes>(
     type: K,
     payload: DashboardEventTypes[K],
-    source: "user" | "server" | "system" = "system",
+    source: EventSource = "system",
     correlationId?: string
   ): DashboardEvent<DashboardEventTypes[K]> {
     return {
@@ -422,7 +421,7 @@ export class EventBus extends BrowserEventEmitter {
   public publishTyped<K extends keyof DashboardEventTypes>(
     type: K,
     payload: DashboardEventTypes[K],
-    source: "user" | "server" | "system" = "system",
+    source: EventSource = "system",
     correlationId?: string
   ): void {
     const event = this.createEvent(type, payload, source, correlationId);
@@ -487,7 +486,7 @@ export class EventBus extends BrowserEventEmitter {
     const str = JSON.stringify(obj);
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
+      const char = str.codePointAt(i) ?? 0;
       hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
@@ -536,7 +535,7 @@ export class EventBus extends BrowserEventEmitter {
 
   private updateSubscriberMetrics(): void {
     this.metrics.subscriberCount = this.eventNames().reduce(
-      (total, eventName) => total + this.listenerCount(eventName as string),
+      (total, eventName) => total + this.listenerCount(eventName),
       0
     );
   }
@@ -627,7 +626,7 @@ export const subscribeToEvent = <T>(
 export const publishTypedEvent = <K extends keyof DashboardEventTypes>(
   type: K,
   payload: DashboardEventTypes[K],
-  source: "user" | "server" | "system" = "system",
+  source: EventSource = "system",
   correlationId?: string
 ): void => {
   getEventBus().publishTyped(type, payload, source, correlationId);

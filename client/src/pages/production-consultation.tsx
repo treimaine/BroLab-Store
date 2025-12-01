@@ -85,14 +85,19 @@ export default function ProductionConsultation() {
 
       console.log("🚀 Starting consultation reservation");
       // Convert form data to reservation format using new schema
-      const priceAmount =
-        formData.duration === "30"
-          ? 7500 // $75 in cents
-          : formData.duration === "60"
-            ? 15000 // $150 in cents
-            : formData.duration === "90"
-              ? 20000 // $200 in cents
-              : 40000; // $400 for monthly mentorship
+      const getPriceAmount = (duration: string): number => {
+        switch (duration) {
+          case "30":
+            return 7500; // $75 in cents
+          case "60":
+            return 15000; // $150 in cents
+          case "90":
+            return 20000; // $200 in cents
+          default:
+            return 40000; // $400 for monthly mentorship
+        }
+      };
+      const priceAmount = getPriceAmount(formData.duration);
 
       const reservationData = {
         serviceType: "consultation" as const,
@@ -110,7 +115,7 @@ export default function ProductionConsultation() {
         preferredDate: new Date(
           `${formData.preferredDate}T${formData.preferredTime}`
         ).toISOString(),
-        preferredDuration: parseInt(formData.duration),
+        preferredDuration: Number.parseInt(formData.duration, 10),
         serviceDetails: {
           includeRevisions: 1,
           rushDelivery: false,
@@ -162,7 +167,7 @@ Additional Message: ${formData.message}`,
       } else {
         throw new Error("Failed to book consultation");
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Booking Failed",
         description: "Please try again or contact us directly.",

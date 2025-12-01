@@ -93,8 +93,8 @@ export const useErrorHandling = (
   const {
     component = "dashboard",
     showToasts = true,
-    autoRetry = true,
-    maxRetries = 3,
+    autoRetry: _autoRetry = true,
+    maxRetries: _maxRetries = 3,
     config,
     onError,
     onRecoverySuccess,

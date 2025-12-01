@@ -498,8 +498,9 @@ class PerformanceMonitor {
     const memoryMetrics = this.metrics.filter(m => m.name.startsWith("memory_"));
     if (memoryMetrics.length === 0) return null;
 
-    const latest = memoryMetrics.reduce((latest, current) =>
-      new Date(current.timestamp) > new Date(latest.timestamp) ? current : latest
+    // Find the latest metric by timestamp (kept for potential future use)
+    const _latest = memoryMetrics.reduce((acc, current) =>
+      new Date(current.timestamp) > new Date(acc.timestamp) ? current : acc
     );
 
     return {

@@ -70,7 +70,7 @@ export const useConnectionManager = (
   const {
     config,
     autoConnect = true,
-    autoReconnect = true,
+    autoReconnect: _autoReconnect = true,
     onError,
     onStatusChange,
     onMessage,
@@ -104,66 +104,68 @@ export const useConnectionManager = (
 
   // Initialize connection manager
   useEffect(() => {
-    if (!managerRef.current) {
-      managerRef.current = getConnectionManager(config);
-
-      // Set up event listeners
-      const statusUnsubscribe = managerRef.current.onStatusChange(newStatus => {
-        setStatus(newStatus);
-        if (onStatusChange) {
-          onStatusChange(newStatus);
-        }
-      });
-
-      const messageUnsubscribe = managerRef.current.onMessage(message => {
-        if (onMessage) {
-          onMessage(message);
-        }
-      });
-
-      const errorHandler = (errorEvent: { error: SyncError }) => {
-        setError(errorEvent.error);
-        if (onError) {
-          onError(errorEvent.error);
-        }
-
-        // Generate recovery actions
-        const actions = generateRecoveryActions(errorEvent.error, managerRef.current!);
-        setRecoveryActions(actions);
-      };
-
-      managerRef.current.on("sync_error", errorHandler);
-
-      const connectedHandler = () => {
-        setError(null);
-        setRecoveryActions([]);
-      };
-
-      managerRef.current.on("connected", connectedHandler);
-
-      // Auto-connect if enabled
-      if (autoConnect) {
-        managerRef.current.connect().catch(err => {
-          console.error("Auto-connect failed:", err);
-        });
-      }
-
-      // Update metrics periodically
-      const metricsInterval = setInterval(() => {
-        if (managerRef.current) {
-          setMetrics(managerRef.current.getConnectionMetrics());
-        }
-      }, 1000);
-
-      return () => {
-        statusUnsubscribe();
-        messageUnsubscribe();
-        managerRef.current?.off("sync_error", errorHandler);
-        managerRef.current?.off("connected", connectedHandler);
-        clearInterval(metricsInterval);
-      };
+    if (managerRef.current) {
+      return undefined;
     }
-    return undefined;
+
+    managerRef.current = getConnectionManager(config);
+    const manager = managerRef.current;
+
+    // Status change handler
+    const handleStatusChange = (newStatus: ConnectionStatus): void => {
+      setStatus(newStatus);
+      onStatusChange?.(newStatus);
+    };
+
+    // Message handler
+    const handleMessage = (message: ConnectionMessage): void => {
+      onMessage?.(message);
+    };
+
+    // Error handler
+    const handleSyncError = (errorEvent: { error: SyncError }): void => {
+      setError(errorEvent.error);
+      onError?.(errorEvent.error);
+      const actions = generateRecoveryActions(errorEvent.error, manager);
+      setRecoveryActions(actions);
+    };
+
+    // Connected handler
+    const handleConnected = (): void => {
+      setError(null);
+      setRecoveryActions([]);
+    };
+
+    // Metrics update handler
+    const handleMetricsUpdate = (): void => {
+      if (managerRef.current) {
+        setMetrics(managerRef.current.getConnectionMetrics());
+      }
+    };
+
+    // Set up event listeners
+    const statusUnsubscribe = manager.onStatusChange(handleStatusChange);
+    const messageUnsubscribe = manager.onMessage(handleMessage);
+    manager.on("sync_error", handleSyncError);
+    manager.on("connected", handleConnected);
+
+    // Auto-connect if enabled
+    if (autoConnect) {
+      manager.connect().catch(err => {
+        console.error("Auto-connect failed:", err);
+      });
+    }
+
+    // Update metrics periodically
+    const metricsInterval = setInterval(handleMetricsUpdate, 1000);
+
+    return () => {
+      statusUnsubscribe();
+      messageUnsubscribe();
+      manager.off("sync_error", handleSyncError);
+      manager.off("connected", handleConnected);
+      clearInterval(metricsInterval);
+    };
   }, [config, autoConnect, onError, onStatusChange, onMessage]);
 
   // Connect function
@@ -296,11 +298,40 @@ export const useConnectionStatus = (
   };
 };
 
+// Helper to delay execution
+const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper to queue a message
+const queueMessage = (
+  message: ConnectionMessage,
+  setPendingMessages: React.Dispatch<React.SetStateAction<ConnectionMessage[]>>
+): void => {
+  setPendingMessages(prev => [...prev, message]);
+};
+
+// Helper to remove message from queue
+const removeFromQueue = (
+  messageId: string,
+  setPendingMessages: React.Dispatch<React.SetStateAction<ConnectionMessage[]>>
+): void => {
+  setPendingMessages(prev => prev.filter(m => m.id !== messageId));
+};
+
+// Helper to handle failed message send
+const handleFailedSend = (
+  message: ConnectionMessage,
+  err: unknown,
+  setPendingMessages: React.Dispatch<React.SetStateAction<ConnectionMessage[]>>
+): void => {
+  console.error("Failed to send pending message:", err);
+  queueMessage(message, setPendingMessages);
+};
+
 /**
  * Hook for sending messages with automatic retry
  */
 export const useConnectionMessaging = () => {
-  const { sendMessage, isConnected, error } = useConnectionManager();
+  const { sendMessage, isConnected } = useConnectionManager();
   const [pendingMessages, setPendingMessages] = useState<ConnectionMessage[]>([]);
 
   const sendWithRetry = useCallback(
@@ -310,25 +341,19 @@ export const useConnectionMessaging = () => {
       while (retries < maxRetries) {
         try {
           if (!isConnected) {
-            // Queue message if not connected
-            setPendingMessages(prev => [...prev, message]);
+            queueMessage(message, setPendingMessages);
             throw new Error("Not connected - message queued");
           }
 
           await sendMessage(message);
-
-          // Remove from pending if it was queued
-          setPendingMessages(prev => prev.filter(m => m.id !== message.id));
-
+          removeFromQueue(message.id, setPendingMessages);
           return;
         } catch (err) {
           retries++;
           if (retries >= maxRetries) {
             throw err;
           }
-
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+          await delay(1000 * retries);
         }
       }
     },
@@ -337,17 +362,13 @@ export const useConnectionMessaging = () => {
 
   // Send pending messages when connection is restored
   useEffect(() => {
-    if (isConnected && pendingMessages.length > 0) {
-      const messagesToSend = [...pendingMessages];
-      setPendingMessages([]);
+    if (!isConnected || pendingMessages.length === 0) return;
 
-      messagesToSend.forEach(message => {
-        sendMessage(message).catch(err => {
-          console.error("Failed to send pending message:", err);
-          // Re-queue failed messages
-          setPendingMessages(prev => [...prev, message]);
-        });
-      });
+    const messagesToSend = [...pendingMessages];
+    setPendingMessages([]);
+
+    for (const message of messagesToSend) {
+      sendMessage(message).catch(err => handleFailedSend(message, err, setPendingMessages));
     }
   }, [isConnected, pendingMessages, sendMessage]);
 

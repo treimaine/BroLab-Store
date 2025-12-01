@@ -6,11 +6,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Check, Gift, Lock } from "lucide-react";
 
 interface RewardsGridProps {
-  userId: number;
-  className?: string;
+  readonly userId: number;
+  readonly className?: string;
 }
 
-export function RewardsGrid({ userId, className }: RewardsGridProps) {
+export function RewardsGrid({ userId, className }: Readonly<RewardsGridProps>) {
   const { rewards, isLoading } = useLoyaltyRewards();
   const { redeemReward, isLoading: isRedeeming } = useRedeemReward();
   const { toast } = useToast();
@@ -73,23 +73,23 @@ export function RewardsGrid({ userId, className }: RewardsGridProps) {
 }
 
 interface RewardCardProps {
-  reward: {
-    id: number;
-    name: string;
-    description: string;
-    pointsRequired: number;
-    available?: boolean;
-    type?: string;
-    metadata?: {
-      amount?: number;
+  readonly reward: {
+    readonly id: number;
+    readonly name: string;
+    readonly description: string;
+    readonly pointsRequired: number;
+    readonly available?: boolean;
+    readonly type?: string;
+    readonly metadata?: {
+      readonly amount?: number;
     };
   };
-  userId: number;
-  onRedeem: (rewardId: number) => void;
-  isRedeeming: boolean;
+  readonly userId: number;
+  readonly onRedeem: (rewardId: number) => void;
+  readonly isRedeeming: boolean;
 }
 
-function RewardCard({ reward, userId, onRedeem, isRedeeming }: RewardCardProps) {
+function RewardCard({ reward, userId, onRedeem, isRedeeming }: Readonly<RewardCardProps>) {
   const { eligibility, isLoading: isCheckingEligibility } = useRewardEligibility(userId, reward.id);
 
   return (
@@ -117,19 +117,25 @@ function RewardCard({ reward, userId, onRedeem, isRedeeming }: RewardCardProps) 
           onClick={() => onRedeem(reward.id)}
           disabled={isRedeeming || isCheckingEligibility || !eligibility?.canRedeem}
         >
-          {isRedeeming ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white" />
-          ) : eligibility?.canRedeem ? (
-            <>
-              <Check className="w-4 h-4 mr-2" />
-              Réclamer
-            </>
-          ) : (
-            <>
-              <Lock className="w-4 h-4 mr-2" />
-              {eligibility?.reason || "Points insuffisants"}
-            </>
-          )}
+          {(() => {
+            if (isRedeeming) {
+              return <div className="animate-spin rounded-full h-4 w-4 border-2 border-white" />;
+            }
+            if (eligibility?.canRedeem) {
+              return (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Réclamer
+                </>
+              );
+            }
+            return (
+              <>
+                <Lock className="w-4 h-4 mr-2" />
+                {eligibility?.reason || "Points insuffisants"}
+              </>
+            );
+          })()}
         </Button>
       </CardContent>
     </Card>

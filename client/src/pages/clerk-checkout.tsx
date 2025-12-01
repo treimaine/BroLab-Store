@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StandardHero } from "@/components/ui/StandardHero";
-import { SignedIn, SignedOut, SignInButton, useUser } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 import { CheckCircle, Clock, CreditCard } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -14,7 +14,6 @@ interface PaymentSession {
 
 export default function ClerkCheckoutPage() {
   const [location] = useLocation();
-  const { user } = useUser();
   const [paymentSession, setPaymentSession] = useState<PaymentSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -28,7 +27,7 @@ export default function ClerkCheckoutPage() {
     if (sessionId && amount && service) {
       setPaymentSession({
         sessionId,
-        amount: parseFloat(amount),
+        amount: Number.parseFloat(amount),
         service: decodeURIComponent(service),
       });
       setIsLoading(false);
@@ -103,7 +102,7 @@ export default function ClerkCheckoutPage() {
                 <div className="bg-gray-800 rounded-lg p-4">
                   <div className="flex items-center space-x-2 mb-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-green-400 font-medium">What's Included:</span>
+                    <span className="text-green-400 font-medium">What&apos;s Included:</span>
                   </div>
                   <p className="text-gray-300 text-sm">
                     Professional {paymentSession.service.toLowerCase()} service with full support
@@ -150,7 +149,7 @@ export default function ClerkCheckoutPage() {
                   <Button
                     variant="outline"
                     className="w-full border-gray-600 text-gray-300 hover:bg-gray-800"
-                    onClick={() => window.history.back()}
+                    onClick={() => globalThis.history.back()}
                   >
                     Back to Services
                   </Button>

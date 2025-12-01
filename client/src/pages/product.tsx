@@ -37,37 +37,226 @@ interface SimilarProduct {
   tags?: Array<string | Tag>;
 }
 
+// Helper to convert LicenseTypeEnum to LicenseType
+function getLicenseTypeEnum(license: LicenseTypeEnum): LicenseType {
+  const mapping: Record<LicenseTypeEnum, LicenseType> = {
+    basic: LicenseType.BASIC,
+    premium: LicenseType.PREMIUM,
+    unlimited: LicenseType.UNLIMITED,
+  };
+  return mapping[license] ?? LicenseType.BASIC;
+}
+
+// Helper to check if product is free
+function checkIsFree(product: {
+  is_free?: boolean;
+  tags?: Array<string | Tag>;
+  price?: number | string;
+}): boolean {
+  if (product.is_free) return true;
+
+  const hasFreeTag = product.tags?.some((tag: string | Tag) =>
+    typeof tag === "string" ? tag.toLowerCase() === "free" : tag.name.toLowerCase() === "free"
+  );
+  if (hasFreeTag) return true;
+
+  if (product.price === 0 || product.price === "0") return true;
+
+  return false;
+}
+
+// Helper to get tag name
+function getTagName(tag: string | Tag): string {
+  return typeof tag === "string" ? tag : tag.name;
+}
+
+// Helper to get meta value
+function getMetaValue(metaData: MetaData[] | undefined, key: string): unknown {
+  return metaData?.find((meta: MetaData) => meta.key === key)?.value ?? null;
+}
+
+// License options configuration
+const LICENSE_OPTIONS: Array<{
+  type: LicenseTypeEnum;
+  name: string;
+  description: string;
+  price: number;
+}> = [
+  {
+    type: "basic",
+    name: "Basic License (MP3)",
+    description: "Up to 50,000 streams/downloads",
+    price: LicensePricing.basic,
+  },
+  {
+    type: "premium",
+    name: "Premium License (WAV)",
+    description: "Up to 150,000 streams/downloads",
+    price: LicensePricing.premium,
+  },
+  {
+    type: "unlimited",
+    name: "Unlimited License",
+    description: "Unlimited streams/downloads",
+    price: LicensePricing.unlimited,
+  },
+];
+
+// Loading skeleton component
+function ProductLoadingSkeleton({ productId }: Readonly<{ productId: number }>): JSX.Element {
+  return (
+    <div className="pt-16 bg-[var(--dark-gray)] min-h-screen">
+      <SchemaMarkup type="beat" beatId={productId} />
+      <OpenGraphMeta type="beat" beatId={productId} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="animate-pulse">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            <div className="space-y-6">
+              <div className="aspect-square bg-[var(--medium-gray)] rounded-xl" />
+              <div className="card-dark h-32" />
+            </div>
+            <div className="space-y-6">
+              <div className="h-8 bg-[var(--medium-gray)] rounded" />
+              <div className="h-6 bg-[var(--medium-gray)] rounded w-1/2" />
+              <div className="card-dark h-48" />
+              <div className="card-dark h-64" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Not found component
+function ProductNotFound({ productId }: Readonly<{ productId: number }>): JSX.Element {
+  return (
+    <div className="pt-16 bg-[var(--dark-gray)] min-h-screen">
+      <SchemaMarkup type="beat" beatId={productId} />
+      <OpenGraphMeta type="beat" beatId={productId} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-white mb-4">Beat not found</h1>
+          <p className="text-gray-300 mb-6">
+            The beat you are looking for does not exist or may have been removed.
+          </p>
+          <Button onClick={() => globalThis.history.back()} className="btn-primary">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Go Back
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Product image component
+interface ProductImageProps {
+  readonly product: { images?: Array<{ src: string }>; name: string };
+}
+
+function ProductImage({ product }: ProductImageProps): JSX.Element {
+  return (
+    <div className="space-y-6">
+      <div className="relative aspect-square bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center overflow-hidden group">
+        {product.images?.[0]?.src ? (
+          <img
+            src={product.images[0].src}
+            alt={product.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <Music className="w-24 h-24 text-white/20" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// License selector component
+interface LicenseSelectorProps {
+  readonly selectedLicense: LicenseTypeEnum;
+  readonly onLicenseChange: (license: LicenseTypeEnum) => void;
+}
+
+function LicenseSelector({ selectedLicense, onLicenseChange }: LicenseSelectorProps): JSX.Element {
+  return (
+    <div className="card-dark p-6">
+      <h3 className="text-xl font-bold text-white mb-4">License Options</h3>
+      <RadioGroup
+        value={selectedLicense}
+        onValueChange={(value: string) => onLicenseChange(value as LicenseTypeEnum)}
+      >
+        <div className="space-y-3">
+          {LICENSE_OPTIONS.map(option => (
+            <div
+              key={option.type}
+              className="flex items-center space-x-3 p-4 bg-[var(--dark-gray)] rounded-lg cursor-pointer hover:bg-gray-700 transition-colors"
+            >
+              <RadioGroupItem value={option.type} id={option.type} />
+              <Label htmlFor={option.type} className="flex-1 cursor-pointer">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-white font-medium">{option.name}</h4>
+                    <p className="text-gray-400 text-sm">{option.description}</p>
+                  </div>
+                  <span className="text-[var(--accent-green)] font-bold text-lg">
+                    ${option.price}
+                  </span>
+                </div>
+              </Label>
+            </div>
+          ))}
+        </div>
+      </RadioGroup>
+    </div>
+  );
+}
+
+// Wishlist button component
+interface WishlistButtonProps {
+  readonly productId: number;
+  readonly isFavorite: boolean;
+  readonly onToggle: () => void;
+  readonly fullWidth?: boolean;
+}
+
+function WishlistButton({
+  productId: _productId,
+  isFavorite: isFav,
+  onToggle,
+  fullWidth,
+}: WishlistButtonProps): JSX.Element {
+  return (
+    <Button
+      onClick={onToggle}
+      className={`${fullWidth ? "w-full" : "flex-1"} text-lg py-4 ${
+        isFav ? "bg-red-500 hover:bg-red-600 text-white" : "btn-secondary"
+      }`}
+    >
+      <Heart className={`w-5 h-5 mr-2 ${isFav ? "fill-current" : ""}`} />
+      {isFav ? "Remove from Wishlist" : "Add to Wishlist"}
+    </Button>
+  );
+}
+
 export default function Product(): JSX.Element {
   const [, params] = useRoute("/product/:id");
   const productId = params?.id ? Number.parseInt(params.id, 10) : 0;
   const [selectedLicense, setSelectedLicense] = useState<LicenseTypeEnum>("basic");
   const [showLicensePreview, setShowLicensePreview] = useState(false);
 
-  // Convert LicenseTypeEnum to LicenseType enum for components that need it
-  const getLicenseTypeEnum = (license: LicenseTypeEnum): LicenseType => {
-    switch (license) {
-      case "basic":
-        return LicenseType.BASIC;
-      case "premium":
-        return LicenseType.PREMIUM;
-      case "unlimited":
-        return LicenseType.UNLIMITED;
-      default:
-        return LicenseType.BASIC;
-    }
-  };
-
   const { useProduct, useSimilarProducts } = useWooCommerce();
   const { data: product, isLoading, error, refetch } = useProduct(productId.toString());
 
-  // Forcer le rechargement des données au montage du composant
+  // Force reload data on component mount
   useEffect(() => {
     if (productId) {
       refetch();
     }
   }, [productId, refetch]);
 
-  // Récupérer les recommandations de produits similaires
+  // Get similar product recommendations
   const genre = product?.categories?.[0]?.name;
   const { data: similarProducts, isLoading: isLoadingSimilar } = useSimilarProducts(
     productId.toString(),
@@ -179,86 +368,14 @@ export default function Product(): JSX.Element {
   };
 
   if (isLoading) {
-    return (
-      <div className="pt-16 bg-[var(--dark-gray)] min-h-screen">
-        <SchemaMarkup type="beat" beatId={productId} />
-        <OpenGraphMeta type="beat" beatId={productId} />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="animate-pulse">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              <div className="space-y-6">
-                <div className="aspect-square bg-[var(--medium-gray)] rounded-xl" />
-                <div className="card-dark h-32" />
-              </div>
-              <div className="space-y-6">
-                <div className="h-8 bg-[var(--medium-gray)] rounded" />
-                <div className="h-6 bg-[var(--medium-gray)] rounded w-1/2" />
-                <div className="card-dark h-48" />
-                <div className="card-dark h-64" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <ProductLoadingSkeleton productId={productId} />;
   }
 
   if (!product || error || productId === 0 || Number.isNaN(productId)) {
-    return (
-      <div className="pt-16 bg-[var(--dark-gray)] min-h-screen">
-        <SchemaMarkup type="beat" beatId={productId} />
-        <OpenGraphMeta type="beat" beatId={productId} />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-white mb-4">Beat not found</h1>
-            <p className="text-gray-300 mb-6">
-              The beat you&apos;re looking for doesn&apos;t exist or may have been removed.
-            </p>
-            <Button onClick={() => globalThis.history.back()} className="btn-primary">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Go Back
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
+    return <ProductNotFound productId={productId} />;
   }
 
-  const isFree =
-    product.is_free ||
-    product.tags?.some((tag: string | Tag) =>
-      typeof tag === "string" ? tag.toLowerCase() === "free" : tag.name.toLowerCase() === "free"
-    ) ||
-    product.price === 0 ||
-    product.price === "0" ||
-    false;
-
-  const licenseOptions: Array<{
-    type: LicenseTypeEnum;
-    name: string;
-    description: string;
-    price: number;
-  }> = [
-    {
-      type: "basic",
-      name: "Basic License (MP3)",
-      description: "Up to 50,000 streams/downloads",
-      price: LicensePricing.basic,
-    },
-    {
-      type: "premium",
-      name: "Premium License (WAV)",
-      description: "Up to 150,000 streams/downloads",
-      price: LicensePricing.premium,
-    },
-    {
-      type: "unlimited",
-      name: "Unlimited License",
-      description: "Unlimited streams/downloads",
-      price: LicensePricing.unlimited,
-    },
-  ];
-
+  const isFree = checkIsFree(product);
   const selectedPrice = LicensePricing[selectedLicense];
 
   return (
@@ -287,19 +404,7 @@ export default function Product(): JSX.Element {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Product Image with Integrated Audio Preview */}
-            <div className="space-y-6">
-              <div className="relative aspect-square bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center overflow-hidden group">
-                {product.images?.[0]?.src ? (
-                  <img
-                    src={product.images[0].src}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <Music className="w-24 h-24 text-white/20" />
-                )}
-              </div>
-            </div>
+            <ProductImage product={product} />
 
             {/* Product Details */}
             <div className="space-y-6">
@@ -333,41 +438,15 @@ export default function Product(): JSX.Element {
 
               {/* License Options - Only show for paid products */}
               {!isFree && (
-                <div className="card-dark p-6">
-                  <h3 className="text-xl font-bold text-white mb-4">License Options</h3>
-                  <RadioGroup
-                    value={selectedLicense}
-                    onValueChange={(value: string) => setSelectedLicense(value as LicenseTypeEnum)}
-                  >
-                    <div className="space-y-3">
-                      {licenseOptions.map(option => (
-                        <div
-                          key={option.type}
-                          className="flex items-center space-x-3 p-4 bg-[var(--dark-gray)] rounded-lg cursor-pointer hover:bg-gray-700 transition-colors"
-                        >
-                          <RadioGroupItem value={option.type} id={option.type} />
-                          <Label htmlFor={option.type} className="flex-1 cursor-pointer">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="text-white font-medium">{option.name}</h4>
-                                <p className="text-gray-400 text-sm">{option.description}</p>
-                              </div>
-                              <span className="text-[var(--accent-green)] font-bold text-lg">
-                                ${option.price}
-                              </span>
-                            </div>
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </RadioGroup>
-                </div>
+                <LicenseSelector
+                  selectedLicense={selectedLicense}
+                  onLicenseChange={setSelectedLicense}
+                />
               )}
 
               {/* Action Buttons */}
               <div className="space-y-4">
                 {isFree ? (
-                  // Free product - Direct download button
                   <div className="flex space-x-4">
                     <Button
                       onClick={handleFreeDownload}
@@ -376,22 +455,13 @@ export default function Product(): JSX.Element {
                       <Download className="w-5 h-5 mr-2" />
                       Download Now
                     </Button>
-                    <Button
-                      onClick={handleAddToWishlist}
-                      className={`flex-1 text-lg py-4 ${
-                        isFavorite(product.id)
-                          ? "bg-red-500 hover:bg-red-600 text-white"
-                          : "btn-secondary"
-                      }`}
-                    >
-                      <Heart
-                        className={`w-5 h-5 mr-2 ${isFavorite(product.id) ? "fill-current" : ""}`}
-                      />
-                      {isFavorite(product.id) ? "Remove from Wishlist" : "Add to Wishlist"}
-                    </Button>
+                    <WishlistButton
+                      productId={product.id}
+                      isFavorite={isFavorite(product.id)}
+                      onToggle={handleAddToWishlist}
+                    />
                   </div>
                 ) : (
-                  // Paid product - License options and cart
                   <>
                     <div className="flex space-x-4">
                       <Button
@@ -407,19 +477,12 @@ export default function Product(): JSX.Element {
                         Add to Cart - ${selectedPrice}
                       </Button>
                     </div>
-                    <Button
-                      onClick={handleAddToWishlist}
-                      className={`w-full text-lg py-4 ${
-                        isFavorite(product.id)
-                          ? "bg-red-500 hover:bg-red-600 text-white"
-                          : "btn-secondary"
-                      }`}
-                    >
-                      <Heart
-                        className={`w-5 h-5 mr-2 ${isFavorite(product.id) ? "fill-current" : ""}`}
-                      />
-                      {isFavorite(product.id) ? "Remove from Wishlist" : "Add to Wishlist"}
-                    </Button>
+                    <WishlistButton
+                      productId={product.id}
+                      isFavorite={isFavorite(product.id)}
+                      onToggle={handleAddToWishlist}
+                      fullWidth
+                    />
                   </>
                 )}
               </div>
@@ -440,15 +503,9 @@ export default function Product(): JSX.Element {
                   image: product?.images?.[0]?.src || "/api/placeholder/400/400",
                   bpm: product?.bpm || null,
                   genre: product?.categories?.[0]?.name || "Unknown",
-                  mood:
-                    product?.meta_data?.find((meta: MetaData) => meta.key === "mood")?.value ||
-                    null,
-                  key:
-                    product?.meta_data?.find((meta: MetaData) => meta.key === "key")?.value || null,
-                  tags:
-                    product?.tags?.map((tag: string | Tag) =>
-                      typeof tag === "string" ? tag : tag.name
-                    ) || [],
+                  mood: getMetaValue(product?.meta_data, "mood"),
+                  key: getMetaValue(product?.meta_data, "key"),
+                  tags: product?.tags?.map(getTagName) || [],
                 }}
                 recommendations={
                   (similarProducts as SimilarProduct[] | undefined)?.map(similarProduct => ({
@@ -458,21 +515,12 @@ export default function Product(): JSX.Element {
                     image: similarProduct.images?.[0]?.src || "/api/placeholder/400/400",
                     bpm: similarProduct.bpm || null,
                     genre: similarProduct.categories?.[0]?.name || "Unknown",
-                    mood:
-                      similarProduct.meta_data?.find((meta: MetaData) => meta.key === "mood")
-                        ?.value || null,
-                    key:
-                      similarProduct.meta_data?.find((meta: MetaData) => meta.key === "key")
-                        ?.value || null,
-                    tags:
-                      similarProduct.tags?.map((tag: string | Tag) =>
-                        typeof tag === "string" ? tag : tag.name
-                      ) || [],
+                    mood: getMetaValue(similarProduct.meta_data, "mood"),
+                    key: getMetaValue(similarProduct.meta_data, "key"),
+                    tags: similarProduct.tags?.map(getTagName) || [],
                   })) || []
                 }
                 onBeatSelect={(selectedBeat: { id: number }): void => {
-                  console.log("Beat selected:", selectedBeat);
-                  // Navigate to the selected beat
                   globalThis.location.href = `/product/${selectedBeat.id}`;
                 }}
                 isLoading={isLoadingSimilar}

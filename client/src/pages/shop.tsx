@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { useUnifiedFilters } from "@/hooks/useUnifiedFilters";
 import { UnifiedFilters } from "@/lib/unifiedFilters";
 import type { BeatProduct } from "@shared/schema";
@@ -23,12 +22,88 @@ type BeatProductWithWoo = BeatProduct & {
   attributes?: WooAttribute[];
 };
 
+// Helper to get product genre
+function getProductGenre(product: BeatProductWithWoo): string {
+  if (product.categories?.[0]?.name) return product.categories[0].name;
+
+  const categoryFromFind = product.categories?.find(cat => cat.name)?.name;
+  if (categoryFromFind) return categoryFromFind;
+
+  const metaKeys = ["genre", "category", "style"];
+  for (const key of metaKeys) {
+    const value = product.meta_data?.find(meta => meta.key === key)?.value;
+    if (value) return String(value);
+  }
+
+  const attrNames = ["Genre", "Style"];
+  for (const name of attrNames) {
+    const value = product.attributes?.find(attr => attr.name === name)?.options?.[0];
+    if (value) return value;
+  }
+
+  return "";
+}
+
+// Helper to get product BPM
+function getProductBpm(product: BeatProductWithWoo): number | undefined {
+  if (typeof product.bpm === "number") return product.bpm;
+
+  const md = product.meta_data ?? [];
+  const bpmMeta = md.find(m => m.key === "bpm")?.value ?? md.find(m => m.key === "BPM")?.value;
+  const attrVal = product.attributes?.find(a => a.name === "BPM")?.options?.[0];
+  const parsed = Number(bpmMeta ?? attrVal);
+
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+// Helper to get product tags
+function getProductTags(product: BeatProductWithWoo): string[] {
+  const tags: string[] = [];
+
+  if (product.tags && Array.isArray(product.tags)) {
+    tags.push(...product.tags.map(t => (typeof t === "string" ? t : t.name)));
+  }
+
+  const metaTags = product.meta_data?.find(meta => meta.key === "tags")?.value as
+    | string
+    | string[]
+    | undefined;
+
+  if (metaTags) {
+    if (typeof metaTags === "string") {
+      tags.push(...metaTags.split(",").map((tag: string) => tag.trim()));
+    } else if (Array.isArray(metaTags)) {
+      tags.push(...metaTags);
+    }
+  }
+
+  return tags.filter(Boolean);
+}
+
+// Helper to check if product is free
+function isProductFree(product: BeatProductWithWoo): boolean {
+  if (product.is_free) return true;
+
+  const hasFreeTag = product.tags?.some(
+    tag => (typeof tag === "string" ? tag : tag.name)?.toLowerCase() === "free"
+  );
+  if (hasFreeTag) return true;
+
+  if (typeof product.price === "string") {
+    if (product.price === "0" || Number.parseFloat(product.price) === 0) return true;
+  }
+
+  if (typeof product.price === "number" && product.price === 0) return true;
+
+  return false;
+}
+
 export default function Shop() {
   const [, setLocation] = useLocation();
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Utiliser le système de filtrage unifié
+  // Use unified filtering system
   const {
     products,
     filters,
@@ -50,12 +125,9 @@ export default function Shop() {
     pageSize: 12,
   });
 
-  const { useCategories } = useWooCommerce();
-  const { data: categories } = useCategories();
-
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    // La recherche est maintenant gérée par le système unifié
+    // Search is now handled by the unified system
   }, []);
 
   const handleClearFilters = useCallback(() => {
@@ -94,13 +166,13 @@ export default function Shop() {
         <Card className="card-dark">
           <CardContent className="p-6">
             <div className="text-center">
-              <h2 className="text-xl font-semibold mb-4">Erreur de chargement</h2>
+              <h2 className="text-xl font-semibold mb-4">Loading Error</h2>
               <p className="text-muted-foreground mb-4">
                 Unable to load products. Please try again.
               </p>
-              <Button onClick={() => window.location.reload()}>
+              <Button onClick={() => globalThis.location.reload()}>
                 <RotateCcw className="w-4 h-4 mr-2" />
-                Recharger
+                Reload
               </Button>
             </div>
           </CardContent>
@@ -172,7 +244,7 @@ export default function Shop() {
             {Object.entries(filters).map(([key, value]) => {
               if (!value || key === "search") return null;
 
-              // Vérifier que la clé est une clé valide de UnifiedFilters
+              // Check that the key is a valid UnifiedFilters key
               if (
                 key === "search" ||
                 key === "categories" ||
@@ -274,91 +346,30 @@ export default function Shop() {
         {viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {isLoading
-              ? // Loading skeletons
-                Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="card-dark p-4 sm:p-6 animate-pulse">
-                    <div className="w-full h-48 bg-[var(--medium-gray)] rounded-lg mb-4" />
-                    <div className="h-4 bg-[var(--medium-gray)] rounded mb-2" />
-                    <div className="h-3 bg-[var(--medium-gray)] rounded w-2/3" />
-                  </div>
+              ? Array.from({ length: 8 }).map((_, i) => (
+                <div key={`skeleton-${String(i)}`} className="card-dark p-4 sm:p-6 animate-pulse">
+                  <div className="w-full h-48 bg-[var(--medium-gray)] rounded-lg mb-4" />
+                  <div className="h-4 bg-[var(--medium-gray)] rounded mb-2" />
+                  <div className="h-3 bg-[var(--medium-gray)] rounded w-2/3" />
+                </div>
                 ))
               : products.map(product => (
-                  <BeatCard
-                    key={product.id}
-                    id={product.id}
-                    title={product.name || "Untitled"}
-                    genre={
-                      (product as BeatProductWithWoo).categories?.[0]?.name ||
-                      (product as BeatProductWithWoo).categories?.find(cat => cat.name)?.name ||
-                      String(
-                        (product as BeatProductWithWoo).meta_data?.find(
-                          meta => meta.key === "genre"
-                        )?.value ?? ""
-                      ) ||
-                      String(
-                        (product as BeatProductWithWoo).meta_data?.find(
-                          meta => meta.key === "category"
-                        )?.value ?? ""
-                      ) ||
-                      String(
-                        (product as BeatProductWithWoo).meta_data?.find(
-                          meta => meta.key === "style"
-                        )?.value ?? ""
-                      ) ||
-                      (product as BeatProductWithWoo).attributes?.find(
-                        attr => attr.name === "Genre"
-                      )?.options?.[0] ||
-                      (product as BeatProductWithWoo).attributes?.find(
-                        attr => attr.name === "Style"
-                      )?.options?.[0] ||
-                      ""
-                    }
-                    bpm={(() => {
-                      if (typeof product.bpm === "number") return product.bpm;
-                      const md = (product as BeatProductWithWoo).meta_data || [];
-                      const bpmMeta =
-                        md.find(m => m.key === "bpm")?.value ??
-                        md.find(m => m.key === "BPM")?.value;
-                      const attrVal = (product as BeatProductWithWoo).attributes?.find(
-                        a => a.name === "BPM"
-                      )?.options?.[0];
-                      const parsed = Number(bpmMeta ?? attrVal);
-                      return Number.isFinite(parsed) ? parsed : undefined;
-                    })()}
-                    price={product.price}
-                    imageUrl={product.images?.[0]?.src || ""}
-                    audioUrl={product.audio_url || ""}
-                    tags={(() => {
-                      const tags = [];
-                      if (product.tags && Array.isArray(product.tags)) {
-                        tags.push(...product.tags.map(t => (typeof t === "string" ? t : t.name)));
-                      }
-                      const metaTags = (product as BeatProductWithWoo).meta_data?.find(
-                        meta => meta.key === "tags"
-                      )?.value as string | string[] | undefined;
-                      if (metaTags) {
-                        if (typeof metaTags === "string") {
-                          tags.push(...metaTags.split(",").map((tag: string) => tag.trim()));
-                        } else if (Array.isArray(metaTags)) {
-                          tags.push(...metaTags);
-                        }
-                      }
-                      return tags.filter(Boolean);
-                    })()}
-                    featured={product.featured}
-                    downloads={product.downloads || 0}
-                    duration={product.duration}
-                    isFree={
-                      product.is_free ||
-                      product.tags?.some(
-                        tag => (typeof tag === "string" ? tag : tag.name)?.toLowerCase() === "free"
-                      ) ||
-                      (typeof product.price === "string" &&
-                        (product.price === "0" || parseFloat(product.price) === 0)) ||
-                      (typeof product.price === "number" && product.price === 0)
-                    }
-                    onViewDetails={() => handleProductView(product.id)}
-                  />
+                <BeatCard
+                  key={product.id}
+                  id={product.id}
+                  title={product.name || "Untitled"}
+                  genre={getProductGenre(product as BeatProductWithWoo)}
+                  bpm={getProductBpm(product as BeatProductWithWoo)}
+                  price={product.price}
+                  imageUrl={product.images?.[0]?.src || ""}
+                  audioUrl={product.audio_url || ""}
+                  tags={getProductTags(product as BeatProductWithWoo)}
+                  featured={product.featured}
+                  downloads={product.downloads || 0}
+                  duration={product.duration}
+                  isFree={isProductFree(product as BeatProductWithWoo)}
+                  onViewDetails={() => handleProductView(product.id)}
+                />
                 ))}
           </div>
         ) : (
