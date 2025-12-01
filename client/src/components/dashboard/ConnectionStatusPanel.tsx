@@ -65,16 +65,8 @@ export const ConnectionStatusPanel: React.FC<ConnectionStatusPanelProps> = ({
   lastSyncTime,
   variant = "card",
 }) => {
-  const {
-    status,
-    isConnected,
-    isReconnecting,
-    connect,
-    reconnect,
-    getCurrentStrategy,
-    error,
-    clearError,
-  } = useConnectionManager();
+  const { isConnected, isReconnecting, connect, reconnect, getCurrentStrategy, error, clearError } =
+    useConnectionManager();
 
   const { current: metrics, qualityScore, isHealthy } = useConnectionMetrics();
   const syncStatus = useSyncStatus();
@@ -84,12 +76,10 @@ export const ConnectionStatusPanel: React.FC<ConnectionStatusPanelProps> = ({
     try {
       if (onRefresh) {
         await onRefresh();
+      } else if (isConnected) {
+        await reconnect();
       } else {
-        if (isConnected) {
-          await reconnect();
-        } else {
-          await connect();
-        }
+        await connect();
       }
       clearError();
     } catch (err) {
@@ -114,30 +104,30 @@ export const ConnectionStatusPanel: React.FC<ConnectionStatusPanelProps> = ({
       };
     }
 
-    if (isConnected) {
-      if (isHealthy) {
-        return {
-          icon: CheckCircle,
-          color: "text-green-500",
-          bgColor: "bg-green-500/10",
-          borderColor: "border-green-500/20",
-          label: "Online",
-          description: `Connected via ${getCurrentStrategy()}`,
-          message: "Your dashboard shows live data and updates automatically.",
-          severity: "success" as const,
-        };
-      } else {
-        return {
-          icon: AlertCircle,
-          color: "text-yellow-500",
-          bgColor: "bg-yellow-500/10",
-          borderColor: "border-yellow-500/20",
-          label: "Connected",
-          description: "Connection quality is degraded",
-          message: "Connection is slower than usual. Data updates may be delayed.",
-          severity: "warning" as const,
-        };
-      }
+    if (isConnected && isHealthy) {
+      return {
+        icon: CheckCircle,
+        color: "text-green-500",
+        bgColor: "bg-green-500/10",
+        borderColor: "border-green-500/20",
+        label: "Online",
+        description: `Connected via ${getCurrentStrategy()}`,
+        message: "Your dashboard shows live data and updates automatically.",
+        severity: "success" as const,
+      };
+    }
+
+    if (isConnected && !isHealthy) {
+      return {
+        icon: AlertCircle,
+        color: "text-yellow-500",
+        bgColor: "bg-yellow-500/10",
+        borderColor: "border-yellow-500/20",
+        label: "Connected",
+        description: "Connection quality is degraded",
+        message: "Connection is slower than usual. Data updates may be delayed.",
+        severity: "warning" as const,
+      };
     }
 
     if (error) {
@@ -178,6 +168,14 @@ export const ConnectionStatusPanel: React.FC<ConnectionStatusPanelProps> = ({
   };
 
   const qualityInfo = getQualityIndicator(qualityScore);
+
+  // Helper function to get quality bar color
+  const getQualityBarColor = (score: number): string => {
+    if (score >= 0.8) return "bg-green-500";
+    if (score >= 0.6) return "bg-yellow-500";
+    if (score >= 0.3) return "bg-orange-500";
+    return "bg-red-500";
+  };
 
   // Get data freshness
   const getDataFreshness = () => {
@@ -348,13 +346,7 @@ export const ConnectionStatusPanel: React.FC<ConnectionStatusPanelProps> = ({
                 <div
                   className={cn(
                     "h-full rounded-full transition-all duration-300",
-                    qualityScore >= 0.8
-                      ? "bg-green-500"
-                      : qualityScore >= 0.6
-                        ? "bg-yellow-500"
-                        : qualityScore >= 0.3
-                          ? "bg-orange-500"
-                          : "bg-red-500"
+                    getQualityBarColor(qualityScore)
                   )}
                   style={{ width: `${Math.max(qualityScore * 100, 5)}%` }}
                 />

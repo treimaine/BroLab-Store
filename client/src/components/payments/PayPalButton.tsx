@@ -13,6 +13,7 @@ interface PayPalButtonProps {
   currency?: string;
   description?: string;
   reservationId: string;
+  /** Callback when payment succeeds (reserved for future use with PayPal webhooks) */
   onPaymentSuccess?: (transactionId: string) => void;
   onPaymentError?: (error: string) => void;
   className?: string;
@@ -24,10 +25,10 @@ export function PayPalButton({
   currency = "EUR",
   description,
   reservationId,
-  onPaymentSuccess,
+  onPaymentSuccess: _onPaymentSuccess,
   onPaymentError,
   className = "",
-}: PayPalButtonProps) {
+}: Readonly<PayPalButtonProps>) {
   const { user } = useUser();
   const { toast } = useToast();
 
@@ -105,7 +106,7 @@ export function PayPalButton({
         // Rediriger vers PayPal après 3 secondes
         setTimeout(() => {
           console.log("🔄 Redirecting to PayPal:", result.paymentUrl);
-          window.location.href = result.paymentUrl;
+          globalThis.location.href = result.paymentUrl;
         }, 3000);
       } else {
         throw new Error(result.error || "Invalid PayPal response");

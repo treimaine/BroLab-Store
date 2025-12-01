@@ -107,9 +107,9 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
   private storageListener: ((event: StorageEvent) => void) | null = null;
 
   // State management
-  private activeTabs = new Map<string, TabInfo>();
-  private messageHistory = new Map<string, number>(); // messageId -> timestamp
-  private pendingConflicts = new Map<string, ConflictInfo>();
+  private readonly activeTabs = new Map<string, TabInfo>();
+  private readonly messageHistory = new Map<string, number>(); // messageId -> timestamp
+  private readonly pendingConflicts = new Map<string, ConflictInfo>();
   private isDestroyed = false;
 
   // Timers
@@ -119,7 +119,6 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
 
   // Focus detection
   private isFocused = true;
-  private lastFocusChange = Date.now();
 
   constructor(config: Partial<CrossTabSyncConfig> = {}, userId: string = "anonymous") {
     super();
@@ -266,13 +265,13 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
 
     // Remove event listeners
     if (this.storageListener) {
-      window.removeEventListener("storage", this.storageListener);
+      globalThis.removeEventListener("storage", this.storageListener);
       this.storageListener = null;
     }
 
-    window.removeEventListener("focus", this.handleFocus);
-    window.removeEventListener("blur", this.handleBlur);
-    window.removeEventListener("beforeunload", this.handleBeforeUnload);
+    globalThis.removeEventListener("focus", this.handleFocus);
+    globalThis.removeEventListener("blur", this.handleBlur);
+    globalThis.removeEventListener("beforeunload", this.handleBeforeUnload);
 
     // Close broadcast channel
     if (this.broadcastChannel) {
@@ -324,14 +323,14 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
    * Generate unique tab ID
    */
   private generateTabId(): string {
-    return `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `tab_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
    * Generate unique message ID
    */
   private generateMessageId(): string {
-    return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
@@ -343,7 +342,7 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
       createdAt: Date.now(),
       lastActivity: Date.now(),
       focused: this.isFocused,
-      url: window.location.href,
+      url: globalThis.location.href,
       userAgent: navigator.userAgent,
     };
   }
@@ -361,17 +360,18 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
    * Setup BroadcastChannel for modern browsers
    */
   private setupBroadcastChannel(): void {
-    if (typeof BroadcastChannel !== "undefined") {
-      try {
-        this.broadcastChannel = new BroadcastChannel(this.config.channelName);
-        this.broadcastChannel.addEventListener("message", this.handleBroadcastMessage);
-        this.log("BroadcastChannel setup successful");
-      } catch (error) {
-        this.log("BroadcastChannel setup failed", error);
-        this.broadcastChannel = null;
-      }
-    } else {
+    if (typeof BroadcastChannel === "undefined") {
       this.log("BroadcastChannel not supported, using localStorage fallback only");
+      return;
+    }
+
+    try {
+      this.broadcastChannel = new BroadcastChannel(this.config.channelName);
+      this.broadcastChannel.addEventListener("message", this.handleBroadcastMessage);
+      this.log("BroadcastChannel setup successful");
+    } catch (error) {
+      this.log("BroadcastChannel setup failed", error);
+      this.broadcastChannel = null;
     }
   }
 
@@ -379,7 +379,7 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
    * Setup localStorage fallback for older browsers
    */
   private setupStorageFallback(): void {
-    this.storageListener = (event: StorageEvent) => {
+    this.storageListener = (event: StorageEvent): void => {
       if (event.key?.startsWith(this.config.storagePrefix + "message_")) {
         try {
           const message = JSON.parse(event.newValue || "{}") as CrossTabMessage;
@@ -390,7 +390,7 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
       }
     };
 
-    window.addEventListener("storage", this.storageListener);
+    globalThis.addEventListener("storage", this.storageListener);
     this.log("Storage fallback setup successful");
   }
 
@@ -398,9 +398,9 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
    * Setup focus detection
    */
   private setupFocusDetection(): void {
-    window.addEventListener("focus", this.handleFocus);
-    window.addEventListener("blur", this.handleBlur);
-    window.addEventListener("beforeunload", this.handleBeforeUnload);
+    globalThis.addEventListener("focus", this.handleFocus);
+    globalThis.addEventListener("blur", this.handleBlur);
+    globalThis.addEventListener("beforeunload", this.handleBeforeUnload);
 
     // Check focus state periodically
     this.focusCheckTimer = setInterval(() => {
@@ -473,7 +473,7 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
       setTimeout(() => {
         try {
           localStorage.removeItem(storageKey);
-        } catch (error) {
+        } catch {
           // Ignore cleanup errors
         }
       }, this.config.deduplicationWindow);
@@ -490,7 +490,7 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
   /**
    * Handle BroadcastChannel message
    */
-  private handleBroadcastMessage = (event: MessageEvent<CrossTabMessage>): void => {
+  private readonly handleBroadcastMessage = (event: MessageEvent<CrossTabMessage>): void => {
     this.handleMessage(event.data, "broadcast");
   };
 
@@ -678,9 +678,8 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
   /**
    * Handle window focus
    */
-  private handleFocus = (): void => {
+  private readonly handleFocus = (): void => {
     this.isFocused = true;
-    this.lastFocusChange = Date.now();
     this.updateTabActivity();
 
     this.sendMessage({
@@ -696,9 +695,8 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
   /**
    * Handle window blur
    */
-  private handleBlur = (): void => {
+  private readonly handleBlur = (): void => {
     this.isFocused = false;
-    this.lastFocusChange = Date.now();
     this.updateTabActivity();
 
     this.sendMessage({
@@ -714,7 +712,7 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
   /**
    * Handle before unload
    */
-  private handleBeforeUnload = (): void => {
+  private readonly handleBeforeUnload = (): void => {
     this.destroy();
   };
 
@@ -740,7 +738,7 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
     if (tab) {
       tab.lastActivity = Date.now();
       tab.focused = this.isFocused;
-      tab.url = window.location.href;
+      tab.url = globalThis.location.href;
       this.activeTabs.set(this.tabId, tab);
       this.updateActiveTabsStorage();
     }
@@ -763,19 +761,17 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
    * Update tab info from message
    */
   private updateTabFromMessage(message: CrossTabMessage): void {
-    let tab = this.activeTabs.get(message.tabId);
-    if (!tab) {
-      tab = {
-        id: message.tabId,
-        createdAt: message.timestamp,
-        lastActivity: message.timestamp,
-        focused: false,
-        url: "",
-        userAgent: "",
-      };
-    } else {
-      tab.lastActivity = message.timestamp;
-    }
+    const existingTab = this.activeTabs.get(message.tabId);
+    const tab: TabInfo = existingTab
+      ? { ...existingTab, lastActivity: message.timestamp }
+      : {
+          id: message.tabId,
+          createdAt: message.timestamp,
+          lastActivity: message.timestamp,
+          focused: false,
+          url: "",
+          userAgent: "",
+        };
 
     this.activeTabs.set(message.tabId, tab);
     this.updateActiveTabsStorage();

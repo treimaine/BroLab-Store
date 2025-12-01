@@ -38,11 +38,10 @@ export function ComponentPreloader() {
 
       default:
         // For other pages, preload common components
-        preloadComponent(() =>
-          import("@/components/audio/EnhancedGlobalAudioPlayer").then(module => ({
-            default: module.EnhancedGlobalAudioPlayer,
-          }))
-        );
+        preloadComponent(async () => {
+          const module = await import("@/components/audio/EnhancedGlobalAudioPlayer");
+          return { default: module.EnhancedGlobalAudioPlayer };
+        });
         break;
     }
   }, [location]);

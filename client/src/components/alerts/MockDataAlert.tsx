@@ -44,32 +44,15 @@ export const MockDataAlert: React.FC<MockDataAlertProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleReload = async () => {
+  const handleReload = async (): Promise<void> => {
     setIsRefreshing(true);
     try {
       // Add a small delay to show the loading state
       await new Promise(resolve => setTimeout(resolve, 500));
-      window.location.reload();
+      globalThis.location.reload();
     } catch (error) {
       console.error("Failed to reload page:", error);
       setIsRefreshing(false);
-    }
-  };
-
-  const getIndicatorTypeLabel = (type: MockDataIndicator["type"]) => {
-    switch (type) {
-      case "placeholder_text":
-        return "Placeholder Text";
-      case "generic_value":
-        return "Generic Value";
-      case "test_data":
-        return "Test Data";
-      case "hardcoded_value":
-        return "Hardcoded Value";
-      case "lorem_ipsum":
-        return "Lorem Ipsum";
-      default:
-        return "Unknown";
     }
   };
 
@@ -122,7 +105,7 @@ export const MockDataAlert: React.FC<MockDataAlertProps> = ({
           {/* Summary */}
           <div className="mb-4">
             <p className="text-sm text-red-600 dark:text-red-400">
-              This may indicate a data loading issue or that you're viewing test data.
+              This may indicate a data loading issue or that you&apos;re viewing test data.
             </p>
           </div>
 
@@ -133,9 +116,9 @@ export const MockDataAlert: React.FC<MockDataAlertProps> = ({
                 Critical Issues ({highConfidenceIndicators.length})
               </h4>
               <div className="space-y-2 max-h-32 overflow-y-auto">
-                {highConfidenceIndicators.slice(0, 3).map((indicator, index) => (
+                {highConfidenceIndicators.slice(0, 3).map(indicator => (
                   <div
-                    key={index}
+                    key={`${indicator.field}-${indicator.type}`}
                     className="bg-red-100 dark:bg-red-800/30 p-2 rounded border-l-4 border-red-500"
                   >
                     <div className="flex items-start justify-between">
@@ -176,9 +159,9 @@ export const MockDataAlert: React.FC<MockDataAlertProps> = ({
                 Additional Issues ({lowConfidenceIndicators.length})
               </h4>
               <div className="space-y-1 max-h-24 overflow-y-auto">
-                {lowConfidenceIndicators.map((indicator, index) => (
+                {lowConfidenceIndicators.map(indicator => (
                   <div
-                    key={index}
+                    key={`${indicator.field}-${indicator.type}`}
                     className="text-xs text-red-600 dark:text-red-400 flex justify-between"
                   >
                     <span>

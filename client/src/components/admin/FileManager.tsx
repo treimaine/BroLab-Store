@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import FileUpload from "@/components/ui/file-upload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -26,7 +27,6 @@ import {
   User,
 } from "lucide-react";
 import { useState } from "react";
-import FileUpload from "@/components/ui/file-upload";
 
 interface FileRecord {
   id: string;
@@ -68,7 +68,7 @@ function FileUploadComponent({ onUploadSuccess }: FileUploadProps) {
         throw new Error("Upload failed");
       }
 
-      const result = await response.json();
+      await response.json();
       toast({
         title: "Upload réussi",
         description: `Fichier "${file.name}" uploadé avec succès`,
@@ -161,11 +161,7 @@ function FileList() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const {
-    data: files = [],
-    isLoading,
-    refetch,
-  } = useQuery({
+  const { data: files = [], isLoading } = useQuery({
     queryKey: ["/api/storage/files", selectedRole],
     queryFn: async () => {
       const params = new URLSearchParams();

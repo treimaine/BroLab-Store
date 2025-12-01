@@ -44,9 +44,9 @@ export default function Terms() {
           <div className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-8 mb-8">
             <h2 className="text-2xl font-bold mb-6">1. Acceptance of Terms</h2>
             <p className="text-gray-300 leading-relaxed mb-6">
-              By accessing and using BroLab Entertainment's website and services, you accept and
-              agree to be bound by the terms and provision of this agreement. If you do not agree to
-              abide by the above, please do not use this service.
+              By accessing and using BroLab Entertainment&apos;s website and services, you accept
+              and agree to be bound by the terms and provision of this agreement. If you do not
+              agree to abide by the above, please do not use this service.
             </p>
           </div>
 
@@ -120,7 +120,7 @@ export default function Terms() {
       {page ? (
         <>
           <StandardHero
-            title={(page.title?.rendered || "Terms of Service").replace(/<[^>]+>/g, "")}
+            title={(page.title?.rendered || "Terms of Service").replaceAll(/<[^>]+>/g, "")}
             subtitle="Please review our terms and conditions for using BroLab Entertainment services."
           />
           <div className="max-w-4xl mx-auto px-4 py-20">

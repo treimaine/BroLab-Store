@@ -84,6 +84,22 @@ export function sendValidationError(
 }
 
 /**
+ * Get default message for auth error type
+ */
+function getAuthErrorMessage(
+  type: BroLabErrorType.UNAUTHORIZED | BroLabErrorType.FORBIDDEN | BroLabErrorType.SESSION_EXPIRED
+): string {
+  switch (type) {
+    case BroLabErrorType.FORBIDDEN:
+      return "Access forbidden";
+    case BroLabErrorType.SESSION_EXPIRED:
+      return "Session expired";
+    default:
+      return "Authentication required";
+  }
+}
+
+/**
  * Authentication error responses
  */
 export function sendAuthError(
@@ -99,12 +115,7 @@ export function sendAuthError(
 ): void {
   const statusCode =
     type === BroLabErrorType.FORBIDDEN ? HTTP_STATUS.FORBIDDEN : HTTP_STATUS.UNAUTHORIZED;
-  const defaultMessage =
-    type === BroLabErrorType.FORBIDDEN
-      ? "Access forbidden"
-      : type === BroLabErrorType.SESSION_EXPIRED
-        ? "Session expired"
-        : "Authentication required";
+  const defaultMessage = getAuthErrorMessage(type);
 
   const response: AuthErrorResponse = {
     success: false,
@@ -119,6 +130,30 @@ export function sendAuthError(
   };
 
   res.status(statusCode).json(response);
+}
+
+/**
+ * Get status code for business error type
+ */
+function getBusinessErrorStatusCode(
+  type:
+    | BroLabErrorType.BEAT_NOT_FOUND
+    | BroLabErrorType.DOWNLOAD_QUOTA_EXCEEDED
+    | BroLabErrorType.PAYMENT_FAILED
+    | BroLabErrorType.BOOKING_CONFLICT
+): number {
+  switch (type) {
+    case BroLabErrorType.BEAT_NOT_FOUND:
+      return 404;
+    case BroLabErrorType.DOWNLOAD_QUOTA_EXCEEDED:
+      return 429;
+    case BroLabErrorType.PAYMENT_FAILED:
+      return 402;
+    case BroLabErrorType.BOOKING_CONFLICT:
+      return 409;
+    default:
+      return 400;
+  }
 }
 
 /**
@@ -147,16 +182,7 @@ export function sendBusinessError(
   },
   requestId?: string
 ): void {
-  const statusCode =
-    type === BroLabErrorType.BEAT_NOT_FOUND
-      ? 404
-      : type === BroLabErrorType.DOWNLOAD_QUOTA_EXCEEDED
-        ? 429
-        : type === BroLabErrorType.PAYMENT_FAILED
-          ? 402
-          : type === BroLabErrorType.BOOKING_CONFLICT
-            ? 409
-            : 400;
+  const statusCode = getBusinessErrorStatusCode(type);
 
   const response: BusinessErrorResponse = {
     success: false,
@@ -213,6 +239,26 @@ export function sendRateLimitError(
 }
 
 /**
+ * Get status code for file upload error type
+ */
+function getFileUploadErrorStatusCode(
+  type:
+    | BroLabErrorType.FILE_TOO_LARGE
+    | BroLabErrorType.FILE_TYPE_NOT_ALLOWED
+    | BroLabErrorType.VIRUS_DETECTED
+    | BroLabErrorType.UPLOAD_FAILED
+): number {
+  switch (type) {
+    case BroLabErrorType.FILE_TOO_LARGE:
+      return 413;
+    case BroLabErrorType.VIRUS_DETECTED:
+      return 422;
+    default:
+      return 400;
+  }
+}
+
+/**
  * File upload error responses
  */
 export function sendFileUploadError(
@@ -236,12 +282,7 @@ export function sendFileUploadError(
   },
   requestId?: string
 ): void {
-  const statusCode =
-    type === BroLabErrorType.FILE_TOO_LARGE
-      ? 413
-      : type === BroLabErrorType.VIRUS_DETECTED
-        ? 422
-        : 400;
+  const statusCode = getFileUploadErrorStatusCode(type);
 
   const response: FileUploadErrorResponse = {
     success: false,
@@ -399,18 +440,25 @@ export function sendMaintenanceError(
   res.status(503).json(response);
 }
 
+interface RequestWithId {
+  requestId?: string;
+}
+
 /**
  * Extract request ID from request object
  */
-export function getRequestId(req: { requestId?: string } | any): string | undefined {
-  return req?.requestId;
+export function getRequestId(req: unknown): string | undefined {
+  if (req && typeof req === "object" && "requestId" in req) {
+    return (req as RequestWithId).requestId;
+  }
+  return undefined;
 }
 
 /**
  * Error response middleware for unhandled errors
  */
 export function errorResponseMiddleware() {
-  return (error: Error, req: any, res: Response, next: unknown) => {
+  return (error: Error, req: unknown, res: Response, _next: unknown) => {
     console.error("Unhandled error:", error);
 
     const requestId = getRequestId(req);

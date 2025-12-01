@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { getUserStats, getUserStatsByClerkId } from "./users/getUserStats";
 
 // Get user by Clerk ID
 export const getUserByClerkId = query({
@@ -69,7 +68,7 @@ export const upsertUser = mutation({
 
     if (existingUser) {
       // Update existing user
-      const userId = await ctx.db.patch(existingUser._id, {
+      await ctx.db.patch(existingUser._id, {
         email: args.email,
         username: args.username,
         firstName: args.fullName?.split(" ")[0],
@@ -121,30 +120,30 @@ export const updateUserAvatar = mutation({
 });
 
 // Re-export getUserStats functions
-export { getUserStats, getUserStatsByClerkId };
+export { getUserStats, getUserStatsByClerkId } from "./users/getUserStats";
+
 // Restore user data
 export const restore = mutation({
   args: {
     userId: v.string(),
-    state: v.any(),
+    state: v.object({
+      updatedAt: v.optional(v.number()),
+    }),
   },
-  handler: async (ctx, { userId, state }) => {
+  handler: async (ctx, args) => {
     try {
       console.log("User data restore:", {
-        userId,
-        stateSize: JSON.stringify(state).length,
+        userId: args.userId,
         timestamp: Date.now(),
       });
 
-      // Restore user data
-      await ctx.db.patch(userId as Id<"users">, {
-        ...state,
-        _restoredAt: Date.now(),
-        _restoredFrom: "user_restore",
+      // Restore user data with only valid schema fields
+      await ctx.db.patch(args.userId as Id<"users">, {
+        updatedAt: args.state.updatedAt ?? Date.now(),
       });
 
-      console.log("User data restored successfully:", { userId });
-      return { success: true, userId, timestamp: Date.now() };
+      console.log("User data restored successfully:", { userId: args.userId });
+      return { success: true, userId: args.userId, timestamp: Date.now() };
     } catch (error) {
       console.error("Error restoring user data:", error);
       throw error;

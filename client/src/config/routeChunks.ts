@@ -103,18 +103,18 @@ export function preloadRouteChunks(priority: RoutePriority): void {
 }
 
 // Helper to create lazy route with chunk awareness
-export function createChunkedRoute<T extends ComponentType<unknown>>(
-  importFn: () => Promise<{ default: T }>,
+export function createChunkedRoute<P = object>(
+  importFn: () => Promise<{ default: ComponentType<P> }>,
   routePath: string
-): LazyExoticComponent<T> {
+): LazyExoticComponent<ComponentType<P>> {
   if (!featureFlags.enableLazyRoutes) {
     // If lazy routes are disabled, load immediately
-    return createRouteLazyComponent(importFn, routePath);
+    return createRouteLazyComponent<P>(importFn, routePath);
   }
 
   // Create lazy component with chunk-aware preloading
   // Future enhancement: use chunk info for smarter preloading
-  return createRouteLazyComponent(importFn, routePath);
+  return createRouteLazyComponent<P>(importFn, routePath);
 }
 
 // Helper to get routes by priority for progressive loading

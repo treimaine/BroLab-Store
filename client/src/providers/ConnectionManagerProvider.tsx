@@ -13,7 +13,16 @@ import {
 } from "@/services/ConnectionManager";
 import { useDashboardStore } from "@/stores/useDashboardStore";
 import type { ConnectionStatus, RecoveryAction, SyncError } from "@shared/types/sync";
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { SyncErrorType } from "@shared/types/sync";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 // ================================
 // CONTEXT INTERFACES
@@ -55,7 +64,7 @@ export interface ConnectionManagerProviderProps {
   config?: Partial<ConnectionConfig>;
   /** Whether to auto-connect on mount */
   autoConnect?: boolean;
-  /** Whether to show connection status in UI */
+  /** Whether to show connection status in UI (reserved for future use) */
   showStatus?: boolean;
   /** Custom error handler */
   onError?: (error: SyncError) => void;
@@ -94,7 +103,7 @@ export const useConnectionManagerContext = (): ConnectionManagerContextValue => 
 export const ConnectionManagerProvider: React.FC<ConnectionManagerProviderProps> = ({
   config,
   autoConnect = true,
-  showStatus = true,
+  showStatus: _showStatus = true,
   onError,
   onConnected,
   onDisconnected,
@@ -114,6 +123,55 @@ export const ConnectionManagerProvider: React.FC<ConnectionManagerProviderProps>
 
   // Dashboard store integration
   const { setSyncStatus, addSyncError, clearSyncErrors, publish } = useDashboardStore();
+
+  // Handle incoming messages - defined before useEffect to avoid hoisting issues
+  const handleIncomingMessage = useCallback(
+    (message: ConnectionMessage) => {
+      try {
+        // Route messages based on type
+        switch (message.type) {
+          case "data_update": {
+            // Handle data updates from server
+            const { payload } = message;
+            if (
+              payload &&
+              typeof payload === "object" &&
+              "section" in payload &&
+              "data" in payload
+            ) {
+              publish({
+                type: "data.updated",
+                payload: payload as { section: string; data: unknown },
+                timestamp: Date.now(),
+                source: "server",
+                id: message.id,
+                correlationId: message.correlationId,
+              });
+            }
+            break;
+          }
+          case "sync_request":
+            // Handle sync requests from server
+            publish({
+              type: "sync.forced",
+              payload: { trigger: "server" },
+              timestamp: Date.now(),
+              source: "server",
+              id: message.id,
+            });
+            break;
+          case "heartbeat_response":
+            // Handled by connection implementation
+            break;
+          default:
+            console.log("Received unknown message type:", message.type);
+        }
+      } catch (err) {
+        console.error("Error handling incoming message:", err);
+      }
+    },
+    [publish]
+  );
 
   // Initialize connection manager
   useEffect(() => {
@@ -240,64 +298,8 @@ export const ConnectionManagerProvider: React.FC<ConnectionManagerProviderProps>
     addSyncError,
     clearSyncErrors,
     publish,
+    handleIncomingMessage,
   ]);
-
-  // Handle incoming messages
-  const handleIncomingMessage = useCallback((message: ConnectionMessage) => {
-    try {
-      // Route messages based on type
-      switch (message.type) {
-        case "data_update":
-          handleDataUpdate(message);
-          break;
-        case "sync_request":
-          handleSyncRequest(message);
-          break;
-        case "heartbeat_response":
-          // Handled by connection implementation
-          break;
-        default:
-          console.log("Received unknown message type:", message.type);
-      }
-    } catch (err) {
-      console.error("Error handling incoming message:", err);
-    }
-  }, []);
-
-  // Handle data updates from server
-  const handleDataUpdate = useCallback(
-    (message: ConnectionMessage) => {
-      const { payload } = message;
-
-      if (payload && typeof payload === "object" && "section" in payload && "data" in payload) {
-        // Update dashboard store with new data
-        publish({
-          type: "data.updated",
-          payload: payload as { section: string; data: any },
-          timestamp: Date.now(),
-          source: "server",
-          id: message.id,
-          correlationId: message.correlationId,
-        });
-      }
-    },
-    [publish]
-  );
-
-  // Handle sync requests from server
-  const handleSyncRequest = useCallback(
-    (message: ConnectionMessage) => {
-      // Trigger force sync
-      publish({
-        type: "sync.forced",
-        payload: { trigger: "server" },
-        timestamp: Date.now(),
-        source: "server",
-        id: message.id,
-      });
-    },
-    [publish]
-  );
 
   // Context methods
   const connect = useCallback(async () => {
@@ -397,7 +399,7 @@ export const ConnectionManagerProvider: React.FC<ConnectionManagerProviderProps>
 
           case "reload":
             if (action.full) {
-              window.location.reload();
+              globalThis.location.reload();
             } else {
               // Soft reload - reconnect and refresh data
               await reconnect();
@@ -420,23 +422,38 @@ export const ConnectionManagerProvider: React.FC<ConnectionManagerProviderProps>
     [reconnect, enableFallback, publish]
   );
 
-  // Context value
-  const contextValue: ConnectionManagerContextValue = {
-    connectionManager: managerRef.current!,
-    status,
-    isConnected: status.connected,
-    isReconnecting: status.reconnecting,
-    error,
-    recoveryActions,
-    connect,
-    disconnect,
-    reconnect,
-    sendMessage,
-    enableFallback,
-    getCurrentStrategy,
-    clearError,
-    executeRecoveryAction,
-  };
+  // Context value - memoized to prevent unnecessary re-renders
+  const contextValue: ConnectionManagerContextValue = useMemo(
+    () => ({
+      connectionManager: managerRef.current!,
+      status,
+      isConnected: status.connected,
+      isReconnecting: status.reconnecting,
+      error,
+      recoveryActions,
+      connect,
+      disconnect,
+      reconnect,
+      sendMessage,
+      enableFallback,
+      getCurrentStrategy,
+      clearError,
+      executeRecoveryAction,
+    }),
+    [
+      status,
+      error,
+      recoveryActions,
+      connect,
+      disconnect,
+      reconnect,
+      sendMessage,
+      enableFallback,
+      getCurrentStrategy,
+      clearError,
+      executeRecoveryAction,
+    ]
+  );
 
   return (
     <ConnectionManagerContext.Provider value={contextValue}>
@@ -482,7 +499,7 @@ function generateRecoveryActions(
   });
 
   // Offer reload for critical errors
-  if (error.type === ("AUTHENTICATION_ERROR" as any)) {
+  if (error.type === SyncErrorType.AUTHENTICATION_ERROR) {
     actions.push({
       type: "reload",
       full: true,

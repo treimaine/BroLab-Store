@@ -247,6 +247,7 @@ export interface SonaarTrackData {
 
 /**
  * Parsed Sonaar metadata from WooCommerce
+ * Note: tracks field is used in parseSonaarAudioData function
  */
 export interface ParsedSonaarData {
   tracks: SonaarTrackData[];
@@ -492,7 +493,7 @@ export function validateWooCommerceQuery(query: unknown): WooCommerceProductQuer
 export function parseSonaarAudioData(metaData: WooCommerceMetaData[]): ParsedSonaarData {
   const albTracklistMeta = metaData.find(meta => meta.key === "alb_tracklist");
 
-  if (!albTracklistMeta || !albTracklistMeta.value) {
+  if (!albTracklistMeta?.value) {
     return { tracks: [], primaryAudioUrl: null };
   }
 
@@ -539,7 +540,7 @@ export function extractBroLabMetadata(product: WooCommerceProduct): {
   is_free: boolean;
   audio_url: string | null;
 } {
-  const { tracks, primaryAudioUrl } = parseSonaarAudioData(product.meta_data);
+  const { tracks: _tracks, primaryAudioUrl } = parseSonaarAudioData(product.meta_data);
 
   return {
     bpm: product.meta_data.find(meta => meta.key === "bpm")?.value as string,

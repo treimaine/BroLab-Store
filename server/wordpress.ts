@@ -122,7 +122,8 @@ function proxyImageUrl(originalUrl: string | null): string | null {
 }
 
 // Fonctions d'extraction des métadonnées pour le filtrage côté serveur
-function extractInstruments(product: WooCommerceProduct): string[] | null {
+// Note: These functions are available for future server-side filtering enhancements
+function _extractInstruments(product: WooCommerceProduct): string[] | null {
   const instruments = product.meta_data?.find(
     (meta: WooCommerceMetaData) => meta.key === "instruments"
   )?.value;
@@ -132,11 +133,11 @@ function extractInstruments(product: WooCommerceProduct): string[] | null {
   return null;
 }
 
-function extractTags(product: WooCommerceProduct): string[] | null {
+function _extractTags(product: WooCommerceProduct): string[] | null {
   return product.tags?.map((tag: WooCommerceTag) => tag.name) || null;
 }
 
-function extractTimeSignature(product: WooCommerceProduct): string | null {
+function _extractTimeSignature(product: WooCommerceProduct): string | null {
   return (
     (product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "time_signature")
       ?.value as string) ||
@@ -146,7 +147,7 @@ function extractTimeSignature(product: WooCommerceProduct): string | null {
   );
 }
 
-function extractDuration(product: WooCommerceProduct): number | null {
+function _extractDuration(product: WooCommerceProduct): number | null {
   const duration =
     product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "duration")?.value ||
     product.attributes?.find((attr: WooCommerceAttribute) => attr.name === "Duration")
@@ -155,7 +156,7 @@ function extractDuration(product: WooCommerceProduct): number | null {
   return duration ? Number(duration) : null;
 }
 
-function extractHasVocals(product: WooCommerceProduct): boolean {
+function _extractHasVocals(product: WooCommerceProduct): boolean {
   return (
     product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "has_vocals")?.value ===
       "true" ||
@@ -164,13 +165,375 @@ function extractHasVocals(product: WooCommerceProduct): boolean {
   );
 }
 
-function extractStems(product: WooCommerceProduct): boolean {
+function _extractStems(product: WooCommerceProduct): boolean {
   return (
     product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "stems")?.value ===
       "true" ||
     product.tags?.some((tag: WooCommerceTag) => tag.name.toLowerCase().includes("stems")) ||
     false
   );
+}
+
+// Helper regex patterns for metadata extraction
+const BPM_PATTERN = /(\d{2,3})\s*bpm/i;
+const KEY_PATTERN = /([A-G][b#]?(?:maj|min|major|minor)?)/i;
+const DURATION_PATTERN = /(\d+:\d+)/;
+
+// Helper function to extract BPM from product name
+function extractBpmFromName(name: string | undefined): string {
+  if (!name) return "";
+  const match = BPM_PATTERN.exec(name);
+  return match?.[1] || "";
+}
+
+// Helper function to extract key from product name
+function extractKeyFromName(name: string | undefined): string {
+  if (!name) return "";
+  const match = KEY_PATTERN.exec(name);
+  return match?.[1] || "";
+}
+
+// Helper function to extract duration from product name
+function extractDurationFromName(name: string | undefined): string {
+  if (!name) return "";
+  const match = DURATION_PATTERN.exec(name);
+  return match?.[1] || "";
+}
+
+// Helper function to infer genre from product name
+function inferGenreFromName(name: string | undefined): string {
+  if (!name) return "";
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes("trap")) return "Trap";
+  if (lowerName.includes("hip hop")) return "Hip Hop";
+  if (lowerName.includes("rnb")) return "R&B";
+  if (lowerName.includes("drill")) return "Drill";
+  if (lowerName.includes("afro")) return "Afrobeat";
+  return "";
+}
+
+// Helper function to get default instruments based on genre
+function getDefaultInstruments(genre: string | undefined): string {
+  if (!genre) return "Drums, Bass, Synth";
+  const lowerGenre = genre.toLowerCase();
+  if (lowerGenre.includes("trap")) return "Drums, 808, Synth";
+  if (lowerGenre.includes("hip hop")) return "Drums, Bass, Piano";
+  return "Drums, Bass, Synth";
+}
+
+// Helper function to check if product is free
+function isProductFree(product: WooCommerceProduct): boolean {
+  const hasFreeTag = product.tags?.some((tag: WooCommerceTag) =>
+    tag.name?.toLowerCase().includes("free")
+  );
+  const hasFreeCategory = product.categories?.some((cat: WooCommerceCategory) =>
+    cat.name?.toLowerCase().includes("free")
+  );
+  const hasFreeInName = product.name?.toLowerCase().includes("free");
+  const priceIsZero = product.price === "0" || Number.parseFloat(product.price || "0") === 0;
+  const regularPriceIsZero =
+    product.regular_price === "0" || Number.parseFloat(product.regular_price || "0") === 0;
+
+  return Boolean(
+    hasFreeTag || hasFreeCategory || hasFreeInName || priceIsZero || regularPriceIsZero
+  );
+}
+
+// Helper function to find mood from categories
+const MOOD_KEYWORDS = new Set(["chill", "dark", "upbeat", "sad", "happy", "aggressive"]);
+
+function findMoodFromCategories(categories: WooCommerceCategory[] | undefined): string {
+  const moodCategory = categories?.find((cat: WooCommerceCategory) =>
+    MOOD_KEYWORDS.has(cat.name?.toLowerCase())
+  );
+  return moodCategory?.name || "";
+}
+
+// Helper function to extract metadata value
+function extractMetaValue(
+  metaData: WooCommerceMetaData[] | undefined,
+  key: string,
+  defaultValue: string = ""
+): string {
+  const meta = metaData?.find((m: WooCommerceMetaData) => m.key === key);
+  return (meta?.value as string) || defaultValue;
+}
+
+// Helper function to extract audio URL from Sonaar data
+function extractAudioFromSonaarData(sonaarData: unknown): string | null {
+  if (Array.isArray(sonaarData) && sonaarData.length > 0) {
+    const firstTrack = sonaarData[0];
+    return (
+      firstTrack.track_mp3 || firstTrack.audio_preview || firstTrack.src || firstTrack.url || null
+    );
+  }
+  if (sonaarData && typeof sonaarData === "object") {
+    const data = sonaarData as Record<string, unknown>;
+    return (
+      (data.track_mp3 as string) ||
+      (data.audio_preview as string) ||
+      (data.src as string) ||
+      (data.url as string) ||
+      null
+    );
+  }
+  return null;
+}
+
+// Helper function to extract audio URL from product metadata
+function extractAudioUrl(product: WooCommerceProduct): string | null {
+  const albTracklistMeta = product.meta_data?.find(
+    (meta: WooCommerceMetaData) =>
+      meta.key === "alb_tracklist" || meta.key === "tracklist" || meta.key === "sonaar_tracklist"
+  );
+  const audioUrlMeta = product.meta_data?.find(
+    (meta: WooCommerceMetaData) =>
+      meta.key === "audio_url" ||
+      meta.key === "sonaar_audio_file" ||
+      meta.key === "audio_preview" ||
+      meta.key === "track_mp3"
+  );
+
+  if (albTracklistMeta?.value) {
+    try {
+      const sonaarData =
+        typeof albTracklistMeta.value === "string"
+          ? JSON.parse(albTracklistMeta.value)
+          : albTracklistMeta.value;
+      const audioUrl = extractAudioFromSonaarData(sonaarData);
+      if (audioUrl) return audioUrl;
+    } catch {
+      // Ignore parsing errors
+    }
+  }
+
+  if (audioUrlMeta) {
+    return audioUrlMeta.value as string;
+  }
+
+  return null;
+}
+
+// Helper function to extract product metadata with multiple fallback keys
+function extractProductMetadata(product: WooCommerceProduct): {
+  bpm: string;
+  key: string;
+  mood: string;
+  artist: string;
+  genre: string;
+  duration: string;
+  instruments: string;
+} {
+  const getMeta = (key: string): string => extractMetaValue(product.meta_data, key);
+
+  const bpm =
+    getMeta("bpm") ||
+    getMeta("_bpm") ||
+    getMeta("tempo") ||
+    getMeta("_tempo") ||
+    extractBpmFromName(product.name);
+
+  const key =
+    getMeta("key") ||
+    getMeta("_key") ||
+    getMeta("musical_key") ||
+    getMeta("_musical_key") ||
+    getMeta("song_key") ||
+    extractKeyFromName(product.name);
+
+  const mood =
+    getMeta("mood") ||
+    getMeta("_mood") ||
+    getMeta("vibe") ||
+    getMeta("_vibe") ||
+    getMeta("energy") ||
+    findMoodFromCategories(product.categories);
+
+  const artist =
+    getMeta("artist") ||
+    getMeta("_artist") ||
+    getMeta("producer") ||
+    getMeta("_producer") ||
+    "Treigua";
+
+  const genreFromMeta =
+    getMeta("genre") || getMeta("_genre") || getMeta("music_genre") || getMeta("style");
+  const genre = product.categories?.[0]?.name || genreFromMeta || inferGenreFromName(product.name);
+
+  const duration =
+    getMeta("duration") ||
+    getMeta("_duration") ||
+    getMeta("length") ||
+    getMeta("time") ||
+    extractDurationFromName(product.name);
+
+  const instruments =
+    getMeta("instruments") ||
+    getMeta("_instruments") ||
+    getMeta("sounds") ||
+    getMeta("tags") ||
+    getDefaultInstruments(genre);
+
+  return { bpm, key, mood, artist, genre, duration, instruments };
+}
+
+// Main product transformation function - reduces cognitive complexity
+function transformProduct(
+  product: WooCommerceProduct,
+  proxyImages: boolean = true
+): TransformedProduct {
+  const metadata = extractProductMetadata(product);
+  const getMeta = (key: string): string => extractMetaValue(product.meta_data, key);
+
+  const audioUrl = extractAudioUrl(product);
+  const productIsFree = isProductFree(product);
+
+  const hasVocals = getMeta("has_vocals") === "yes" || getMeta("_has_vocals") === "yes";
+  const stems =
+    getMeta("stems") === "yes" || getMeta("_stems") === "yes" || product.downloadable || false;
+
+  const images = proxyImages
+    ? (product.images || []).map((img: WooCommerceImage) => ({
+        ...img,
+        src: proxyImageUrl(img.src) || img.src,
+      }))
+    : product.images || [];
+
+  return {
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    price: product.price ? Number.parseFloat(product.price) : 0,
+    regular_price: product.regular_price ? Number.parseFloat(product.regular_price) : 0,
+    sale_price: product.sale_price ? Number.parseFloat(product.sale_price) : 0,
+    on_sale: product.on_sale || false,
+    featured: product.featured || false,
+    categories: product.categories || [],
+    tags: product.tags || [],
+    images,
+    attributes: product.attributes || [],
+    meta_data: product.meta_data || [],
+    audio_url: proxyAudioUrl(audioUrl),
+    bpm: metadata.bpm,
+    key: metadata.key,
+    mood: metadata.mood,
+    artist: metadata.artist,
+    genre: metadata.genre,
+    duration: metadata.duration,
+    instruments: metadata.instruments,
+    is_free: productIsFree,
+    hasVocals,
+    stems,
+    total_sales: product.total_sales || 0,
+  };
+}
+
+// Helper function to build basic query params from request
+function buildBasicQueryParams(query: Record<string, unknown>): URLSearchParams {
+  const queryParams = new URLSearchParams();
+  const basicParams = [
+    "search",
+    "category",
+    "min_price",
+    "max_price",
+    "per_page",
+    "page",
+    "orderby",
+    "order",
+  ];
+
+  for (const param of basicParams) {
+    if (query[param]) {
+      queryParams.append(param, query[param] as string);
+    }
+  }
+  return queryParams;
+}
+
+// Helper function to determine comparison operator for range queries
+function getRangeCompareOperator(hasMin: boolean, hasMax: boolean): string {
+  if (hasMin && hasMax) return "BETWEEN";
+  if (hasMin) return ">=";
+  return "<=";
+}
+
+// Helper function to build meta queries for filtering
+function buildMetaQueries(query: Record<string, unknown>): WooCommerceMetaQuery[] {
+  const metaQueries: WooCommerceMetaQuery[] = [];
+
+  // BPM Range
+  if (query.bpm_min || query.bpm_max) {
+    metaQueries.push({
+      key: "bpm",
+      value: (query.bpm_min || query.bpm_max || "") as string,
+      type: "NUMERIC",
+      compare: getRangeCompareOperator(!!query.bpm_min, !!query.bpm_max),
+    });
+  }
+
+  // Simple equality filters
+  const equalityFilters = [
+    { queryKey: "key", metaKey: "key" },
+    { queryKey: "mood", metaKey: "mood" },
+    { queryKey: "producer", metaKey: "producer" },
+  ];
+
+  for (const filter of equalityFilters) {
+    if (query[filter.queryKey]) {
+      metaQueries.push({
+        key: filter.metaKey,
+        value: query[filter.queryKey] as string,
+        compare: "=",
+      });
+    }
+  }
+
+  // Duration Range
+  if (query.duration_min || query.duration_max) {
+    metaQueries.push({
+      key: "duration",
+      value: (query.duration_min || query.duration_max || "") as string,
+      type: "NUMERIC",
+      compare: getRangeCompareOperator(!!query.duration_min, !!query.duration_max),
+    });
+  }
+
+  // Boolean filters
+  if (query.has_vocals === "true") {
+    metaQueries.push({ key: "has_vocals", value: "true", compare: "=" });
+  }
+  if (query.stems === "true") {
+    metaQueries.push({ key: "stems", value: "true", compare: "=" });
+  }
+
+  return metaQueries;
+}
+
+// Helper function to add attribute filters to query params
+function addAttributeFilters(queryParams: URLSearchParams, query: Record<string, unknown>): void {
+  const attributeFilters = [
+    { queryKey: "keys", attributeName: "Key" },
+    { queryKey: "moods", attributeName: "Mood" },
+    { queryKey: "producers", attributeName: "Producer" },
+    { queryKey: "instruments", attributeName: "Instruments" },
+    { queryKey: "time_signature", attributeName: "Time Signature" },
+  ];
+
+  for (const filter of attributeFilters) {
+    if (query[filter.queryKey]) {
+      const values = (query[filter.queryKey] as string).split(",");
+      queryParams.append(
+        "attribute",
+        JSON.stringify({ name: filter.attributeName, option: values })
+      );
+    }
+  }
+
+  // Tags filter
+  if (query.tags) {
+    const tags = (query.tags as string).split(",");
+    queryParams.append("tag", tags.join(","));
+  }
 }
 
 // WooCommerce REST API helpers
@@ -231,7 +594,7 @@ export function registerWordPressRoutes(app: Express) {
       res.setHeader("Cache-Control", "public, max-age=3600");
       res.send(Buffer.from(buffer));
     } catch (error: unknown) {
-      const errorMessage =
+      const _errorMessage =
         error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error proxying image:", error);
       res.status(500).json({ error: ErrorMessages.FILE.DOWNLOAD_FAILED });
@@ -244,7 +607,7 @@ export function registerWordPressRoutes(app: Express) {
       const pages = await wpApiRequest("/pages");
       res.json(pages);
     } catch (error: unknown) {
-      const errorMessage =
+      const _errorMessage =
         error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching pages:", error);
       res.status(500).json({ error: ErrorMessages.WOOCOMMERCE.SYNC_FAILED });
@@ -260,7 +623,7 @@ export function registerWordPressRoutes(app: Express) {
       }
       res.json(pages[0]);
     } catch (error: unknown) {
-      const errorMessage =
+      const _errorMessage =
         error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching page:", error);
       res.status(500).json({ error: ErrorMessages.WOOCOMMERCE.SYNC_FAILED });
@@ -274,7 +637,7 @@ export function registerWordPressRoutes(app: Express) {
       const posts = await wpApiRequest(`/posts?${queryString}`);
       res.json(posts);
     } catch (error: unknown) {
-      const errorMessage =
+      const _errorMessage =
         error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching posts:", error);
       res.status(500).json({ error: ErrorMessages.WOOCOMMERCE.SYNC_FAILED });
@@ -286,7 +649,7 @@ export function registerWordPressRoutes(app: Express) {
       const post = await wpApiRequest(`/posts/${req.params.id}`);
       res.json(post);
     } catch (error: unknown) {
-      const errorMessage =
+      const _errorMessage =
         error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching post:", error);
       res.status(500).json({ error: ErrorMessages.WOOCOMMERCE.SYNC_FAILED });
@@ -299,7 +662,7 @@ export function registerWordPressRoutes(app: Express) {
       const media = await wpApiRequest(`/media/${req.params.id}`);
       res.json(media);
     } catch (error: unknown) {
-      const errorMessage =
+      const _errorMessage =
         error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching media:", error);
       res.status(500).json({ error: ErrorMessages.FILE.DOWNLOAD_FAILED });
@@ -309,173 +672,18 @@ export function registerWordPressRoutes(app: Express) {
   // WooCommerce Products
   app.get("/api/woocommerce/products", async (req, res) => {
     try {
-      // Construire la requête WooCommerce API avec filtrage natif
-      const queryParams = new URLSearchParams();
+      // Build query params using helper functions
+      const query = req.query as Record<string, unknown>;
+      const queryParams = buildBasicQueryParams(query);
 
-      // Paramètres WooCommerce API natifs
-      if (req.query.search) queryParams.append("search", req.query.search as string);
-      if (req.query.category) queryParams.append("category", req.query.category as string);
-      if (req.query.min_price) queryParams.append("min_price", req.query.min_price as string);
-      if (req.query.max_price) queryParams.append("max_price", req.query.max_price as string);
-      if (req.query.per_page) queryParams.append("per_page", req.query.per_page as string);
-      if (req.query.page) queryParams.append("page", req.query.page as string);
-      if (req.query.orderby) queryParams.append("orderby", req.query.orderby as string);
-      if (req.query.order) queryParams.append("order", req.query.order as string);
-
-      // Filtrage par métadonnées via WooCommerce API meta_query
-      const metaQueries: WooCommerceMetaQuery[] = [];
-
-      // BPM Range
-      if (req.query.bpm_min || req.query.bpm_max) {
-        const bpmQuery: WooCommerceMetaQuery = {
-          key: "bpm",
-          value: (req.query.bpm_min || req.query.bpm_max || "") as string,
-          type: "NUMERIC",
-        };
-        if (req.query.bpm_min && req.query.bpm_max) {
-          bpmQuery.compare = "BETWEEN";
-        } else if (req.query.bpm_min) {
-          bpmQuery.compare = ">=";
-        } else if (req.query.bpm_max) {
-          bpmQuery.compare = "<=";
-        }
-        metaQueries.push(bpmQuery);
-      }
-
-      // Key
-      if (req.query.key) {
-        metaQueries.push({
-          key: "key",
-          value: req.query.key as string,
-          compare: "=",
-        });
-      }
-
-      // Mood
-      if (req.query.mood) {
-        metaQueries.push({
-          key: "mood",
-          value: req.query.mood as string,
-          compare: "=",
-        });
-      }
-
-      // Producer
-      if (req.query.producer) {
-        metaQueries.push({
-          key: "producer",
-          value: req.query.producer as string,
-          compare: "=",
-        });
-      }
-
-      // Duration Range
-      if (req.query.duration_min || req.query.duration_max) {
-        const durationQuery: WooCommerceMetaQuery = {
-          key: "duration",
-          value: (req.query.duration_min || req.query.duration_max || "") as string,
-          type: "NUMERIC",
-        };
-        if (req.query.duration_min && req.query.duration_max) {
-          durationQuery.compare = "BETWEEN";
-        } else if (req.query.duration_min) {
-          durationQuery.compare = ">=";
-        } else if (req.query.duration_max) {
-          durationQuery.compare = "<=";
-        }
-        metaQueries.push(durationQuery);
-      }
-
-      // Has Vocals
-      if (req.query.has_vocals === "true") {
-        metaQueries.push({
-          key: "has_vocals",
-          value: "true",
-          compare: "=",
-        });
-      }
-
-      // Stems
-      if (req.query.stems === "true") {
-        metaQueries.push({
-          key: "stems",
-          value: "true",
-          compare: "=",
-        });
-      }
-
-      // Ajouter meta_query si des filtres de métadonnées sont présents
+      // Build and add meta queries
+      const metaQueries = buildMetaQueries(query);
       if (metaQueries.length > 0) {
-        queryParams.append(
-          "meta_query",
-          JSON.stringify({
-            relation: "AND",
-            ...metaQueries,
-          })
-        );
+        queryParams.append("meta_query", JSON.stringify({ relation: "AND", ...metaQueries }));
       }
 
-      // Filtrage par tags (WooCommerce API native)
-      if (req.query.tags) {
-        const tags = (req.query.tags as string).split(",");
-        queryParams.append("tag", tags.join(","));
-      }
-
-      // Filtrage par attributs (WooCommerce API native)
-      if (req.query.keys) {
-        const keys = (req.query.keys as string).split(",");
-        queryParams.append(
-          "attribute",
-          JSON.stringify({
-            name: "Key",
-            option: keys,
-          })
-        );
-      }
-
-      if (req.query.moods) {
-        const moods = (req.query.moods as string).split(",");
-        queryParams.append(
-          "attribute",
-          JSON.stringify({
-            name: "Mood",
-            option: moods,
-          })
-        );
-      }
-
-      if (req.query.producers) {
-        const producers = (req.query.producers as string).split(",");
-        queryParams.append(
-          "attribute",
-          JSON.stringify({
-            name: "Producer",
-            option: producers,
-          })
-        );
-      }
-
-      if (req.query.instruments) {
-        const instruments = (req.query.instruments as string).split(",");
-        queryParams.append(
-          "attribute",
-          JSON.stringify({
-            name: "Instruments",
-            option: instruments,
-          })
-        );
-      }
-
-      if (req.query.time_signature) {
-        const timeSignatures = (req.query.time_signature as string).split(",");
-        queryParams.append(
-          "attribute",
-          JSON.stringify({
-            name: "Time Signature",
-            option: timeSignatures,
-          })
-        );
-      }
+      // Add attribute filters
+      addAttributeFilters(queryParams, query);
 
       const queryString = queryParams.toString();
       const products = await wcApiRequest(`/products?${queryString}`);
@@ -485,215 +693,17 @@ export function registerWordPressRoutes(app: Express) {
 
       // Is Free (filtrage côté serveur car WooCommerce API ne le supporte pas bien)
       if (req.query.is_free === "true") {
-        filteredProducts = products.filter((product: WooCommerceProduct) => {
-          const isFree =
-            product.tags?.some((tag: WooCommerceTag) => tag.name.toLowerCase() === "free") ||
-            product.price === "0" ||
-            parseFloat(product.price || "0") === 0 ||
-            false;
-          return isFree;
-        });
+        filteredProducts = products.filter((product: WooCommerceProduct) => isProductFree(product));
       }
 
-      // Transform product data to match frontend expectations
-      const transformedProducts = filteredProducts.map(
-        (product: WooCommerceProduct): TransformedProduct => {
-          // Extract metadata with better fallbacks
-          const extractMeta = (key: string, defaultValue: string = ""): string => {
-            const meta = product.meta_data?.find((m: WooCommerceMetaData) => m.key === key);
-            return (meta?.value as string) || defaultValue;
-          };
-
-          // Enhanced metadata extraction with multiple fallbacks
-          const productBpm =
-            extractMeta("bpm") ||
-            extractMeta("_bpm") ||
-            extractMeta("tempo") ||
-            extractMeta("_tempo") ||
-            // Extract from title if contains BPM pattern
-            product.name?.match(/(\d{2,3})\s*bpm/i)?.[1] ||
-            "";
-
-          const productKey =
-            extractMeta("key") ||
-            extractMeta("_key") ||
-            extractMeta("musical_key") ||
-            extractMeta("_musical_key") ||
-            extractMeta("song_key") ||
-            // Extract from title if contains key pattern
-            product.name?.match(/([A-G][b#]?(?:maj|min|major|minor)?)/i)?.[1] ||
-            "";
-
-          const productMood =
-            extractMeta("mood") ||
-            extractMeta("_mood") ||
-            extractMeta("vibe") ||
-            extractMeta("_vibe") ||
-            extractMeta("energy") ||
-            // Infer from categories
-            product.categories?.find((cat: WooCommerceCategory) =>
-              ["chill", "dark", "upbeat", "sad", "happy", "aggressive"].includes(
-                cat.name?.toLowerCase()
-              )
-            )?.name ||
-            "";
-
-          const productArtist =
-            extractMeta("artist") ||
-            extractMeta("_artist") ||
-            extractMeta("producer") ||
-            extractMeta("_producer") ||
-            "Treigua"; // Default artist
-
-          const productGenre =
-            product.categories?.[0]?.name ||
-            extractMeta("genre") ||
-            extractMeta("_genre") ||
-            extractMeta("music_genre") ||
-            extractMeta("style") ||
-            // Infer from product name
-            (product.name?.toLowerCase().includes("trap")
-              ? "Trap"
-              : product.name?.toLowerCase().includes("hip hop")
-                ? "Hip Hop"
-                : product.name?.toLowerCase().includes("rnb")
-                  ? "R&B"
-                  : product.name?.toLowerCase().includes("drill")
-                    ? "Drill"
-                    : product.name?.toLowerCase().includes("afro")
-                      ? "Afrobeat"
-                      : "") ||
-            "";
-
-          const productDuration =
-            extractMeta("duration") ||
-            extractMeta("_duration") ||
-            extractMeta("length") ||
-            extractMeta("time") ||
-            // Extract from title if contains duration pattern
-            product.name?.match(/(\d+:\d+)/)?.[1] ||
-            "";
-
-          const productInstruments =
-            extractMeta("instruments") ||
-            extractMeta("_instruments") ||
-            extractMeta("sounds") ||
-            extractMeta("tags") ||
-            // Default based on genre
-            (productGenre?.toLowerCase().includes("trap")
-              ? "Drums, 808, Synth"
-              : productGenre?.toLowerCase().includes("hip hop")
-                ? "Drums, Bass, Piano"
-                : "Drums, Bass, Synth") ||
-            "";
-
-          // Simplified free product detection
-          const productIsFree =
-            product.tags?.some((tag: WooCommerceTag) => tag.name?.toLowerCase().includes("free")) ||
-            product.categories?.some((cat: WooCommerceCategory) =>
-              cat.name?.toLowerCase().includes("free")
-            ) ||
-            product.name?.toLowerCase().includes("free") ||
-            product.price === "0" ||
-            parseFloat(product.price || "0") === 0 ||
-            product.regular_price === "0" ||
-            parseFloat(product.regular_price || "0") === 0;
-
-          // Extract audio URL from various possible sources
-          let audioUrl = null;
-
-          // Try to find audio URL from meta_data - prioritize alb_tracklist
-          const albTracklistMeta = product.meta_data?.find(
-            (meta: WooCommerceMetaData) => meta.key === "alb_tracklist"
-          );
-          const audioUrlMeta = product.meta_data?.find(
-            (meta: WooCommerceMetaData) =>
-              meta.key === "audio_url" || meta.key === "sonaar_audio_file"
-          );
-
-          // Try alb_tracklist first (contains actual audio URLs)
-          if (albTracklistMeta && albTracklistMeta.value) {
-            try {
-              // Handle Sonaar data structure
-              let sonaarData;
-              if (typeof albTracklistMeta.value === "string") {
-                // If it's a string, try to parse as JSON
-                sonaarData = JSON.parse(albTracklistMeta.value);
-              } else {
-                // If it's already an object (like alb_tracklist), use it directly
-                sonaarData = albTracklistMeta.value;
-              }
-
-              if (sonaarData && Array.isArray(sonaarData) && sonaarData.length > 0) {
-                // Get the first track's audio URL
-                const firstTrack = sonaarData[0];
-                audioUrl =
-                  firstTrack.track_mp3 ||
-                  firstTrack.audio_preview ||
-                  firstTrack.src ||
-                  firstTrack.url;
-              } else if (sonaarData && typeof sonaarData === "object") {
-                // Handle single track object
-                audioUrl =
-                  sonaarData.track_mp3 ||
-                  sonaarData.audio_preview ||
-                  sonaarData.src ||
-                  sonaarData.url;
-              }
-            } catch (e) {
-              // Ignore parsing errors
-            }
-          }
-
-          // If no audio URL found, try other sources
-          if (!audioUrl && audioUrlMeta) {
-            audioUrl = audioUrlMeta.value;
-          }
-
-          return {
-            ...product,
-            // Keep prices in dollar format as provided by WooCommerce
-            price: product.price ? parseFloat(product.price) : 0,
-            regular_price: product.regular_price ? parseFloat(product.regular_price) : 0,
-            sale_price: product.sale_price ? parseFloat(product.sale_price) : 0,
-            // Ensure images are properly formatted and proxied
-            images: (product.images || []).map((img: WooCommerceImage) => ({
-              ...img,
-              src: proxyImageUrl(img.src) || img.src,
-            })),
-            // Ensure categories are properly formatted
-            categories: product.categories || [],
-            // Extract audio URL from various sources and proxy it
-            audio_url: proxyAudioUrl(audioUrl),
-            // Enhanced metadata for better display - use real data only
-            bpm: productBpm || "",
-            key: productKey || "",
-            mood: productMood || "",
-            artist: productArtist,
-            genre: productGenre || "",
-            duration: productDuration || "",
-            instruments: productInstruments || "",
-            // Check if product has FREE tag or is priced at 0
-            is_free: productIsFree,
-            // Add featured flag for recommendations
-            featured: product.featured || false,
-            // Add total sales for popularity
-            total_sales: product.total_sales || 0,
-            // Enhanced display fields
-            hasVocals:
-              extractMeta("has_vocals") === "yes" || extractMeta("_has_vocals") === "yes" || false,
-            stems:
-              extractMeta("stems") === "yes" ||
-              extractMeta("_stems") === "yes" ||
-              product.downloadable ||
-              false,
-          };
-        }
+      // Transform product data to match frontend expectations using helper function
+      const transformedProducts = filteredProducts.map((product: WooCommerceProduct) =>
+        transformProduct(product, true)
       );
 
       res.json(transformedProducts);
     } catch (error: unknown) {
-      const errorMessage =
+      const _errorMessage =
         error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching products:", error);
       res.status(500).json({ error: ErrorMessages.BEATS.NOT_FOUND });
@@ -710,190 +720,12 @@ export function registerWordPressRoutes(app: Express) {
 
       const product = await wcApiRequest(`/products/${productId}`);
 
-      // Extract metadata with better fallbacks
-      const extractMeta = (key: string, defaultValue: string = ""): string => {
-        const meta = product.meta_data?.find((m: WooCommerceMetaData) => m.key === key);
-        return (meta?.value as string) || defaultValue;
-      };
-
-      // Enhanced metadata extraction with multiple fallbacks
-      const productBpm =
-        extractMeta("bpm") ||
-        extractMeta("_bpm") ||
-        extractMeta("tempo") ||
-        extractMeta("_tempo") ||
-        product.name?.match(/(\d{2,3})\s*bpm/i)?.[1] ||
-        "";
-
-      const productKey =
-        extractMeta("key") ||
-        extractMeta("_key") ||
-        extractMeta("musical_key") ||
-        extractMeta("_musical_key") ||
-        extractMeta("song_key") ||
-        product.name?.match(/([A-G][b#]?(?:maj|min|major|minor)?)/i)?.[1] ||
-        "";
-
-      const productMood =
-        extractMeta("mood") ||
-        extractMeta("_mood") ||
-        extractMeta("vibe") ||
-        extractMeta("_vibe") ||
-        extractMeta("energy") ||
-        product.categories?.find((cat: WooCommerceCategory) =>
-          ["chill", "dark", "upbeat", "sad", "happy", "aggressive"].includes(
-            cat.name?.toLowerCase()
-          )
-        )?.name ||
-        "";
-
-      const productArtist =
-        extractMeta("artist") ||
-        extractMeta("_artist") ||
-        extractMeta("producer") ||
-        extractMeta("_producer") ||
-        "Treigua";
-
-      const productGenre =
-        product.categories?.[0]?.name ||
-        extractMeta("genre") ||
-        extractMeta("_genre") ||
-        extractMeta("music_genre") ||
-        extractMeta("style") ||
-        (product.name?.toLowerCase().includes("trap")
-          ? "Trap"
-          : product.name?.toLowerCase().includes("hip hop")
-            ? "Hip Hop"
-            : product.name?.toLowerCase().includes("rnb")
-              ? "R&B"
-              : product.name?.toLowerCase().includes("drill")
-                ? "Drill"
-                : product.name?.toLowerCase().includes("afro")
-                  ? "Afrobeat"
-                  : "") ||
-        "";
-
-      const productDuration =
-        extractMeta("duration") ||
-        extractMeta("_duration") ||
-        extractMeta("length") ||
-        extractMeta("time") ||
-        product.name?.match(/(\d+:\d+)/)?.[1] ||
-        "";
-
-      const productInstruments =
-        extractMeta("instruments") ||
-        extractMeta("_instruments") ||
-        extractMeta("sounds") ||
-        extractMeta("tags") ||
-        (productGenre?.toLowerCase().includes("trap")
-          ? "Drums, 808, Synth"
-          : productGenre?.toLowerCase().includes("hip hop")
-            ? "Drums, Bass, Piano"
-            : "Drums, Bass, Synth") ||
-        "";
-
-      // Simplified free product detection
-      const productIsFree =
-        product.tags?.some((tag: WooCommerceTag) => tag.name?.toLowerCase().includes("free")) ||
-        product.categories?.some((cat: WooCommerceCategory) =>
-          cat.name?.toLowerCase().includes("free")
-        ) ||
-        product.name?.toLowerCase().includes("free") ||
-        product.price === "0" ||
-        parseFloat(product.price || "0") === 0 ||
-        product.regular_price === "0" ||
-        parseFloat(product.regular_price || "0") === 0;
-
-      // Extract audio URL using the same logic as the products list
-      const audioUrl = (() => {
-        let audioUrl = null;
-
-        // Find alb_tracklist metadata (Sonaar plugin)
-        const albTracklistMeta = product.meta_data?.find(
-          (meta: WooCommerceMetaData) =>
-            meta.key === "alb_tracklist" ||
-            meta.key === "tracklist" ||
-            meta.key === "sonaar_tracklist"
-        );
-
-        // Find other audio URL metadata
-        const audioUrlMeta = product.meta_data?.find(
-          (meta: WooCommerceMetaData) =>
-            meta.key === "audio_url" || meta.key === "audio_preview" || meta.key === "track_mp3"
-        );
-
-        // Try alb_tracklist first (contains actual audio URLs)
-        if (albTracklistMeta && albTracklistMeta.value) {
-          try {
-            let sonaarData;
-            if (typeof albTracklistMeta.value === "string") {
-              sonaarData = JSON.parse(albTracklistMeta.value);
-            } else {
-              sonaarData = albTracklistMeta.value;
-            }
-
-            if (sonaarData && Array.isArray(sonaarData) && sonaarData.length > 0) {
-              const firstTrack = sonaarData[0];
-              audioUrl =
-                firstTrack.track_mp3 ||
-                firstTrack.audio_preview ||
-                firstTrack.src ||
-                firstTrack.url;
-            } else if (sonaarData && typeof sonaarData === "object") {
-              audioUrl =
-                sonaarData.track_mp3 ||
-                sonaarData.audio_preview ||
-                sonaarData.src ||
-                sonaarData.url;
-            }
-          } catch (e) {
-            // Ignore parsing errors
-          }
-        }
-
-        // If no audio URL found, try other sources
-        if (!audioUrl && audioUrlMeta) {
-          audioUrl = audioUrlMeta.value;
-        }
-
-        return proxyAudioUrl(audioUrl);
-      })();
-
-      // Transform product data to match frontend expectations
-      const transformedProduct = {
-        ...product,
-        // Keep prices in dollar format as provided by WooCommerce
-        price: product.price ? parseFloat(product.price) : 0,
-        regular_price: product.regular_price ? parseFloat(product.regular_price) : 0,
-        sale_price: product.sale_price ? parseFloat(product.sale_price) : 0,
-        // Ensure images are properly formatted
-        images: product.images || [],
-        // Ensure categories are properly formatted
-        categories: product.categories || [],
-        audio_url: audioUrl,
-        // Enhanced metadata for better display - use real data only
-        bpm: productBpm || "",
-        key: productKey || "",
-        mood: productMood || "",
-        artist: productArtist,
-        genre: productGenre || "",
-        duration: productDuration || "",
-        instruments: productInstruments || "",
-        // Check if product has FREE tag or is priced at 0
-        is_free: productIsFree,
-        hasVocals:
-          extractMeta("has_vocals") === "yes" || extractMeta("_has_vocals") === "yes" || false,
-        stems:
-          extractMeta("stems") === "yes" ||
-          extractMeta("_stems") === "yes" ||
-          product.downloadable ||
-          false,
-      };
+      // Transform product data using helper function (proxyImages=false for single product)
+      const transformedProduct = transformProduct(product, false);
 
       res.json(transformedProduct);
     } catch (error: unknown) {
-      const errorMessage =
+      const _errorMessage =
         error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching product:", error);
       res.status(500).json({ error: ErrorMessages.BEATS.NOT_FOUND });
@@ -906,7 +738,7 @@ export function registerWordPressRoutes(app: Express) {
       const categories = await wcApiRequest("/products/categories");
       res.json(categories);
     } catch (error: unknown) {
-      const errorMessage =
+      const _errorMessage =
         error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error fetching categories:", error);
       res.status(500).json({ error: ErrorMessages.WOOCOMMERCE.SYNC_FAILED });
@@ -922,7 +754,7 @@ export function registerWordPressRoutes(app: Express) {
       });
       res.json(order);
     } catch (error: unknown) {
-      const errorMessage =
+      const _errorMessage =
         error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error creating order:", error);
       res.status(500).json({ error: ErrorMessages.ORDER.PROCESSING_FAILED });
@@ -938,7 +770,7 @@ export function registerWordPressRoutes(app: Express) {
       });
       res.json(customer);
     } catch (error: unknown) {
-      const errorMessage =
+      const _errorMessage =
         error instanceof Error ? error.message : ErrorMessages.GENERIC.UNKNOWN_ERROR;
       console.error("Error creating customer:", error);
       res.status(500).json({ error: ErrorMessages.USER.PROFILE_UPDATE_FAILED });

@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 
-interface PerformanceMetrics {
+/**
+ * Performance metrics interface for lazy loading optimization
+ * @internal Used for type documentation - actual metrics are collected via PerformanceObserver
+ */
+export interface PerformanceMetrics {
   componentLoadTime: number;
   bundleSize: number;
   initialLoadTime: number;
@@ -51,37 +55,7 @@ export function PerformanceMonitor() {
   return null;
 }
 
-/**
- * Hook to measure component load time
- */
-export function useComponentLoadTime(componentName: string) {
-  useEffect(() => {
-    const startTime = performance.now();
-
-    return () => {
-      const endTime = performance.now();
-      const loadTime = endTime - startTime;
-
-      // Create a performance measure
-      performance.mark(`${componentName}-load-end`);
-      performance.measure(
-        `component-load-${componentName}`,
-        `${componentName}-load-start`,
-        `${componentName}-load-end`
-      );
-
-      console.log(`${componentName} load time: ${loadTime.toFixed(2)}ms`);
-    };
-  }, [componentName]);
-
-  // Mark the start of component load
-  useEffect(() => {
-    performance.mark(`${componentName}-load-start`);
-  }, [componentName]);
-
-  // Return void explicitly to satisfy TypeScript noImplicitReturns
-  return;
-}
+// Note: useComponentLoadTime is now in @/hooks/useComponentLoadTime
 
 /**
  * Bundle size analyzer for development

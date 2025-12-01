@@ -24,7 +24,7 @@ export default function Cart() {
               <ShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h1 className="text-2xl font-bold text-white mb-4">Your Cart is Empty</h1>
               <p className="text-gray-300 mb-8">
-                Looks like you haven't added any beats to your cart yet.
+                Looks like you haven&apos;t added any beats to your cart yet.
               </p>
               <Link href="/shop">
                 <Button className="btn-primary">Browse Beats</Button>
@@ -182,10 +182,10 @@ export default function Cart() {
               </div>
             </div>
 
-            {(cart as any).subtotal >= 100 && (
+            {cart.total >= 100 && (
               <div className="mt-4 p-3 bg-[var(--accent-green)]/10 border border-[var(--accent-green)]/20 rounded-lg">
                 <p className="text-[var(--accent-green)] text-sm font-medium">
-                  🎉 You've qualified for 20% off your order!
+                  🎉 You&apos;ve qualified for 20% off your order!
                 </p>
               </div>
             )}

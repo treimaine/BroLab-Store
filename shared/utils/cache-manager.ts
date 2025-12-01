@@ -358,7 +358,7 @@ export class CacheManagerImpl implements CacheManager {
 
   private calculateHitRate(isHit: boolean): number {
     // This is a simplified calculation - in production, you'd want to track this more accurately
-    const totalRequests = this.stats.totalEntries || 1;
+    const _totalRequests = this.stats.totalEntries || 1;
     return isHit
       ? Math.min(100, this.stats.hitRate * 0.9 + 10)
       : Math.max(0, this.stats.missRate + 1);

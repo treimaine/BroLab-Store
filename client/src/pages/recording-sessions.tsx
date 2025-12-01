@@ -81,14 +81,13 @@ export default function RecordingSessions() {
 
       console.log("🚀 Starting reservation submission for recording session");
       // Convert form data to reservation format using new schema
-      const budgetAmount =
-        formData.budget === "300-500"
-          ? 40000 // $400 in cents
-          : formData.budget === "500-1000"
-            ? 75000 // $750 in cents
-            : formData.budget === "1000-2000"
-              ? 150000 // $1500 in cents
-              : 250000; // $2500+ in cents
+      const budgetMap: Record<string, number> = {
+        "300-500": 40000, // $400 in cents
+        "500-1000": 75000, // $750 in cents
+        "1000-2000": 150000, // $1500 in cents
+        "2000+": 250000, // $2500+ in cents
+      };
+      const budgetAmount = budgetMap[formData.budget] ?? 250000;
 
       const reservationData = {
         serviceType: "recording" as const,
@@ -101,7 +100,7 @@ export default function RecordingSessions() {
         preferredDate: new Date(
           `${formData.preferredDate}T${formData.preferredTime}`
         ).toISOString(),
-        preferredDuration: parseInt(formData.duration) * 60, // Convert hours to minutes
+        preferredDuration: Number.parseInt(formData.duration, 10) * 60, // Convert hours to minutes
         serviceDetails: {
           includeRevisions: 2,
           rushDelivery: false,
@@ -112,7 +111,7 @@ export default function RecordingSessions() {
       };
 
       console.log("🚀 Sending reservation data:", reservationData);
-      
+
       // Get authentication token from Clerk
       const token = await getToken();
       if (!token) {
@@ -126,9 +125,9 @@ export default function RecordingSessions() {
 
       const response = await fetch("/api/reservations", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(reservationData),
       });
@@ -142,7 +141,7 @@ export default function RecordingSessions() {
         const pendingPayment = {
           service: "recording",
           serviceName: "Recording Session",
-          serviceDetails: `${formData.sessionType} - ${formData.duration} hour${parseInt(formData.duration) > 1 ? "s" : ""} (${formData.location})`,
+          serviceDetails: `${formData.sessionType} - ${formData.duration} hour${Number.parseInt(formData.duration, 10) > 1 ? "s" : ""} (${formData.location})`,
           reservationId: reservation.id,
           price: reservationData.budget / 100, // Convert cents to dollars
           quantity: 1,

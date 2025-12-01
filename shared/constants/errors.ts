@@ -292,7 +292,7 @@ export const SECURITY_CONFIG = {
 // UTILITY FUNCTIONS
 // ================================
 
-export function getErrorMessage(errorType: ErrorType, locale = "en"): string {
+export function getErrorMessage(errorType: ErrorType, _locale = "en"): string {
   // For now, return English messages. In the future, this could support i18n
   return ERROR_MESSAGES[errorType] || ERROR_MESSAGES[ErrorType.UNKNOWN_ERROR];
 }

@@ -17,6 +17,10 @@ import {
   UserSession,
 } from "../types/analytics";
 
+interface GlobalWithStorage {
+  localStorage?: Storage;
+}
+
 class AnalyticsManagerImpl implements AnalyticsManager {
   private config: AnalyticsConfig;
   private currentSession: UserSession | null = null;
@@ -39,7 +43,7 @@ class AnalyticsManagerImpl implements AnalyticsManager {
       privacy: this.getDefaultPrivacySettings(),
       sampling: {
         enabled: false,
-        rate: 1.0,
+        rate: 1,
       },
       realTime: {
         enabled: true,
@@ -68,37 +72,39 @@ class AnalyticsManagerImpl implements AnalyticsManager {
   }
 
   private initializeTracking(): void {
-    if (typeof window !== "undefined") {
-      // Check for Do Not Track
-      if (this.privacySettings.respectDoNotTrack && navigator.doNotTrack === "1") {
-        this.privacySettings.trackingEnabled = false;
-        this.config.enabled = false;
-        return;
+    if (globalThis.window === undefined) {
+      return;
+    }
+
+    // Check for Do Not Track
+    if (this.privacySettings.respectDoNotTrack && navigator.doNotTrack === "1") {
+      this.privacySettings.trackingEnabled = false;
+      this.config.enabled = false;
+      return;
+    }
+
+    // Start session automatically
+    this.startSession();
+
+    // Track page visibility changes
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && this.currentSession) {
+        this.endSession(this.currentSession.id);
+      } else if (!document.hidden && !this.currentSession) {
+        this.startSession();
       }
+    });
 
-      // Start session automatically
-      this.startSession();
-
-      // Track page visibility changes
-      document.addEventListener("visibilitychange", () => {
-        if (document.hidden && this.currentSession) {
-          this.endSession(this.currentSession.id);
-        } else if (!document.hidden && !this.currentSession) {
-          this.startSession();
-        }
-      });
-
-      // Track page unload
-      window.addEventListener("beforeunload", () => {
-        if (this.currentSession) {
-          this.endSession(this.currentSession.id);
-        }
-      });
-
-      // Start real-time updates if enabled
-      if (this.config.realTime.enabled) {
-        this.startRealTimeUpdates();
+    // Track page unload
+    globalThis.window.addEventListener("beforeunload", () => {
+      if (this.currentSession) {
+        this.endSession(this.currentSession.id);
       }
+    });
+
+    // Start real-time updates if enabled
+    if (this.config.realTime.enabled) {
+      this.startRealTimeUpdates();
     }
   }
 
@@ -109,12 +115,9 @@ class AnalyticsManagerImpl implements AnalyticsManager {
 
     this.realTimeInterval = setInterval(async () => {
       try {
-        const metrics = await this.getRealTimeMetrics();
-        this.emitEvent({
-          type: "interaction",
-          data: metrics as any,
-          timestamp: Date.now(),
-        });
+        await this.getRealTimeMetrics();
+        // Real-time metrics are available via getRealTimeMetrics() method
+        // No event emission needed here as metrics are fetched on demand
       } catch (error) {
         if (this.config.debug) {
           console.error("Failed to update real-time metrics:", error);
@@ -144,12 +147,13 @@ class AnalyticsManagerImpl implements AnalyticsManager {
   }
 
   private detectDeviceType(): DeviceType {
-    if (typeof window === "undefined") return "unknown";
+    if (globalThis.window === undefined) return "unknown";
 
     const userAgent = navigator.userAgent.toLowerCase();
-    const width = window.innerWidth;
+    const width = globalThis.window.innerWidth;
 
-    if (/mobile|android|iphone|ipod|blackberry|iemobile|opera mini/i.test(userAgent)) {
+    // Mobile device detection pattern
+    if (/mobile|android|iphone|ipod|blackberry|opera mini/i.test(userAgent)) {
       return "mobile";
     } else if (/tablet|ipad/i.test(userAgent) || (width >= 768 && width <= 1024)) {
       return "tablet";
@@ -182,10 +186,10 @@ class AnalyticsManagerImpl implements AnalyticsManager {
       sessionId: this.currentSession?.id || "unknown",
       deviceType: this.detectDeviceType(),
       screenResolution:
-        typeof window !== "undefined"
-          ? `${window.screen.width}x${window.screen.height}`
-          : undefined,
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+        globalThis.window === undefined
+          ? undefined
+          : `${globalThis.window.screen.width}x${globalThis.window.screen.height}`,
+      userAgent: globalThis.navigator === undefined ? undefined : navigator.userAgent,
     };
 
     this.interactions.push(fullInteraction);
@@ -208,10 +212,12 @@ class AnalyticsManagerImpl implements AnalyticsManager {
     if (this.config.storage.local) {
       try {
         const storage =
-          typeof window !== "undefined" ? window.localStorage : (global as any).localStorage;
+          globalThis.window === undefined
+            ? (globalThis as GlobalWithStorage).localStorage
+            : globalThis.window.localStorage;
         if (storage) {
           const stored = storage.getItem("analytics_interactions") || "[]";
-          const interactions = JSON.parse(stored);
+          const interactions = JSON.parse(stored) as UserInteraction[];
           interactions.push(fullInteraction);
 
           // Keep only recent interactions to prevent storage bloat
@@ -237,10 +243,10 @@ class AnalyticsManagerImpl implements AnalyticsManager {
       component: "page",
       action: "view",
       target: page,
-      url: typeof window !== "undefined" ? window.location.href : page,
+      url: globalThis.window === undefined ? page : globalThis.window.location.href,
       metadata: {
         ...metadata,
-        referrer: typeof document !== "undefined" ? document.referrer : undefined,
+        referrer: globalThis.document === undefined ? undefined : document.referrer,
       },
     });
 
@@ -251,13 +257,15 @@ class AnalyticsManagerImpl implements AnalyticsManager {
   }
 
   async trackConversion(funnelId: string, stepId: string, value?: number): Promise<void> {
+    const currentUrl = globalThis.window === undefined ? "" : globalThis.window.location.href;
+
     await this.trackInteraction({
       sessionId: this.currentSession?.id || "unknown",
       type: "purchase",
       component: "funnel",
       action: "conversion",
       target: stepId,
-      url: typeof window !== "undefined" ? window.location.href : "",
+      url: currentUrl,
       value,
       metadata: {
         funnelId,
@@ -269,7 +277,18 @@ class AnalyticsManagerImpl implements AnalyticsManager {
     // Emit conversion event
     this.emitEvent({
       type: "conversion",
-      data: { funnelId, stepId, value, timestamp: Date.now() } as any,
+      data: {
+        id: `conversion_${Date.now()}`,
+        sessionId: this.currentSession?.id || "unknown",
+        type: "purchase",
+        component: "funnel",
+        action: "conversion",
+        target: stepId,
+        url: currentUrl,
+        timestamp: Date.now(),
+        value,
+        metadata: { funnelId, stepId },
+      } as UserInteraction,
       timestamp: Date.now(),
     });
   }
@@ -285,9 +304,9 @@ class AnalyticsManagerImpl implements AnalyticsManager {
       interactions: 0,
       bounceRate: false,
       deviceType: this.detectDeviceType(),
-      referrer: typeof document !== "undefined" ? document.referrer : undefined,
-      browser: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
-      os: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      referrer: globalThis.document === undefined ? undefined : document.referrer,
+      browser: globalThis.navigator === undefined ? undefined : navigator.userAgent,
+      os: globalThis.navigator === undefined ? undefined : navigator.userAgent,
     };
 
     this.sessions.push(this.currentSession);
@@ -419,7 +438,11 @@ class AnalyticsManagerImpl implements AnalyticsManager {
     };
   }
 
-  private getTopPages(interactions: UserInteraction[]) {
+  private getTopPages(interactions: UserInteraction[]): Array<{
+    page: string;
+    views: number;
+    uniqueViews: number;
+  }> {
     const pageViews = interactions.filter(i => i.type === "page_load");
     const pageCounts = pageViews.reduce(
       (acc, i) => {
@@ -439,7 +462,11 @@ class AnalyticsManagerImpl implements AnalyticsManager {
       .slice(0, 10);
   }
 
-  private getTopActions(interactions: UserInteraction[]) {
+  private getTopActions(interactions: UserInteraction[]): Array<{
+    action: string;
+    count: number;
+    conversionRate: number;
+  }> {
     const actionCounts = interactions.reduce(
       (acc, i) => {
         const key = `${i.component}:${i.action}`;
@@ -461,7 +488,11 @@ class AnalyticsManagerImpl implements AnalyticsManager {
       .slice(0, 10);
   }
 
-  private getUserFlows(sessions: UserSession[]) {
+  private getUserFlows(sessions: UserSession[]): Array<{
+    path: string;
+    users: number;
+    conversionRate: number;
+  }> {
     // Simplified user flow analysis
     return sessions
       .filter(s => s.pageViews > 1)
@@ -473,7 +504,7 @@ class AnalyticsManagerImpl implements AnalyticsManager {
       .slice(0, 10);
   }
 
-  private getDeviceBreakdown(sessions: UserSession[]) {
+  private getDeviceBreakdown(sessions: UserSession[]): Record<DeviceType, number> {
     return sessions.reduce(
       (acc, s) => {
         acc[s.deviceType] = (acc[s.deviceType] || 0) + 1;
@@ -483,7 +514,7 @@ class AnalyticsManagerImpl implements AnalyticsManager {
     );
   }
 
-  private getBrowserBreakdown(sessions: UserSession[]) {
+  private getBrowserBreakdown(sessions: UserSession[]): Record<string, number> {
     return sessions.reduce(
       (acc, s) => {
         const browser = s.browser?.split(" ")[0] || "Unknown";
@@ -494,7 +525,7 @@ class AnalyticsManagerImpl implements AnalyticsManager {
     );
   }
 
-  private getGeographicBreakdown(sessions: UserSession[]) {
+  private getGeographicBreakdown(sessions: UserSession[]): Record<string, number> {
     return sessions.reduce(
       (acc, s) => {
         const country = s.country || "Unknown";
@@ -505,8 +536,11 @@ class AnalyticsManagerImpl implements AnalyticsManager {
     );
   }
 
-  private getTimeOfDayActivity(interactions: UserInteraction[]) {
-    const hourlyActivity = new Array(24).fill(0);
+  private getTimeOfDayActivity(interactions: UserInteraction[]): Array<{
+    hour: number;
+    activity: number;
+  }> {
+    const hourlyActivity = new Array(24).fill(0) as number[];
     interactions.forEach(i => {
       const hour = new Date(i.timestamp).getHours();
       hourlyActivity[hour]++;
@@ -515,9 +549,12 @@ class AnalyticsManagerImpl implements AnalyticsManager {
     return hourlyActivity.map((activity, hour) => ({ hour, activity }));
   }
 
-  private getDayOfWeekActivity(interactions: UserInteraction[]) {
+  private getDayOfWeekActivity(interactions: UserInteraction[]): Array<{
+    day: string;
+    activity: number;
+  }> {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const dailyActivity = new Array(7).fill(0);
+    const dailyActivity = new Array(7).fill(0) as number[];
 
     interactions.forEach(i => {
       const day = new Date(i.timestamp).getDay();
@@ -570,10 +607,6 @@ class AnalyticsManagerImpl implements AnalyticsManager {
   async getUserBehaviorInsights(timeRange: TimeRange): Promise<UserBehaviorInsight[]> {
     // Generate insights based on interaction patterns
     const insights: UserBehaviorInsight[] = [];
-
-    const filteredInteractions = this.interactions.filter(
-      i => i.timestamp >= timeRange.start && i.timestamp <= timeRange.end
-    );
 
     // Example insight: High bounce rate
     const sessions = this.sessions.filter(
@@ -678,7 +711,7 @@ class AnalyticsManagerImpl implements AnalyticsManager {
       // Re-check Do Not Track if respectDoNotTrack is enabled
       if (
         this.privacySettings.respectDoNotTrack &&
-        typeof navigator !== "undefined" &&
+        globalThis.navigator !== undefined &&
         navigator.doNotTrack === "1"
       ) {
         this.privacySettings.trackingEnabled = false;

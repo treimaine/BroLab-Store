@@ -8,14 +8,23 @@ import {
 import { logger } from "./logger";
 
 /**
+ * Resource data interface for type safety
+ */
+interface ResourceData {
+  _updatedAt?: number;
+  updatedAt?: number;
+  [key: string]: unknown;
+}
+
+/**
  * DataConsistencyManager handles conflict detection, resolution, and rollback operations
  * for maintaining data consistency across the system.
  */
 export class DataConsistencyManagerImpl implements DataConsistencyManager {
-  private conflicts: Map<string, DataConflict> = new Map();
-  private rollbackPoints: Map<string, RollbackOperation> = new Map();
-  private convexClient: ConvexHttpClient;
-  private autoResolveStrategies: Map<string, ConflictResolution["strategy"]> = new Map();
+  private readonly conflicts: Map<string, DataConflict> = new Map();
+  private readonly rollbackPoints: Map<string, RollbackOperation> = new Map();
+  private readonly convexClient: ConvexHttpClient;
+  private readonly autoResolveStrategies: Map<string, ConflictResolution["strategy"]> = new Map();
 
   constructor(convexClient: ConvexHttpClient) {
     this.convexClient = convexClient;
@@ -35,13 +44,13 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
   /**
    * Detect conflicts for a specific resource
    */
-  async detectConflicts(resourceType: string, resourceId: string): Promise<DataConflict[]> {
+  async detectConflicts(_resourceType: string, _resourceId: string): Promise<DataConflict[]> {
     try {
-      logger.info("Detecting conflicts", { resourceType, resourceId });
+      logger.info("Detecting conflicts", { resourceType: _resourceType, resourceId: _resourceId });
 
       // Get local and remote versions of the resource
-      const localData = await this.getLocalData(resourceType, resourceId);
-      const remoteData = await this.getRemoteData(resourceType, resourceId);
+      const localData = await this.getLocalData(_resourceType, _resourceId);
+      const remoteData = await this.getRemoteData(_resourceType, _resourceId);
 
       if (!localData || !remoteData) {
         return [];
@@ -52,9 +61,9 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
       // Compare timestamps and data
       if (this.hasDataConflict(localData, remoteData)) {
         const conflict: DataConflict = {
-          id: `${resourceType}_${resourceId}_${Date.now()}`,
-          resourceType,
-          resourceId,
+          id: `${_resourceType}_${_resourceId}_${Date.now()}`,
+          resourceType: _resourceType,
+          resourceId: _resourceId,
           localValue: localData,
           remoteValue: remoteData,
           timestamp: Date.now(),
@@ -71,15 +80,19 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
 
         logger.warn("Data conflict detected", {
           conflictId: conflict.id,
-          resourceType,
-          resourceId,
+          resourceType: _resourceType,
+          resourceId: _resourceId,
           conflictFields: conflict.metadata?.conflictFields,
         });
       }
 
       return conflicts;
     } catch (error) {
-      logger.error("Error detecting conflicts", { error, resourceType, resourceId });
+      logger.error("Error detecting conflicts", {
+        error,
+        resourceType: _resourceType,
+        resourceId: _resourceId,
+      });
       throw error;
     }
   }
@@ -290,23 +303,36 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
 
   // Private helper methods
 
-  private async getLocalData(resourceType: string, resourceId: string): Promise<any> {
+  private async getLocalData(
+    _resourceType: string,
+    _resourceId: string
+  ): Promise<ResourceData | null> {
     // Implementation would depend on local storage mechanism
     // For now, return null to indicate no local data
     return null;
   }
 
-  private async getRemoteData(resourceType: string, resourceId: string): Promise<any> {
-    // Use Convex to get remote data - let errors propagate for proper error handling
-    // Use proper Convex API reference with proper typing
-    const result = await this.convexClient.query("dataConsistency:get" as any, {
-      resourceType,
-      resourceId,
-    });
-    return result;
+  private async getRemoteData(
+    resourceType: string,
+    resourceId: string
+  ): Promise<ResourceData | null> {
+    try {
+      // Use Convex to get remote data with proper function reference
+      const result = await this.convexClient.query(
+        "data:get" as unknown as Parameters<typeof this.convexClient.query>[0],
+        {
+          resourceType,
+          resourceId,
+        }
+      );
+      return result as ResourceData | null;
+    } catch (error) {
+      logger.error("Error fetching remote data", { error, resourceType, resourceId });
+      return null;
+    }
   }
 
-  private hasDataConflict(localData: any, remoteData: any): boolean {
+  private hasDataConflict(localData: ResourceData, remoteData: ResourceData): boolean {
     if (!localData || !remoteData) return false;
 
     // Compare timestamps
@@ -321,7 +347,7 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
     return false;
   }
 
-  private getConflictingFields(localData: any, remoteData: any): string[] {
+  private getConflictingFields(localData: ResourceData, remoteData: ResourceData): string[] {
     const conflictingFields: string[] = [];
 
     if (!localData || !remoteData) return conflictingFields;
@@ -340,29 +366,32 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
   }
 
   private resolveLastWriteWins(conflict: DataConflict): unknown {
-    const localTimestamp =
-      (conflict.localValue as any)?._updatedAt || (conflict.localValue as any)?.updatedAt || 0;
-    const remoteTimestamp =
-      (conflict.remoteValue as any)?._updatedAt || (conflict.remoteValue as any)?.updatedAt || 0;
+    const localValue = conflict.localValue as ResourceData | null;
+    const remoteValue = conflict.remoteValue as ResourceData | null;
+
+    const localTimestamp = localValue?._updatedAt || localValue?.updatedAt || 0;
+    const remoteTimestamp = remoteValue?._updatedAt || remoteValue?.updatedAt || 0;
 
     return localTimestamp > remoteTimestamp ? conflict.localValue : conflict.remoteValue;
   }
 
   private resolveMerge(conflict: DataConflict): unknown {
     // Simple merge strategy - combine non-conflicting fields
-    const local = conflict.localValue as Record<string, any>;
-    const remote = conflict.remoteValue as Record<string, any>;
+    const local = conflict.localValue as ResourceData | null;
+    const remote = conflict.remoteValue as ResourceData | null;
 
     if (!local || !remote) {
       return local || remote;
     }
 
-    const merged = { ...remote, ...local };
+    const merged: ResourceData = { ...remote, ...local };
 
     // For arrays, merge them
     Object.keys(merged).forEach(key => {
-      if (Array.isArray(local[key]) && Array.isArray(remote[key])) {
-        const uniqueItems = Array.from(new Set([...remote[key], ...local[key]]));
+      const localVal = local[key];
+      const remoteVal = remote[key];
+      if (Array.isArray(localVal) && Array.isArray(remoteVal)) {
+        const uniqueItems = Array.from(new Set([...remoteVal, ...localVal]));
         merged[key] = uniqueItems;
       }
     });
@@ -382,11 +411,14 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
   private async applyResolvedValue(conflict: DataConflict, resolvedValue: unknown): Promise<void> {
     try {
       // Apply the resolved value to both local and remote storage
-      await this.convexClient.mutation("dataConsistency:update" as any, {
-        resourceType: conflict.resourceType,
-        resourceId: conflict.resourceId,
-        data: resolvedValue,
-      });
+      await this.convexClient.mutation(
+        "data:update" as unknown as Parameters<typeof this.convexClient.mutation>[0],
+        {
+          resourceType: conflict.resourceType,
+          resourceId: conflict.resourceId,
+          data: resolvedValue,
+        }
+      );
 
       logger.info("Resolved value applied", {
         conflictId: conflict.id,
@@ -402,11 +434,14 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
   private async restorePreviousState(rollbackOperation: RollbackOperation): Promise<void> {
     try {
       // Restore the previous state using Convex
-      await this.convexClient.mutation("dataConsistency:update" as any, {
-        resourceType: rollbackOperation.operationType,
-        resourceId: rollbackOperation.resourceId,
-        data: rollbackOperation.previousState,
-      });
+      await this.convexClient.mutation(
+        "data:restore" as unknown as Parameters<typeof this.convexClient.mutation>[0],
+        {
+          operationType: rollbackOperation.operationType,
+          resourceId: rollbackOperation.resourceId,
+          state: rollbackOperation.previousState,
+        }
+      );
 
       logger.info("Previous state restored", {
         rollbackId: rollbackOperation.id,
@@ -422,11 +457,19 @@ export class DataConsistencyManagerImpl implements DataConsistencyManager {
   }
 
   private async getAllResources(resourceType: string): Promise<Array<{ id: string }>> {
-    // Use proper Convex API reference with proper typing
-    const result = await this.convexClient.query("dataConsistency:list" as any, {
-      resourceType,
-    });
-    return result || [];
+    try {
+      // Use proper Convex API reference
+      const result = await this.convexClient.query(
+        "data:list" as unknown as Parameters<typeof this.convexClient.query>[0],
+        {
+          resourceType,
+        }
+      );
+      return (result as Array<{ id: string }>) || [];
+    } catch (error) {
+      logger.error("Error fetching all resources", { error, resourceType });
+      return [];
+    }
   }
 }
 

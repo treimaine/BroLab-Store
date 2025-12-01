@@ -50,7 +50,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   isOpen = false,
   onClose,
 }) => {
-  const { user } = useUser();
+  const { isSignedIn: _isSignedIn } = useUser();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<"all" | "unread">("all");
 

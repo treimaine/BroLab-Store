@@ -30,8 +30,8 @@ interface ResponsiveBeatCardProps {
 export function ResponsiveBeatCard({
   beat,
   className = "",
-  productId,
-  productName,
+  productId: _productId,
+  productName: _productName,
 }: ResponsiveBeatCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);

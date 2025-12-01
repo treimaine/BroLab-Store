@@ -40,7 +40,7 @@ export const DashboardConnectionStatus: React.FC<DashboardConnectionStatusProps>
   lastSyncTime,
 }) => {
   const {
-    status,
+    status: _status,
     isConnected,
     isReconnecting,
     connect,
@@ -206,7 +206,7 @@ export const ConnectionStatusBadge: React.FC<{
   className?: string;
   showLabel?: boolean;
 }> = ({ className, showLabel = true }) => {
-  const { isConnected, isReconnecting, getCurrentStrategy } = useConnectionManager();
+  const { isConnected, isReconnecting } = useConnectionManager();
   const syncStatus = useSyncStatus();
 
   const getStatusColor = () => {

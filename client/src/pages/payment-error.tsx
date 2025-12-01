@@ -94,7 +94,7 @@ export default function PaymentErrorPage() {
       <div className="min-h-screen bg-[var(--deep-black)] text-white flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-gray-600 border-t-[var(--accent-purple)] rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400">Analyse de l'erreur de paiement...</p>
+          <p className="text-gray-400">Analyse de l&apos;erreur de paiement...</p>
         </div>
       </div>
     );
@@ -109,19 +109,21 @@ export default function PaymentErrorPage() {
           </div>
           <CardTitle className="text-2xl text-red-400">Erreur de Paiement</CardTitle>
           <CardDescription className="text-gray-300">
-            Le paiement n'a pas pu être traité correctement.
+            Le paiement n&apos;a pas pu être traité correctement.
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
           {/* Détails de l'erreur */}
           <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 space-y-3">
-            <h3 className="text-lg font-semibold text-red-400">Détails de l'Erreur</h3>
+            <h3 className="text-lg font-semibold text-red-400">Détails de l&apos;Erreur</h3>
 
             <div className="space-y-2 text-sm">
               <div>
-                <span className="text-red-300">Type d'erreur:</span>
-                <span className="text-white ml-2 capitalize">{errorData.error.replace(/_/g, " ")}</span>
+                <span className="text-red-300">Type d&apos;erreur:</span>
+                <span className="text-white ml-2 capitalize">
+                  {errorData.error.replaceAll("_", " ")}
+                </span>
               </div>
 
               {errorData.token && (
@@ -142,9 +144,7 @@ export default function PaymentErrorPage() {
 
           {/* Message d'erreur */}
           <div className="bg-gray-800 rounded-lg p-4 text-center">
-            <p className="text-gray-300">
-              {getErrorMessage(errorData.error)}
-            </p>
+            <p className="text-gray-300">{getErrorMessage(errorData.error)}</p>
             <p className="text-gray-400 text-sm mt-2">
               Si le problème persiste, contactez le support client.
             </p>
@@ -184,7 +184,7 @@ export default function PaymentErrorPage() {
 
           {/* Informations de support */}
           <div className="text-xs text-gray-500 text-center space-y-1">
-            <p>Code d'erreur: {errorData.error}</p>
+            <p>Code d&apos;erreur: {errorData.error}</p>
             {errorData.token && <p>Order ID: {errorData.token}</p>}
             <p>Heure: {new Date().toLocaleString("fr-FR")}</p>
             <p>Pour toute question, contactez le support client</p>

@@ -190,7 +190,7 @@ export default function CheckoutSuccess() {
         {/* Next Steps */}
         <Card className="bg-gray-900 border-gray-700 mb-8">
           <CardHeader>
-            <CardTitle className="text-white">What's Next?</CardTitle>
+            <CardTitle className="text-white">What&apos;s Next?</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

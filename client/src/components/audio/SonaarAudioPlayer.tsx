@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, SkipForward, SkipBack } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Pause, Play, Volume2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface SonaarAudioPlayerProps {
   src: string;
@@ -18,9 +18,9 @@ export function SonaarAudioPlayer({
   title = "Untitled Beat",
   artist = "BroLab",
   className = "",
-  autoPlay = false,
+  autoPlay: _autoPlay = false,
   showControls = true,
-  compact = false
+  compact = false,
 }: SonaarAudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -42,18 +42,18 @@ export function SonaarAudioPlayer({
     const handleLoadStart = () => setIsLoading(true);
     const handleCanPlay = () => setIsLoading(false);
 
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('loadstart', handleLoadStart);
-    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener("timeupdate", updateTime);
+    audio.addEventListener("loadedmetadata", updateDuration);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("loadstart", handleLoadStart);
+    audio.addEventListener("canplay", handleCanPlay);
 
     return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('loadstart', handleLoadStart);
-      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener("timeupdate", updateTime);
+      audio.removeEventListener("loadedmetadata", updateDuration);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("loadstart", handleLoadStart);
+      audio.removeEventListener("canplay", handleCanPlay);
     };
   }, [src]);
 
@@ -78,7 +78,7 @@ export function SonaarAudioPlayer({
   const handleSeek = (value: number[]) => {
     const audio = audioRef.current;
     if (!audio || !duration) return;
-    
+
     const newTime = (value[0] / 100) * duration;
     audio.currentTime = newTime;
     setCurrentTime(newTime);
@@ -87,7 +87,7 @@ export function SonaarAudioPlayer({
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
   const progressPercentage = duration ? (currentTime / duration) * 100 : 0;
@@ -115,9 +115,11 @@ export function SonaarAudioPlayer({
   }
 
   return (
-    <div className={`sonaar-player bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-lg p-4 ${className}`}>
+    <div
+      className={`sonaar-player bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-lg p-4 ${className}`}
+    >
       <audio ref={audioRef} src={src} preload="metadata" />
-      
+
       {/* Track Info */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -165,7 +167,7 @@ export function SonaarAudioPlayer({
             <Volume2 className="w-4 h-4 text-gray-400" />
             <Slider
               value={[volume]}
-              onValueChange={(value) => setVolume(value[0])}
+              onValueChange={value => setVolume(value[0])}
               max={100}
               step={1}
               className="sonaar-volume"

@@ -117,6 +117,54 @@ export const useErrorHandling = (
     isHealthy: true,
   });
 
+  // Refs for stable function references used in event handlers
+  const refreshAnalyticsRef = useRef<() => void>(() => {});
+  const dismissErrorRef = useRef<(errorId: string) => void>(() => {});
+
+  // ================================
+  // STATE UPDATE HELPERS (extracted to reduce nesting depth)
+  // ================================
+
+  const addErrorToState = useCallback((error: EnhancedSyncError) => {
+    setState(prev => ({
+      ...prev,
+      errors: [...prev.errors, error],
+      isHealthy: false,
+    }));
+  }, []);
+
+  const setRecoveryStarted = useCallback((fingerprint: string) => {
+    setState(prev => ({
+      ...prev,
+      recoveryStatuses: {
+        ...prev.recoveryStatuses,
+        [fingerprint]: {
+          ...prev.recoveryStatuses[fingerprint],
+          inProgress: true,
+        },
+      },
+      hasActiveRecoveries: true,
+    }));
+  }, []);
+
+  const updateRecoveryComplete = useCallback((fingerprint: string, checkHealthy: boolean) => {
+    setState(prev => {
+      const newRecoveryStatuses = { ...prev.recoveryStatuses };
+      if (newRecoveryStatuses[fingerprint]) {
+        newRecoveryStatuses[fingerprint].inProgress = false;
+      }
+
+      const hasActiveRecoveries = Object.values(newRecoveryStatuses).some(s => s.inProgress);
+
+      return {
+        ...prev,
+        recoveryStatuses: newRecoveryStatuses,
+        hasActiveRecoveries,
+        isHealthy: checkHealthy ? !hasActiveRecoveries && prev.errors.length === 0 : prev.isHealthy,
+      };
+    });
+  }, []);
+
   // ================================
   // ERROR MANAGER EVENT HANDLERS
   // ================================
@@ -125,12 +173,8 @@ export const useErrorHandling = (
     const errorManager = errorManagerRef.current;
 
     // Error event handler
-    const handleErrorEvent = (error: EnhancedSyncError) => {
-      setState(prev => ({
-        ...prev,
-        errors: [...prev.errors, error],
-        isHealthy: false,
-      }));
+    const handleErrorEvent = (error: EnhancedSyncError): void => {
+      addErrorToState(error);
 
       // Show toast notification if enabled
       if (showToasts) {
@@ -145,23 +189,13 @@ export const useErrorHandling = (
       // Call custom error handler
       onError?.(error);
 
-      // Update analytics
-      refreshAnalytics();
+      // Update analytics via ref
+      refreshAnalyticsRef.current();
     };
 
     // Recovery started handler
-    const handleRecoveryStarted = ({ error }: { error: EnhancedSyncError }) => {
-      setState(prev => ({
-        ...prev,
-        recoveryStatuses: {
-          ...prev.recoveryStatuses,
-          [error.fingerprint]: {
-            ...prev.recoveryStatuses[error.fingerprint],
-            inProgress: true,
-          },
-        },
-        hasActiveRecoveries: true,
-      }));
+    const handleRecoveryStarted = ({ error }: { error: EnhancedSyncError }): void => {
+      setRecoveryStarted(error.fingerprint);
 
       if (showToasts) {
         toast({
@@ -173,24 +207,8 @@ export const useErrorHandling = (
     };
 
     // Recovery success handler
-    const handleRecoverySuccess = ({ error }: { error: EnhancedSyncError }) => {
-      setState(prev => {
-        const newRecoveryStatuses = { ...prev.recoveryStatuses };
-        if (newRecoveryStatuses[error.fingerprint]) {
-          newRecoveryStatuses[error.fingerprint].inProgress = false;
-        }
-
-        const hasActiveRecoveries = Object.values(newRecoveryStatuses).some(
-          status => status.inProgress
-        );
-
-        return {
-          ...prev,
-          recoveryStatuses: newRecoveryStatuses,
-          hasActiveRecoveries,
-          isHealthy: !hasActiveRecoveries && prev.errors.length === 0,
-        };
-      });
+    const handleRecoverySuccessEvent = ({ error }: { error: EnhancedSyncError }): void => {
+      updateRecoveryComplete(error.fingerprint, true);
 
       if (showToasts) {
         toast({
@@ -202,27 +220,12 @@ export const useErrorHandling = (
       }
 
       onRecoverySuccess?.(error);
-      refreshAnalytics();
+      refreshAnalyticsRef.current();
     };
 
     // Recovery failure handler
-    const handleRecoveryFailure = ({ error }: { error: EnhancedSyncError }) => {
-      setState(prev => {
-        const newRecoveryStatuses = { ...prev.recoveryStatuses };
-        if (newRecoveryStatuses[error.fingerprint]) {
-          newRecoveryStatuses[error.fingerprint].inProgress = false;
-        }
-
-        const hasActiveRecoveries = Object.values(newRecoveryStatuses).some(
-          status => status.inProgress
-        );
-
-        return {
-          ...prev,
-          recoveryStatuses: newRecoveryStatuses,
-          hasActiveRecoveries,
-        };
-      });
+    const handleRecoveryFailureEvent = ({ error }: { error: EnhancedSyncError }): void => {
+      updateRecoveryComplete(error.fingerprint, false);
 
       if (showToasts) {
         toast({
@@ -234,38 +237,47 @@ export const useErrorHandling = (
       }
 
       onRecoveryFailure?.(error);
-      refreshAnalytics();
+      refreshAnalyticsRef.current();
     };
 
     // User action handler
-    const handleUserAction = ({ action, errorId }: { action: string; errorId: string }) => {
+    const handleUserAction = ({ action, errorId }: { action: string; errorId: string }): void => {
       if (action === "dismiss") {
-        dismissError(errorId);
+        dismissErrorRef.current(errorId);
       } else if (action === "refresh") {
         // Emit refresh event for dashboard components to handle
-        window.dispatchEvent(new CustomEvent("dashboard:refresh"));
+        globalThis.dispatchEvent(new CustomEvent("dashboard:refresh"));
       } else if (action === "contact_support") {
         // Open support contact (could be a modal, email, or external link)
-        window.open("mailto:support@brolab.com?subject=Dashboard Sync Error", "_blank");
+        globalThis.open("mailto:support@brolab.com?subject=Dashboard Sync Error", "_blank");
       }
     };
 
     // Register event listeners
     errorManager.on("error", handleErrorEvent);
     errorManager.on("recovery_started", handleRecoveryStarted);
-    errorManager.on("recovery_success", handleRecoverySuccess);
-    errorManager.on("recovery_failure", handleRecoveryFailure);
+    errorManager.on("recovery_success", handleRecoverySuccessEvent);
+    errorManager.on("recovery_failure", handleRecoveryFailureEvent);
     errorManager.on("user_action", handleUserAction);
 
     // Cleanup on unmount
     return () => {
       errorManager.off("error", handleErrorEvent);
       errorManager.off("recovery_started", handleRecoveryStarted);
-      errorManager.off("recovery_success", handleRecoverySuccess);
-      errorManager.off("recovery_failure", handleRecoveryFailure);
+      errorManager.off("recovery_success", handleRecoverySuccessEvent);
+      errorManager.off("recovery_failure", handleRecoveryFailureEvent);
       errorManager.off("user_action", handleUserAction);
     };
-  }, [showToasts, toast, onError, onRecoverySuccess, onRecoveryFailure]);
+  }, [
+    showToasts,
+    toast,
+    onError,
+    onRecoverySuccess,
+    onRecoveryFailure,
+    addErrorToState,
+    setRecoveryStarted,
+    updateRecoveryComplete,
+  ]);
 
   // ================================
   // ACTION HANDLERS
@@ -364,6 +376,12 @@ export const useErrorHandling = (
     }));
   }, []);
 
+  // Update refs with stable function references
+  useEffect(() => {
+    refreshAnalyticsRef.current = refreshAnalytics;
+    dismissErrorRef.current = dismissError;
+  }, [refreshAnalytics, dismissError]);
+
   // ================================
   // PERIODIC UPDATES
   // ================================
@@ -371,7 +389,7 @@ export const useErrorHandling = (
   useEffect(() => {
     // Update recovery statuses periodically
     const updateRecoveryStatuses = () => {
-      const newRecoveryStatuses: Record<string, any> = {};
+      const newRecoveryStatuses: ErrorHandlingState["recoveryStatuses"] = {};
       let hasActiveRecoveries = false;
 
       for (const error of state.errors) {

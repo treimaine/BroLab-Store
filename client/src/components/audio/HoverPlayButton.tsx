@@ -29,7 +29,7 @@ export function HoverPlayButton({
   price,
   isFree = false,
 }: HoverPlayButtonProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const { currentTrack, isPlaying, setCurrentTrack, setIsPlaying } = useAudioStore();
 
   const sizeClasses = {

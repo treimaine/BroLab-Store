@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 
-// Synchroniser les commandes WooCommerce avec Convex
+// Sync WooCommerce orders with Convex
 export const syncWooCommerceOrders = mutation({
   args: {
     orders: v.array(
@@ -18,7 +18,7 @@ export const syncWooCommerceOrders = mutation({
             name: v.string(),
             quantity: v.number(),
             total: v.string(),
-            price: v.optional(v.number()), // Prix unitaire du produit
+            price: v.optional(v.number()), // Unit price of the product
             license: v.optional(v.string()),
           })
         ),
@@ -28,27 +28,27 @@ export const syncWooCommerceOrders = mutation({
     ),
   },
   handler: async (ctx, { orders }) => {
-    console.log(`🔄 Syncing ${orders.length} WooCommerce orders to Convex`);
+    console.log(`Syncing ${orders.length} WooCommerce orders to Convex`);
 
     const results = [];
 
     for (const order of orders) {
       try {
-        // Vérifier si la commande existe déjà
+        // Check if order already exists
         const existingOrder = await ctx.db
           .query("orders")
           .withIndex("by_woocommerce_id", q => q.eq("woocommerceId", order.id))
           .first();
 
         if (existingOrder) {
-          // Mettre à jour la commande existante
+          // Update existing order
           await ctx.db.patch(existingOrder._id, {
             status: order.status,
-            total: parseFloat(order.total) * 100, // Convertir en centimes
+            total: Number.parseFloat(order.total) * 100, // Convert to cents
             items: order.items.map(item => ({
               productId: item.productId,
               title: item.name,
-              price: item.price ? item.price * 100 : 0, // Utiliser le prix unitaire et convertir en centimes
+              price: item.price ? item.price * 100 : 0, // Use unit price and convert to cents
               quantity: item.quantity,
               license: item.license || "basic",
               type: "beat",
@@ -65,18 +65,18 @@ export const syncWooCommerceOrders = mutation({
           });
           results.push({ id: order.id, action: "updated", success: true });
         } else {
-          // Créer une nouvelle commande
+          // Create new order
           await ctx.db.insert("orders", {
             woocommerceId: order.id,
-            userId: undefined, // Sera mis à jour si l'utilisateur est connecté
+            userId: undefined, // Will be updated if user is connected
             email: order.customerEmail,
-            total: parseFloat(order.total) * 100, // Convertir en centimes
+            total: Number.parseFloat(order.total) * 100, // Convert to cents
             currency: "EUR", // Default currency for WooCommerce orders
             status: order.status,
             items: order.items.map(item => ({
               productId: item.productId,
               title: item.name,
-              price: item.price ? item.price * 100 : 0, // Utiliser le prix unitaire et convertir en centimes
+              price: item.price ? item.price * 100 : 0, // Use unit price and convert to cents
               quantity: item.quantity,
               license: item.license || "basic",
               type: "beat",
@@ -95,7 +95,7 @@ export const syncWooCommerceOrders = mutation({
           results.push({ id: order.id, action: "created", success: true });
         }
       } catch (error) {
-        console.error(`❌ Error syncing order ${order.id}:`, error);
+        console.error(`Error syncing order ${order.id}:`, error);
         results.push({ id: order.id, action: "error", success: false, error: String(error) });
       }
     }
@@ -104,14 +104,14 @@ export const syncWooCommerceOrders = mutation({
   },
 });
 
-// Associer une commande à un utilisateur Clerk
+// Link an order to a Clerk user
 export const linkOrderToUser = mutation({
   args: {
     orderId: v.number(),
     clerkId: v.string(),
   },
   handler: async (ctx, { orderId, clerkId }) => {
-    // Trouver l'utilisateur par Clerk ID
+    // Find user by Clerk ID
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
@@ -121,7 +121,7 @@ export const linkOrderToUser = mutation({
       throw new Error("User not found");
     }
 
-    // Trouver la commande par WooCommerce ID
+    // Find order by WooCommerce ID
     const order = await ctx.db
       .query("orders")
       .withIndex("by_woocommerce_id", q => q.eq("woocommerceId", orderId))
@@ -131,7 +131,7 @@ export const linkOrderToUser = mutation({
       throw new Error("Order not found");
     }
 
-    // Associer la commande à l'utilisateur
+    // Link order to user
     await ctx.db.patch(order._id, {
       userId: user._id,
       updatedAt: Date.now(),
@@ -141,7 +141,7 @@ export const linkOrderToUser = mutation({
   },
 });
 
-// Obtenir les commandes d'un utilisateur
+// Get user orders
 export const getUserOrders = query({
   args: { clerkId: v.string() },
   handler: async (ctx, { clerkId }) => {
@@ -164,17 +164,17 @@ export const getUserOrders = query({
   },
 });
 
-// Obtenir toutes les commandes synchronisées
+// Get all synced orders
 export const getSyncedOrders = query({
   args: {
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
     status: v.optional(v.string()),
   },
-  handler: async (ctx, { limit = 50, offset = 0, status }) => {
+  handler: async (ctx, { limit = 50, offset: _offset = 0, status }) => {
     const orders = await ctx.db.query("orders").order("desc").collect();
 
-    // Filtrer par statut si spécifié
+    // Filter by status if specified
     const filteredOrders = status ? orders.filter(order => order.status === status) : orders;
 
     return { page: filteredOrders.slice(0, limit), isDone: true, continueCursor: null };

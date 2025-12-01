@@ -100,7 +100,7 @@ export const getSyncedProducts = query({
     genre: v.optional(v.string()),
     featured: v.optional(v.boolean()),
   },
-  handler: async (ctx, { limit = 50, offset = 0, genre, featured }) => {
+  handler: async (ctx, { limit = 50, offset: _offset = 0, genre, featured }) => {
     const beats = await ctx.db.query("beats").order("desc").collect();
 
     // Filtrer par genre si spécifié
