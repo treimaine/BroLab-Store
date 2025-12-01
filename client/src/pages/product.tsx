@@ -451,7 +451,7 @@ export default function Product(): JSX.Element {
                     ) || [],
                 }}
                 recommendations={
-                  similarProducts?.map((similarProduct: SimilarProduct) => ({
+                  (similarProducts as SimilarProduct[] | undefined)?.map(similarProduct => ({
                     id: similarProduct.id,
                     title: similarProduct.name,
                     price: typeof similarProduct.price === "number" ? similarProduct.price : 0,

@@ -613,6 +613,62 @@ export class ConnectionManager extends BrowserEventEmitter {
   }
 
   /**
+   * Override on() to accept typed event callbacks
+   * Wraps the listener to ensure it receives properly typed event data
+   */
+  public override on<T = unknown>(event: string, listener: (data: T) => void): this {
+    // Wrap the listener to handle the event data properly
+    const wrappedListener = (...args: unknown[]) => {
+      // The first argument should be the event data
+      const eventData = args[0] as T;
+      listener(eventData);
+    };
+    // Store the original listener reference for removal
+    (wrappedListener as { __originalListener?: (data: T) => void }).__originalListener = listener;
+    return super.on(event, wrappedListener);
+  }
+
+  /**
+   * Override once() to accept typed event callbacks
+   * Wraps the listener to ensure it receives properly typed event data
+   */
+  public override once<T = unknown>(event: string, listener: (data: T) => void): this {
+    // Wrap the listener to handle the event data properly
+    const wrappedListener = (...args: unknown[]) => {
+      // The first argument should be the event data
+      const eventData = args[0] as T;
+      listener(eventData);
+    };
+    // Store the original listener reference for removal
+    (wrappedListener as { __originalListener?: (data: T) => void }).__originalListener = listener;
+    return super.once(event, wrappedListener);
+  }
+
+  /**
+   * Override off() to accept typed event callbacks
+   * Handles removal of wrapped listeners by finding the original listener reference
+   */
+  public override off<T = unknown>(event: string, listener: (data: T) => void): this {
+    // Access the private listeners map from BrowserEventEmitter
+    const listenersMap = (
+      this as unknown as { listeners: Map<string, Array<(...args: unknown[]) => void>> }
+    ).listeners;
+    const eventListeners = listenersMap?.get(event);
+
+    if (eventListeners) {
+      const wrappedListener = eventListeners.find(
+        (l: (...args: unknown[]) => void) =>
+          (l as { __originalListener?: (data: T) => void }).__originalListener === listener
+      );
+      if (wrappedListener) {
+        return super.removeListener(event, wrappedListener);
+      }
+    }
+    // Fallback to direct removal if no wrapped listener found
+    return super.removeListener(event, listener as (...args: unknown[]) => void);
+  }
+
+  /**
    * Connect using the best available strategy
    */
   public async connect(): Promise<void> {
