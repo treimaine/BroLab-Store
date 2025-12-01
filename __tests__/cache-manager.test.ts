@@ -314,7 +314,7 @@ describe("CacheManager", () => {
       const key = "invalid-json-key";
 
       // Manually set invalid compressed data
-      const cache = cacheManager as any;
+      const cache = cacheManager as unknown as { cache: Map<string, unknown> };
       cache.cache.set(key, {
         key,
         value: "invalid-json{",

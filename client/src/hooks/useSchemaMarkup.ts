@@ -1,21 +1,12 @@
 import { useEffect, useState } from "react";
-import { Helmet } from "react-helmet-async";
-
-interface SchemaMarkupProps {
-  readonly type: "beat" | "beats-list" | "organization";
-  readonly beatId?: number;
-  readonly baseUrl?: string;
-}
 
 /**
- * Component to inject Schema markup JSON-LD into the head
- * Uses react-helmet-async for consistency with existing UI
+ * Hook to fetch and use Schema markup in components
  */
-export function SchemaMarkup({
-  type,
-  beatId,
-  baseUrl = "https://brolabentertainment.com",
-}: SchemaMarkupProps): JSX.Element | null {
+export function useSchemaMarkup(
+  type: "beat" | "beats-list" | "organization",
+  beatId?: number
+): string {
   const [schemaMarkup, setSchemaMarkup] = useState<string>("");
 
   useEffect(() => {
@@ -42,8 +33,6 @@ export function SchemaMarkup({
         if (response.ok) {
           const markup = await response.text();
           setSchemaMarkup(markup);
-        } else {
-          console.warn("Failed to fetch schema markup:", response.status);
         }
       } catch (error) {
         console.error("Error fetching schema markup:", error);
@@ -51,15 +40,7 @@ export function SchemaMarkup({
     };
 
     void fetchSchemaMarkup();
-  }, [type, beatId, baseUrl]);
+  }, [type, beatId]);
 
-  if (!schemaMarkup) {
-    return null;
-  }
-
-  return (
-    <Helmet>
-      <script type="application/ld+json">{schemaMarkup}</script>
-    </Helmet>
-  );
+  return schemaMarkup;
 }

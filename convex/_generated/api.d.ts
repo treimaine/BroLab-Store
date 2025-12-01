@@ -40,6 +40,7 @@ import type * as files_getFile from "../files/getFile.js";
 import type * as files_listFiles from "../files/listFiles.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
+import type * as invoices from "../invoices.js";
 import type * as lib_dashboardConfig from "../lib/dashboardConfig.js";
 import type * as lib_dashboardValidation from "../lib/dashboardValidation.js";
 import type * as lib_statisticsCalculator from "../lib/statisticsCalculator.js";
@@ -82,6 +83,7 @@ import type * as subscriptions_incrementDownloadUsage from "../subscriptions/inc
 import type * as subscriptions_invoices from "../subscriptions/invoices.js";
 import type * as subscriptions_updateSubscription from "../subscriptions/updateSubscription.js";
 import type * as subscriptions_upsertSubscription from "../subscriptions/upsertSubscription.js";
+import type * as subscriptions from "../subscriptions.js";
 import type * as sync_internal from "../sync/internal.js";
 import type * as sync_woocommerce from "../sync/woocommerce.js";
 import type * as sync_wordpress from "../sync/wordpress.js";
@@ -129,6 +131,7 @@ declare const fullApi: ApiFromModules<{
   "files/listFiles": typeof files_listFiles;
   files: typeof files;
   http: typeof http;
+  invoices: typeof invoices;
   "lib/dashboardConfig": typeof lib_dashboardConfig;
   "lib/dashboardValidation": typeof lib_dashboardValidation;
   "lib/statisticsCalculator": typeof lib_statisticsCalculator;
@@ -171,6 +174,7 @@ declare const fullApi: ApiFromModules<{
   "subscriptions/invoices": typeof subscriptions_invoices;
   "subscriptions/updateSubscription": typeof subscriptions_updateSubscription;
   "subscriptions/upsertSubscription": typeof subscriptions_upsertSubscription;
+  subscriptions: typeof subscriptions;
   "sync/internal": typeof sync_internal;
   "sync/woocommerce": typeof sync_woocommerce;
   "sync/wordpress": typeof sync_wordpress;

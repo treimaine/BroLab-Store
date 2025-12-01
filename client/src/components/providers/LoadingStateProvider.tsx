@@ -3,38 +3,16 @@
  * Provides centralized loading state management across the application
  */
 
-import { ReactNode, createContext, useContext } from "react";
+import { LoadingStateContext } from "@/contexts/LoadingStateContext";
 import { useLoadingState } from "@/hooks/useLoadingState";
-
-interface LoadingStateContextType {
-  globalLoading: boolean;
-  loadingStates: Record<string, any>;
-  setLoading: (key: string, loading: boolean) => void;
-  setError: (key: string, error: Error | null) => void;
-  setData: (key: string, data: any) => void;
-  clearState: (key: string) => void;
-  withLoading: <T>(
-    key: string,
-    operation: () => Promise<T>,
-    options?: {
-      onSuccess?: (data: T) => void;
-      onError?: (error: Error) => void;
-      clearOnSuccess?: boolean;
-    }
-  ) => Promise<T>;
-  isLoadingAny: () => boolean;
-  hasErrors: () => boolean;
-  getLoadingKeys: () => string[];
-  getErrorKeys: () => string[];
-}
-
-const LoadingStateContext = createContext<LoadingStateContextType | null>(null);
+import { useLoadingStateContext } from "@/hooks/useLoadingStateContext";
+import { ReactNode } from "react";
 
 interface LoadingStateProviderProps {
-  children: ReactNode;
+  readonly children: ReactNode;
 }
 
-export function LoadingStateProvider({ children }: LoadingStateProviderProps) {
+function LoadingStateProviderComponent({ children }: Readonly<LoadingStateProviderProps>) {
   const loadingManager = useLoadingState();
 
   return (
@@ -42,16 +20,10 @@ export function LoadingStateProvider({ children }: LoadingStateProviderProps) {
   );
 }
 
-export function useLoadingStateContext(): LoadingStateContextType {
-  const context = useContext(LoadingStateContext);
-  if (!context) {
-    throw new Error("useLoadingStateContext must be used within a LoadingStateProvider");
-  }
-  return context;
-}
+export const LoadingStateProvider = LoadingStateProviderComponent;
 
 // Global loading indicator component
-export function GlobalLoadingIndicator() {
+export function GlobalLoadingIndicator(): JSX.Element | null {
   const { globalLoading, getLoadingKeys } = useLoadingStateContext();
 
   if (!globalLoading) {
@@ -73,7 +45,7 @@ export function GlobalLoadingIndicator() {
 }
 
 // Error boundary for loading states
-export function LoadingErrorBoundary({ children }: { children: ReactNode }) {
+export function LoadingErrorBoundary({ children }: Readonly<{ children: ReactNode }>): JSX.Element {
   const { hasErrors, getErrorKeys, clearState } = useLoadingStateContext();
 
   if (!hasErrors()) {

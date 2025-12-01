@@ -60,7 +60,10 @@ router.post(
       });
 
       // Log download with Convex (use string literal to avoid deep type instantiation)
-      const download = await (convex as any).mutation("downloads:recordDownload", {
+      const convexClient = convex as {
+        mutation: (name: string, args: Record<string, unknown>) => Promise<unknown>;
+      };
+      const download = await convexClient.mutation("downloads:recordDownload", {
         beatId: Number(productId),
         licenseType: String(license),
         downloadUrl: undefined,
@@ -182,7 +185,10 @@ router.get("/quota", isAuthenticated, async (req, res): Promise<void> => {
     }
 
     // For now, return a basic quota response since checkDownloadQuota returns unlimited
-    const downloads = await (convex as any).query("downloads:getUserDownloads", {});
+    const convexClient = convex as {
+      query: (name: string, args: Record<string, unknown>) => Promise<unknown[]>;
+    };
+    const downloads = await convexClient.query("downloads:getUserDownloads", {});
 
     const downloadsUsed = downloads.length;
     const quota = 10; // Basic quota

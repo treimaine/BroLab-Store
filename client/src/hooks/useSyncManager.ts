@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export interface UseSyncManagerOptions {
   autoStart?: boolean;
   debugMode?: boolean;
-  onDataUpdate?: (data: any) => void;
+  onDataUpdate?: (data: Record<string, unknown>) => void;
   onError?: (error: SyncError) => void;
   onStatusChange?: (status: SyncStatus) => void;
 }
@@ -84,7 +84,7 @@ export const useSyncManager = (options: UseSyncManagerOptions = {}): UseSyncMana
       onStatusChange?.(newStatus);
     };
 
-    const handleDataUpdate = (data: any) => {
+    const handleDataUpdate = (data: Record<string, unknown>) => {
       onDataUpdate?.(data);
     };
 
@@ -168,7 +168,7 @@ export const useSyncManager = (options: UseSyncManagerOptions = {}): UseSyncMana
  */
 export const useSyncEvents = (
   eventType: string,
-  handler: (data: any) => void,
+  handler: (data: Record<string, unknown>) => void,
   deps: React.DependencyList = []
 ) => {
   const syncManager = getSyncManager();

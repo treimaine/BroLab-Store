@@ -203,45 +203,49 @@
   - Fix handler function return types in error management services
   - _Requirements: 2.1, 2.2, 2.3_
 
-## Phase 8: Final Error Resolution (Current: 81 errors)
+## Phase 8: EventBus Type Safety (Current: 50 errors)
 
-- [ ] 8. Fix remaining TypeScript errors
+- [ ] 8. Fix EventBus listener type compatibility
 
-- [x] 8.1 Fix lazy audio component type compatibility (6 errors)
-  - Fix `createLazyComponent` generic type constraint in `client/src/utils/lazyLoading.ts`
-  - Update component import functions to properly type the lazy-loaded components
-  - Fix prop spreading type compatibility in wrapper components
+- [ ] 8.1 Fix EventBus typed listener methods
+  - Update EventBus to properly type listener callbacks with specific event types
+  - Fix `on`, `once`, `prependListener`, and `addListener` methods to accept typed callbacks
+  - Ensure event listeners receive properly typed event objects, not `unknown[]`
   - Files affected:
-    - `client/src/components/audio/LazyAudioComponents.tsx` (6 errors)
-    - `client/src/hooks/useInteractionPreloader.ts` (1 error)
+    - `client/src/services/EventBus.ts`
+  - _Requirements: 3.1, 3.2, 3.3_
+
+- [ ] 8.2 Fix hook EventBus listener registrations (32 errors)
+  - Update all hooks that register EventBus listeners to match new typed signatures
+  - Fix listener callbacks to properly type their event parameters
+  - Files affected:
+    - `client/src/hooks/useSyncManager.ts` (12 errors)
+    - `client/src/hooks/useOptimisticUpdates.ts` (10 errors)
+    - `client/src/hooks/useErrorHandling.ts` (10 errors)
+  - _Requirements: 3.1, 3.2, 3.3_
+
+- [ ] 8.3 Fix provider and service EventBus listener registrations (14 errors)
+  - Update provider components and services that register EventBus listeners
+  - Ensure listener callbacks properly type their event parameters
+  - Files affected:
+    - `client/src/providers/OptimisticUpdatesProvider.tsx` (8 errors)
+    - `client/src/services/ConnectionManager.ts` (4 errors)
+    - `client/src/providers/ConnectionManagerProvider.tsx` (2 errors)
+  - _Requirements: 3.1, 3.2, 3.3_
+
+- [ ] 8.4 Fix page component type issues (2 errors)
+  - Fix product page similar products map callback type compatibility
+  - Fix shop page product type compatibility
+  - Files affected:
+    - `client/src/pages/product.tsx` (1 error)
+    - `client/src/pages/shop.tsx` (1 error)
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [x] 8.2 Fix server route error handling type safety (74 errors)
-  - Update all `catch` blocks to properly type error as `unknown`
-  - Add type guard to convert `unknown` error to `Error | string` before passing to `handleRouteError`
-  - Pattern: `catch (error) { handleRouteError(error instanceof Error ? error : String(error), res, "message"); }`
-  - Files affected (74 errors across 22 files):
-    - `server/routes/activity.ts` (1 error)
-    - `server/routes/categories.ts` (1 error)
-    - `server/routes/clerk.ts` (2 errors)
-    - `server/routes/downloads.ts` (6 errors)
-    - `server/routes/email.ts` (4 errors)
-    - `server/routes/internal.ts` (4 errors)
-    - `server/routes/monitoring.ts` (4 errors)
-    - `server/routes/openGraph.ts` (4 errors)
-    - `server/routes/orders.ts` (5 errors)
-    - `server/routes/payments.ts` (2 errors)
-    - `server/routes/paypal.ts` (6 errors)
-    - `server/routes/reservations.ts` (8 errors)
-    - `server/routes/schema.ts` (3 errors)
-    - `server/routes/security.ts` (3 errors)
-    - `server/routes/serviceOrders.ts` (2 errors)
-    - `server/routes/sitemap.ts` (4 errors)
-    - `server/routes/storage.ts` (4 errors)
-    - `server/routes/stripe.ts` (3 errors)
-    - `server/routes/uploads.ts` (1 error)
-    - `server/routes/wishlist.ts` (4 errors)
-    - `server/routes/woo.ts` (3 errors)
+- [ ] 8.5 Fix useConnectionManager hook listener registrations (2 errors)
+  - Fix error event listener type compatibility in useConnectionManager hook
+  - Update event handler signatures to match EventBus typed signatures
+  - Files affected:
+    - `client/src/hooks/useConnectionManager.ts` (2 errors)
   - _Requirements: 3.1, 3.2, 3.3_
 
 ## Phase 9: Validation and Testing
@@ -298,13 +302,13 @@
 4. **Phase 5 Completion**: ✅ Component import and server-side type errors resolved
 5. **Phase 6 Completion**: ✅ Dashboard modernization errors resolved
 6. **Phase 7 Completion**: ✅ Type system enhancement completed
-7. **Phase 8 Completion**: ✅ Final error resolution completed (all 37 errors fixed)
-8. **Phase 9 Completion**: ✅ Validation and testing completed
-9. **Phase 10 Completion**: ✅ Documentation and cleanup completed
+7. **Phase 8 Completion**: 🔄 EventBus and component type safety in progress (50 errors remaining)
+8. **Phase 9 Completion**: ⏳ Validation and testing pending
+9. **Phase 10 Completion**: ⏳ Documentation and cleanup pending
 
 ### Quality Metrics (Target Goals)
 
-- **Error Reduction**: 114 errors → 0 errors (100% resolution target)
+- **Error Reduction**: 114 errors → 50 errors → 0 errors (56% complete, 100% resolution target)
 - **Compilation Success**: `npx tsc --noEmit` passes with zero errors
 - **Application Startup**: `npm run dev` starts without errors
 - **Frontend Access**: Application loads in browser without console errors
@@ -313,14 +317,13 @@
 
 ### Current Status
 
-**🔄 IN PROGRESS**: 81 TypeScript errors remaining (29% reduction from original 114 errors)
+**🔄 IN PROGRESS**: 50 TypeScript errors remaining (56% reduction from original 114 errors)
 
 - **Original Issues**: ✅ All malformed function names and basic syntax errors resolved (Phases 1-7)
-- **Type Safety**: 🔄 Component lazy loading type compatibility needs fixing (7 errors)
-- **Error Handling**: 🔄 Server route error handling needs type guards (74 errors)
-- **Dashboard Modernization**: ✅ All dashboard component errors resolved
-- **Legacy Code**: ✅ Archived migration files properly typed
-- **Compilation**: ❌ `npx tsc --noEmit` fails with 81 errors
+- **Server Routes**: ✅ All server route error handling fixed
+- **EventBus Type Safety**: 🔄 EventBus listener type compatibility needs fixing (48 errors)
+- **Page Components**: � Produect and shop page type compatibility needs fixing (2 errors)
+- **Compilation**: ❌ `npx tsc --noEmit` fails with 50 errors
 - **Application**: ⚠️ Development server status unknown until errors resolved
 
 ### Rollback Triggers
@@ -352,9 +355,9 @@
 
 ## Current State Summary
 
-This implementation plan is **in progress** with 81 TypeScript errors remaining out of the original 114 errors (29% reduction achieved).
+This implementation plan is **in progress** with 50 TypeScript errors remaining out of the original 114 errors (56% reduction achieved).
 
-### 🔄 **Progress Status** (114 → 81 errors, 29% resolution)
+### 🔄 **Progress Status** (114 → 50 errors, 56% resolution)
 
 Phases 1-7 have been successfully completed, resolving core syntax and type safety issues:
 
@@ -368,24 +371,34 @@ Phases 1-7 have been successfully completed, resolving core syntax and type safe
 
 ### **Remaining Work**
 
-Two categories of errors remain to be fixed:
+All remaining 50 errors are related to EventBus listener type compatibility:
 
-1. **Phase 8.1**: Lazy audio component type compatibility (7 errors)
-   - Generic type constraints in `createLazyComponent` utility
-   - Component import function typing
-   - Prop spreading type compatibility
+1. **Phase 8.1**: EventBus typed listener methods
+   - EventBus listener methods need proper typed signatures
+   - Event callbacks should receive typed events, not `unknown[]`
 
-2. **Phase 8.2**: Server route error handling type safety (74 errors)
-   - All `catch` blocks need type guards for `unknown` error
-   - Pattern: Convert `unknown` to `Error | string` before passing to `handleRouteError`
-   - Affects 22 route files across the server
+2. **Phase 8.2**: Hook EventBus listener registrations (32 errors)
+   - All hooks registering EventBus listeners need type updates
+   - Files: useSyncManager.ts (12), useOptimisticUpdates.ts (10), useErrorHandling.ts (10)
+
+3. **Phase 8.3**: Provider and service EventBus listener registrations (14 errors)
+   - Providers and services registering listeners need type updates
+   - Files: OptimisticUpdatesProvider.tsx (8), ConnectionManager.ts (4), ConnectionManagerProvider.tsx (2)
+
+4. **Phase 8.4**: Page component type issues (2 errors)
+   - Product and shop page type compatibility fixes needed
+   - Files: product.tsx (1), shop.tsx (1)
+
+5. **Phase 8.5**: useConnectionManager hook listener registrations (2 errors)
+   - Error event listener type compatibility in useConnectionManager hook
+   - Files: useConnectionManager.ts (2)
 
 ### **Implementation Results**
 
 Phases completed:
 
-1. **Phase 1-7**: ✅ Core syntax errors, type safety, and dashboard modernization (33 errors fixed)
-2. **Phase 8**: 🔄 Final error resolution in progress (81 errors remaining)
+1. **Phase 1-7**: ✅ Core syntax errors, type safety, and dashboard modernization (64 errors fixed)
+2. **Phase 8**: 🔄 EventBus listener type compatibility in progress (50 errors remaining)
 3. **Phase 9**: ⏳ Validation and testing pending
 4. **Phase 10**: ⏳ Documentation and cleanup pending
 
@@ -393,9 +406,12 @@ Phases completed:
 
 To complete this spec:
 
-1. Fix lazy audio component type compatibility (Phase 8.1)
-2. Add type guards to all server route error handlers (Phase 8.2)
-3. Run validation and testing (Phase 9)
-4. Document changes and optimize configuration (Phase 10)
+1. Fix EventBus typed listener methods (Phase 8.1)
+2. Fix hook EventBus listener registrations (Phase 8.2)
+3. Fix provider and service EventBus listener registrations (Phase 8.3)
+4. Fix page component type issues (Phase 8.4)
+5. Fix useConnectionManager hook listener registrations (Phase 8.5)
+6. Run validation and testing (Phase 9)
+7. Document changes and optimize configuration (Phase 10)
 
-**The spec will be complete when all 81 remaining TypeScript errors are resolved and the application compiles successfully.**
+**The spec will be complete when all 50 remaining TypeScript errors are resolved and the application compiles successfully.**

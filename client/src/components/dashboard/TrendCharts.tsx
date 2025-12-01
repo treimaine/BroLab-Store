@@ -63,12 +63,12 @@ function TrendIndicator({
   label,
   icon: Icon,
   color,
-}: {
+}: Readonly<{
   trend: TrendData;
   label: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;
-}) {
+}>) {
   const isPositive = trend.changePercent > 0;
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
 
@@ -111,7 +111,7 @@ function TrendIndicator({
 }
 
 // Revenue area chart
-function RevenueAreaChart({ data }: { data: ChartDataPoint[] }) {
+function RevenueAreaChart({ data }: Readonly<{ data: ChartDataPoint[] }>) {
   return (
     <Card className="bg-gray-900/50 border-gray-700/50">
       <CardHeader>
@@ -174,7 +174,7 @@ function RevenueAreaChart({ data }: { data: ChartDataPoint[] }) {
 }
 
 // Activity line chart
-function ActivityLineChart({ data }: { data: ChartDataPoint[] }) {
+function ActivityLineChart({ data }: Readonly<{ data: ChartDataPoint[] }>) {
   return (
     <Card className="bg-gray-900/50 border-gray-700/50">
       <CardHeader>
@@ -231,7 +231,7 @@ function ActivityLineChart({ data }: { data: ChartDataPoint[] }) {
 }
 
 // Favorites bar chart (previously beats)
-function BeatsBarChart({ data }: { data: ChartDataPoint[] }) {
+function BeatsBarChart({ data }: Readonly<{ data: ChartDataPoint[] }>) {
   return (
     <Card className="bg-gray-900/50 border-gray-700/50">
       <CardHeader>
@@ -273,14 +273,14 @@ function BeatsBarChart({ data }: { data: ChartDataPoint[] }) {
   );
 }
 
-// Composant principal
+// Main component
 export function TrendCharts({
   data,
   trends,
   favoritesMonthly,
   isLoading = false,
   className,
-}: TrendChartsProps) {
+}: Readonly<TrendChartsProps>) {
   const [selectedPeriod, setSelectedPeriod] = useState<"7d" | "30d" | "90d" | "1y">("30d");
 
   const filteredData = useMemo(() => {
@@ -301,14 +301,16 @@ export function TrendCharts({
   const favoritesData = useMemo<ChartDataPoint[]>(() => {
     if (favoritesMonthly && favoritesMonthly.length > 0) {
       // When period is days-based, we still show up to the matching months window
-      const monthsWindow =
-        selectedPeriod === "7d"
-          ? 1
-          : selectedPeriod === "30d"
-            ? 1
-            : selectedPeriod === "90d"
-              ? 3
-              : 12;
+      let monthsWindow: number;
+      if (selectedPeriod === "7d") {
+        monthsWindow = 1;
+      } else if (selectedPeriod === "30d") {
+        monthsWindow = 1;
+      } else if (selectedPeriod === "90d") {
+        monthsWindow = 3;
+      } else {
+        monthsWindow = 12;
+      }
       const sliced = favoritesMonthly.slice(-monthsWindow);
       return sliced.map(m => ({
         date: m.label,
@@ -325,16 +327,22 @@ export function TrendCharts({
     return (
       <div className={cn("space-y-6", className)}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-gray-800/50 rounded-lg p-4 animate-pulse">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div
+              key={`skeleton-trend-${i}`}
+              className="bg-gray-800/50 rounded-lg p-4 animate-pulse"
+            >
               <div className="h-4 bg-gray-700 rounded w-3/4 mb-2" />
               <div className="h-8 bg-gray-700 rounded w-1/2" />
             </div>
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-gray-900/50 rounded-lg p-6 animate-pulse">
+          {Array.from({ length: 3 }, (_, i) => (
+            <div
+              key={`skeleton-chart-${i}`}
+              className="bg-gray-900/50 rounded-lg p-6 animate-pulse"
+            >
               <div className="h-6 bg-gray-700 rounded w-1/3 mb-4" />
               <div className="h-64 bg-gray-700 rounded" />
             </div>
@@ -400,7 +408,7 @@ export function TrendCharts({
         />
       </div>
 
-      {/* Graphiques */}
+      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RevenueAreaChart data={filteredData} />
         <ActivityLineChart data={filteredData} />

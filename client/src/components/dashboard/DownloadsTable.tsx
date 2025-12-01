@@ -38,58 +38,76 @@ const DownloadsTable = memo<DownloadsTableProps>(
           label: "Beat",
           sortable: true,
           filterable: true,
-          render: (value: string, row: DownloadItem) => (
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <FileAudio className="w-4 h-4 text-blue-500" />
-                <p className="font-medium">{value}</p>
+          render: (value: unknown, row: TableData) => {
+            const title = typeof value === "string" ? value : String(value);
+            const download = row as unknown as DownloadItem;
+            return (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <FileAudio className="w-4 h-4 text-blue-500" />
+                  <p className="font-medium">{title}</p>
+                </div>
+                {download.artist && (
+                  <p className="text-sm text-muted-foreground">par {download.artist}</p>
+                )}
               </div>
-              {row.artist && <p className="text-sm text-muted-foreground">par {row.artist}</p>}
-            </div>
-          ),
+            );
+          },
         },
         {
           key: "format",
           label: "Format",
           sortable: true,
           filterable: true,
-          render: (value: string, row: DownloadItem) => (
-            <div className="space-y-1">
-              <Badge variant="outline" className="uppercase font-mono">
-                {value}
-              </Badge>
-              <p className="text-xs text-muted-foreground">{row.quality}</p>
-            </div>
-          ),
+          render: (value: unknown, row: TableData) => {
+            const format = typeof value === "string" ? value : String(value);
+            const download = row as unknown as DownloadItem;
+            return (
+              <div className="space-y-1">
+                <Badge variant="outline" className="uppercase font-mono">
+                  {format}
+                </Badge>
+                <p className="text-xs text-muted-foreground">{download.quality}</p>
+              </div>
+            );
+          },
         },
         {
           key: "fileSize",
           label: "Size",
           sortable: true,
-          render: (value: number) => (
-            <span className="text-sm font-mono">
-              {value < 1 ? `${(value * 1024).toFixed(0)} KB` : `${value.toFixed(1)} MB`}
-            </span>
-          ),
+          render: (value: unknown) => {
+            const size = typeof value === "number" ? value : Number(value);
+            return (
+              <span className="text-sm font-mono">
+                {size < 1 ? `${(size * 1024).toFixed(0)} KB` : `${size.toFixed(1)} MB`}
+              </span>
+            );
+          },
         },
         {
           key: "licenseType",
           label: "License",
           filterable: true,
-          render: (value: string) => (
-            <Badge variant="secondary" className="capitalize">
-              {value || "Standard"}
-            </Badge>
-          ),
+          render: (value: unknown) => {
+            const license = typeof value === "string" ? value : String(value);
+            return (
+              <Badge variant="secondary" className="capitalize">
+                {license || "Standard"}
+              </Badge>
+            );
+          },
         },
         {
           key: "downloadCount",
           label: "Downloads",
           sortable: true,
-          render: (value: number, row: DownloadItem) => {
-            const isLimited = row.maxDownloads && row.maxDownloads > 0;
-            const isNearLimit = isLimited && value >= row.maxDownloads! * 0.8;
-            const isAtLimit = isLimited && value >= row.maxDownloads!;
+          render: (value: unknown, row: TableData) => {
+            const count = typeof value === "number" ? value : Number(value);
+            const download = row as unknown as DownloadItem;
+            const isLimited = download.maxDownloads && download.maxDownloads > 0;
+            const isNearLimit = isLimited && count >= download.maxDownloads! * 0.8;
+            const isAtLimit = isLimited && count >= download.maxDownloads!;
 
             const getTextColor = () => {
               if (isAtLimit) return "text-red-600";
@@ -106,14 +124,16 @@ const DownloadsTable = memo<DownloadsTableProps>(
             return (
               <div className="space-y-1">
                 <div className="flex items-center gap-1">
-                  <span className={`font-medium ${getTextColor()}`}>{value}</span>
-                  {isLimited && <span className="text-muted-foreground">/ {row.maxDownloads}</span>}
+                  <span className={`font-medium ${getTextColor()}`}>{count}</span>
+                  {isLimited && (
+                    <span className="text-muted-foreground">/ {download.maxDownloads}</span>
+                  )}
                 </div>
                 {isLimited && (
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div
                       className={`h-1.5 rounded-full ${getProgressColor()}`}
-                      style={{ width: `${Math.min((value / row.maxDownloads!) * 100, 100)}%` }}
+                      style={{ width: `${Math.min((count / download.maxDownloads!) * 100, 100)}%` }}
                     />
                   </div>
                 )}
@@ -126,25 +146,31 @@ const DownloadsTable = memo<DownloadsTableProps>(
           label: "First download",
           type: "date",
           sortable: true,
-          render: (value: string) => (
-            <div className="space-y-1">
-              <p className="text-sm">{new Date(value).toLocaleDateString("en-US")}</p>
-              <p className="text-xs text-muted-foreground">
-                {new Date(value).toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            </div>
-          ),
+          render: (value: unknown) => {
+            const date = typeof value === "string" ? value : String(value);
+            return (
+              <div className="space-y-1">
+                <p className="text-sm">{new Date(date).toLocaleDateString("en-US")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(date).toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+            );
+          },
         },
         {
           key: "status",
           label: "Status",
-          render: (_, row: DownloadItem) => {
+          render: (_: unknown, row: TableData) => {
+            const download = row as unknown as DownloadItem;
             const isExpired =
-              row.isExpired || (row.expiresAt && new Date(row.expiresAt) < new Date());
-            const isAtLimit = row.maxDownloads && row.downloadCount >= row.maxDownloads;
+              download.isExpired ||
+              (download.expiresAt && new Date(download.expiresAt) < new Date());
+            const isAtLimit =
+              download.maxDownloads && download.downloadCount >= download.maxDownloads;
 
             if (isExpired) {
               return (
@@ -207,7 +233,7 @@ const DownloadsTable = memo<DownloadsTableProps>(
     // Row actions
     const handleRowClick = useCallback(
       (row: TableData) => {
-        const download = row as DownloadItem;
+        const download = row as unknown as DownloadItem;
         handleDownload(download);
       },
       [handleDownload]

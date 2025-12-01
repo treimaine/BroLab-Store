@@ -73,7 +73,17 @@ export function RewardsGrid({ userId, className }: RewardsGridProps) {
 }
 
 interface RewardCardProps {
-  reward: any; // Type from LoyaltyService
+  reward: {
+    id: number;
+    name: string;
+    description: string;
+    pointsRequired: number;
+    available?: boolean;
+    type?: string;
+    metadata?: {
+      amount?: number;
+    };
+  };
   userId: number;
   onRedeem: (rewardId: number) => void;
   isRedeeming: boolean;

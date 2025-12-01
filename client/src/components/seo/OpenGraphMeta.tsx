@@ -2,20 +2,20 @@ import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 
 interface OpenGraphMetaProps {
-  type: "beat" | "shop" | "home" | "page";
-  beatId?: number;
-  pageName?: "about" | "contact" | "terms" | "privacy" | "license";
+  readonly type: "beat" | "shop" | "home" | "page";
+  readonly beatId?: number;
+  readonly pageName?: "about" | "contact" | "terms" | "privacy" | "license";
 }
 
 /**
- * Composant pour injecter les meta tags Open Graph dans le head
- * Utilise react-helmet-async pour la cohérence avec l'UI existante
+ * Component to inject Open Graph meta tags into the head
+ * Uses react-helmet-async for consistency with existing UI
  */
-export function OpenGraphMeta({ type, beatId, pageName }: OpenGraphMetaProps) {
+export function OpenGraphMeta({ type, beatId, pageName }: Readonly<OpenGraphMetaProps>) {
   const [openGraphHTML, setOpenGraphHTML] = useState<string>("");
 
   useEffect(() => {
-    const fetchOpenGraph = async () => {
+    const fetchOpenGraph = async (): Promise<void> => {
       try {
         let endpoint = "";
 
@@ -57,71 +57,22 @@ export function OpenGraphMeta({ type, beatId, pageName }: OpenGraphMetaProps) {
     return null;
   }
 
-  // Parser le HTML pour extraire les meta tags
+  // Parse HTML to extract meta tags
   const parser = new DOMParser();
   const doc = parser.parseFromString(openGraphHTML, "text/html");
   const metaTags = Array.from(doc.querySelectorAll("meta"));
 
   return (
     <Helmet>
-      {metaTags.map((meta, index) => {
-        const attrs: any = {};
-        for (let i = 0; i < meta.attributes.length; i++) {
-          const attr = meta.attributes[i];
+      {metaTags.map(meta => {
+        const attrs: Record<string, string> = {};
+        for (const attr of meta.attributes) {
           attrs[attr.name] = attr.value;
         }
-        return <meta key={index} {...attrs} />;
+        // Use property or content as unique key
+        const key = attrs.property || attrs.name || attrs.content;
+        return <meta key={key} {...attrs} />;
       })}
     </Helmet>
   );
-}
-
-/**
- * Hook pour utiliser les meta tags Open Graph dans les composants
- */
-export function useOpenGraphMeta(
-  type: "beat" | "shop" | "home" | "page",
-  beatId?: number,
-  pageName?: "about" | "contact" | "terms" | "privacy" | "license"
-) {
-  const [openGraphHTML, setOpenGraphHTML] = useState<string>("");
-
-  useEffect(() => {
-    const fetchOpenGraph = async () => {
-      try {
-        let endpoint = "";
-
-        switch (type) {
-          case "beat":
-            if (!beatId) return;
-            endpoint = `/api/opengraph/beat/${beatId}`;
-            break;
-          case "shop":
-            endpoint = "/api/opengraph/shop";
-            break;
-          case "home":
-            endpoint = "/api/opengraph/home";
-            break;
-          case "page":
-            if (!pageName) return;
-            endpoint = `/api/opengraph/page/${pageName}`;
-            break;
-          default:
-            return;
-        }
-
-        const response = await fetch(endpoint);
-        if (response.ok) {
-          const html = await response.text();
-          setOpenGraphHTML(html);
-        }
-      } catch (error) {
-        console.error("Error fetching Open Graph meta tags:", error);
-      }
-    };
-
-    fetchOpenGraph();
-  }, [type, beatId, pageName]);
-
-  return openGraphHTML;
 }

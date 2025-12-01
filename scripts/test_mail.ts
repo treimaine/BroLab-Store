@@ -1,20 +1,19 @@
-import { sendMail } from '../server/services/mail.js';
-import { config } from 'dotenv';
 #!/usr/bin/env tsx
-
 // Load environment variables
+import { config } from "dotenv";
+import { sendMail } from "../server/services/mail.js";
 config();
 
 async function testMail() {
-  const testEmail = process.argv[2] || 'test@example.com';
-  
-  console.log('🧪 Testing mail service...');
-  console.log('📧 Sending to:', testEmail);
-  
+  const testEmail = process.argv[2] || "test@example.com";
+
+  console.log("🧪 Testing mail service...");
+  console.log("📧 Sending to:", testEmail);
+
   try {
     await sendMail({
       to: testEmail,
-      subject: '🧪 BroLab Mail Service Test',
+      subject: "🧪 BroLab Mail Service Test",
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4;">
           <div style="background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
@@ -30,11 +29,10 @@ async function testMail() {
         </div>
       `,
     });
-    
-    console.log('✅ Test email sent successfully!');
-    
+
+    console.log("✅ Test email sent successfully!");
   } catch (error: any) {
-    console.error('❌ Test failed:', error.message);
+    console.error("❌ Test failed:", error.message);
     process.exit(1);
   }
 }

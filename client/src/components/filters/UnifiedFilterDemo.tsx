@@ -1,10 +1,10 @@
-import { BeatCard } from "@/components/beats/beat-card";
 import { TableBeatView } from "@/components/beats/TableBeatView";
+import { BeatCard } from "@/components/beats/beat-card";
+import { UnifiedFilterPanel } from "@/components/filters/UnifiedFilterPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { UnifiedFilterPanel } from "@/components/filters/UnifiedFilterPanel";
 import { useUnifiedFilters } from "@/hooks/useUnifiedFilters";
 import { Filter, Grid3X3, List, RotateCcw, Search } from "lucide-react";
 import { useState } from "react";
@@ -134,7 +134,7 @@ export function UnifiedFilterDemo() {
               onChange={e => {
                 const [sortBy, sortOrder] = e.target.value.split("-") as [
                   "date" | "price" | "title" | "popularity",
-                  "asc" | "desc"
+                  "asc" | "desc",
                 ];
                 updateFilters({ sortBy, sortOrder });
               }}
@@ -221,7 +221,7 @@ export function UnifiedFilterDemo() {
               </div>
             ) : (
               <TableBeatView
-                products={products}
+                products={products as unknown as import("@shared/types").BroLabWooCommerceProduct[]}
                 onViewDetails={productId => console.log("View product:", productId)}
               />
             )}
@@ -275,7 +275,7 @@ export function UnifiedFilterDemo() {
             <div>
               <h4 className="font-semibold mb-2">🎯 Fonctionnalités</h4>
               <ul className="text-sm space-y-1 text-muted-foreground">
-                <li>• Gestion d'état centralisée</li>
+                <li>• Gestion d&apos;état centralisée</li>
                 <li>• Requêtes optimisées</li>
                 <li>• Calcul dynamique des plages</li>
                 <li>• Cache intelligent</li>

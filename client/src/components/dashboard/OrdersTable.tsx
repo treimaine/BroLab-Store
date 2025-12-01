@@ -1,24 +1,16 @@
-import React, { useCallback } from 'react';
-import InteractiveDataTable, { TableColumn, TableData } from './InteractiveDataTable';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Eye,
-  Download,
-  RefreshCw,
-  CheckCircle,
-  Clock,
-  XCircle,
-  AlertTriangle,
-} from 'lucide-react';
-import { toast } from 'sonner';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, CheckCircle, Clock, Download, RefreshCw, XCircle } from "lucide-react";
+import React, { useCallback } from "react";
+import { toast } from "sonner";
+import InteractiveDataTable, { TableColumn, TableData } from "./InteractiveDataTable";
 
 interface Order {
   id: string;
   beatTitle: string;
   artist?: string;
   amount: number;
-  status: 'pending' | 'completed' | 'failed' | 'processing';
+  status: "pending" | "completed" | "failed" | "processing";
   createdAt: string;
   updatedAt?: string;
   paymentMethod?: string;
@@ -42,84 +34,90 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
   // Configuration des colonnes
   const columns: TableColumn[] = [
     {
-      key: 'id',
-      label: 'ID Commande',
+      key: "id",
+      label: "ID Commande",
       sortable: true,
       filterable: true,
-      render: (value: string) => (
-        <span className="font-mono text-sm text-muted-foreground">#{value.slice(-8)}</span>
-      ),
+      render: (value: unknown) => {
+        const id = typeof value === "string" ? value : String(value);
+        return <span className="font-mono text-sm text-muted-foreground">#{id.slice(-8)}</span>;
+      },
     },
     {
-      key: 'beatTitle',
-      label: 'Beat',
+      key: "beatTitle",
+      label: "Beat",
       sortable: true,
       filterable: true,
-      render: (value: string, row: Order) => (
-        <div className="space-y-1">
-          <p className="font-medium">{value}</p>
-          {row.artist && (
-            <p className="text-sm text-muted-foreground">par {row.artist}</p>
-          )}
-        </div>
-      ),
+      render: (value: unknown, row: TableData) => {
+        const title = typeof value === "string" ? value : String(value);
+        const order = row as unknown as Order;
+        return (
+          <div className="space-y-1">
+            <p className="font-medium">{title}</p>
+            {order.artist && <p className="text-sm text-muted-foreground">par {order.artist}</p>}
+          </div>
+        );
+      },
     },
     {
-      key: 'licenseType',
-      label: 'Licence',
+      key: "licenseType",
+      label: "Licence",
       sortable: true,
       filterable: true,
-      render: (value: string) => (
-        <Badge variant="outline" className="capitalize">
-          {value || 'Standard'}
-        </Badge>
-      ),
+      render: (value: unknown) => {
+        const license = typeof value === "string" ? value : String(value);
+        return (
+          <Badge variant="outline" className="capitalize">
+            {license || "Standard"}
+          </Badge>
+        );
+      },
     },
     {
-      key: 'amount',
-      label: 'Montant',
-      type: 'currency',
+      key: "amount",
+      label: "Montant",
+      type: "currency",
       sortable: true,
-      render: (value: number) => (
-        <span className="font-semibold text-green-600">
-          ${value.toFixed(2)}
-        </span>
-      ),
+      render: (value: unknown) => {
+        const amount = typeof value === "number" ? value : Number(value);
+        return <span className="font-semibold text-green-600">${amount.toFixed(2)}</span>;
+      },
     },
     {
-      key: 'status',
-      label: 'Statut',
+      key: "status",
+      label: "Statut",
       sortable: true,
       filterable: true,
-      render: (value: string) => {
+      render: (value: unknown) => {
+        const status = typeof value === "string" ? value : String(value);
         const statusConfig = {
           pending: {
-            variant: 'secondary' as const,
+            variant: "secondary" as const,
             icon: Clock,
-            label: 'En attente',
-            className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+            label: "En attente",
+            className: "bg-yellow-100 text-yellow-800 border-yellow-200",
           },
           processing: {
-            variant: 'secondary' as const,
+            variant: "secondary" as const,
             icon: RefreshCw,
-            label: 'En cours',
-            className: 'bg-blue-100 text-blue-800 border-blue-200',
+            label: "En cours",
+            className: "bg-blue-100 text-blue-800 border-blue-200",
           },
           completed: {
-            variant: 'default' as const,
+            variant: "default" as const,
             icon: CheckCircle,
-            label: 'Terminé',
-            className: 'bg-green-100 text-green-800 border-green-200',
+            label: "Terminé",
+            className: "bg-green-100 text-green-800 border-green-200",
           },
           failed: {
-            variant: 'destructive' as const,
+            variant: "destructive" as const,
             icon: XCircle,
-            label: 'Échoué',
-            className: 'bg-red-100 text-red-800 border-red-200',
+            label: "Échoué",
+            className: "bg-red-100 text-red-800 border-red-200",
           },
         };
 
-        const config = statusConfig[value as keyof typeof statusConfig] || statusConfig.pending;
+        const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
         const Icon = config.icon;
 
         return (
@@ -131,75 +129,82 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
       },
     },
     {
-      key: 'paymentMethod',
-      label: 'Paiement',
+      key: "paymentMethod",
+      label: "Paiement",
       filterable: true,
-      render: (value: string) => (
-        <span className="text-sm capitalize">
-          {value || 'Carte bancaire'}
-        </span>
-      ),
+      render: (value: unknown) => {
+        const payment = typeof value === "string" ? value : String(value);
+        return <span className="text-sm capitalize">{payment || "Carte bancaire"}</span>;
+      },
     },
     {
-      key: 'createdAt',
-      label: 'Date',
-      type: 'date',
+      key: "createdAt",
+      label: "Date",
+      type: "date",
       sortable: true,
-      render: (value: string) => (
-        <div className="space-y-1">
-          <p className="text-sm">
-            {new Date(value).toLocaleDateString('fr-FR')}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {new Date(value).toLocaleTimeString('fr-FR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </p>
-        </div>
-      ),
+      render: (value: unknown) => {
+        const date = typeof value === "string" ? value : String(value);
+        return (
+          <div className="space-y-1">
+            <p className="text-sm">{new Date(date).toLocaleDateString("fr-FR")}</p>
+            <p className="text-xs text-muted-foreground">
+              {new Date(date).toLocaleTimeString("fr-FR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+          </div>
+        );
+      },
     },
   ];
 
   // Gestion des actions sur les lignes
   const handleRowClick = useCallback((row: TableData) => {
-    const order = row as Order;
+    const order = row as unknown as Order;
     toast.info(`Commande #${order.id.slice(-8)} sélectionnée`);
     // Ici, on pourrait ouvrir un modal avec les détails de la commande
   }, []);
 
   // Export des données
-  const handleExport = useCallback((format: 'csv' | 'pdf') => {
-    if (format === 'csv') {
-      // Générer un CSV
-      const csvHeaders = columns.map(col => col.label).join(',');
-      const csvData = orders.map(order => [
-        order.id,
-        order.beatTitle,
-        order.licenseType || 'Standard',
-        order.amount,
-        order.status,
-        order.paymentMethod || 'Carte bancaire',
-        new Date(order.createdAt).toLocaleDateString('fr-FR'),
-      ].join(',')).join('\n');
-      
-      const csvContent = `${csvHeaders}\n${csvData}`;
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `commandes_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast.success('Export CSV téléchargé');
-    } else {
-      // Pour le PDF, on pourrait utiliser une bibliothèque comme jsPDF
-      toast.info('Export PDF en cours de développement');
-    }
-  }, [orders, columns]);
+  const handleExport = useCallback(
+    (format: "csv" | "pdf") => {
+      if (format === "csv") {
+        // Générer un CSV
+        const csvHeaders = columns.map(col => col.label).join(",");
+        const csvData = orders
+          .map(order =>
+            [
+              order.id,
+              order.beatTitle,
+              order.licenseType || "Standard",
+              order.amount,
+              order.status,
+              order.paymentMethod || "Carte bancaire",
+              new Date(order.createdAt).toLocaleDateString("fr-FR"),
+            ].join(",")
+          )
+          .join("\n");
+
+        const csvContent = `${csvHeaders}\n${csvData}`;
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `commandes_${new Date().toISOString().split("T")[0]}.csv`);
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast.success("Export CSV téléchargé");
+      } else {
+        // Pour le PDF, on pourrait utiliser une bibliothèque comme jsPDF
+        toast.info("Export PDF en cours de développement");
+      }
+    },
+    [orders, columns]
+  );
 
   // Données formatées pour le tableau
   const tableData: TableData[] = orders.map(order => ({
@@ -227,40 +232,35 @@ const OrdersTable: React.FC<OrdersTableProps> = ({
         onRowClick={handleRowClick}
         onExport={handleExport}
       />
-      
+
       {/* Actions rapides */}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRefresh}
-          disabled={isLoading}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+        <Button variant="outline" size="sm" onClick={onRefresh} disabled={isLoading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
           Actualiser
         </Button>
-        
+
         <Button
           variant="outline"
           size="sm"
           onClick={() => {
-            const pendingOrders = orders.filter(o => o.status === 'pending');
+            const pendingOrders = orders.filter(o => o.status === "pending");
             if (pendingOrders.length > 0) {
               toast.info(`${pendingOrders.length} commande(s) en attente`);
             } else {
-              toast.success('Aucune commande en attente');
+              toast.success("Aucune commande en attente");
             }
           }}
         >
           <AlertTriangle className="w-4 h-4 mr-2" />
           Vérifier les commandes en attente
         </Button>
-        
+
         <Button
           variant="outline"
           size="sm"
           onClick={() => {
-            const completedOrders = orders.filter(o => o.status === 'completed' && o.downloadUrl);
+            const completedOrders = orders.filter(o => o.status === "completed" && o.downloadUrl);
             toast.info(`${completedOrders.length} téléchargement(s) disponible(s)`);
           }}
         >

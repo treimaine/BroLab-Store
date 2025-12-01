@@ -27,8 +27,8 @@ export const preloadCriticalResources = () => {
 };
 
 // Lazy load images with intersection observer
-export const lazyLoadImages = () => {
-  if ("IntersectionObserver" in window) {
+export const lazyLoadImages = (): void => {
+  if ("IntersectionObserver" in globalThis) {
     const imageObserver = new IntersectionObserver((entries, observer) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
@@ -49,7 +49,7 @@ export const lazyLoadImages = () => {
 };
 
 // Debounce function for search and scroll events
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number,
   immediate?: boolean
@@ -71,7 +71,7 @@ export function debounce<T extends (...args: any[]) => any>(
 }
 
 // Throttle function for resize and scroll events
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): (...args: Parameters<T>) => void {
@@ -88,7 +88,7 @@ export function throttle<T extends (...args: any[]) => any>(
 
 // Check if user prefers reduced motion
 export const prefersReducedMotion = (): boolean => {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
 };
 
 // Optimize scroll performance
@@ -107,7 +107,7 @@ export const optimizeScrolling = () => {
     }
   };
 
-  window.addEventListener("scroll", requestScrollUpdate, { passive: true });
+  globalThis.addEventListener("scroll", requestScrollUpdate, { passive: true });
 };
 
 // Web Vitals monitoring
@@ -150,11 +150,8 @@ export const cleanupAudioResources = () => {
 
 // Network-aware loading
 export const isSlowConnection = (): boolean => {
-  const connection = (navigator as any).connection;
-  if (connection) {
-    return connection.effectiveType === "slow-2g" || connection.effectiveType === "2g";
-  }
-  return false;
+  const connection = (navigator as { connection?: { effectiveType?: string } }).connection;
+  return connection?.effectiveType === "slow-2g" || connection?.effectiveType === "2g" || false;
 };
 
 // Bundle size analysis helper

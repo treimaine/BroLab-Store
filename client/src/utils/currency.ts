@@ -14,7 +14,7 @@ export interface CurrencyFormatterOptions {
 }
 
 export class CurrencyFormatter {
-  private config = CURRENCY_CONFIG;
+  private readonly config = CURRENCY_CONFIG;
 
   /**
    * Format currency amount in dollars
@@ -70,9 +70,9 @@ export class CurrencyFormatter {
    */
   parse(formatted: string): number {
     // Remove currency symbols and non-numeric characters except decimal point
-    const cleaned = formatted.replace(/[^\d.-]/g, "");
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? 0 : parsed;
+    const cleaned = formatted.replaceAll(/[^\d.-]/g, "");
+    const parsed = Number.parseFloat(cleaned);
+    return Number.isNaN(parsed) ? 0 : parsed;
   }
 
   /**
@@ -127,8 +127,8 @@ export class CurrencyFormatter {
   /**
    * Check if amount is valid
    */
-  isValidAmount(amount: any): boolean {
-    return typeof amount === "number" && !isNaN(amount) && isFinite(amount);
+  isValidAmount(amount: unknown): boolean {
+    return typeof amount === "number" && !Number.isNaN(amount) && Number.isFinite(amount);
   }
 }
 
@@ -178,7 +178,7 @@ export function getCurrencySymbol(): string {
   return currencyFormatter.getSymbol();
 }
 
-export function isValidCurrencyAmount(amount: any): boolean {
+export function isValidCurrencyAmount(amount: unknown): boolean {
   return currencyFormatter.isValidAmount(amount);
 }
 

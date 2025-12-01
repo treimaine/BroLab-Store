@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { cn } from "@/lib/utils";
 import { useFilterStore } from "@/stores/useFilterStore";
+import type { BroLabWooCommerceProduct, WooCommerceTag } from "@shared/types";
 import { Clock, Music, Search, Star, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -67,7 +68,7 @@ export function SearchHero() {
     }
   };
 
-  const handleSuggestionClick = (product: any) => {
+  const handleSuggestionClick = (product: BroLabWooCommerceProduct) => {
     // Navigate directly to the specific product page using product ID
     if (product.id && product.id !== 0) {
       setShowSuggestions(false);
@@ -145,9 +146,9 @@ export function SearchHero() {
                       <Clock className="w-3 h-3" />
                       Recent Searches
                     </div>
-                    {recentSearches.map((query, index) => (
+                    {recentSearches.map(query => (
                       <button
-                        key={index}
+                        key={query}
                         type="button"
                         onClick={() => handleRecentSearchClick(query)}
                         className="w-full text-left p-3 hover:bg-white/5 rounded-lg flex items-center gap-4 transition-all duration-200 group"
@@ -173,7 +174,7 @@ export function SearchHero() {
                       <Star className="w-3 h-3" />
                       Beat Suggestions
                     </div>
-                    {searchResults.map((product: any) => (
+                    {searchResults.map((product: BroLabWooCommerceProduct) => (
                       <button
                         key={product.id}
                         type="button"
@@ -225,13 +226,17 @@ export function SearchHero() {
                                 const isFree =
                                   product.is_free ||
                                   product.tags?.some(
-                                    (tag: any) => tag.name.toLowerCase() === "free"
+                                    (tag: WooCommerceTag) => tag.name.toLowerCase() === "free"
                                   ) ||
-                                  product.price === 0 ||
-                                  product.price === "0" ||
-                                  parseFloat(product.price) === 0 ||
+                                  (typeof product.price === "string"
+                                    ? Number.parseFloat(product.price)
+                                    : product.price) === 0 ||
                                   false;
-                                return isFree ? "FREE" : `$${product.price?.toFixed(2) || "0.00"}`;
+                                const priceNum =
+                                  typeof product.price === "string"
+                                    ? Number.parseFloat(product.price)
+                                    : product.price;
+                                return isFree ? "FREE" : `$${priceNum?.toFixed(2) || "0.00"}`;
                               })()}
                             </span>
                           </div>
@@ -268,7 +273,7 @@ export function SearchHero() {
                       </div>
                       <div className="flex-1">
                         <div className="text-[var(--accent-purple)] font-medium text-sm">
-                          Search all beats for "{searchQuery}"
+                          Search all beats for &ldquo;{searchQuery}&rdquo;
                         </div>
                         <div className="text-gray-400 text-xs mt-1">
                           View complete results in shop
@@ -294,7 +299,7 @@ export function SearchHero() {
           Popular Genres
         </h3>
         <div className="flex flex-wrap gap-3 justify-center">
-          {popularGenres.map((genre, index) => (
+          {popularGenres.map(genre => (
             <Link
               key={genre.name}
               href={`/shop?genre=${encodeURIComponent(genre.name.toLowerCase())}`}

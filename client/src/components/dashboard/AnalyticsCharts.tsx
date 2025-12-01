@@ -1,36 +1,41 @@
-import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { motion } from "framer-motion";
 import {
-  TrendingUp,
-  TrendingDown,
+  BarChart3,
+  Calendar,
   DollarSign,
   Download,
   Music,
+  TrendingDown,
+  TrendingUp,
   Users,
-  Calendar,
-  BarChart3,
-} from 'lucide-react';
+} from "lucide-react";
+import React, { useMemo } from "react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 interface AnalyticsData {
   revenue: Array<{ date: string; amount: number; orders: number }>;
@@ -46,47 +51,37 @@ interface AnalyticsData {
 
 interface AnalyticsChartsProps {
   data: AnalyticsData;
-  timeRange: '7d' | '30d' | '90d' | '1y';
-  onTimeRangeChange: (range: '7d' | '30d' | '90d' | '1y') => void;
+  timeRange: "7d" | "30d" | "90d" | "1y";
+  onTimeRangeChange: (range: "7d" | "30d" | "90d" | "1y") => void;
   className?: string;
 }
 
 const COLORS = {
-  primary: '#8B5CF6',
-  secondary: '#06B6D4',
-  success: '#10B981',
-  warning: '#F59E0B',
-  danger: '#EF4444',
-  purple: '#A855F7',
-  pink: '#EC4899',
-  indigo: '#6366F1',
+  primary: "#8B5CF6",
+  secondary: "#06B6D4",
+  success: "#10B981",
+  warning: "#F59E0B",
+  danger: "#EF4444",
+  purple: "#A855F7",
+  pink: "#EC4899",
+  indigo: "#6366F1",
 };
 
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
+import { CustomTooltip } from "./CustomTooltip";
+
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
   }).format(value);
 };
 
-const formatNumber = (value: number) => {
-  return new Intl.NumberFormat('fr-FR').format(value);
+const formatNumber = (value: number): string => {
+  return new Intl.NumberFormat("fr-FR").format(value);
 };
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-gray-900/95 border border-gray-700 rounded-lg p-3 shadow-xl backdrop-blur-sm">
-        <p className="text-gray-300 text-sm mb-2">{label}</p>
-        {payload.map((entry: any, index: number) => (
-          <p key={index} className="text-sm" style={{ color: entry.color }}>
-            {entry.name}: {entry.name.includes('€') ? formatCurrency(entry.value) : formatNumber(entry.value)}
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
+const legendFormatter = (value: string): JSX.Element => {
+  return <span className="text-gray-300">{value}</span>;
 };
 
 const MetricCard: React.FC<{
@@ -94,17 +89,17 @@ const MetricCard: React.FC<{
   value: string | number;
   change: number;
   icon: React.ReactNode;
-  format?: 'currency' | 'number' | 'percentage';
-}> = ({ title, value, change, icon, format = 'number' }) => {
+  format?: "currency" | "number" | "percentage";
+}> = ({ title, value, change, icon, format = "number" }) => {
   const isPositive = change >= 0;
   const formattedValue = useMemo(() => {
-    if (format === 'currency' && typeof value === 'number') {
+    if (format === "currency" && typeof value === "number") {
       return formatCurrency(value);
     }
-    if (format === 'percentage' && typeof value === 'number') {
+    if (format === "percentage" && typeof value === "number") {
       return `${value}%`;
     }
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       return formatNumber(value);
     }
     return value;
@@ -115,9 +110,7 @@ const MetricCard: React.FC<{
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-purple-600/20 rounded-lg">
-              {icon}
-            </div>
+            <div className="p-2 bg-purple-600/20 rounded-lg">{icon}</div>
             <div>
               <p className="text-sm text-gray-400">{title}</p>
               <p className="text-2xl font-bold text-white">{formattedValue}</p>
@@ -129,11 +122,11 @@ const MetricCard: React.FC<{
             ) : (
               <TrendingDown className="w-4 h-4 text-red-500" />
             )}
-            <span className={`text-sm font-medium ${
-              isPositive ? 'text-green-500' : 'text-red-500'
-            }`}
+            <span
+              className={`text-sm font-medium ${isPositive ? "text-green-500" : "text-red-500"}`}
             >
-              {isPositive ? '+' : ''}{change.toFixed(1)}%
+              {isPositive ? "+" : ""}
+              {change.toFixed(1)}%
             </span>
           </div>
         </div>
@@ -146,7 +139,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
   data,
   timeRange,
   onTimeRangeChange,
-  className = '',
+  className = "",
 }) => {
   const totalRevenue = useMemo(() => {
     return data.revenue.reduce((sum, item) => sum + item.amount, 0);
@@ -338,16 +331,12 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {data.licenseDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    {data.licenseDistribution.map(entry => (
+                      <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend
-                    verticalAlign="bottom"
-                    height={36}
-                    formatter={(value) => <span className="text-gray-300">{value}</span>}
-                  />
+                  <Legend verticalAlign="bottom" height={36} formatter={legendFormatter} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -355,25 +344,25 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
         </Card>
       </div>
 
-      {/* Actions rapides */}
+      {/* Quick Actions */}
       <Card className="bg-gray-900/50 border-gray-700/50 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="text-white">Actions rapides</CardTitle>
-          <CardDescription>Outils d'analyse et d'export</CardDescription>
+          <CardTitle className="text-white">Quick Actions</CardTitle>
+          <CardDescription>Analysis and export tools</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
               <Calendar className="w-4 h-4 mr-2" />
-              Rapport mensuel
+              Monthly Report
             </Button>
             <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
               <Download className="w-4 h-4 mr-2" />
-              Exporter données
+              Export Data
             </Button>
             <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
               <BarChart3 className="w-4 h-4 mr-2" />
-              Analyse détaillée
+              Detailed Analysis
             </Button>
           </div>
         </CardContent>
