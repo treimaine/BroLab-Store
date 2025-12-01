@@ -10,6 +10,12 @@ export interface DashboardEvent<T = unknown> {
   correlationId?: string;
 }
 
+// Internal interface for wrapped listeners
+interface WrappedListener {
+  (...args: unknown[]): void;
+  __originalListener?: (event: DashboardEvent<unknown>) => void;
+}
+
 export interface SubscriptionOptions {
   once?: boolean;
   priority?: number;
@@ -77,51 +83,102 @@ export class EventBus extends BrowserEventEmitter {
 
   /**
    * Override on() to accept typed event callbacks
+   * Wraps the listener to ensure it receives a properly typed DashboardEvent
    */
   public override on<T = unknown>(
     event: string,
     listener: (event: DashboardEvent<T>) => void
   ): this {
-    return super.on(event, listener as (...args: unknown[]) => void);
+    // Wrap the listener to handle the event properly
+    const wrappedListener: WrappedListener = (...args: unknown[]) => {
+      // The first argument should be the DashboardEvent
+      const dashboardEvent = args[0] as DashboardEvent<T>;
+      listener(dashboardEvent);
+    };
+    // Store the original listener reference for removal
+    wrappedListener.__originalListener = listener as (event: DashboardEvent<unknown>) => void;
+    return super.on(event, wrappedListener);
   }
 
   /**
    * Override once() to accept typed event callbacks
+   * Wraps the listener to ensure it receives a properly typed DashboardEvent
    */
   public override once<T = unknown>(
     event: string,
     listener: (event: DashboardEvent<T>) => void
   ): this {
-    return super.once(event, listener as (...args: unknown[]) => void);
+    // Wrap the listener to handle the event properly
+    const wrappedListener: WrappedListener = (...args: unknown[]) => {
+      // The first argument should be the DashboardEvent
+      const dashboardEvent = args[0] as DashboardEvent<T>;
+      listener(dashboardEvent);
+    };
+    // Store the original listener reference for removal
+    wrappedListener.__originalListener = listener as (event: DashboardEvent<unknown>) => void;
+    return super.once(event, wrappedListener);
   }
 
   /**
    * Override prependListener() to accept typed event callbacks
+   * Wraps the listener to ensure it receives a properly typed DashboardEvent
    */
   public override prependListener<T = unknown>(
     event: string,
     listener: (event: DashboardEvent<T>) => void
   ): this {
-    return super.prependListener(event, listener as (...args: unknown[]) => void);
+    // Wrap the listener to handle the event properly
+    const wrappedListener: WrappedListener = (...args: unknown[]) => {
+      // The first argument should be the DashboardEvent
+      const dashboardEvent = args[0] as DashboardEvent<T>;
+      listener(dashboardEvent);
+    };
+    // Store the original listener reference for removal
+    wrappedListener.__originalListener = listener as (event: DashboardEvent<unknown>) => void;
+    return super.prependListener(event, wrappedListener);
   }
 
   /**
    * Override addListener() to accept typed event callbacks
+   * Wraps the listener to ensure it receives a properly typed DashboardEvent
    */
   public override addListener<T = unknown>(
     event: string,
     listener: (event: DashboardEvent<T>) => void
   ): this {
-    return super.addListener(event, listener as (...args: unknown[]) => void);
+    // Wrap the listener to handle the event properly
+    const wrappedListener: WrappedListener = (...args: unknown[]) => {
+      // The first argument should be the DashboardEvent
+      const dashboardEvent = args[0] as DashboardEvent<T>;
+      listener(dashboardEvent);
+    };
+    // Store the original listener reference for removal
+    wrappedListener.__originalListener = listener as (event: DashboardEvent<unknown>) => void;
+    return super.addListener(event, wrappedListener);
   }
 
   /**
    * Override removeListener() to accept typed event callbacks
+   * Handles removal of wrapped listeners by finding the original listener reference
    */
   public override removeListener<T = unknown>(
     event: string,
     listener: (event: DashboardEvent<T>) => void
   ): this {
+    // Access the private listeners map from BrowserEventEmitter
+    const listenersMap = (this as unknown as { listeners: Map<string, WrappedListener[]> })
+      .listeners;
+    const eventListeners = listenersMap?.get(event);
+
+    if (eventListeners) {
+      const wrappedListener = eventListeners.find(
+        (l: WrappedListener) => l.__originalListener === listener
+      );
+      if (wrappedListener) {
+        return super.removeListener(event, wrappedListener);
+      }
+    }
+    // Fallback to direct removal if no wrapped listener found
     return super.removeListener(event, listener as (...args: unknown[]) => void);
   }
 
@@ -206,6 +263,9 @@ export class EventBus extends BrowserEventEmitter {
       }
     };
 
+    // Store reference to the wrapped handler for unsubscribe
+    const handlerRef = wrappedHandler;
+
     // Add listener with priority support
     if (once) {
       this.once(eventType, wrappedHandler);
@@ -229,7 +289,7 @@ export class EventBus extends BrowserEventEmitter {
 
     // Return unsubscribe function
     return () => {
-      this.removeListener(eventType, wrappedHandler);
+      this.removeListener(eventType, handlerRef);
       this.updateSubscriberMetrics();
       this.log("Event subscription removed", { eventType });
     };

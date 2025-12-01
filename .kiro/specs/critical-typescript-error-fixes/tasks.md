@@ -205,9 +205,9 @@
 
 ## Phase 8: EventBus Type Safety (Current: 50 errors)
 
-- [ ] 8. Fix EventBus listener type compatibility
+- [x] 8. Fix EventBus listener type compatibility
 
-- [ ] 8.1 Fix EventBus typed listener methods
+- [x] 8.1 Fix EventBus typed listener methods
   - Update EventBus to properly type listener callbacks with specific event types
   - Fix `on`, `once`, `prependListener`, and `addListener` methods to accept typed callbacks
   - Ensure event listeners receive properly typed event objects, not `unknown[]`
@@ -215,7 +215,7 @@
     - `client/src/services/EventBus.ts`
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 8.2 Fix hook EventBus listener registrations (32 errors)
+- [x] 8.2 Fix hook EventBus listener registrations (32 errors)
   - Update all hooks that register EventBus listeners to match new typed signatures
   - Fix listener callbacks to properly type their event parameters
   - Files affected:
@@ -224,7 +224,7 @@
     - `client/src/hooks/useErrorHandling.ts` (10 errors)
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 8.3 Fix provider and service EventBus listener registrations (14 errors)
+- [x] 8.3 Fix provider and service EventBus listener registrations (14 errors)
   - Update provider components and services that register EventBus listeners
   - Ensure listener callbacks properly type their event parameters
   - Files affected:
@@ -233,7 +233,7 @@
     - `client/src/providers/ConnectionManagerProvider.tsx` (2 errors)
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 8.4 Fix page component type issues (2 errors)
+- [x] 8.4 Fix page component type issues (2 errors)
   - Fix product page similar products map callback type compatibility
   - Fix shop page product type compatibility
   - Files affected:
@@ -241,7 +241,7 @@
     - `client/src/pages/shop.tsx` (1 error)
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 8.5 Fix useConnectionManager hook listener registrations (2 errors)
+- [x] 8.5 Fix useConnectionManager hook listener registrations (2 errors)
   - Fix error event listener type compatibility in useConnectionManager hook
   - Update event handler signatures to match EventBus typed signatures
   - Files affected:
