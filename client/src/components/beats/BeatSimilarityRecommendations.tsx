@@ -324,11 +324,18 @@ export function BeatSimilarityRecommendations({
                 const { label, color } = getSimilarityLevel(similarity.total);
 
                 return (
-                  <button
+                  <div
                     key={beat.id}
-                    type="button"
-                    className="relative group cursor-pointer w-full text-left"
+                    className="relative group cursor-pointer w-full"
                     onClick={() => handleBeatClick(beat)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleBeatClick(beat);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
                     aria-label={`Select ${beat.title || beat.name} - ${Math.round(similarity.total)}% match`}
                   >
                     <ResponsiveBeatCard
@@ -355,7 +362,7 @@ export function BeatSimilarityRecommendations({
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
           </div>

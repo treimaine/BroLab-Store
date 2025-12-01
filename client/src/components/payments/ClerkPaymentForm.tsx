@@ -123,7 +123,10 @@ export function ClerkPaymentForm({
         <AlertCircle className="w-16 h-16 text-orange-500 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-white mb-2">Authentication Required</h3>
         <p className="text-gray-300 mb-4">Please sign in to complete your purchase.</p>
-        <Button onClick={() => (globalThis.location.href = "/sign-in")} className="btn-primary">
+        <Button
+          onClick={() => (globalThis.location.href = "/login?returnTo=/checkout")}
+          className="btn-primary"
+        >
           Sign In
         </Button>
       </div>
