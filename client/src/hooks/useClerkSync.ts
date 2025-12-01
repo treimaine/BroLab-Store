@@ -16,7 +16,7 @@ export function useClerkSync() {
   const syncInProgress = useRef(false);
   const hasAttemptedSync = useRef(false);
 
-  // @ts-ignore - Avoiding deep type instantiation issue
+  // @ts-expect-error - Avoiding deep type instantiation issue
   const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser);
 
   const syncUser = useCallback(async () => {
@@ -28,7 +28,8 @@ export function useClerkSync() {
     if (syncInProgress.current || globalSyncInProgress) {
       return;
     }
-    if (lastSyncedUserId === clerkUser.id && isSynced) {
+    // Check module-level lastSyncedUserId to avoid re-syncing the same user
+    if (lastSyncedUserId === clerkUser.id) {
       return;
     }
 

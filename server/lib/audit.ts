@@ -1,13 +1,11 @@
 // Configuration Convex
 // SECURITY: Use lazy initialization with proper validation, no hardcoded fallback
-import { getConvex } from "./convex";
-const convex = getConvex();
 
 export interface AuditLogEntry {
   userId?: string;
   action: string;
   resource: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
 }
@@ -26,20 +24,11 @@ export class AuditLogger {
 
   /**
    * Log a security-relevant action
+   * Note: Convex integration pending - currently logs to console
    */
   async log(entry: AuditLogEntry): Promise<void> {
     try {
-      // TODO: Fix Convex type inference issue - temporarily disabled for strict mode compliance
-      // await convex.mutation(api.audit.logAuditEvent, {
-      //   userId: entry.userId,
-      //   action: entry.action,
-      //   resource: entry.resource,
-      //   details: entry.details,
-      //   ipAddress: entry.ipAddress,
-      //   userAgent: entry.userAgent,
-      // });
-
-      // Temporary fallback - log to console
+      // Log to console for now - Convex integration pending
       console.log("Audit log entry:", entry);
     } catch (error) {
       console.error("Failed to log audit entry:", error);
@@ -216,7 +205,7 @@ export class AuditLogger {
   async logSecurityEvent(
     userId: string,
     event: string,
-    details: Record<string, any>,
+    details: Record<string, unknown>,
     ipAddress?: string,
     userAgent?: string
   ): Promise<void> {
@@ -245,18 +234,12 @@ export class AuditLogger {
 
   /**
    * Get user audit logs
+   * Note: Convex integration temporarily disabled for strict mode compliance
    */
-  async getUserAuditLogs(userId: string, limit = 50): Promise<any[]> {
+  async getUserAuditLogs(_userId: string, _limit = 50): Promise<AuditLogEntry[]> {
     try {
-      // TODO: Fix Convex type inference issue - temporarily disabled for strict mode compliance
-      // const logs = await convex.query(api.audit.getUserAuditLogs, {
-      //   clerkId: userId,
-      //   limit,
-      // });
-      // return logs;
-
-      // Temporary fallback
-      console.log("Getting audit logs for user:", userId);
+      // Temporary fallback - Convex integration pending
+      console.log("Getting audit logs for user:", _userId, "limit:", _limit);
       return [];
     } catch (error) {
       console.error("Failed to get user audit logs:", error);
@@ -266,12 +249,12 @@ export class AuditLogger {
 
   /**
    * Get security events
+   * Note: Convex integration temporarily disabled for strict mode compliance
    */
-  async getSecurityEvents(limit = 100): Promise<any[]> {
+  async getSecurityEvents(_limit = 100): Promise<AuditLogEntry[]> {
     try {
-      // TODO: Fix Convex type inference issue - temporarily disabled for strict mode compliance
-      // const events = await convex.query(api.audit.getSecurityEvents, { limit });
-      const events: any[] = [];
+      // Temporary fallback - Convex integration pending
+      const events: AuditLogEntry[] = [];
       return events;
     } catch (error) {
       console.error("Failed to get security events:", error);

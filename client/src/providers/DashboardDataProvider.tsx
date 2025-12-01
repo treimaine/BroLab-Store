@@ -13,11 +13,15 @@ interface DashboardDataProviderProps {
   children: ReactNode;
 }
 
-export function DashboardDataProvider({ children }: DashboardDataProviderProps) {
+export function DashboardDataProvider({ children }: Readonly<DashboardDataProviderProps>) {
   const { user } = useUser();
 
   // Initialize real data fetching when user is authenticated
-  const { isLoading, hasError, isInitialized } = useDashboardData({
+  const {
+    isLoading: _isLoading,
+    hasError,
+    isInitialized,
+  } = useDashboardData({
     includeChartData: true,
     includeTrends: true,
     activityLimit: 50,

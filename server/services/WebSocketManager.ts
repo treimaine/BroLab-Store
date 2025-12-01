@@ -56,7 +56,7 @@ export class WebSocketManager {
   /**
    * Handle new client connection
    */
-  private handleConnection(socket: WebSocket, request: IncomingMessage): void {
+  private handleConnection(socket: WebSocket, _request: IncomingMessage): void {
     const clientId = this.generateClientId();
     const client: ClientConnection = {
       id: clientId,
@@ -142,10 +142,10 @@ export class WebSocketManager {
   /**
    * Handle client disconnect
    */
-  private handleDisconnect(clientId: string, code: number, reason: string): void {
-    const client = this.clients.get(clientId);
-    if (client) {
-      console.log(`Client disconnected: ${clientId} (code: ${code}, reason: ${reason})`);
+  private handleDisconnect(clientId: string, code: number, _reason: string): void {
+    const _client = this.clients.get(clientId);
+    if (_client) {
+      console.log(`Client disconnected: ${clientId} (code: ${code}, reason: ${_reason})`);
       this.clients.delete(clientId);
     }
   }
@@ -360,7 +360,7 @@ export class WebSocketManager {
   /**
    * Fetch dashboard data for sync (placeholder implementation)
    */
-  private async fetchDashboardData(clientId: string): Promise<unknown> {
+  private async fetchDashboardData(_clientId: string): Promise<unknown> {
     // This would typically fetch real data from Convex or database
     // For now, return a placeholder structure
     return {

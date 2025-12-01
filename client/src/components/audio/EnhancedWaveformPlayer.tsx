@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Volume2, Download, Heart } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import WaveSurfer from 'wavesurfer.js';
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Download, Heart, Pause, Play, Volume2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import WaveSurfer from "wavesurfer.js";
 
 interface EnhancedWaveformPlayerProps {
   src: string;
@@ -21,11 +21,11 @@ export function EnhancedWaveformPlayer({
   title,
   artist,
   duration,
-  bpm,
+  bpm: _bpm,
   genre,
   onLike,
   onDownload,
-  liked = false
+  liked = false,
 }: EnhancedWaveformPlayerProps) {
   const waveformRef = useRef<HTMLDivElement>(null);
   const waveSurferRef = useRef<WaveSurfer | null>(null);
@@ -40,30 +40,30 @@ export function EnhancedWaveformPlayer({
     // Initialize WaveSurfer
     waveSurferRef.current = WaveSurfer.create({
       container: waveformRef.current,
-      waveColor: 'rgba(147, 51, 234, 0.3)',
-      progressColor: '#a855f7',
-      cursorColor: '#ffffff',
+      waveColor: "rgba(147, 51, 234, 0.3)",
+      progressColor: "#a855f7",
+      cursorColor: "#ffffff",
       barWidth: 2,
       barRadius: 1,
       height: 64,
       normalize: true,
-      backend: 'MediaElement', // Use MediaElement instead of WebAudio for better compatibility
-      mediaControls: false
+      backend: "MediaElement", // Use MediaElement instead of WebAudio for better compatibility
+      mediaControls: false,
     });
 
     // Load audio
     waveSurferRef.current.load(src);
 
     // Event listeners
-    waveSurferRef.current.on('ready', () => {
+    waveSurferRef.current.on("ready", () => {
       setTotalDuration(waveSurferRef.current?.getDuration() || 0);
     });
 
-    waveSurferRef.current.on('audioprocess', () => {
+    waveSurferRef.current.on("audioprocess", () => {
       setCurrentTime(waveSurferRef.current?.getCurrentTime() || 0);
     });
 
-    waveSurferRef.current.on('finish', () => {
+    waveSurferRef.current.on("finish", () => {
       setIsPlaying(false);
     });
 
@@ -91,7 +91,7 @@ export function EnhancedWaveformPlayer({
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
   return (
@@ -119,13 +119,9 @@ export function EnhancedWaveformPlayer({
           <Button
             onClick={togglePlayPause}
             className="bg-[var(--accent-purple)] hover:bg-purple-600 w-10 h-10 rounded-full p-0"
-            aria-label={isPlaying ? 'Pause track' : 'Play track'}
+            aria-label={isPlaying ? "Pause track" : "Play track"}
           >
-            {isPlaying ? (
-              <Pause className="w-5 h-5" />
-            ) : (
-              <Play className="w-5 h-5 ml-0.5" />
-            )}
+            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
           </Button>
 
           <div className="flex items-center space-x-2">
@@ -152,13 +148,13 @@ export function EnhancedWaveformPlayer({
               onClick={onLike}
               variant="ghost"
               size="sm"
-              className={`${liked ? 'text-red-500' : 'text-gray-400'} hover:text-red-500`}
-              aria-label={liked ? 'Unlike track' : 'Like track'}
+              className={`${liked ? "text-red-500" : "text-gray-400"} hover:text-red-500`}
+              aria-label={liked ? "Unlike track" : "Like track"}
             >
-              <Heart className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
+              <Heart className={`w-4 h-4 ${liked ? "fill-current" : ""}`} />
             </Button>
           )}
-          
+
           {onDownload && (
             <Button
               onClick={onDownload}

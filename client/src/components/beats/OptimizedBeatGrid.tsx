@@ -1,7 +1,7 @@
-import { BeatCardSkeleton } from "@/components/loading/LoadingSpinner";
 import { ResponsiveBeatCard } from "@/components/beats/ResponsiveBeatCard";
-import { useIntersectionObserver } from "@/components/loading/VirtualScrollList";
 import { BeatCard } from "@/components/beats/beat-card";
+import { BeatCardSkeleton } from "@/components/loading/LoadingSpinner";
+import { useIntersectionObserver } from "@/components/loading/VirtualScrollList";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { cn } from "@/lib/utils";
 import type { BeatProduct as Beat } from "@shared/schema";
@@ -28,7 +28,7 @@ interface OptimizedBeatGridProps {
 // Lazy loaded beat card with intersection observer
 function LazyBeatCard({
   beat,
-  index,
+  index: _index,
   viewMode = "grid",
   onBeatClick,
 }: {
@@ -96,7 +96,7 @@ export function OptimizedBeatGrid({
   className = "",
   onBeatClick,
 }: OptimizedBeatGridProps) {
-  const isMobile = useIsMobile();
+  const _isMobile = useIsMobile();
   const [loadedCount, setLoadedCount] = useState(12); // Initial load count
 
   const loadMoreRef = useRef<HTMLDivElement>(null);

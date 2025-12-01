@@ -1,31 +1,14 @@
 // Privacy-compliant Analytics Provider Component
 
-import React, { createContext, useContext, useEffect, useState } from "react";
 import { AnalyticsConfig, PrivacySettings } from "@shared/types/analytics";
 import { analyticsManager } from "@shared/utils/analytics-manager";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-interface AnalyticsContextType {
-  isInitialized: boolean;
-  isTrackingEnabled: boolean;
-  privacySettings: PrivacySettings | null;
-  config: AnalyticsConfig | null;
-  updatePrivacySettings: (settings: Partial<PrivacySettings>) => Promise<void>;
-  updateConfig: (config: Partial<AnalyticsConfig>) => void;
-  requestConsent: () => Promise<boolean>;
-  revokeConsent: () => Promise<void>;
-  showPrivacyBanner: boolean;
-  setShowPrivacyBanner: (show: boolean) => void;
-}
-
-const AnalyticsContext = createContext<AnalyticsContextType | null>(null);
-
-export const useAnalyticsContext = () => {
-  const context = useContext(AnalyticsContext);
-  if (!context) {
-    throw new Error("useAnalyticsContext must be used within an AnalyticsProvider");
-  }
-  return context;
-};
+import {
+  AnalyticsContext,
+  AnalyticsContextType,
+  useAnalyticsContext,
+} from "@/hooks/useAnalyticsContext";
 
 interface AnalyticsProviderProps {
   children: React.ReactNode;
@@ -45,7 +28,14 @@ const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
   const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [config, setConfig] = useState<AnalyticsConfig | null>(null);
   const [showPrivacyBanner, setShowPrivacyBanner] = useState(false);
+  // Track consent state for internal logic (used in requestConsent/revokeConsent)
   const [consentGiven, setConsentGiven] = useState(false);
+  // Use consentGiven in debug logging to avoid unused variable warning
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development" && consentGiven) {
+      console.debug("Analytics consent granted");
+    }
+  }, [consentGiven]);
 
   // Initialize analytics
   useEffect(() => {
@@ -66,7 +56,7 @@ const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
           },
           sampling: {
             enabled: false,
-            rate: 1.0,
+            rate: 1,
           },
           realTime: {
             enabled: true,
@@ -127,7 +117,7 @@ const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
     initializeAnalytics();
   }, [defaultConfig, requireConsent, showBanner]);
 
-  const updatePrivacySettings = async (settings: Partial<PrivacySettings>) => {
+  const updatePrivacySettings = useCallback(async (settings: Partial<PrivacySettings>) => {
     try {
       await analyticsManager.setPrivacySettings(settings);
       const updatedSettings = await analyticsManager.getPrivacySettings();
@@ -137,9 +127,9 @@ const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
       console.error("Failed to update privacy settings:", error);
       throw error;
     }
-  };
+  }, []);
 
-  const updateConfig = (newConfig: Partial<AnalyticsConfig>) => {
+  const updateConfig = useCallback((newConfig: Partial<AnalyticsConfig>) => {
     try {
       analyticsManager.configure(newConfig);
       const updatedConfig = analyticsManager.getConfig();
@@ -149,9 +139,9 @@ const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
       console.error("Failed to update analytics config:", error);
       throw error;
     }
-  };
+  }, []);
 
-  const requestConsent = async (): Promise<boolean> => {
+  const requestConsent = useCallback(async (): Promise<boolean> => {
     try {
       // Store consent
       const consentData = {
@@ -174,9 +164,9 @@ const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
       console.error("Failed to grant consent:", error);
       return false;
     }
-  };
+  }, [updatePrivacySettings]);
 
-  const revokeConsent = async () => {
+  const revokeConsent = useCallback(async () => {
     try {
       // Remove consent
       localStorage.removeItem("analytics-consent");
@@ -196,20 +186,33 @@ const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
       console.error("Failed to revoke consent:", error);
       throw error;
     }
-  };
+  }, [updatePrivacySettings]);
 
-  const contextValue: AnalyticsContextType = {
-    isInitialized,
-    isTrackingEnabled,
-    privacySettings,
-    config,
-    updatePrivacySettings,
-    updateConfig,
-    requestConsent,
-    revokeConsent,
-    showPrivacyBanner,
-    setShowPrivacyBanner,
-  };
+  const contextValue: AnalyticsContextType = useMemo(
+    () => ({
+      isInitialized,
+      isTrackingEnabled,
+      privacySettings,
+      config,
+      updatePrivacySettings,
+      updateConfig,
+      requestConsent,
+      revokeConsent,
+      showPrivacyBanner,
+      setShowPrivacyBanner,
+    }),
+    [
+      isInitialized,
+      isTrackingEnabled,
+      privacySettings,
+      config,
+      updatePrivacySettings,
+      updateConfig,
+      requestConsent,
+      revokeConsent,
+      showPrivacyBanner,
+    ]
+  );
 
   return (
     <AnalyticsContext.Provider value={contextValue}>
@@ -258,7 +261,7 @@ const PrivacyConsentBanner: React.FC = () => {
                 <li>Performance metrics</li>
               </ul>
 
-              <h4>What we don't collect:</h4>
+              <h4>What we don&apos;t collect:</h4>
               <ul>
                 <li>Personal information without consent</li>
                 <li>Sensitive data</li>

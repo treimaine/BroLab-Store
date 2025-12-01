@@ -31,7 +31,7 @@ export default function PaymentCancelPage() {
       setCancelData({
         reservationId: reservationId || undefined,
         serviceType: serviceType || undefined,
-        amount: amount ? parseFloat(amount) : undefined,
+        amount: amount ? Number.parseFloat(amount) : undefined,
         reason: reason || undefined,
       });
     }
@@ -128,7 +128,7 @@ export default function PaymentCancelPage() {
                 <ul className="text-amber-200 text-sm space-y-1">
                   <li>• Votre réservation est toujours active et en attente de paiement</li>
                   <li>• Vous pouvez réessayer le paiement à tout moment</li>
-                  <li>• Aucun montant n'a été débité de votre compte</li>
+                  <li>• Aucun montant n&apos;a été débité de votre compte</li>
                   <li>• Votre créneau de réservation est conservé</li>
                 </ul>
               </div>
@@ -140,7 +140,8 @@ export default function PaymentCancelPage() {
             <h4 className="font-semibold text-blue-300 mb-2">Que faire maintenant ?</h4>
             <div className="text-blue-200 text-sm space-y-1">
               <p>
-                1. <strong>Réessayer le paiement</strong> - Cliquez sur "Retour à la Réservation"
+                1. <strong>Réessayer le paiement</strong> - Cliquez sur &quot;Retour à la
+                Réservation&quot;
               </p>
               <p>
                 2. <strong>Vérifier vos informations</strong> - Assurez-vous que vos données sont
@@ -176,7 +177,7 @@ export default function PaymentCancelPage() {
           <div className="flex justify-center">
             <Button onClick={goHome} variant="ghost" className="text-gray-400 hover:text-white">
               <Home className="w-4 h-4 mr-2" />
-              Retour à l'Accueil
+              Retour à l&apos;Accueil
             </Button>
           </div>
 

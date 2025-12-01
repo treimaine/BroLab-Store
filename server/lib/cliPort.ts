@@ -18,7 +18,7 @@ export async function choosePort(opts: CliOptions): Promise<number> {
     try {
       port = await findFreePort(basePort, tries);
       found = true;
-    } catch (_err) {
+    } catch {
       if (opts.isTTY && !opts.auto) {
         const { port: chosenPort, auto: wantAuto } = await promptForPort(basePort, tries);
         if (wantAuto) {

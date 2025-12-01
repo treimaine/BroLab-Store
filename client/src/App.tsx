@@ -25,31 +25,29 @@ import {
 } from "@/utils/lazyLoading";
 
 // Layout components - lazy loaded for better performance
-const Footer = createLazyComponent(() =>
-  import("@/components/layout/footer").then(module => ({ default: module.Footer }))
-);
-const MobileBottomNav = createLazyComponent(() =>
-  import("@/components/layout/MobileBottomNav").then(module => ({
-    default: module.MobileBottomNav,
-  }))
-);
-const OfflineIndicator = createLazyComponent(() =>
-  import("@/components/loading/OfflineIndicator").then(module => ({
-    default: module.OfflineIndicator,
-  }))
-);
-const NewsletterModal = createLazyComponent(() =>
-  import("@/components/newsletter/NewsletterModal").then(module => ({
-    default: module.NewsletterModal,
-  }))
-);
+const Footer = createLazyComponent(async () => {
+  const module = await import("@/components/layout/footer");
+  return { default: module.Footer };
+});
+const MobileBottomNav = createLazyComponent(async () => {
+  const module = await import("@/components/layout/MobileBottomNav");
+  return { default: module.MobileBottomNav };
+});
+const OfflineIndicator = createLazyComponent(async () => {
+  const module = await import("@/components/loading/OfflineIndicator");
+  return { default: module.OfflineIndicator };
+});
+const NewsletterModal = createLazyComponent(async () => {
+  const module = await import("@/components/newsletter/NewsletterModal");
+  return { default: module.NewsletterModal };
+});
 
 // Audio player - lazy loaded as it's heavy and not immediately needed
 const EnhancedGlobalAudioPlayer = createLazyComponent(
-  () =>
-    import("@/components/audio/EnhancedGlobalAudioPlayer").then(module => ({
-      default: module.EnhancedGlobalAudioPlayer,
-    })),
+  async () => {
+    const module = await import("@/components/audio/EnhancedGlobalAudioPlayer");
+    return { default: module.EnhancedGlobalAudioPlayer };
+  },
   { preloadDelay: 2000 } // Preload after 2 seconds
 );
 

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import type { Reservation } from "@shared/types/dashboard";
 import { Calendar, CheckCircle, Clock, Clock4, CreditCard, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 
 /**
  * Reservations Tab - Studio Service Bookings and Revenue Diversification
@@ -27,9 +27,8 @@ export default function ReservationsTab({
   reservations = [],
   isLoading = false,
   error = null,
-}: ReservationsTabProps) {
+}: Readonly<ReservationsTabProps>): React.ReactElement {
   const { toast } = useToast();
-  const [limit, setLimit] = useState<number>(20);
 
   // Use only real reservations data - no mock or fallback data
   const localReservations = useMemo(() => {
@@ -42,21 +41,20 @@ export default function ReservationsTab({
     // When provided via props, pagination is external; otherwise controlled by limit
   }, [reservations]);
 
-  // Vérifier les paramètres URL pour les nouvelles réservations
+  // Check URL params for new reservations
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(globalThis.location.search);
     const reservationSuccess = urlParams.get("reservation_success");
     const paymentSuccess = urlParams.get("payment_success");
     const reservationId = urlParams.get("id") || urlParams.get("reservation");
 
     if ((reservationSuccess === "true" || paymentSuccess === "true") && reservationId) {
-      // Rafraîchir les réservations après une nouvelle réservation ou un paiement
+      // Refresh reservations after a new reservation or payment
       setTimeout(() => {
-        setLimit(l => Math.max(l, 50));
-        // Nettoyer l'URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+        // Clean URL
+        globalThis.history.replaceState({}, document.title, globalThis.location.pathname);
 
-        // Afficher un message de succès
+        // Show success message
         if (paymentSuccess === "true") {
           toast({
             title: "Paiement confirmé !",
@@ -129,8 +127,8 @@ export default function ReservationsTab({
           Mes Réservations
         </h2>
         <div className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={`reservations-loading-${i}`} className="animate-pulse">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={`reservations-loading-skeleton-${String(idx)}`} className="animate-pulse">
               <div className="h-32 bg-gray-800 rounded-lg" />
             </div>
           ))}
@@ -164,10 +162,12 @@ export default function ReservationsTab({
             <Calendar className="w-16 h-16 mx-auto text-gray-500 mb-4" />
             <h3 className="text-xl font-semibold text-white mb-2">Aucune réservation</h3>
             <p className="text-gray-400 mb-6">
-              Vous n'avez pas encore de réservations de services.
+              Vous n&apos;avez pas encore de réservations de services.
             </p>
             <Button
-              onClick={() => (window.location.href = "/mixing-mastering")}
+              onClick={() => {
+                globalThis.location.href = "/mixing-mastering";
+              }}
               className="bg-[var(--accent-purple)] hover:bg-purple-700"
             >
               Réserver un service

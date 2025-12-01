@@ -10,6 +10,7 @@
  * - 2.1: Eliminate unnecessary lazy loading and optimize rendering
  */
 
+import { VirtualScrollList } from "@/components/loading/VirtualScrollList";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +18,6 @@ import { cn } from "@/lib/utils";
 import { AlertCircle, CheckCircle, Clock, Download, FileAudio, RefreshCw } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { VirtualScrollList } from "@/components/loading/VirtualScrollList";
 
 interface DownloadItem {
   id: string;
@@ -48,7 +48,7 @@ const VirtualDownloadRow = memo<{
   download: DownloadItem;
   index: number;
   onDownload: (download: DownloadItem) => void;
-}>(({ download, index, onDownload }) => {
+}>(({ download, index: _index, onDownload }) => {
   const isExpired =
     download.isExpired || (download.expiresAt && new Date(download.expiresAt) < new Date());
   const isAtLimit = download.maxDownloads && download.downloadCount >= download.maxDownloads;

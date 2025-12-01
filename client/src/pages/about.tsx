@@ -1,7 +1,7 @@
-import { Music, Users, Award, Target, Heart, Star } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { StandardHero } from "@/components/ui/StandardHero";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Award, Heart, Music, Star, Target, Users } from "lucide-react";
 
 export default function About() {
   const stats = [
@@ -65,23 +65,20 @@ export default function About() {
         title="About Us"
         subtitle="We are a premier music production company dedicated to creating high-quality beats that inspire artists and elevate the music industry. Founded with a passion for innovation and excellence, we've been helping artists bring their creative visions to life."
       />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Stats Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-          {stats.map((stat, index) => {
+          {stats.map(stat => {
             const Icon = stat.icon;
             return (
               <Card
-                key={index}
+                key={stat.label}
                 className="bg-[var(--medium-gray)] border-[var(--medium-gray)] text-center"
               >
                 <CardContent className="p-6">
                   <Icon className="w-12 h-12 text-[var(--accent-purple)] mx-auto mb-4" />
-                  <div className="text-3xl font-bold text-white mb-2">
-                    {stat.value}
-                  </div>
+                  <div className="text-3xl font-bold text-white mb-2">{stat.value}</div>
                   <div className="text-gray-400">{stat.label}</div>
                 </CardContent>
               </Card>
@@ -93,29 +90,23 @@ export default function About() {
         <div className="mb-16">
           <Card className="bg-[var(--medium-gray)] border-[var(--medium-gray)]">
             <CardContent className="p-8">
-              <h2 className="text-3xl font-bold text-white mb-6 text-center">
-                Our Story
-              </h2>
+              <h2 className="text-3xl font-bold text-white mb-6 text-center">Our Story</h2>
               <div className="prose prose-lg prose-invert max-w-none">
                 <p className="text-gray-300 leading-relaxed mb-6 text-center">
-                  Founded in 2019, BroLab Entertainment started as a passion
-                  project between friends who shared a love for creating
-                  innovative beats. What began in a small home studio has grown
-                  into a professional production house serving artists
-                  worldwide.
+                  Founded in 2019, BroLab Entertainment started as a passion project between friends
+                  who shared a love for creating innovative beats. What began in a small home studio
+                  has grown into a professional production house serving artists worldwide.
                 </p>
                 <p className="text-gray-300 leading-relaxed mb-6 text-center">
-                  Our journey has been driven by one simple belief: every artist
-                  deserves access to high-quality production that elevates their
-                  music. We've worked with emerging talents and established
-                  artists, always maintaining our commitment to excellence and
-                  creative collaboration.
+                  Our journey has been driven by one simple belief: every artist deserves access to
+                  high-quality production that elevates their music. We&apos;ve worked with emerging
+                  talents and established artists, always maintaining our commitment to excellence
+                  and creative collaboration.
                 </p>
                 <p className="text-gray-300 leading-relaxed text-center">
-                  Today, we continue to push boundaries, explore new sounds, and
-                  support the next generation of musical innovators. Your
-                  success is our success, and we're here to help you achieve
-                  your dreams.
+                  Today, we continue to push boundaries, explore new sounds, and support the next
+                  generation of musical innovators. Your success is our success, and we&apos;re here
+                  to help you achieve your dreams.
                 </p>
               </div>
             </CardContent>
@@ -124,15 +115,13 @@ export default function About() {
 
         {/* Our Values */}
         <div className="mb-16">
-          <h2 className="text-3xl font-bold text-white text-center mb-8">
-            Our Values
-          </h2>
+          <h2 className="text-3xl font-bold text-white text-center mb-8">Our Values</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {values.map((value, index) => {
+            {values.map(value => {
               const Icon = value.icon;
               return (
                 <Card
-                  key={index}
+                  key={value.title}
                   className="bg-[var(--medium-gray)] border-[var(--medium-gray)]"
                 >
                   <CardContent className="p-6">
@@ -141,12 +130,8 @@ export default function About() {
                         <Icon className="w-8 h-8 text-[var(--accent-purple)]" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-white mb-2">
-                          {value.title}
-                        </h3>
-                        <p className="text-gray-300 leading-relaxed">
-                          {value.description}
-                        </p>
+                        <h3 className="text-xl font-bold text-white mb-2">{value.title}</h3>
+                        <p className="text-gray-300 leading-relaxed">{value.description}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -158,13 +143,11 @@ export default function About() {
 
         {/* Team Section */}
         <div className="mb-16">
-          <h2 className="text-3xl font-bold text-white text-center mb-8">
-            Meet Our Team
-          </h2>
+          <h2 className="text-3xl font-bold text-white text-center mb-8">Meet Our Team</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {team.map((member, index) => (
+            {team.map(member => (
               <Card
-                key={index}
+                key={member.name}
                 className="bg-[var(--medium-gray)] border-[var(--medium-gray)]"
               >
                 <CardContent className="p-6 text-center">
@@ -175,15 +158,9 @@ export default function About() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-1">
-                    {member.name}
-                  </h3>
-                  <Badge className="bg-[var(--accent-purple)] mb-4">
-                    {member.role}
-                  </Badge>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    {member.bio}
-                  </p>
+                  <h3 className="text-xl font-bold text-white mb-1">{member.name}</h3>
+                  <Badge className="bg-[var(--accent-purple)] mb-4">{member.role}</Badge>
+                  <p className="text-gray-300 text-sm leading-relaxed">{member.bio}</p>
                 </CardContent>
               </Card>
             ))}
@@ -194,15 +171,12 @@ export default function About() {
         <div className="text-center">
           <Card className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 border-[var(--accent-purple)]">
             <CardContent className="p-8">
-              <h2 className="text-3xl font-bold text-white mb-4">
-                Our Mission
-              </h2>
+              <h2 className="text-3xl font-bold text-white mb-4">Our Mission</h2>
               <p className="text-xl text-gray-200 max-w-3xl mx-auto leading-relaxed">
-                To empower artists worldwide by providing access to
-                premium-quality beats that inspire creativity, drive innovation,
-                and help turn musical dreams into reality. We believe that great
-                music starts with great beats, and we're here to provide exactly
-                that.
+                To empower artists worldwide by providing access to premium-quality beats that
+                inspire creativity, drive innovation, and help turn musical dreams into reality. We
+                believe that great music starts with great beats, and we&apos;re here to provide
+                exactly that.
               </p>
             </CardContent>
           </Card>

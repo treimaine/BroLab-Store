@@ -12,18 +12,23 @@ export interface LazyComponentOptions {
   retryOnError?: boolean;
 }
 
-// Type for component props - using Record for flexibility without any
-type ComponentProps = Record<string, unknown>;
+/**
+ * Helper to convert a named export to a default export format
+ * This ensures proper typing when using dynamic imports with named exports
+ */
+export function namedExport<P>(component: ComponentType<P>): { default: ComponentType<P> } {
+  return { default: component };
+}
 
 /**
  * Retries importing a component after a delay
  */
-function retryImport<T extends ComponentType<ComponentProps>>(
-  importFn: () => Promise<{ default: T }>,
+function retryImport<P>(
+  importFn: () => Promise<{ default: ComponentType<P> }>,
   error: unknown
-): Promise<{ default: T }> {
+): Promise<{ default: ComponentType<P> }> {
   console.warn("Failed to load component, retrying...", error);
-  return new Promise<{ default: T }>((resolve, reject) => {
+  return new Promise<{ default: ComponentType<P> }>((resolve, reject) => {
     setTimeout(() => {
       importFn().then(resolve).catch(reject);
     }, 1000);
@@ -32,11 +37,12 @@ function retryImport<T extends ComponentType<ComponentProps>>(
 
 /**
  * Creates a lazy component with enhanced loading capabilities
+ * @template P - The props type for the component
  */
-export function createLazyComponent<T extends ComponentType<ComponentProps>>(
-  importFn: () => Promise<{ default: T }>,
+export function createLazyComponent<P = Record<string, unknown>>(
+  importFn: () => Promise<{ default: ComponentType<P> }>,
   options: LazyComponentOptions = {}
-): LazyExoticComponent<T> {
+): LazyExoticComponent<ComponentType<P>> {
   const { preloadDelay, preloadOnHover: _preloadOnHover = false, retryOnError = true } = options;
 
   // Create the lazy component
@@ -61,9 +67,10 @@ export function createLazyComponent<T extends ComponentType<ComponentProps>>(
 
 /**
  * Preloads a component without rendering it
+ * @template P - The props type for the component
  */
-export async function preloadComponent<T extends ComponentType<ComponentProps>>(
-  importFn: () => Promise<{ default: T }>
+export async function preloadComponent<P = Record<string, unknown>>(
+  importFn: () => Promise<{ default: ComponentType<P> }>
 ): Promise<void> {
   try {
     await importFn();
@@ -75,9 +82,10 @@ export async function preloadComponent<T extends ComponentType<ComponentProps>>(
 
 /**
  * Sets up preload listeners for navigation links
+ * @template P - The props type for the component
  */
-function setupPreloadListeners<T extends ComponentType<ComponentProps>>(
-  importFn: () => Promise<{ default: T }>,
+function setupPreloadListeners<P = Record<string, unknown>>(
+  importFn: () => Promise<{ default: ComponentType<P> }>,
   routePath: string
 ): void {
   const preloadOnHover = (): void => {
@@ -93,12 +101,14 @@ function setupPreloadListeners<T extends ComponentType<ComponentProps>>(
 
 /**
  * Creates a lazy component with route-based preloading
+ * Route components typically have no required props or use route params
+ * @template P - The props type for the component (defaults to empty object for route components)
  */
-export function createRouteLazyComponent<T extends ComponentType<unknown>>(
-  importFn: () => Promise<{ default: T }>,
+export function createRouteLazyComponent<P = object>(
+  importFn: () => Promise<{ default: ComponentType<P> }>,
   routePath: string
-): LazyExoticComponent<T> {
-  const LazyComponent = createLazyComponent(importFn, {
+): LazyExoticComponent<ComponentType<P>> {
+  const LazyComponent = createLazyComponent<P>(importFn, {
     retryOnError: true,
   });
 

@@ -1,9 +1,9 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PAYPAL_PARAMS } from "@/config/paypal";
 import { useToast } from "@/hooks/use-toast";
 import PayPalClientService from "@/services/paypal";
-import { PAYPAL_PARAMS } from "@/config/paypal";
 import { ArrowRight, CheckCircle, CreditCard, Home } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation, useSearch } from "wouter";
@@ -27,11 +27,11 @@ export default function PaymentSuccessPage() {
   useEffect(() => {
     // ✅ CORRECTION: Parser les paramètres PayPal correctement
     const urlParams = new URLSearchParams(searchParams);
-    
+
     // Paramètres PayPal standards
     const paypalToken = urlParams.get(PAYPAL_PARAMS.TOKEN); // orderId PayPal
     const paypalPayerId = urlParams.get(PAYPAL_PARAMS.PAYER_ID); // PayerID PayPal
-    
+
     // Paramètres BroLab (optionnels)
     const reservationId = urlParams.get("reservation");
     const serviceType = urlParams.get("service");
@@ -45,6 +45,55 @@ export default function PaymentSuccessPage() {
       amount: amount,
     });
 
+    /**
+     * Gère la capture du paiement PayPal
+     * ✅ CORRECTION: Utilise le token PayPal (orderId) pour la capture
+     */
+    const capturePayPalPayment = async (token: string) => {
+      setIsProcessing(true);
+      try {
+        console.log("🎯 Capturing PayPal payment with token:", token);
+
+        // ✅ CORRECTION: Vérifier que c'est bien un token PayPal valide
+        if (!token || token.length < PAYPAL_PARAMS.MIN_ORDER_ID_LENGTH) {
+          throw new Error("Invalid PayPal token");
+        }
+
+        const result = await PayPalClientService.handlePayPalReturn(token);
+
+        if (result.success && result.transactionId) {
+          toast({
+            title: "Paiement Confirmé !",
+            description: `Transaction ${result.transactionId} - Votre réservation est maintenant confirmée.`,
+            variant: "default",
+          });
+
+          // ✅ CORRECTION: Mettre à jour les données avec l'ID de transaction PayPal
+          setPaymentData(prev =>
+            prev
+              ? {
+                  ...prev,
+                  transactionId: result.transactionId,
+                  paypalOrderId: token, // ✅ CORRECTION: Garder l'orderId PayPal
+                }
+              : null
+          );
+        } else {
+          throw new Error(result.error || "Failed to capture payment");
+        }
+      } catch (error) {
+        console.error("❌ Error capturing PayPal payment:", error);
+        toast({
+          title: "Erreur de Confirmation",
+          description:
+            "Le paiement a été reçu mais la confirmation a échoué. Contactez le support.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+
     if (paypalToken) {
       // ✅ CORRECTION: Priorité aux paramètres PayPal
       setPaymentData({
@@ -52,17 +101,17 @@ export default function PaymentSuccessPage() {
         paypalPayerId: paypalPayerId || undefined,
         reservationId: reservationId || undefined,
         serviceType: serviceType || undefined,
-        amount: amount ? parseFloat(amount) : undefined,
+        amount: amount ? Number.parseFloat(amount) : undefined,
       });
 
       // ✅ CORRECTION: Capturer automatiquement le paiement PayPal
-      handlePayPalCapture(paypalToken);
+      capturePayPalPayment(paypalToken);
     } else if (reservationId && serviceType && amount) {
       // Fallback pour les anciens paramètres
       setPaymentData({
         reservationId,
         serviceType,
-        amount: parseFloat(amount),
+        amount: Number.parseFloat(amount),
       });
     } else {
       // ✅ CORRECTION: Gérer le cas où aucun paramètre valide n'est présent
@@ -76,76 +125,33 @@ export default function PaymentSuccessPage() {
   }, [searchParams, toast]);
 
   /**
-   * Gère la capture du paiement PayPal
-   * ✅ CORRECTION: Utilise le token PayPal (orderId) pour la capture
-   */
-  const handlePayPalCapture = async (paypalToken: string) => {
-    setIsProcessing(true);
-    try {
-      console.log("🎯 Capturing PayPal payment with token:", paypalToken);
-
-      // ✅ CORRECTION: Vérifier que c'est bien un token PayPal valide
-      if (!paypalToken || paypalToken.length < PAYPAL_PARAMS.MIN_ORDER_ID_LENGTH) {
-        throw new Error("Invalid PayPal token");
-      }
-
-      const result = await PayPalClientService.handlePayPalReturn(paypalToken);
-
-      if (result.success && result.transactionId) {
-        toast({
-          title: "Paiement Confirmé !",
-          description: `Transaction ${result.transactionId} - Votre réservation est maintenant confirmée.`,
-          variant: "default",
-        });
-
-        // ✅ CORRECTION: Mettre à jour les données avec l'ID de transaction PayPal
-        setPaymentData(prev => (prev ? { 
-          ...prev, 
-          transactionId: result.transactionId,
-          paypalOrderId: paypalToken // ✅ CORRECTION: Garder l'orderId PayPal
-        } : null));
-      } else {
-        throw new Error(result.error || "Failed to capture payment");
-      }
-    } catch (error) {
-      console.error("❌ Error capturing PayPal payment:", error);
-      toast({
-        title: "Erreur de Confirmation",
-        description: "Le paiement a été reçu mais la confirmation a échoué. Contactez le support.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  /**
    * Redirige vers le dashboard
    */
   const goToDashboard = () => {
     if (paymentData) {
       // ✅ CORRECTION: Utiliser les paramètres PayPal si disponibles
       const params = new URLSearchParams();
-      
+
       if (paymentData.paypalOrderId) {
         params.append("paypal_order", paymentData.paypalOrderId);
       }
-      
+
       if (paymentData.reservationId) {
         params.append("reservation_success", "true");
         params.append("id", paymentData.reservationId);
       }
-      
+
       if (paymentData.serviceType) {
         params.append("service", paymentData.serviceType);
       }
-      
+
       if (paymentData.amount) {
         params.append("amount", paymentData.amount.toString());
       }
 
       const queryString = params.toString();
-      setLocation(`/dashboard${queryString ? `?${queryString}` : ""}`);
+      const dashboardUrl = queryString ? "/dashboard?" + queryString : "/dashboard";
+      setLocation(dashboardUrl);
     } else {
       setLocation("/dashboard");
     }
@@ -195,7 +201,7 @@ export default function PaymentSuccessPage() {
                   <span className="text-white font-mono ml-2">{paymentData.paypalOrderId}</span>
                 </div>
               )}
-              
+
               {paymentData.paypalPayerId && (
                 <div>
                   <span className="text-gray-400">Payer ID:</span>
@@ -211,7 +217,7 @@ export default function PaymentSuccessPage() {
                   </Badge>
                 </div>
               )}
-              
+
               {paymentData.amount && (
                 <div>
                   <span className="text-gray-400">Montant:</span>
@@ -223,14 +229,14 @@ export default function PaymentSuccessPage() {
                   </span>
                 </div>
               )}
-              
+
               {paymentData.reservationId && (
                 <div>
                   <span className="text-gray-400">Réservation:</span>
                   <span className="text-white font-mono ml-2">{paymentData.reservationId}</span>
                 </div>
               )}
-              
+
               {paymentData.transactionId && (
                 <div>
                   <span className="text-gray-400">Transaction:</span>
@@ -276,7 +282,7 @@ export default function PaymentSuccessPage() {
               size="lg"
             >
               <Home className="w-4 h-4 mr-2" />
-              Retour à l'Accueil
+              Retour à l&apos;Accueil
             </Button>
           </div>
 

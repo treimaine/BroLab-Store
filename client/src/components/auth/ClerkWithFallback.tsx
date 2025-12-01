@@ -1,9 +1,9 @@
 import { PricingTable, SignIn, useUser } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
-// Composant wrapper qui détecte les erreurs Clerk et affiche des alternatives
-export function ClerkPricingTableWithFallback() {
-  const { isLoaded, user } = useUser();
+// Wrapper component that detects Clerk errors and displays alternatives
+export function ClerkPricingTableWithFallback(): React.JSX.Element {
+  const { isLoaded } = useUser();
   const [clerkError, setClerkError] = useState(false);
 
   useEffect(() => {
@@ -23,11 +23,11 @@ export function ClerkPricingTableWithFallback() {
       <div className="max-w-4xl mx-auto">
         <div className="text-center p-8 bg-blue-900/20 border border-blue-600/30 rounded-lg">
           <h3 className="text-2xl font-bold text-blue-200 mb-4">
-            🚀 Plans d'abonnement disponibles
+            🚀 Plans d&apos;abonnement disponibles
           </h3>
           <p className="text-blue-200 mb-6">
             The native Clerk subscription system will be available once the environment is
-            optimized. En attendant, voici les plans disponibles :
+            optimized. En attendant, voici les plans disponibles&nbsp;:
           </p>
 
           {/* Plans basiques en attendant Clerk */}
@@ -82,7 +82,7 @@ export function ClerkPricingTableWithFallback() {
   );
 }
 
-export function ClerkSignInWithFallback() {
+export function ClerkSignInWithFallback(): React.JSX.Element {
   const { isLoaded } = useUser();
   const [clerkError, setClerkError] = useState(false);
 
@@ -107,7 +107,7 @@ export function ClerkSignInWithFallback() {
             The sign-in system will be fully functional in production.
           </p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => globalThis.location.reload()}
             className="bg-[var(--accent-purple)] hover:bg-[var(--accent-purple)]/90 text-white px-6 py-3 rounded-lg font-medium transition-colors"
           >
             Try again

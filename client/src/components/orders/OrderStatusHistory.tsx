@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 interface StatusHistoryEntry {
   id: number;
@@ -15,27 +15,30 @@ interface OrderStatusHistoryProps {
   className?: string;
 }
 
-export function OrderStatusHistory({ orderId, className }: OrderStatusHistoryProps) {
+export function OrderStatusHistory({
+  orderId,
+  className,
+}: Readonly<OrderStatusHistoryProps>): React.ReactElement {
   const [history, setHistory] = useState<StatusHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>();
   // Utiliser l'instance Supabase déjà configurée
-  const fetchHistory = async () => {
-    try {
-      const response = await fetch(`/api/orders/${orderId}/history`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch history");
-      }
-      const data = await response.json();
-      setHistory(data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch history");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const response = await fetch(`/api/orders/${orderId}/history`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch history");
+        }
+        const data = await response.json();
+        setHistory(data || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch history");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchHistory();
 
     // Mettre en place un polling pour les mises à jour
@@ -47,11 +50,13 @@ export function OrderStatusHistory({ orderId, className }: OrderStatusHistoryPro
   }, [orderId]);
 
   if (isLoading) {
-    return <div className="animate-pulse">Chargement de l'historique...</div>;
+    return <div className="animate-pulse">Chargement de l&apos;historique...</div>;
   }
 
   if (error) {
-    return <div className="text-red-500">Erreur lors du chargement de l'historique : {error}</div>;
+    return (
+      <div className="text-red-500">Erreur lors du chargement de l&apos;historique : {error}</div>
+    );
   }
 
   return (

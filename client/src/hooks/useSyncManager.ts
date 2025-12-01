@@ -5,7 +5,7 @@ import {
   SyncStatus,
   getSyncManager,
 } from "@/services/SyncManager";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 export interface UseSyncManagerOptions {
   autoStart?: boolean;
@@ -172,13 +172,24 @@ export const useSyncEvents = (
   deps: React.DependencyList = []
 ) => {
   const syncManager = getSyncManager();
+  const handlerRef = useRef(handler);
+
+  // Keep handler ref up to date
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
 
   useEffect(() => {
-    syncManager.on(eventType, handler);
+    const stableHandler = (data: Record<string, unknown>) => {
+      handlerRef.current(data);
+    };
+
+    syncManager.on(eventType, stableHandler);
 
     return () => {
-      syncManager.off(eventType, handler);
+      syncManager.off(eventType, stableHandler);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncManager, eventType, ...deps]);
 };
 

@@ -2,10 +2,10 @@
 
 ## Current Status
 
-- **Total Issues**: 671 warnings, 0 errors
+- **Total Issues**: 392 warnings, 0 errors (as of latest lint run)
 - **Phase 1**: ✅ Complete - All critical errors fixed
-- **Phase 2**: 🔄 In Progress - Type safety improvements (tasks 8, 13 complete)
-- **Phase 3**: ⏳ Not Started - Code quality fixes
+- **Phase 2**: 🔄 In Progress - Type safety improvements
+- **Phase 3**: 🔄 In Progress - Code quality fixes (some tasks complete)
 - **Phase 4**: ⏳ Not Started - Final cleanup
 
 ## Phase 1: Critical Errors - Fix All ESLint Errors (32 → 0)
@@ -14,223 +14,196 @@
   - Convert all `require()` statements to `import` statements in test files
   - Update dynamic requires to use `import()` expressions
   - Verify module resolution paths are correct
-  - Files: `__tests__/bpm-filter-server.test.ts`, `__tests__/config-dashboard.test.ts`, `__tests__/convex-integration-type-safety.test.ts`, `__tests__/data-validation-cache.test.ts`, `__tests__/enhanced-statistics.test.ts`, `__tests__/integration/*.test.tsx`, `__tests__/server/*.test.ts`
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
 - [x] 2. Fix switch case lexical declaration issues
   - Add block scopes (curly braces) around case blocks with `const`/`let` declarations
-  - Ensure proper scoping in switch statements
-  - Files: `client/src/lib/errorTracker.ts`, `server/routes/reservations.ts`
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
 - [x] 3. Remove useless try-catch wrappers
-  - Identify try-catch blocks that only re-throw without adding value
   - Remove unnecessary wrappers while preserving error propagation
-  - Keep try-catch blocks that add logging or error transformation
-  - Files: `client/src/lib/convexClient.ts` (5 instances)
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
 - [x] 4. Fix unused expression violations
-  - Convert unused expressions to assignments or remove them
-  - Use void operator for intentional side-effect expressions
-  - Files: `client/src/components/errors/OptimisticUpdateFeedback.tsx`
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
 - [x] 5. Replace empty interface declarations
-  - Convert empty interfaces to type aliases or add proper members
-  - Document marker interfaces with explanatory comments
-  - Files: `client/src/components/ui/sonner.tsx`
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [x] 6. Fix remaining Phase 1 critical errors (2 parsing errors)
-  - Move shebang to line 1 in `scripts/audit_repo.ts` (currently on line 4)
-  - Move shebang to line 1 in `scripts/test_mail.ts` (currently on line 3)
+- [x] 6. Fix remaining Phase 1 critical errors (parsing errors)
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
 - [x] 7. Validate Phase 1 completion
-  - Run `npm run lint` and verify 0 errors, ~863 warnings
-  - Run `npm run type-check` to ensure no TypeScript errors
-  - Run `npm test` to ensure all tests pass
-  - Document results in `.kiro/specs/eslint-compliance-fix/phase1-results.md`
-  - _Requirements: All Phase 1 requirements_
-  - **Status**: ✅ Complete - 0 errors, 671 warnings remaining
+  - **Status**: ✅ Complete - 0 errors
 
-## Phase 2: Type Safety - Replace `any` Types (~863 → ~131 warnings)
+## Phase 2: Type Safety - Replace `any` Types
 
-- [x] 8. Replace `any` types in test mock functions
-  - Define proper jest mock types for all test mocks
-  - Use `jest.MockedFunction<typeof fn>` pattern
-  - Replace generic `any` mocks with typed mocks
-  - Files: `__tests__/analytics-system.test.ts`, `__tests__/api-stripe-webhook.test.ts`, `__tests__/api-subscription.test.ts`, `__tests__/cache-manager.test.ts`, `__tests__/cliPort.test.ts`
+- [x] 8. Replace `any` types in test mock functions (partial)
   - _Requirements: 1.1, 1.2, 1.3_
 
 - [ ] 9. Replace `any` types in hooks and utilities
-  - Fix `any` types in `client/src/hooks/useDownloads.ts` (remove @ts-nocheck)
-  - Fix `any` types in `client/src/hooks/useErrorHandling.ts`
-  - Fix `any` types in `client/src/hooks/useFormValidation.ts`
-  - Fix `any` types in `client/src/lib/api.ts`
-  - Fix `any` types in `client/src/lib/clerkConfig.ts`
-  - Fix `any` types in `client/src/lib/convexRealtime.ts`
-  - Fix `any` types in `client/src/lib/emergency-cart-reset.ts`
-  - Fix `any` types in `client/src/lib/logger.ts`
-  - Fix `any` types in `client/src/lib/performanceMonitor.ts`
-  - Fix `any` types in `client/src/lib/unifiedFilters.ts` (40+ instances)
+  - Fix `any` types in `client/src/hooks/useDownloads.ts` (5 instances + @ts-nocheck)
+  - Fix `any` types in `client/src/hooks/useFormValidation.ts` (1 instance)
+  - Fix `any` types in `client/src/lib/api.ts` (2 instances)
+  - Fix `any` types in `client/src/lib/clerkConfig.ts` (1 instance)
+  - Fix `any` types in `client/src/lib/convexRealtime.ts` (2 instances)
+  - Fix `any` types in `client/src/lib/emergency-cart-reset.ts` (3 instances)
+  - Fix `any` types in `client/src/lib/logger.ts` (1 instance)
+  - Fix `any` types in `client/src/lib/performanceMonitor.ts` (5 instances)
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 10. Replace `any` types in components and pages
-  - Fix `any` types in `client/src/components/loading/IntersectionLazyLoader.tsx`
-  - Fix `any` types in `client/src/components/loading/LazyComponents.tsx`
-  - Fix `any` types in `client/src/components/payments/ClerkPaymentTest.tsx`
-  - Fix `any` types in `client/src/pages/cart.tsx`
-  - Fix `any` types in `client/src/pages/contact.tsx`
-  - Fix `any` types in `client/src/pages/reset-password.tsx`
-  - Fix `any` types in `client/src/utils/lazyLoading.ts`
-  - Fix `any` types in `client/src/utils/lazyLoadingMonitor.ts`
-  - Fix `any` types in `client/src/utils/tracking.ts`
+- [ ] 10. Replace `any` types in components
+  - Fix `any` types in `client/src/components/loading/IntersectionLazyLoader.tsx` (8 instances)
+  - Fix `any` types in `client/src/components/loading/LazyComponents.tsx` (9 instances)
+  - Fix `any` types in `client/src/components/payments/ClerkPaymentTest.tsx` (1 instance)
+  - Fix `any` types in `client/src/components/audio/WaveformPlayer.tsx` (1 instance)
+  - Fix `any` types in `client/src/components/dashboard/DataFreshnessIndicator.tsx` (1 instance)
+  - Fix `any` types in `client/src/components/admin/FileManager.tsx` (5 instances)
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 11. Replace `any` types in providers
-  - Fix `any` types in `client/src/providers/ConnectionManagerProvider.tsx`
-  - Fix `any` types in `client/src/providers/DashboardRealtimeProvider.tsx`
-  - Fix `any` types in `client/src/providers/OptimisticUpdatesProvider.tsx`
-  - Fix `any` types in `client/src/services/paypal.ts`
-  - Fix `any` types in `client/src/utils/configValidator.ts`
+- [ ] 11. Replace `any` types in pages and services
+  - Fix `any` types in `client/src/pages/reset-password.tsx` (1 instance)
+  - Fix `any` types in `client/src/services/paypal.ts` (1 instance)
+  - Fix `any` types in `client/src/utils/tracking.ts` (2 instances)
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
 - [ ] 12. Replace `any` types in Convex functions
-  - Fix `any` types in `convex/activity/getRecent.ts`
-  - Fix `any` types in `convex/auth/roles.ts`
-  - Fix `any` types in `convex/data.ts`
-  - Fix `any` types in `convex/downloads/enriched.ts`
-  - Fix `any` types in `convex/lib/dashboardValidation.ts`
-  - Fix `any` types in `convex/lib/validation.ts`
-  - Fix `any` types in `convex/orders/createOrder.ts`
-  - Fix `any` types in `convex/orders/updateOrder.ts`
-  - Fix `any` types in `convex/quotas/*.ts`
-  - Fix `any` types in `convex/rateLimits.ts`
-  - Fix `any` types in `convex/reservations/sendPaymentConfirmation.ts`
-  - Fix `any` types in `convex/subscriptions/*.ts`
+  - Fix `any` types in `convex/activity/getRecent.ts` (2 instances)
+  - Fix `any` types in `convex/auth/roles.ts` (4 instances)
+  - Fix `any` types in `convex/downloads/enriched.ts` (2 instances)
+  - Fix `any` types in `convex/lib/dashboardValidation.ts` (1 instance)
+  - Fix `any` types in `convex/lib/validation.ts` (3 instances)
+  - Fix `any` types in `convex/orders/createOrder.ts` (1 instance)
+  - Fix `any` types in `convex/orders/updateOrder.ts` (2 instances)
+  - Fix `any` types in `convex/quotas/getUserQuotas.ts` (2 instances)
+  - Fix `any` types in `convex/quotas/updateQuota.ts` (1 instance)
+  - Fix `any` types in `convex/rateLimits.ts` (2 instances)
+  - Fix `any` types in `convex/reservations/sendPaymentConfirmation.ts` (2 instances)
+  - Fix `any` types in `convex/subscriptions/createOrUpdateFromClerk.ts` (1 instance)
+  - Fix `any` types in `convex/subscriptions/getCurrentSubscription.ts` (2 instances)
+  - Fix `any` types in `convex/subscriptions/invoices.ts` (1 instance)
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [x] 13. Replace `any` types in client source files
-  - Review and use existing types from `shared/types/`
-  - Create new interfaces in appropriate type files
-  - Files: `client/src/components/**/*.tsx`, `client/src/hooks/**/*.ts`, `client/src/services/**/*.ts`
+- [x] 13. Replace `any` types in client source files (partial)
   - _Requirements: 1.1, 1.3, 1.4_
 
 - [ ] 14. Replace `any` types in server lib and middleware
-  - Fix `any` types in `server/lib/accessControl.ts`
-  - Fix `any` types in `server/lib/audit.ts`
-  - Fix `any` types in `server/lib/dataConsistencyManager.ts`
-  - Fix `any` types in `server/lib/errorResponses.ts`
-  - Fix `any` types in `server/lib/findFreePort.ts`
-  - Fix `any` types in `server/lib/logger.ts`
-  - Fix `any` types in `server/lib/openGraphGenerator.ts`
-  - Fix `any` types in `server/lib/rollbackManager.ts`
-  - Fix `any` types in `server/lib/validation.ts`
-  - Fix `any` types in `server/middleware/clerkAuth.ts`
+  - Fix `any` types in `server/lib/accessControl.ts` (7 instances)
+  - Fix `any` types in `server/lib/logger.ts` (1 instance)
+  - Fix `any` types in `server/lib/openGraphGenerator.ts` (2 instances)
+  - Fix `any` types in `server/lib/rollbackManager.ts` (13 instances)
+  - Fix `any` types in `server/lib/validation.ts` (3 instances)
+  - Fix `any` types in `server/middleware/clerkAuth.ts` (4 instances)
   - _Requirements: 1.1, 1.3, 1.4_
 
 - [ ] 15. Replace `any` types in server routes and services
-  - Fix `any` types in `server/config/paypal.ts`
-  - Fix `any` types in `server/routes/internal.ts`
-  - Fix `any` types in `server/routes/uploads.ts`
-  - Fix `any` types in `server/services/WebSocketManager.ts`
-  - Fix `any` types in `server/services/cacheWarmingService.ts`
-  - Fix `any` types in `server/services/wp.ts`
-  - Fix `any` types in `server/types/json2csv.d.ts`
+  - Fix `any` types in `server/config/paypal.ts` (1 instance)
+  - Fix `any` types in `server/routes/internal.ts` (1 instance)
+  - Fix `any` types in `server/routes/uploads.ts` (1 instance)
+  - Fix `any` types in `server/services/WebSocketManager.ts` (1 instance)
+  - Fix `any` types in `server/services/cacheWarmingService.ts` (1 instance)
+  - Fix `any` types in `server/services/wp.ts` (8 instances)
   - _Requirements: 1.1, 1.3, 1.4_
 
 - [ ] 15a. Replace `any` types in shared utilities
-  - Fix `any` types in `shared/types/ConvexOrder.ts`
-  - Fix `any` types in `shared/types/dashboard.ts`
-  - Fix `any` types in `shared/utils/analytics-manager.ts`
+  - Fix `any` types in `shared/types/ConvexOrder.ts` (6 instances)
+  - Fix `any` types in `shared/types/dashboard.ts` (1 instance)
   - _Requirements: 1.1, 1.3, 1.4, 1.5_
 
-- [ ] 15b. Replace `any` types in migration scripts (optional)
-  - Fix `any` types in `convex/migrations/archive/*.ts`
-  - Fix `any` types in `scripts/test_mail.ts`
+- [ ] 15b. Replace `any` types in test files (remaining)
+  - Fix `any` types in `__tests__/components/file-upload-error-handling.test.tsx` (3 instances)
+  - Fix `any` types in `__tests__/connection-manager-basic.test.ts` (11 instances)
+  - Fix `any` types in `__tests__/connection-manager.test.ts` (30 instances)
+  - Fix `any` types in `__tests__/convex-functions.test.ts` (6 instances)
+  - Fix `any` types in `__tests__/convex-integration-type-safety.test.ts` (3 instances)
+  - Fix `any` types in `__tests__/dataSynchronizationManager.test.ts` (12 instances)
+  - Fix `any` types in `__tests__/dbUser.test.ts` (1 instance)
+  - Fix `any` types in `__tests__/enhanced-statistics.test.ts` (2 instances)
+  - Fix `any` types in `__tests__/hooks/useDashboard.test.ts` (6 instances)
+  - Fix `any` types in `__tests__/hooks/useOfflineManager.test.tsx` (10 instances)
+  - Fix `any` types in `__tests__/integration/*.test.tsx` (4 instances)
+  - Fix `any` types in `__tests__/jest-environment.test.ts` (1 instance)
+  - Fix `any` types in `__tests__/offline-manager.test.ts` (4 instances)
+  - Fix `any` types in `__tests__/optimistic-updates.test.ts` (3 instances)
+  - Fix `any` types in `__tests__/rate-limiter.test.ts` (1 instance)
+  - Fix `any` types in `__tests__/rollbackManager.test.ts` (16 instances)
+  - Fix `any` types in `__tests__/securityEnhancer.test.ts` (8 instances)
+  - Fix `any` types in `__tests__/server/reservations.test.ts` (1 instance)
+  - Fix `any` types in `__tests__/services/*.test.ts` (9 instances)
+  - Fix `any` types in `__tests__/stubs/woocommerce-stubs.ts` (2 instances)
+  - Fix `any` types in `__tests__/utils/dataConsistency.integration.test.ts` (1 instance)
+  - _Requirements: 1.1, 1.2, 1.3_
+
+- [ ] 15c. Replace `any` types in migration scripts (optional)
+  - Fix `any` types in `convex/migrations/archive/cleanOrders.ts` (12 instances)
+  - Fix `any` types in `convex/migrations/archive/cleanupGenericDownloads.ts` (3 instances)
+  - Fix `any` types in `convex/migrations/archive/fixOrderPrices.ts` (3 instances)
+  - Fix `any` types in `convex/migrations/archive/fixReservationPrices.ts` (2 instances)
+  - Fix `any` types in `convex/migrations/archive/markSpecificFreeBeats.ts` (4 instances)
+  - Fix `any` types in `scripts/test_mail.ts` (1 instance)
   - Note: These are archive/utility scripts, lower priority
   - _Requirements: 1.1, 1.3, 1.4_
 
 - [ ] 16. Validate Phase 2 completion
-  - Run `npm run lint` and verify 0 errors, significantly reduced warnings
+  - Run `npm run lint` and verify significantly reduced warnings
   - Run `npm run type-check` to ensure no TypeScript errors
   - Run `npm test` to ensure all tests pass
-  - Document results in `.kiro/specs/eslint-compliance-fix/phase2-results.md`
   - _Requirements: All Phase 2 requirements_
-  - **Target**: Reduce from 671 warnings to ~200-300 warnings
 
-## Phase 3: Code Quality - Fix Unused Variables and Comments (~131 → ~4 warnings)
+## Phase 3: Code Quality - Fix Unused Variables and Other Issues
 
-- [x] 17. Fix unused variables in components and pages
-  - Fix unused imports: `Button` in `LicensePicker.tsx`, `X` in `license-preview.tsx`
-  - Fix unused variables in `client/src/components/layout/footer.tsx` (getFooterOpacity, opacity, borderOpacity)
-  - Fix unused variables in `client/src/components/orders/OrderCard.tsx` (setLocation, error)
-  - Fix unused variables in `client/src/pages/cart.tsx` (refreshCartPricing)
-  - Fix unused variables in `client/src/pages/clerk-checkout.tsx` (user)
-  - Fix unused variables in `client/src/pages/contact.tsx` (Send, Clock, page)
-  - Fix unused variables in `client/src/pages/payment-dashboard.tsx` (selectedPlan, setSelectedPlan)
-  - Fix unused variables in `client/src/pages/production-consultation.tsx` (error)
-  - Fix unused variables in `client/src/pages/shop.tsx` (categories)
+- [x] 17. Fix unused variables in components
+  - Fix unused `result` in `client/src/components/admin/FileManager.tsx`
+  - Fix unused `refetch` in `client/src/components/admin/FileManager.tsx`
+  - Fix unused `user` in `client/src/components/alerts/NotificationCenter.tsx`
+  - Fix unused `bpm` in `client/src/components/audio/EnhancedWaveformPlayer.tsx`
+  - Fix unused `setIsLoading` in `client/src/components/audio/HoverPlayButton.tsx`
+  - Fix unused `SkipForward`, `SkipBack`, `autoPlay` in `client/src/components/audio/SonaarAudioPlayer.tsx`
+  - Fix unused `autoPlay`, `animationRef`, `handleSeek`, `progress` in `client/src/components/audio/WaveformAudioPlayer.tsx`
+  - Fix unused `title` in `client/src/components/audio/audio-player.tsx`
+  - Fix unused `isSynced`, `isLoading` in `client/src/components/auth/ClerkSyncProvider.tsx`
+  - Fix unused `index`, `isMobile` in `client/src/components/beats/OptimizedBeatGrid.tsx`
+  - Fix unused `productId`, `productName` in `client/src/components/beats/ResponsiveBeatCard.tsx`
+  - Fix unused `LicenseTypeEnum` in `client/src/components/cart/cart-provider.tsx`
+  - Fix unused `status`, `getCurrentStrategy` in `client/src/components/dashboard/DashboardConnectionStatus.tsx`
+  - Fix unused `lastUpdateTime` in `client/src/components/dashboard/DataFreshnessIndicator.tsx`
+  - Fix unused `index` in `client/src/components/dashboard/VirtualActivityFeed.tsx`
+  - Fix unused `index` in `client/src/components/dashboard/VirtualDownloadsTable.tsx`
+  - Fix unused `filters`, `onFiltersChange` in `client/src/components/filters/AdvancedFilters.tsx`
+  - Fix unused `ExtendedEnhancedWaveformPlayerProps` in `client/src/components/loading/LazyComponents.tsx`
+  - Fix unused `user` in `client/src/components/layout/MobileBottomNav.tsx`
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [x] 18. Fix unused variables in hooks and utilities
-  - Fix unused variables in `client/src/hooks/use-loyalty.ts` (userId, rewardId parameters)
-  - Fix unused variables in `client/src/hooks/use-toast.ts` (actionTypes)
-  - Fix unused variables in `client/src/hooks/use-wordpress.ts` (WordPressPage, WordPressPost)
-  - Fix unused variables in `client/src/hooks/useBreakpoint.ts` (key parameter)
-  - Fix unused variables in `client/src/hooks/useConnectionManager.ts` (autoReconnect, error)
-  - Fix unused variables in `client/src/hooks/useErrorHandling.ts` (autoRetry, maxRetries)
-  - Fix unused variables in `client/src/hooks/useEventBus.ts` (deps parameter)
-  - Fix unused variables in `client/src/lib/performanceMonitor.ts` (latest)
-  - Fix unused variables in `client/src/lib/unifiedFilters.ts` (filters, extractIsFree, extractHasVocals, extractStems)
-  - Fix unused variables in `client/src/utils/configValidator.ts` (options)
-  - Fix unused variables in `client/src/utils/lazyLoading.ts` (preloadOnHover)
-  - Fix unused variables in `client/src/utils/lazyLoadingMonitor.ts` (preloadDelay)
-  - _Requirements: 3.1, 3.2, 3.3, 3.4_
+- [-] 18. Fix unused variables in Convex files
+  - Fix unused `ctx` in `convex/lib/dashboardConfig.ts`
+  - Fix unused `user` in `convex/lib/dashboardConfig.ts`
+  - Fix unused `identity` in `convex/lib/dashboardConfig.ts`
+  - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 19. Fix unused variables in providers and services
-  - Fix unused variables in `client/src/providers/ConnectionManagerProvider.tsx` (showStatus)
-  - Fix unused variables in `client/src/providers/DashboardDataProvider.tsx` (isLoading)
-  - Fix unused variables in `client/src/providers/OptimisticUpdatesProvider.tsx` (reason, error, action)
-  - Fix unused variables in `client/src/services/CrossTabSyncManager.ts` (error)
-  - Fix unused variables in `client/src/components/monitoring/PerformanceMonitor.tsx` (PerformanceMetrics)
-  - Fix unused variables in `client/src/components/payments/PayPalButton.tsx` (onPaymentSuccess)
-  - Fix unused variables in `client/src/providers/AnalyticsProvider.tsx` (consentGiven)
-  - _Requirements: 3.1, 3.4, 3.5_
+- [ ] 19. Fix unused variables in server files
+  - Fix unused `client` in `server/services/WebSocketManager.ts`
+  - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 20. Fix unused variables in Convex and server files
-  - Fix unused variables in `convex/data.ts` (tableName)
-  - Fix unused variables in `convex/lib/dashboardConfig.ts` (ctx, user, identity)
-  - Fix unused variables in `convex/sync/woocommerce.ts` (offset)
-  - Fix unused variables in `convex/sync/wordpress.ts` (offset)
-  - Fix unused variables in `convex/users.ts` (userId)
-  - Fix unused variables in `server/lib/audit.ts` (convex, limit)
-  - Fix unused variables in `server/lib/cliPort.ts` (\_err)
-  - Fix unused variables in `server/lib/dataConsistencyManager.ts` (resourceType, resourceId)
-  - Fix unused variables in `server/lib/errorResponses.ts` (next)
-  - Fix unused variables in `server/lib/findFreePort.ts` (err, maxTries)
-  - Fix unused variables in `server/lib/invoices.ts` (buffer)
-  - Fix unused variables in `server/lib/storage.ts` (options, expiresIn, bucket, path)
-  - Fix unused variables in `server/middleware/fileUploadSecurity.ts` (quarantineThreats, format)
-  - Fix unused variables in `server/routes.ts` (url)
-  - Fix unused variables in `server/routes/storage.ts` (filters)
-  - Fix unused variables in `server/services/WebSocketManager.ts` (request, client, clientId)
-  - Fix unused variables in `server/services/woo-types.ts` (tracks)
-  - Fix unused variables in `server/wordpress.ts` (extractInstruments, extractTags, extractTimeSignature, extractDuration, extractHasVocals, extractStems, errorMessage, e)
-  - Fix unused variables in `server/types/json2csv.d.ts` (T)
-  - Fix unused variables in `shared/constants/errors.ts` (locale)
-  - Fix unused variables in `shared/utils/analytics-manager.ts` (filteredInteractions)
-  - Fix unused variables in `shared/utils/cache-manager.ts` (totalRequests)
-  - Fix unused variables in `shared/validation/sync.ts` (SubscriptionOptionsSchema)
-  - _Requirements: 3.1, 3.2, 3.3, 3.5_
+- [ ] 20. Fix unused variables in test files
+  - Fix unused `app` in `__tests__/all-filters-server.test.ts`
+  - Fix unused `args` in `__tests__/api-stripe-webhook.test.ts` (4 instances)
+  - Fix unused `findFreePortMock`, `promptMock` in `__tests__/cliPort.test.ts`
+  - Fix unused `error` in `__tests__/components/ReservationErrorHandling.test.tsx` (2 instances)
+  - Fix unused `data` in `__tests__/connection-manager-basic.test.ts`
+  - Fix unused `report1`, `report2` in `__tests__/data-validation-cache.test.ts` (3 instances)
+  - Fix unused `supabaseAdmin` in `__tests__/dbUser.test.ts`
+  - Fix unused `updatedServices`, `error` in `__tests__/enhanced-checkout-redirect.test.ts`
+  - Fix unused `req` in `__tests__/openGraph.test.ts` (2 instances)
+  - Fix unused `update1`, `update2` in `__tests__/optimistic-updates.test.ts`
+  - Fix unused `mockConvex` in `__tests__/rate-limiter.test.ts`
+  - Fix unused `rollbackId1`, `rollbackId2` in `__tests__/rollbackManager.test.ts` (3 instances)
+  - Fix unused `listenerCount` in `__tests__/services/ErrorHandlingManager.test.ts`
+  - Fix unused `data` in `__tests__/utils/dataConsistency.*.test.ts` (3 instances)
+  - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 21. Replace @ts-ignore with @ts-expect-error and fix TypeScript directives
-  - Replace `@ts-ignore` with `@ts-expect-error` in `client/src/hooks/useClerkSync.ts`
+- [ ] 21. Replace @ts-ignore with @ts-expect-error
   - Replace `@ts-ignore` with `@ts-expect-error` in `client/src/hooks/useOrders.ts`
   - Add explanatory comments for each expected error
-  - Fix underlying type errors where possible
   - _Requirements: 8.1, 8.2, 8.5_
 
 - [ ] 22. Remove @ts-nocheck directive from useDownloads.ts
@@ -240,49 +213,52 @@
   - _Requirements: 8.1, 8.3, 8.4_
 
 - [ ] 23. Fix React Hook dependency warnings
-  - Fix missing dependencies in `client/src/components/orders/OrderStatusHistory.tsx`
-  - Fix missing dependencies in `client/src/components/providers/CurrencyLanguageProvider.tsx`
-  - Fix missing dependencies in `client/src/hooks/useClerkSync.ts`
-  - Fix missing dependencies in `client/src/hooks/useErrorHandling.ts`
-  - Fix missing dependencies in `client/src/hooks/useEventBus.ts`
-  - Fix missing dependencies in `client/src/hooks/useSyncManager.ts`
-  - Fix missing dependencies in `client/src/pages/payment-success.tsx`
-  - Fix missing dependencies in `client/src/providers/ConnectionManagerProvider.tsx`
-  - Fix missing dependencies in `client/src/providers/DashboardRealtimeProvider.tsx`
+  - Fix missing dependency `mockNotifications` in `client/src/components/alerts/NotificationCenter.tsx`
+  - Fix missing dependency `currentTrack` in `client/src/components/audio/GlobalAudioPlayer.tsx` (2 instances)
+  - Fix missing dependencies in `client/src/components/audio/SimpleAudioPlayer.tsx` (2 instances)
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 24. Fix React unescaped entities warnings
-  - Fix apostrophes and quotes in multiple page files
-  - Use proper HTML entities (`&apos;`, `&quot;`) or escape characters
-  - Files: Multiple pages and components with unescaped `'` and `"` characters
-  - Note: ~50+ instances across the codebase
+- [x] 24. Fix React unescaped entities warnings
   - _Requirements: 3.1, 3.2_
 
 - [ ] 25. Fix react-refresh/only-export-components warnings
-  - Move exported constants and functions to separate files
-  - Keep component files focused on component exports only
-  - Files: Multiple files with mixed exports (~30+ instances)
-  - Note: This is a code organization improvement
+  - Fix in `__tests__/test-utils.tsx` (3 instances)
+  - Fix in `client/src/components/cart/cart-provider.tsx` (2 instances)
+  - Fix in `client/src/components/kokonutui/file-upload.tsx` (1 instance)
+  - Fix in `client/src/components/loading/IntersectionLazyLoader.tsx` (4 instances)
+  - Fix in `client/src/components/loading/LazyComponents.tsx` (1 instance)
+  - Fix in `client/src/components/loading/VirtualScrollList.tsx` (2 instances)
+  - Fix in `client/src/components/newsletter/NewsletterModal.tsx` (1 instance)
+  - Fix in `client/src/components/providers/GeolocationProvider.tsx` (2 instances)
+  - Fix in `client/src/components/ui/badge.tsx` (1 instance)
+  - Fix in `client/src/components/ui/button.tsx` (1 instance)
+  - Fix in `client/src/components/ui/form.tsx` (1 instance)
+  - Fix in `client/src/components/ui/sidebar.tsx` (1 instance)
+  - Fix in `client/src/providers/CacheProvider.tsx` (1 instance)
+  - Fix in `client/src/providers/ConnectionManagerProvider.tsx` (2 instances)
+  - Fix in `client/src/providers/EventBusProvider.tsx` (3 instances)
+  - Fix in `docs/ConnectionManagerWithAuth.example.tsx` (1 instance)
+  - Fix in `docs/queryHelpers.example.tsx` (4 instances)
   - _Requirements: 3.1, 3.5_
 
-- [ ] 26. Fix remaining test file issues
-  - Convert remaining `require()` to ES6 imports in test files
-  - Fix unused variables in `docs/queryHelpers.example.tsx`
-  - Remove unused eslint-disable directives in `convex/_generated/*.js`
+- [ ] 26. Fix remaining test and docs file issues
+  - Fix unused variables in `docs/queryHelpers.example.tsx` (10 instances)
+  - Remove unused eslint-disable directives in `convex/_generated/api.js`
+  - Remove unused eslint-disable directives in `convex/_generated/dataModel.d.ts`
+  - Remove unused eslint-disable directives in `convex/_generated/server.d.ts`
+  - Remove unused eslint-disable directives in `convex/_generated/server.js`
   - _Requirements: 2.1, 2.2, 3.1_
 
 - [ ] 27. Validate Phase 3 completion
-  - Run `npm run lint` and verify 0 errors, minimal warnings
+  - Run `npm run lint` and verify minimal warnings
   - Run `npm run type-check` to ensure no TypeScript errors
   - Run `npm test` to ensure all tests pass
-  - Document results in `.kiro/specs/eslint-compliance-fix/phase3-results.md`
   - _Requirements: All Phase 3 requirements_
-  - **Target**: Reduce from ~200-300 warnings to <50 warnings
 
-## Phase 4: Final Cleanup - Achieve Zero Warnings (~4 → 0 warnings)
+## Phase 4: Final Cleanup - Achieve Zero Warnings
 
 - [ ] 28. Apply ESLint auto-fixes
-  - Run `npm run lint:fix` to automatically fix remaining auto-fixable warnings
+  - Run `npm run lint:fix` to automatically fix remaining 4 auto-fixable warnings
   - Review all auto-applied changes
   - Verify no functionality changes
   - _Requirements: 9.1, 9.2, 9.3, 9.4_
@@ -292,36 +268,33 @@
   - Run `npm run type-check` to ensure no TypeScript errors
   - Run `npm test` to ensure all tests pass
   - Run `npm run build` to verify production build succeeds
-  - Document final results in `.kiro/specs/eslint-compliance-fix/final-results.md`
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
 - [ ] 30. Update CI/CD and development workflows
   - Verify ESLint runs in CI/CD pipeline with `--max-warnings 0`
   - Update pre-commit hooks to run ESLint checks
   - Document linting requirements in contributing guidelines
-  - Create validation script for tracking lint progress
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
 ## Implementation Priority
 
 ### High Priority (Complete First)
 
-1. **Tasks 9-12**: Replace `any` types - These provide the most value for type safety
+1. **Tasks 9-12**: Replace `any` types in source files - Most value for type safety
 2. **Task 22**: Remove `@ts-nocheck` from useDownloads.ts - Critical for type checking
-3. **Tasks 17-20**: Fix unused variables - Clean up dead code
+3. **Tasks 14-15**: Replace `any` types in server code
 
 ### Medium Priority
 
-4. **Tasks 14-15**: Replace `any` types in server code
+4. **Tasks 17-20**: Fix unused variables - Clean up dead code
 5. **Task 21**: Fix TypeScript directive comments
 6. **Task 23**: Fix React Hook dependency warnings
 
 ### Low Priority (Can be deferred)
 
-7. **Task 24**: Fix unescaped entities - Cosmetic issue
-8. **Task 25**: Fix react-refresh warnings - Development experience improvement
-9. **Task 26**: Fix remaining test file issues
-10. **Task 15b**: Migration scripts (archive code)
+7. **Task 25**: Fix react-refresh warnings - Development experience improvement
+8. **Task 15b-15c**: Test files and migration scripts
+9. **Task 26**: Fix remaining test/docs file issues
 
 ## Notes
 
@@ -330,16 +303,17 @@
 - If tests fail after a fix, revert the specific file and investigate
 - Preserve all existing functionality - only fix linting issues
 - Use existing type definitions from `shared/types/` before creating new ones
-- Focus on high-impact changes first (type safety over cosmetic fixes)
 
 ## Progress Tracking
 
 - **Phase 1**: ✅ Complete (0 errors)
-- **Phase 2**: 🔄 In Progress (2/8 tasks complete)
-  - ✅ Task 8: Test mock types
-  - ✅ Task 13: Client source files
+- **Phase 2**: 🔄 In Progress
+  - ✅ Task 8: Test mock types (partial)
+  - ✅ Task 13: Client source files (partial)
   - ⏳ Tasks 9-12, 14-16: Remaining type safety work
-- **Phase 3**: ⏳ Not Started (0/10 tasks complete)
-- **Phase 4**: ⏳ Not Started (0/3 tasks complete)
+- **Phase 3**: 🔄 In Progress
+  - ✅ Task 24: Unescaped entities
+  - ⏳ Tasks 17-23, 25-27: Remaining code quality work
+- **Phase 4**: ⏳ Not Started
 
-**Current**: 671 warnings → **Target**: 0 warnings
+**Current**: 392 warnings → **Target**: 0 warnings

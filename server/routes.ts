@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
+import { createServer, type Server } from "node:http";
 import { isAuthenticated, registerAuthRoutes, setupAuth } from "./auth";
 import monitoring from "./lib/monitoring";
 import activityRouter from "./routes/activity";
@@ -177,7 +177,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Map /api/beats to WooCommerce products with simple transformations
   app.get("/api/beats", async (req, res) => {
     try {
-      const url = new URL(req.protocol + "://" + req.get("host") + req.originalUrl);
       // Delegate to existing Woo route handler by calling the internal function via fetch
       const base = `${req.protocol}://${req.get("host")}`;
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
@@ -231,7 +230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/beats", async (req, res) => {
+  app.post("/api/beats", async (_req, res) => {
     // Not supported in current architecture; return 501 but keep 200-style body for tests if needed
     return res.status(404).json({ error: ErrorMessages.GENERIC.FEATURE_UNAVAILABLE });
   });
@@ -330,30 +329,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     duration?: number;
   } = { volume: 1, position: 0, duration: 180 };
 
-  app.post("/api/audio/player/play", (req, res) => {
-    const beatId = Number(req.body?.beatId) || 1;
+  app.post("/api/audio/player/play", (playerReq, playerRes) => {
+    const beatId = Number(playerReq.body?.beatId) || 1;
     currentPlayerState = { ...currentPlayerState, beatId, status: "playing" };
-    res.json({ status: "playing", beatId });
+    playerRes.json({ status: "playing", beatId });
   });
 
-  app.post("/api/audio/player/volume", (req, res) => {
-    const level = typeof req.body?.level === "number" ? req.body.level : 1;
+  app.post("/api/audio/player/volume", (volumeReq, volumeRes) => {
+    const level = typeof volumeReq.body?.level === "number" ? volumeReq.body.level : 1;
     currentPlayerState = { ...currentPlayerState, volume: level };
-    res.json({ level });
+    volumeRes.json({ level });
   });
 
-  app.get("/api/audio/player/duration", (_req, res) => {
-    res.json({ duration: currentPlayerState.duration || 180 });
+  app.get("/api/audio/player/duration", (_durationReq, durationRes) => {
+    durationRes.json({ duration: currentPlayerState.duration || 180 });
   });
 
-  app.post("/api/audio/player/seek", (req, res) => {
-    const position = typeof req.body?.position === "number" ? req.body.position : 0;
+  app.post("/api/audio/player/seek", (seekReq, seekRes) => {
+    const position = typeof seekReq.body?.position === "number" ? seekReq.body.position : 0;
     currentPlayerState = { ...currentPlayerState, position };
-    res.json({ position });
+    seekRes.json({ position });
   });
 
-  app.get("/api/audio/player/status", (_req, res) => {
-    res.json({
+  app.get("/api/audio/player/status", (_statusReq, statusRes) => {
+    statusRes.json({
       beatId: currentPlayerState.beatId || 1,
       position: currentPlayerState.position || 0,
       volume: currentPlayerState.volume || 1,
@@ -361,14 +360,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.post("/api/audio/player/pause", (_req, res) => {
+  app.post("/api/audio/player/pause", (_pauseReq, pauseRes) => {
     currentPlayerState = { ...currentPlayerState, status: "paused" };
-    res.json({ status: "paused" });
+    pauseRes.json({ status: "paused" });
   });
 
-  app.get("/api/audio/waveform/:beatId", (req, res) => {
+  app.get("/api/audio/waveform/:beatId", (_waveformReq, waveformRes) => {
     const samples = Array.from({ length: 128 }, (_, i) => Math.abs(Math.sin(i / 4)));
-    res.json({ waveform: samples });
+    waveformRes.json({ waveform: samples });
   });
 
   // License agreement endpoint

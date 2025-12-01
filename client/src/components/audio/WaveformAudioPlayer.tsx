@@ -26,7 +26,7 @@ export function WaveformAudioPlayer({
   showControls = true,
   showWaveform = true,
   previewOnly = false,
-  autoPlay = false,
+  autoPlay: _autoPlay = false,
   onPlay,
   onPause,
   onEnded,
@@ -34,7 +34,6 @@ export function WaveformAudioPlayer({
   const audioRef = useRef<HTMLAudioElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const waveformContainerRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number>();
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -221,7 +220,7 @@ export function WaveformAudioPlayer({
     }
   };
 
-  const handleSeek = (value: number[]) => {
+  const _handleSeek = (value: number[]) => {
     if (!audioRef.current) return;
     const seekTime = (value[0] / 100) * duration;
     audioRef.current.currentTime = seekTime;
@@ -254,7 +253,7 @@ export function WaveformAudioPlayer({
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
-  const progress = duration ? (currentTime / duration) * 100 : 0;
+  const _progress = duration ? (currentTime / duration) * 100 : 0;
 
   // Compact table layout for smaller displays
   if (className?.includes("h-8") || className?.includes("h-10")) {

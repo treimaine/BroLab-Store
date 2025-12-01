@@ -4,6 +4,11 @@ import { scanFile, validateFile } from "../lib/upload";
 import { AuthenticatedRequest } from "../types/express";
 
 /**
+ * Risk level type alias for file security analysis
+ */
+type RiskLevel = "low" | "medium" | "high";
+
+/**
  * Enhanced file upload security middleware
  * Provides comprehensive security checks for uploaded files
  */
@@ -31,7 +36,7 @@ export const enhancedFileUploadSecurity = (
     ],
     enableAntivirusScanning = true,
     enableContentAnalysis = true,
-    quarantineThreats = true,
+    quarantineThreats: _quarantineThreats = true,
   } = options;
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
@@ -172,67 +177,100 @@ export const enhancedFileUploadSecurity = (
 };
 
 /**
- * Analyze file content for suspicious patterns
+ * Result of file content analysis
  */
-async function analyzeFileContent(file: Express.Multer.File): Promise<{
+interface ContentAnalysisResult {
   suspicious: boolean;
   features: string[];
-  riskLevel: "low" | "medium" | "high";
-}> {
+  riskLevel: RiskLevel;
+}
+
+/**
+ * Suspicious pattern definition
+ */
+interface SuspiciousPattern {
+  pattern: RegExp;
+  feature: string;
+  risk: RiskLevel;
+}
+
+/**
+ * Check if file has valid audio header
+ */
+function hasValidAudioHeader(buffer: Buffer): boolean {
+  const audioHeaders: Record<string, number[]> = {
+    mp3: [0xff, 0xfb], // MP3 frame header
+    wav: [0x52, 0x49, 0x46, 0x46], // RIFF header
+    // cspell:disable-next-line
+    flac: [0x66, 0x4c, 0x61, 0x43], // fLaC header
+  };
+
+  return Object.values(audioHeaders).some(header =>
+    header.every((byte, index) => buffer[index] === byte)
+  );
+}
+
+/**
+ * Check content for suspicious patterns and update risk level
+ */
+function checkSuspiciousPatterns(
+  content: string,
+  features: string[],
+  currentRiskLevel: RiskLevel
+): RiskLevel {
+  const suspiciousPatterns: SuspiciousPattern[] = [
+    { pattern: /https?:\/\/[^\s]+/gi, feature: "EMBEDDED_URLS", risk: "medium" },
+    { pattern: /eval\s*\(/gi, feature: "EVAL_FUNCTION", risk: "high" },
+    { pattern: /<script/gi, feature: "SCRIPT_TAGS", risk: "high" },
+    { pattern: /powershell/gi, feature: "POWERSHELL_REFERENCE", risk: "high" },
+    { pattern: /cmd\.exe/gi, feature: "CMD_REFERENCE", risk: "high" },
+  ];
+
+  let riskLevel = currentRiskLevel;
+
+  for (const { pattern, feature, risk } of suspiciousPatterns) {
+    if (pattern.test(content)) {
+      features.push(feature);
+      riskLevel = getHigherRiskLevel(riskLevel, risk);
+    }
+  }
+
+  return riskLevel;
+}
+
+/**
+ * Compare and return the higher risk level
+ */
+function getHigherRiskLevel(current: RiskLevel, incoming: RiskLevel): RiskLevel {
+  const riskOrder: Record<RiskLevel, number> = { low: 0, medium: 1, high: 2 };
+  return riskOrder[incoming] > riskOrder[current] ? incoming : current;
+}
+
+/**
+ * Analyze file content for suspicious patterns
+ */
+async function analyzeFileContent(file: Express.Multer.File): Promise<ContentAnalysisResult> {
   const features: string[] = [];
-  let riskLevel: "low" | "medium" | "high" = "low";
+  let riskLevel: RiskLevel = "low";
 
   try {
-    // Analyze file structure
     const buffer = file.buffer;
+    const isAudioFile = file.mimetype?.startsWith("audio/");
 
-    // Check for unusual file structure
-    if (file.mimetype?.startsWith("audio/")) {
-      // Audio files should have specific headers
-      const audioHeaders = {
-        mp3: [0xff, 0xfb], // MP3 frame header
-        wav: [0x52, 0x49, 0x46, 0x46], // RIFF header
-        flac: [0x66, 0x4c, 0x61, 0x43], // fLaC header
-      };
-
-      let hasValidHeader = false;
-      for (const [format, header] of Object.entries(audioHeaders)) {
-        if (header.every((byte, index) => buffer[index] === byte)) {
-          hasValidHeader = true;
-          break;
-        }
-      }
-
-      if (!hasValidHeader && file.size > 1000) {
-        features.push("INVALID_AUDIO_HEADER");
-        riskLevel = "medium";
-      }
-    }
-
-    // Check for embedded content
-    const content = buffer.toString("utf8", 0, Math.min(buffer.length, 2048));
-
-    // Look for suspicious strings
-    const suspiciousPatterns = [
-      { pattern: /http[s]?:\/\/[^\s]+/gi, feature: "EMBEDDED_URLS", risk: "medium" as const },
-      { pattern: /eval\s*\(/gi, feature: "EVAL_FUNCTION", risk: "high" as const },
-      { pattern: /<script/gi, feature: "SCRIPT_TAGS", risk: "high" as const },
-      { pattern: /powershell/gi, feature: "POWERSHELL_REFERENCE", risk: "high" as const },
-      { pattern: /cmd\.exe/gi, feature: "CMD_REFERENCE", risk: "high" as const },
-    ];
-
-    for (const { pattern, feature, risk } of suspiciousPatterns) {
-      if (pattern.test(content)) {
-        features.push(feature);
-        if (risk === "high") riskLevel = "high";
-        else if (risk === "medium" && riskLevel === "low") riskLevel = "medium";
-      }
-    }
-
-    // Check file size vs content ratio
-    if (file.size < 1000 && file.mimetype?.startsWith("audio/")) {
-      features.push("UNUSUALLY_SMALL_AUDIO");
+    // Check audio header validity
+    if (isAudioFile && !hasValidAudioHeader(buffer) && file.size > 1000) {
+      features.push("INVALID_AUDIO_HEADER");
       riskLevel = "medium";
+    }
+
+    // Check for suspicious content patterns
+    const content = buffer.toString("utf8", 0, Math.min(buffer.length, 2048));
+    riskLevel = checkSuspiciousPatterns(content, features, riskLevel);
+
+    // Check for unusually small audio files
+    if (isAudioFile && file.size < 1000) {
+      features.push("UNUSUALLY_SMALL_AUDIO");
+      riskLevel = getHigherRiskLevel(riskLevel, "medium");
     }
   } catch (error) {
     console.error("Content analysis error:", error);
@@ -240,18 +278,14 @@ async function analyzeFileContent(file: Express.Multer.File): Promise<{
     riskLevel = "medium";
   }
 
-  return {
-    suspicious: features.length > 0,
-    features,
-    riskLevel,
-  };
+  return { suspicious: features.length > 0, features, riskLevel };
 }
 
 /**
  * Generate a hash for file integrity checking
  */
 async function generateFileHash(file: Express.Multer.File): Promise<string> {
-  const crypto = await import("crypto");
+  const crypto = await import("node:crypto");
   const hash = crypto.createHash("sha256");
   hash.update(file.buffer);
   return hash.digest("hex");
@@ -335,7 +369,7 @@ declare module "../types/express" {
       fileHash?: string;
       suspicious?: boolean;
       features?: string[];
-      riskLevel?: "low" | "medium" | "high";
+      riskLevel?: RiskLevel;
     };
   }
 }

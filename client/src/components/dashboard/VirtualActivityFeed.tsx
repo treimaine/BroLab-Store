@@ -10,6 +10,7 @@
  * - 2.1: Eliminate unnecessary lazy loading and optimize rendering
  */
 
+import { VirtualScrollList } from "@/components/loading/VirtualScrollList";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -27,7 +28,6 @@ import {
   User,
 } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
-import { VirtualScrollList } from "@/components/loading/VirtualScrollList";
 
 interface VirtualActivityFeedProps {
   activities: Activity[];
@@ -42,7 +42,7 @@ interface VirtualActivityFeedProps {
 const VirtualActivityItem = memo<{
   activity: Activity;
   index: number;
-}>(({ activity, index }) => {
+}>(({ activity, index: _index }) => {
   const getActivityIcon = useCallback((type: string) => {
     switch (type) {
       case "order":
@@ -174,7 +174,7 @@ export const VirtualActivityFeed = memo<VirtualActivityFeedProps>(
     }, []);
 
     // Get unique key for each activity
-    const getActivityKey = useCallback((activity: Activity, index: number) => {
+    const getActivityKey = useCallback((activity: Activity, _index: number) => {
       return `${activity.id}-${activity.timestamp}`;
     }, []);
 

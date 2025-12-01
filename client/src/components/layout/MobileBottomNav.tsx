@@ -46,7 +46,7 @@ export function MobileBottomNav() {
   const isMobile = useIsMobile();
 
   // Check if user is authenticated using Clerk
-  const { user, isSignedIn } = useUser();
+  const { isSignedIn } = useUser();
 
   const cartItemCount = getItemCount();
 

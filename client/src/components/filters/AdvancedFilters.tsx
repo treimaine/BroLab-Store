@@ -21,8 +21,8 @@ interface AdvancedFiltersProps {
 }
 
 export function AdvancedFilters({
-  filters,
-  onFiltersChange,
+  filters: _filters,
+  onFiltersChange: _onFiltersChange,
   className = "",
 }: AdvancedFiltersProps) {
   return (

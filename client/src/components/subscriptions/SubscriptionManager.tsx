@@ -37,7 +37,7 @@ export function SubscriptionManager() {
 
       {/* Plans Disponibles */}
       <div>
-        <h2 className="text-2xl font-bold text-white mb-6">Plans d'Abonnement</h2>
+        <h2 className="text-2xl font-bold text-white mb-6">Plans d&apos;Abonnement</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Plan Basic */}
           <Card className="bg-gray-900 border-gray-700 hover:border-gray-600 hover:shadow-lg transition-all duration-200">

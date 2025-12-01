@@ -13,92 +13,17 @@
  */
 
 import { DASHBOARD_CONFIG } from "@/config/dashboard";
-import type { DashboardData } from "@shared/types/dashboard";
-import { useQueryClient } from "@tanstack/react-query";
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type PropsWithChildren,
-} from "react";
-
-// Connection status types
-export type ConnectionStatus =
-  | "connecting"
-  | "connected"
-  | "disconnected"
-  | "error"
-  | "reconnecting";
-
-// Real-time event types
-export type RealtimeEventType =
-  | "favorite_added"
-  | "favorite_removed"
-  | "order_created"
-  | "order_updated"
-  | "download_completed"
-  | "reservation_created"
-  | "reservation_updated"
-  | "activity_logged"
-  | "stats_updated";
-
-// Real-time event data structure
-export interface RealtimeEvent {
-  type: RealtimeEventType;
-  userId: string;
-  data: any;
-  timestamp: number;
-  id: string;
-}
-
-// Subscription configuration
-export interface SubscriptionConfig {
-  events: RealtimeEventType[];
-  userId?: string;
-  active: boolean;
-}
-
-// Optimistic update configuration
-export interface OptimisticUpdate {
-  id: string;
-  type: RealtimeEventType;
-  data: any;
-  timestamp: number;
-  rollback?: () => void;
-}
-
-// Real-time context interface
-export interface RealtimeContextValue {
-  // Connection state
-  isConnected: boolean;
-  connectionStatus: ConnectionStatus;
-  lastConnected: Date | null;
-  reconnectAttempts: number;
-
-  // Event handling
-  subscribe: (events: RealtimeEventType[], callback: (event: RealtimeEvent) => void) => () => void;
-  emit: (event: Omit<RealtimeEvent, "id" | "timestamp">) => void;
-
-  // Optimistic updates
-  addOptimisticUpdate: (update: Omit<OptimisticUpdate, "id" | "timestamp">) => string;
-  rollbackOptimisticUpdate: (id: string) => void;
-  clearOptimisticUpdates: () => void;
-
-  // Connection management
-  connect: () => void;
-  disconnect: () => void;
-  reconnect: () => void;
-
-  // Subscription management
-  setActiveTab: (tab: string) => void;
-  activeTab: string | null;
-}
-
-// Create context
-const RealtimeContext = createContext<RealtimeContextValue | null>(null);
+  RealtimeContext,
+  type ConnectionStatus,
+  type OptimisticUpdate,
+  type RealtimeContextValue,
+  type RealtimeEvent,
+  type RealtimeEventType,
+} from "@/providers/DashboardRealtimeContext";
+import type { DashboardData, Download, Favorite, Order } from "@shared/types/dashboard";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
 
 // WebSocket connection manager
 class RealtimeConnectionManager {
@@ -106,16 +31,16 @@ class RealtimeConnectionManager {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = DASHBOARD_CONFIG.realtime.maxRetries;
-  private reconnectInterval = DASHBOARD_CONFIG.realtime.reconnectInterval;
-  private heartbeatInterval = DASHBOARD_CONFIG.realtime.heartbeatInterval;
-  private eventListeners = new Map<string, Set<(event: RealtimeEvent) => void>>();
-  private subscriptions = new Set<RealtimeEventType>();
+  private readonly maxReconnectAttempts = DASHBOARD_CONFIG.realtime.maxRetries;
+  private readonly reconnectInterval = DASHBOARD_CONFIG.realtime.reconnectInterval;
+  private readonly heartbeatInterval = DASHBOARD_CONFIG.realtime.heartbeatInterval;
+  private readonly eventListeners = new Map<string, Set<(event: RealtimeEvent) => void>>();
+  private readonly subscriptions = new Set<RealtimeEventType>();
   private userId: string | null = null;
 
   constructor(
-    private onStatusChange: (status: ConnectionStatus) => void,
-    private onReconnectAttemptsChange: (attempts: number) => void
+    private readonly onStatusChange: (status: ConnectionStatus) => void,
+    private readonly onReconnectAttemptsChange: (attempts: number) => void
   ) {}
 
   connect(userId: string, wsUrl?: string): void {
@@ -243,12 +168,13 @@ class RealtimeConnectionManager {
     console.log("WebSocket disconnected:", event.code, event.reason);
     this.clearTimers();
 
-    if (event.code !== 1000) {
+    if (event.code === 1000) {
+      // Normal closure
+      this.onStatusChange("disconnected");
+    } else {
       // Not a normal closure
       this.onStatusChange("disconnected");
       this.scheduleReconnect();
-    } else {
-      this.onStatusChange("disconnected");
     }
   }
 
@@ -341,7 +267,7 @@ class RealtimeConnectionManager {
 }
 
 // Dashboard Real-time Provider Component
-export function DashboardRealtimeProvider({ children }: PropsWithChildren) {
+export function DashboardRealtimeProvider({ children }: Readonly<PropsWithChildren>) {
   const queryClient = useQueryClient();
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
   const [lastConnected, setLastConnected] = useState<Date | null>(null);
@@ -426,6 +352,74 @@ export function DashboardRealtimeProvider({ children }: PropsWithChildren) {
   }, []);
 
   // Optimistic updates management
+  // Apply optimistic update to React Query cache
+  const applyOptimisticUpdate = useCallback(
+    (update: OptimisticUpdate) => {
+      const queryKey = ["convex", "dashboard.getDashboardData"];
+
+      queryClient.setQueryData(queryKey, (oldData: DashboardData | undefined) => {
+        if (!oldData) return oldData;
+
+        const newData = { ...oldData };
+
+        switch (update.type) {
+          case "favorite_added": {
+            const favoriteData = update.data as Favorite;
+            newData.favorites = [...newData.favorites, favoriteData];
+            newData.stats = {
+              ...newData.stats,
+              totalFavorites: newData.stats.totalFavorites + 1,
+            };
+            break;
+          }
+
+          case "favorite_removed": {
+            const removedFavorite = update.data as Favorite;
+            newData.favorites = newData.favorites.filter(fav => fav.id !== removedFavorite.id);
+            newData.stats = {
+              ...newData.stats,
+              totalFavorites: Math.max(0, newData.stats.totalFavorites - 1),
+            };
+            break;
+          }
+
+          case "order_created": {
+            const orderData = update.data as Order;
+            newData.orders = [orderData, ...newData.orders];
+            newData.stats = {
+              ...newData.stats,
+              totalOrders: newData.stats.totalOrders + 1,
+              totalSpent: newData.stats.totalSpent + (orderData.total || 0),
+            };
+            break;
+          }
+
+          case "download_completed": {
+            const downloadData = update.data as Download;
+            newData.downloads = [downloadData, ...newData.downloads];
+            newData.stats = {
+              ...newData.stats,
+              totalDownloads: newData.stats.totalDownloads + 1,
+            };
+            break;
+          }
+
+          default:
+            // Handle other event types
+            break;
+        }
+
+        return newData;
+      });
+
+      // Store rollback function
+      update.rollback = () => {
+        queryClient.invalidateQueries({ queryKey });
+      };
+    },
+    [queryClient]
+  );
+
   const addOptimisticUpdate = useCallback(
     (update: Omit<OptimisticUpdate, "id" | "timestamp">): string => {
       const id = `opt-${Date.now()}-${Math.random()}`;
@@ -442,7 +436,7 @@ export function DashboardRealtimeProvider({ children }: PropsWithChildren) {
 
       return id;
     },
-    []
+    [applyOptimisticUpdate]
   );
 
   const rollbackOptimisticUpdate = useCallback(
@@ -469,66 +463,6 @@ export function DashboardRealtimeProvider({ children }: PropsWithChildren) {
     });
     setOptimisticUpdates(new Map());
   }, [optimisticUpdates]);
-
-  // Apply optimistic update to React Query cache
-  const applyOptimisticUpdate = useCallback(
-    (update: OptimisticUpdate) => {
-      const queryKey = ["convex", "dashboard.getDashboardData"];
-
-      queryClient.setQueryData(queryKey, (oldData: DashboardData | undefined) => {
-        if (!oldData) return oldData;
-
-        const newData = { ...oldData };
-
-        switch (update.type) {
-          case "favorite_added":
-            newData.favorites = [...newData.favorites, update.data];
-            newData.stats = {
-              ...newData.stats,
-              totalFavorites: newData.stats.totalFavorites + 1,
-            };
-            break;
-
-          case "favorite_removed":
-            newData.favorites = newData.favorites.filter(fav => fav.id !== update.data.id);
-            newData.stats = {
-              ...newData.stats,
-              totalFavorites: Math.max(0, newData.stats.totalFavorites - 1),
-            };
-            break;
-
-          case "order_created":
-            newData.orders = [update.data, ...newData.orders];
-            newData.stats = {
-              ...newData.stats,
-              totalOrders: newData.stats.totalOrders + 1,
-              totalSpent: newData.stats.totalSpent + (update.data.total || 0),
-            };
-            break;
-
-          case "download_completed":
-            newData.downloads = [update.data, ...newData.downloads];
-            newData.stats = {
-              ...newData.stats,
-              totalDownloads: newData.stats.totalDownloads + 1,
-            };
-            break;
-
-          default:
-            // Handle other event types
-            break;
-        }
-
-        return newData;
-      });
-
-      // Store rollback function
-      update.rollback = () => {
-        queryClient.invalidateQueries({ queryKey });
-      };
-    },
-    [queryClient]
-  );
 
   // Tab-based subscription management
   useEffect(() => {
@@ -605,86 +539,59 @@ export function DashboardRealtimeProvider({ children }: PropsWithChildren) {
     };
   }, [connect, disconnect]);
 
-  // Context value
-  const contextValue: RealtimeContextValue = {
-    // Connection state
-    isConnected: connectionStatus === "connected",
-    connectionStatus,
-    lastConnected,
-    reconnectAttempts,
+  // Context value - memoized to prevent unnecessary re-renders
+  const contextValue = useMemo<RealtimeContextValue>(
+    () => ({
+      // Connection state
+      isConnected: connectionStatus === "connected",
+      connectionStatus,
+      lastConnected,
+      reconnectAttempts,
 
-    // Event handling
-    subscribe,
-    emit,
+      // Event handling
+      subscribe,
+      emit,
 
-    // Optimistic updates
-    addOptimisticUpdate,
-    rollbackOptimisticUpdate,
-    clearOptimisticUpdates,
+      // Optimistic updates
+      addOptimisticUpdate,
+      rollbackOptimisticUpdate,
+      clearOptimisticUpdates,
 
-    // Connection management
-    connect,
-    disconnect,
-    reconnect,
+      // Connection management
+      connect,
+      disconnect,
+      reconnect,
 
-    // Subscription management
-    setActiveTab,
-    activeTab,
-  };
+      // Subscription management
+      setActiveTab,
+      activeTab,
+    }),
+    [
+      connectionStatus,
+      lastConnected,
+      reconnectAttempts,
+      subscribe,
+      emit,
+      addOptimisticUpdate,
+      rollbackOptimisticUpdate,
+      clearOptimisticUpdates,
+      connect,
+      disconnect,
+      reconnect,
+      activeTab,
+    ]
+  );
 
   return <RealtimeContext.Provider value={contextValue}>{children}</RealtimeContext.Provider>;
 }
 
-// Hook to use real-time context
-export function useRealtimeContext(): RealtimeContextValue {
-  const context = useContext(RealtimeContext);
-  if (!context) {
-    throw new Error("useRealtimeContext must be used within a DashboardRealtimeProvider");
-  }
-  return context;
-}
-
-// Specialized hooks for common real-time operations
-export function useRealtimeConnection() {
-  const {
-    isConnected,
-    connectionStatus,
-    lastConnected,
-    reconnectAttempts,
-    connect,
-    disconnect,
-    reconnect,
-  } = useRealtimeContext();
-
-  return {
-    isConnected,
-    connectionStatus,
-    lastConnected,
-    reconnectAttempts,
-    connect,
-    disconnect,
-    reconnect,
-  };
-}
-
-export function useOptimisticUpdates() {
-  const { addOptimisticUpdate, rollbackOptimisticUpdate, clearOptimisticUpdates } =
-    useRealtimeContext();
-
-  return {
-    addOptimisticUpdate,
-    rollbackOptimisticUpdate,
-    clearOptimisticUpdates,
-  };
-}
-
-export function useRealtimeSubscription(
-  events: RealtimeEventType[],
-  callback: (event: RealtimeEvent) => void
-) {
-  const { subscribe } = useRealtimeContext();
-
-  useEffect(() => {
-    return subscribe(events, callback);
-  }, [subscribe, callback, events]);
-}
+// Re-export types and context from the context file for backward compatibility
+export { RealtimeContext } from "@/providers/DashboardRealtimeContext";
+export type {
+  ConnectionStatus,
+  OptimisticUpdate,
+  RealtimeContextValue,
+  RealtimeEvent,
+  RealtimeEventType,
+  SubscriptionConfig,
+} from "@/providers/DashboardRealtimeContext";

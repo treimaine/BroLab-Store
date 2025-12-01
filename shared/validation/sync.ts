@@ -220,8 +220,9 @@ const DashboardEventSchema = z.object({
 
 /**
  * Subscription options schema
+ * Note: This schema is defined for future use in subscription validation
  */
-const SubscriptionOptionsSchema = z.object({
+const _SubscriptionOptionsSchema = z.object({
   includeHistory: z.boolean().optional(),
   historyLimit: z.number().min(1).optional(),
   priorityFilter: z.array(z.enum(["low", "normal", "high", "critical"])).optional(),
@@ -475,7 +476,7 @@ export function generateDataHash(data: unknown): string {
   let hash = 0;
 
   for (let i = 0; i < jsonString.length; i++) {
-    const char = jsonString.charCodeAt(i);
+    const char = jsonString.codePointAt(i) ?? 0;
     hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32-bit integer
   }

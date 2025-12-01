@@ -4,13 +4,17 @@ import { useLoyaltyTransactions } from "@/hooks/use-loyalty";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Clock, Gift, ShoppingCart, TrendingDown, TrendingUp } from "lucide-react";
+import React from "react";
 
 interface TransactionHistoryProps {
   userId: number;
   className?: string;
 }
 
-export function TransactionHistory({ userId, className }: TransactionHistoryProps) {
+export function TransactionHistory({
+  userId,
+  className,
+}: Readonly<TransactionHistoryProps>): React.ReactElement {
   const { transactions, isLoading, error } = useLoyaltyTransactions(userId);
 
   if (isLoading) {
@@ -31,7 +35,9 @@ export function TransactionHistory({ userId, className }: TransactionHistoryProp
     return (
       <Card className={className}>
         <CardContent className="p-6 text-center">
-          <p className="text-red-400">Une erreur est survenue lors du chargement de l'historique</p>
+          <p className="text-red-400">
+            Une erreur est survenue lors du chargement de l&apos;historique
+          </p>
         </CardContent>
       </Card>
     );

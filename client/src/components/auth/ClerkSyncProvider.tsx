@@ -1,13 +1,13 @@
-import React, { ReactNode, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useClerkSync } from "@/hooks/useClerkSync";
+import { ReactNode, useEffect } from "react";
 
 interface ClerkSyncProviderProps {
   children: ReactNode;
 }
 
 export function ClerkSyncProvider({ children }: ClerkSyncProviderProps) {
-  const { isSynced, isLoading, error, isAuthenticated } = useClerkSync();
+  const { isSynced: _isSynced, isLoading: _isLoading, error, isAuthenticated } = useClerkSync();
   const { toast } = useToast();
 
   useEffect(() => {
