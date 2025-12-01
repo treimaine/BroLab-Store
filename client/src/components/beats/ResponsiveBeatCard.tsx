@@ -80,29 +80,32 @@ export function ResponsiveBeatCard({
           )}
         />
 
-        {/* Audio Preview Overlay */}
-        <div
-          className={cn(
-            "absolute inset-0 flex items-center justify-center transition-opacity duration-200",
-            isMobile && "opacity-100",
-            !isMobile && isHovered && "opacity-100",
-            !isMobile && !isHovered && "opacity-0"
-          )}
-        >
-          <div className="w-full h-full flex items-center justify-center p-4">
-            <div className="bg-black/80 backdrop-blur-sm rounded-lg p-4 w-full max-w-xs">
-              <LazyWaveformAudioPlayer
-                src={beat.audio_url || "/api/placeholder/audio.mp3"}
-                title={beat.title || beat.name}
-                artist="BroLab"
-                showControls={false}
-                showWaveform={true}
-                previewOnly={true}
-                className="w-full"
-              />
+        {/* Audio Preview Overlay - Only show if real audio URL exists */}
+        {(() => {
+          const audioUrl = beat.audio_url;
+          if (!audioUrl || audioUrl === "/api/placeholder/audio.mp3") return null;
+          return (
+            <div
+              className={cn(
+                "absolute inset-0 flex items-center justify-center transition-opacity duration-200",
+                isMobile && "opacity-100",
+                !isMobile && isHovered && "opacity-100",
+                !isMobile && !isHovered && "opacity-0"
+              )}
+            >
+              <div className="w-full h-full flex items-center justify-center p-4">
+                <div className="bg-black/80 backdrop-blur-sm rounded-lg p-4 w-full max-w-xs">
+                  <LazyWaveformAudioPlayer
+                    src={audioUrl}
+                    title={beat.title || beat.name || "Untitled"}
+                    artist="BroLab"
+                    genre={beat.genre}
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Top badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-2">
