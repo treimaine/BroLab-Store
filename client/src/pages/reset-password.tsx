@@ -99,7 +99,7 @@ export default function ResetPasswordPage() {
         setStatus("error");
         setMessage(result.message || "Erreur lors de la réinitialisation");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setStatus("error");
       setMessage("Erreur de connexion au serveur");
       console.error("Password reset error:", error);

@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 
 export const getUserQuotas = query({
@@ -9,7 +10,7 @@ export const getUserQuotas = query({
 
       const quotas = await ctx.db
         .query("quotas")
-        .withIndex("by_user", q => q.eq("userId", userId as any))
+        .withIndex("by_user", q => q.eq("userId", userId as Id<"users">))
         .filter(q => q.eq(q.field("isActive"), true))
         .collect();
 
@@ -34,7 +35,7 @@ export const getUserQuotaByType = query({
 
       const quota = await ctx.db
         .query("quotas")
-        .withIndex("by_user", q => q.eq("userId", userId as any))
+        .withIndex("by_user", q => q.eq("userId", userId as Id<"users">))
         .filter(q => q.and(q.eq(q.field("quotaType"), quotaType), q.eq(q.field("isActive"), true)))
         .first();
 

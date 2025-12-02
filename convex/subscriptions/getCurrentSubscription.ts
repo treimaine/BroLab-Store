@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { query } from "../_generated/server";
 
 export const getCurrentSubscription = query({
@@ -10,7 +11,7 @@ export const getCurrentSubscription = query({
       // Récupérer l'abonnement actif le plus récent
       const subscription = await ctx.db
         .query("subscriptions")
-        .withIndex("by_user", q => q.eq("userId", userId as any))
+        .withIndex("by_user", q => q.eq("userId", userId as Id<"users">))
         .filter(q => q.eq(q.field("status"), "active"))
         .order("desc")
         .first();
@@ -38,7 +39,7 @@ export const getUserSubscriptions = query({
 
       const subscriptions = await ctx.db
         .query("subscriptions")
-        .withIndex("by_user", q => q.eq("userId", userId as any))
+        .withIndex("by_user", q => q.eq("userId", userId as Id<"users">))
         .order("desc")
         .collect();
 

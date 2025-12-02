@@ -6,11 +6,23 @@ import { useUser } from "@clerk/clerk-react";
 import { AlertCircle, TestTube } from "lucide-react";
 import { useState } from "react";
 
+interface CheckoutSessionData {
+  sessionId: string;
+  url?: string;
+}
+
+interface TestResult {
+  success: boolean;
+  data?: CheckoutSessionData;
+  error?: string;
+  message: string;
+}
+
 export function ClerkPaymentTest() {
   const { user, isLoaded } = useUser();
   const { toast } = useToast();
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<any>(null);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
 
   const runPaymentTest = async () => {
     if (!user) {

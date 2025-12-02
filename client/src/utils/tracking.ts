@@ -1,7 +1,10 @@
+/** Tracking event data payload - supports primitive values and nested objects */
+type TrackingEventData = Record<string, string | number | boolean | null | undefined>;
+
 interface TrackingEvent {
   event: string;
   timestamp: number;
-  data: Record<string, any>;
+  data: TrackingEventData;
   sessionId: string;
 }
 
@@ -9,14 +12,14 @@ interface TrackingEvent {
 function getSessionId(): string {
   let sessionId = localStorage.getItem("session_id");
   if (!sessionId) {
-    sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     localStorage.setItem("session_id", sessionId);
   }
   return sessionId;
 }
 
 // Main tracking function
-export function track(event: string, data: Record<string, any> = {}): void {
+export function track(event: string, data: TrackingEventData = {}): void {
   try {
     const trackingEvent: TrackingEvent = {
       event,
@@ -93,7 +96,7 @@ export const trackPageView = (page: string, title?: string) => {
   track("page_view", {
     page,
     title: title || document.title,
-    url: window.location.href,
+    url: globalThis.location.href,
     referrer: document.referrer,
   });
 };

@@ -36,7 +36,10 @@ export const createOrder = mutation({
 
     if (!user) {
       // Créer l'utilisateur s'il n'existe pas
-      const email = (identity.emailAddresses as any)?.[0]?.emailAddress || "";
+      const emailAddresses = identity.emailAddresses as
+        | Array<{ emailAddress?: string }>
+        | undefined;
+      const email = emailAddresses?.[0]?.emailAddress || "";
       const username =
         (identity.username as string) ||
         email.split("@")[0] ||
