@@ -1,12 +1,33 @@
 import { v } from "convex/values";
+import type { QueryCtx } from "../_generated/server";
 import { mutation, query } from "../_generated/server";
 import { ValidationError, validateClerkId } from "../lib/validation";
 
-// Types de rôles disponibles
+// Available user roles
 export type UserRole = "admin" | "moderator" | "premium" | "user" | "guest";
 
-// Permissions par rôle
-export const ROLE_PERMISSIONS = {
+// All available permissions
+export type Permission =
+  | "user.read"
+  | "user.write"
+  | "user.delete"
+  | "order.read"
+  | "order.write"
+  | "order.delete"
+  | "product.read"
+  | "product.write"
+  | "product.delete"
+  | "download.read"
+  | "download.write"
+  | "download.premium"
+  | "reservation.read"
+  | "reservation.write"
+  | "reservation.delete"
+  | "audit.read"
+  | "system.admin";
+
+// Role permissions mapping
+export const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   admin: [
     "user.read",
     "user.write",
@@ -48,7 +69,7 @@ export const ROLE_PERMISSIONS = {
 } as const;
 
 /**
- * Vérifier si un utilisateur a une permission spécifique
+ * Check if a user has a specific permission
  */
 export const hasPermission = query({
   args: {
@@ -64,7 +85,7 @@ export const hasPermission = query({
 
       console.log(`🔐 Checking permission ${args.permission} for user: ${args.clerkId}`);
 
-      // Récupérer l'utilisateur
+      // Get user
       const user = await ctx.db
         .query("users")
         .withIndex("by_clerk_id", q => q.eq("clerkId", args.clerkId))
@@ -82,7 +103,7 @@ export const hasPermission = query({
 
       const userRole = (user.role || "user") as UserRole;
       const permissions = ROLE_PERMISSIONS[userRole] || [];
-      const hasAccess = permissions.includes(args.permission as any);
+      const hasAccess = permissions.includes(args.permission as Permission);
 
       console.log(
         `${hasAccess ? "✅" : "❌"} Permission ${args.permission} for role ${userRole}: ${hasAccess}`
@@ -96,7 +117,7 @@ export const hasPermission = query({
 });
 
 /**
- * Obtenir toutes les permissions d'un utilisateur
+ * Get all permissions for a user
  */
 export const getUserPermissions = query({
   args: {
@@ -111,7 +132,7 @@ export const getUserPermissions = query({
 
       console.log(`📋 Getting permissions for user: ${args.clerkId}`);
 
-      // Récupérer l'utilisateur
+      // Get user
       const user = await ctx.db
         .query("users")
         .withIndex("by_clerk_id", q => q.eq("clerkId", args.clerkId))
@@ -142,7 +163,7 @@ export const getUserPermissions = query({
 });
 
 /**
- * Mettre à jour le rôle d'un utilisateur (admin seulement)
+ * Update a user's role (admin only)
  */
 export const updateUserRole = mutation({
   args: {
@@ -173,18 +194,18 @@ export const updateUserRole = mutation({
         `🔄 Admin ${adminClerkId} updating role for ${args.targetClerkId} to ${args.newRole}`
       );
 
-      // Vérifier que l'utilisateur actuel est admin
+      // Verify current user is admin
       const adminUser = await ctx.db
         .query("users")
         .withIndex("by_clerk_id", q => q.eq("clerkId", adminClerkId))
         .first();
 
-      if (!adminUser || adminUser.role !== "admin") {
+      if (adminUser?.role !== "admin") {
         console.log(`🚫 Access denied: ${adminClerkId} is not admin`);
         throw new Error("Access denied: Admin role required");
       }
 
-      // Récupérer l'utilisateur cible
+      // Get target user
       const targetUser = await ctx.db
         .query("users")
         .withIndex("by_clerk_id", q => q.eq("clerkId", args.targetClerkId))
@@ -197,13 +218,13 @@ export const updateUserRole = mutation({
       const previousRole = targetUser.role || "user";
       const now = Date.now();
 
-      // Mettre à jour le rôle
+      // Update role
       await ctx.db.patch(targetUser._id, {
         role: args.newRole,
         updatedAt: now,
       });
 
-      // Log de l'activité
+      // Activity log
       await ctx.db.insert("activityLog", {
         userId: targetUser._id,
         action: "role_updated",
@@ -251,7 +272,7 @@ export const updateUserRole = mutation({
     } catch (error) {
       console.error(`❌ Error updating user role:`, error);
 
-      // Log de l'erreur
+      // Error log
       const identity = await ctx.auth.getUserIdentity();
       const errorMessage = error instanceof Error ? error.message : String(error);
       await ctx.db.insert("auditLogs", {
@@ -278,7 +299,7 @@ export const updateUserRole = mutation({
 });
 
 /**
- * Obtenir les utilisateurs par rôle (admin/moderator seulement)
+ * Get users by role (admin/moderator only)
  */
 export const getUsersByRole = query({
   args: {
@@ -297,7 +318,7 @@ export const getUsersByRole = query({
 
       console.log(`👥 Getting users with role ${args.role} for admin: ${clerkId}`);
 
-      // Vérifier que l'utilisateur actuel a les permissions
+      // Verify current user has permissions
       const currentUser = await ctx.db
         .query("users")
         .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
@@ -308,7 +329,7 @@ export const getUsersByRole = query({
         throw new Error("Access denied: Admin or moderator role required");
       }
 
-      // Récupérer les utilisateurs par rôle
+      // Get users by role
       const users = await ctx.db
         .query("users")
         .withIndex("by_role", q => q.eq("role", args.role))
@@ -325,10 +346,10 @@ export const getUsersByRole = query({
 });
 
 /**
- * Middleware pour vérifier les permissions
+ * Middleware to verify permissions
  */
 export async function requirePermission(
-  ctx: any,
+  ctx: QueryCtx,
   permission: string,
   clerkId?: string
 ): Promise<boolean> {
@@ -342,17 +363,17 @@ export async function requirePermission(
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", userClerkId))
+      .withIndex("by_clerk_id", q => q.eq("clerkId", userClerkId))
       .first();
 
-    if (!user || !user.isActive) {
+    if (!user?.isActive) {
       return false;
     }
 
     const userRole = (user.role || "user") as UserRole;
     const permissions = ROLE_PERMISSIONS[userRole] || [];
 
-    return permissions.includes(permission as any);
+    return permissions.includes(permission as Permission);
   } catch (error) {
     console.error(`❌ Error checking permission:`, error);
     return false;

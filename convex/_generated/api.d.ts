@@ -41,6 +41,7 @@ import type * as files_listFiles from "../files/listFiles.js";
 import type * as files_storage from "../files/storage.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
+import type * as invoices_createInvoiceRecord from "../invoices/createInvoiceRecord.js";
 import type * as invoices_generateInvoiceNumber from "../invoices/generateInvoiceNumber.js";
 import type * as invoices from "../invoices.js";
 import type * as lib_dashboardConfig from "../lib/dashboardConfig.js";
@@ -134,6 +135,7 @@ declare const fullApi: ApiFromModules<{
   "files/storage": typeof files_storage;
   files: typeof files;
   http: typeof http;
+  "invoices/createInvoiceRecord": typeof invoices_createInvoiceRecord;
   "invoices/generateInvoiceNumber": typeof invoices_generateInvoiceNumber;
   invoices: typeof invoices;
   "lib/dashboardConfig": typeof lib_dashboardConfig;

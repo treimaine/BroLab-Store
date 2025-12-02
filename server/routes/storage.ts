@@ -1,7 +1,10 @@
 import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import type { InsertFile } from "../../shared/schema";
+import { getConvex } from "../lib/convex";
 import { deleteFile, getSignedUrl, uploadUserFile } from "../lib/storage";
 import { createValidationMiddleware as validateRequest } from "../lib/validation";
 import { downloadRateLimit, uploadRateLimit } from "../middleware/rateLimiter";
@@ -98,7 +101,34 @@ router.post(
         contentType: req.file.mimetype,
       });
 
-      // Validate and save file record to database
+      // Get clerkId from authenticated user for Convex call
+      const clerkId = (req.user as { clerkId?: string })?.clerkId;
+      if (!clerkId) {
+        res.status(400).json({ error: "Missing user identifier" });
+        return;
+      }
+
+      // Create file record in Convex
+      // Requirements: 2.1 - Create file record in Convex using createFile mutation
+      const convex = getConvex();
+      const createFileArgs = {
+        filename: fileName,
+        originalName: req.file.originalname,
+        storagePath: path,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        role: fileRole,
+        reservationId: reservation_id ? (reservation_id as Id<"reservations">) : undefined,
+        orderId: order_id ? (order_id as Id<"orders">) : undefined,
+        clerkId,
+      };
+      const fileId = await convex.mutation(
+        // @ts-expect-error - Convex API type depth issue (known TypeScript limitation)
+        api.files.createFile.createFile,
+        createFileArgs
+      );
+
+      // Build response with file record
       const fileRecord: InsertFile = {
         user_id: Number.parseInt(userId),
         filename: fileName,
@@ -112,12 +142,9 @@ router.post(
         owner_id: Number.parseInt(userId),
       };
 
-      // Convex integration pending - using placeholder
-      const data = { ...fileRecord, id: Date.now().toString() };
-
       res.json({
         success: true,
-        file: data,
+        file: { ...fileRecord, id: fileId },
         url: fullUrl,
       });
     } catch (error: unknown) {
@@ -127,6 +154,7 @@ router.post(
 );
 
 // Get signed URL for private file access with rate limiting
+// Requirements: 2.2, 2.5 - Query Convex for file record and verify ownership
 router.get("/signed-url/:fileId", downloadRateLimit, async (req, res): Promise<void> => {
   try {
     if (!req.isAuthenticated()) {
@@ -135,27 +163,47 @@ router.get("/signed-url/:fileId", downloadRateLimit, async (req, res): Promise<v
     }
 
     const { fileId } = req.params;
-    const userId = req.user!.id;
 
-    // Convex integration pending - using placeholder
-    const file = {
-      id: fileId,
-      owner_id: userId,
-      role: "upload" as FileRole,
-      storage_path: "temp",
-    };
+    // Get clerkId from authenticated user for Convex call
+    const clerkId = (req.user as { clerkId?: string })?.clerkId;
+    if (!clerkId) {
+      res.status(400).json({ error: "Missing user identifier" });
+      return;
+    }
 
-    // Check ownership
-    if (file.owner_id !== userId) {
-      res.status(403).json({ error: "Access denied" });
+    // Query Convex for file record - ownership is verified in the Convex function
+    // Requirements: 2.2, 2.5 - Verify ownership by comparing user IDs
+    const convex = getConvex();
+    let file;
+    try {
+      file = await convex.query(api.files.getFile.getFile, {
+        fileId: fileId as Id<"files">,
+        clerkId,
+      });
+    } catch (error) {
+      // Handle access denied or file not found from Convex
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      if (errorMessage.includes("Access denied")) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      if (errorMessage.includes("not found")) {
+        res.status(404).json({ error: "File not found" });
+        return;
+      }
+      throw error;
+    }
+
+    if (!file) {
+      res.status(404).json({ error: "File not found" });
       return;
     }
 
     // Determine bucket based on role
-    const bucketKey = getBucketKeyForRole(file.role);
+    const bucketKey = getBucketKeyForRole(file.role as FileRole);
 
     // Generate signed URL (expires in 1 hour)
-    const signedUrl = await getSignedUrl(bucketKey, file.storage_path, 3600);
+    const signedUrl = await getSignedUrl(bucketKey, file.storagePath, 3600);
 
     res.json({ url: signedUrl });
   } catch (error: unknown) {
@@ -164,6 +212,7 @@ router.get("/signed-url/:fileId", downloadRateLimit, async (req, res): Promise<v
 });
 
 // List user files with validation
+// Requirements: 2.3 - Query Convex using listFiles and return user's files
 router.get("/files", validateRequest(fileFilterValidation), async (req, res): Promise<void> => {
   try {
     if (!req.isAuthenticated()) {
@@ -171,16 +220,33 @@ router.get("/files", validateRequest(fileFilterValidation), async (req, res): Pr
       return;
     }
 
-    // Convex integration pending - returning empty array
-    const files: Array<{
-      id: string;
-      filename: string;
-      original_name: string;
-      mime_type: string;
-      size: number;
-      role: string;
-      created_at: string;
-    }> = [];
+    // Get clerkId from authenticated user for Convex call
+    const clerkId = (req.user as { clerkId?: string })?.clerkId;
+    if (!clerkId) {
+      res.status(400).json({ error: "Missing user identifier" });
+      return;
+    }
+
+    // Get role filter from query params
+    const { type: roleFilter } = req.query as { type?: string };
+
+    // Query Convex for user's files with optional role filter
+    const convex = getConvex();
+    const convexFiles = await convex.query(api.files.listFiles.listFiles, {
+      role: roleFilter as "upload" | "deliverable" | "invoice" | undefined,
+      clerkId,
+    });
+
+    // Transform Convex response to expected format
+    const files = convexFiles.map(file => ({
+      id: file._id,
+      filename: file.filename,
+      original_name: file.originalName,
+      mime_type: file.mimeType,
+      size: file.size,
+      role: file.role,
+      created_at: new Date(file.createdAt).toISOString(),
+    }));
 
     res.json({ files });
   } catch (error: unknown) {
@@ -189,6 +255,7 @@ router.get("/files", validateRequest(fileFilterValidation), async (req, res): Pr
 });
 
 // Delete file
+// Requirements: 2.4, 2.5 - Verify ownership and delete both storage file and Convex record
 router.delete("/files/:fileId", async (req, res): Promise<void> => {
   try {
     if (!req.isAuthenticated()) {
@@ -197,27 +264,53 @@ router.delete("/files/:fileId", async (req, res): Promise<void> => {
     }
 
     const { fileId } = req.params;
-    const userId = req.user!.id;
 
-    // Convex integration pending - using placeholder
-    const file = {
-      id: fileId,
-      owner_id: userId,
-      role: "upload" as FileRole,
-      storage_path: "temp",
-    };
+    // Get clerkId from authenticated user for Convex call
+    const clerkId = (req.user as { clerkId?: string })?.clerkId;
+    if (!clerkId) {
+      res.status(400).json({ error: "Missing user identifier" });
+      return;
+    }
 
-    // Check ownership
-    if (file.owner_id !== userId) {
-      res.status(403).json({ error: "Access denied" });
+    // Query Convex for file record - ownership is verified in the Convex function
+    const convex = getConvex();
+    let file;
+    try {
+      file = await convex.query(api.files.getFile.getFile, {
+        fileId: fileId as Id<"files">,
+        clerkId,
+      });
+    } catch (error) {
+      // Handle access denied or file not found from Convex
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      if (errorMessage.includes("Access denied")) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      if (errorMessage.includes("not found")) {
+        res.status(404).json({ error: "File not found" });
+        return;
+      }
+      throw error;
+    }
+
+    if (!file) {
+      res.status(404).json({ error: "File not found" });
       return;
     }
 
     // Determine bucket based on role
-    const bucketKey = getBucketKeyForRole(file.role);
+    const bucketKey = getBucketKeyForRole(file.role as FileRole);
 
     // Delete from storage
-    await deleteFile(bucketKey, file.storage_path);
+    await deleteFile(bucketKey, file.storagePath);
+
+    // Delete Convex record
+    // Requirements: 2.4 - Delete both storage file and Convex record
+    await convex.mutation(api.files.deleteFile.deleteFile, {
+      fileId: fileId as Id<"files">,
+      clerkId,
+    });
 
     res.json({ success: true });
   } catch (error: unknown) {
