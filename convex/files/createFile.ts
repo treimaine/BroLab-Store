@@ -11,17 +11,28 @@ export const createFile = mutation({
     role: v.union(v.literal("upload"), v.literal("deliverable"), v.literal("invoice")),
     reservationId: v.optional(v.id("reservations")),
     orderId: v.optional(v.id("orders")),
+    clerkId: v.optional(v.string()), // For server-side calls from Express
   },
   handler: async (ctx, args): Promise<string> => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Unauthorized");
+    let clerkIdToUse: string;
+
+    // Support both authenticated client calls and server-side calls with clerkId
+    if (args.clerkId) {
+      // Server-side call with explicit clerkId
+      clerkIdToUse = args.clerkId;
+    } else {
+      // Client-side call with authentication
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) {
+        throw new Error("Unauthorized");
+      }
+      clerkIdToUse = identity.subject;
     }
 
     // Get user from Convex
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
+      .withIndex("by_clerk_id", q => q.eq("clerkId", clerkIdToUse))
       .first();
 
     if (!user) {

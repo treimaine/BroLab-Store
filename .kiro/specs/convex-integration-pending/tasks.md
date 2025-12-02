@@ -46,75 +46,75 @@
 - [x] 3. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 4. Integrate Storage Library with Convex
-  - [ ] 4.1 Update `server/lib/storage.ts` uploadUserFile function
+- [x] 4. Integrate Storage Library with Convex
+  - [x] 4.1 Update `server/lib/storage.ts` uploadUserFile function
     - Import getConvex and api from convex
     - Convert file buffer to base64 for Convex action
     - Call api.files.storage.uploadToStorage action
     - Return storage path and URL from Convex response
     - _Requirements: 3.1_
-  - [ ] 4.2 Update getSignedUrl function
+  - [x] 4.2 Update getSignedUrl function
     - Call api.files.storage.getStorageUrl action
     - Return URL from Convex response
     - _Requirements: 3.2_
-  - [ ] 4.3 Update deleteFile function
+  - [x] 4.3 Update deleteFile function
     - Call api.files.storage.deleteFromStorage action
     - Handle errors appropriately
     - _Requirements: 3.3_
-  - [ ]\* 4.4 Write property tests for storage library
+  - [x] 4.4 Write property tests for storage library
     - **Property 9: Signed URL Validity**
     - **Property 10: Storage Deletion Completeness**
     - **Validates: Requirements 3.2, 3.3**
 
-- [ ] 5. Integrate Storage Routes with Convex
-  - [ ] 5.1 Update POST /upload endpoint in `server/routes/storage.ts`
+- [x] 5. Integrate Storage Routes with Convex
+  - [x] 5.1 Update POST /upload endpoint in `server/routes/storage.ts`
     - Import getConvex and api from convex
     - After successful storage upload, call api.files.createFile.createFile mutation
     - Return file ID from Convex in response
     - _Requirements: 2.1_
-  - [ ] 5.2 Update GET /signed-url/:fileId endpoint
+  - [x] 5.2 Update GET /signed-url/:fileId endpoint
     - Query Convex for file record using api.files.getFile.getFile
     - Verify ownership by comparing user IDs
     - Return 403 if ownership check fails
     - Generate signed URL using storage library
     - _Requirements: 2.2, 2.5_
-  - [ ] 5.3 Update GET /files endpoint
+  - [x] 5.3 Update GET /files endpoint
     - Call api.files.listFiles.listFiles query with role filter
     - Transform Convex response to expected format
     - _Requirements: 2.3_
-  - [ ] 5.4 Update DELETE /files/:fileId endpoint
+  - [x] 5.4 Update DELETE /files/:fileId endpoint
     - Query Convex for file record
     - Verify ownership, return 403 if check fails
     - Delete from storage using storage library
     - Delete Convex record using api.files.deleteFile.deleteFile mutation
     - _Requirements: 2.4, 2.5_
-  - [ ]\* 5.5 Write property tests for storage routes
+  - [x] 5.5 Write property tests for storage routes
     - **Property 5: File Upload Persistence**
     - **Property 6: File Ownership Enforcement**
     - **Property 7: File Listing Completeness**
     - **Property 14: File Operation Error Responses**
     - **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 5.2**
 
-- [ ] 6. Checkpoint - Ensure all tests pass
+- [x] 6. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. Integrate Invoice Generation with Convex
-  - [ ] 7.1 Update `server/lib/invoices.ts` ensureInvoiceNumber function
+- [x] 7. Integrate Invoice Generation with Convex
+  - [x] 7.1 Update `server/lib/invoices.ts` ensureInvoiceNumber function
     - Import getConvex and api from convex
     - Call api.invoices.generateInvoiceNumber mutation with orderId
     - Return invoice number from Convex response
     - _Requirements: 4.1, 4.2, 4.4_
-  - [ ] 7.2 Update ensureInvoicePdf function for PDF storage
+  - [x] 7.2 Update ensureInvoicePdf function for PDF storage
     - After generating PDF buffer, upload to Convex Storage
     - Create or update invoicesOrders record with PDF URL
     - _Requirements: 4.3_
-  - [ ]\* 7.3 Write property tests for invoice generation
+  - [x] 7.3 Write property tests for invoice generation
     - **Property 13: Invoice PDF Persistence**
     - **Property 15: Invoice Error Strictness**
     - **Validates: Requirements 4.3, 5.3**
 
-- [ ] 8. Add getFile query to Convex files module
-  - [ ] 8.1 Create `convex/files/getFile.ts` query
+- [x] 8. Add getFile query to Convex files module
+  - [x] 8.1 Create `convex/files/getFile.ts` query
     - Accept fileId parameter
     - Return file record or null if not found
     - Used by storage routes for ownership verification
