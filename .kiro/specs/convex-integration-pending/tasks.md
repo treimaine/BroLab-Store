@@ -1,0 +1,124 @@
+# Implementation Plan
+
+- [ ] 1. Create new Convex functions for storage and invoices
+  - [x] 1.1 Create `convex/files/storage.ts` with uploadToStorage, getStorageUrl, and deleteFromStorage actions
+    - Implement uploadToStorage action that accepts base64 file data and stores in Convex Storage
+    - Implement getStorageUrl action that returns URL for a storage ID
+    - Implement deleteFromStorage action that removes file from Convex Storage
+    - _Requirements: 3.1, 3.2, 3.3_
+  - [x] 1.2 Write property test for storage round-trip
+    - **Property 8: Storage Upload Round-Trip**
+    - **Validates: Requirements 3.1**
+  - [x] 1.3 Create `convex/invoices/generateInvoiceNumber.ts` mutation
+    - Implement atomic counter logic using counters table
+    - Check if order already has invoice number (idempotency)
+    - Generate number in format BRLB-{YEAR}-{6-DIGIT-SEQUENCE}
+    - Update order with generated invoice number
+    - _Requirements: 4.1, 4.2, 4.4_
+  - [x] 1.4 Write property test for invoice number uniqueness and format
+    - **Property 11: Invoice Number Uniqueness and Format**
+    - **Validates: Requirements 4.1, 4.2**
+  - [x] 1.5 Write property test for invoice number idempotency
+    - **Property 12: Invoice Number Idempotency**
+    - **Validates: Requirements 4.4**
+
+- [x] 2. Integrate AuditLogger with Convex
+  - [x] 2.1 Update `server/lib/audit.ts` to use Convex for logging
+    - Import getConvex and api from convex
+    - Replace console.log in log() method with api.audit.logAuditEvent mutation
+    - Wrap Convex call in try-catch for graceful degradation
+    - _Requirements: 1.1, 1.4_
+  - [x] 2.2 Update getUserAuditLogs to query Convex
+    - Call api.audit.getUserAuditLogs query with clerkId
+    - Transform Convex response to AuditLogEntry[] format
+    - _Requirements: 1.2_
+  - [x] 2.3 Update getSecurityEvents to query Convex
+    - Call api.audit.getSecurityEvents query
+    - Transform Convex response to AuditLogEntry[] format
+    - _Requirements: 1.3_
+  - [x] 2.4 Write property tests for audit logger
+    - **Property 1: Audit Log Persistence**
+    - **Property 2: Audit Log Ordering**
+    - **Property 3: Security Event Filtering**
+    - **Property 4: Audit Error Graceful Degradation**
+    - **Validates: Requirements 1.1, 1.2, 1.3, 1.4**
+
+- [x] 3. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 4. Integrate Storage Library with Convex
+  - [ ] 4.1 Update `server/lib/storage.ts` uploadUserFile function
+    - Import getConvex and api from convex
+    - Convert file buffer to base64 for Convex action
+    - Call api.files.storage.uploadToStorage action
+    - Return storage path and URL from Convex response
+    - _Requirements: 3.1_
+  - [ ] 4.2 Update getSignedUrl function
+    - Call api.files.storage.getStorageUrl action
+    - Return URL from Convex response
+    - _Requirements: 3.2_
+  - [ ] 4.3 Update deleteFile function
+    - Call api.files.storage.deleteFromStorage action
+    - Handle errors appropriately
+    - _Requirements: 3.3_
+  - [ ]\* 4.4 Write property tests for storage library
+    - **Property 9: Signed URL Validity**
+    - **Property 10: Storage Deletion Completeness**
+    - **Validates: Requirements 3.2, 3.3**
+
+- [ ] 5. Integrate Storage Routes with Convex
+  - [ ] 5.1 Update POST /upload endpoint in `server/routes/storage.ts`
+    - Import getConvex and api from convex
+    - After successful storage upload, call api.files.createFile.createFile mutation
+    - Return file ID from Convex in response
+    - _Requirements: 2.1_
+  - [ ] 5.2 Update GET /signed-url/:fileId endpoint
+    - Query Convex for file record using api.files.getFile.getFile
+    - Verify ownership by comparing user IDs
+    - Return 403 if ownership check fails
+    - Generate signed URL using storage library
+    - _Requirements: 2.2, 2.5_
+  - [ ] 5.3 Update GET /files endpoint
+    - Call api.files.listFiles.listFiles query with role filter
+    - Transform Convex response to expected format
+    - _Requirements: 2.3_
+  - [ ] 5.4 Update DELETE /files/:fileId endpoint
+    - Query Convex for file record
+    - Verify ownership, return 403 if check fails
+    - Delete from storage using storage library
+    - Delete Convex record using api.files.deleteFile.deleteFile mutation
+    - _Requirements: 2.4, 2.5_
+  - [ ]\* 5.5 Write property tests for storage routes
+    - **Property 5: File Upload Persistence**
+    - **Property 6: File Ownership Enforcement**
+    - **Property 7: File Listing Completeness**
+    - **Property 14: File Operation Error Responses**
+    - **Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 5.2**
+
+- [ ] 6. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 7. Integrate Invoice Generation with Convex
+  - [ ] 7.1 Update `server/lib/invoices.ts` ensureInvoiceNumber function
+    - Import getConvex and api from convex
+    - Call api.invoices.generateInvoiceNumber mutation with orderId
+    - Return invoice number from Convex response
+    - _Requirements: 4.1, 4.2, 4.4_
+  - [ ] 7.2 Update ensureInvoicePdf function for PDF storage
+    - After generating PDF buffer, upload to Convex Storage
+    - Create or update invoicesOrders record with PDF URL
+    - _Requirements: 4.3_
+  - [ ]\* 7.3 Write property tests for invoice generation
+    - **Property 13: Invoice PDF Persistence**
+    - **Property 15: Invoice Error Strictness**
+    - **Validates: Requirements 4.3, 5.3**
+
+- [ ] 8. Add getFile query to Convex files module
+  - [ ] 8.1 Create `convex/files/getFile.ts` query
+    - Accept fileId parameter
+    - Return file record or null if not found
+    - Used by storage routes for ownership verification
+    - _Requirements: 2.2, 2.4_
+
+- [ ] 9. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

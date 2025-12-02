@@ -1,6 +1,9 @@
 // Configuration Convex
 // SECURITY: Use lazy initialization with proper validation, no hardcoded fallback
 
+import { api } from "../../convex/_generated/api";
+import { getConvex } from "./convex";
+
 export interface AuditLogEntry {
   userId?: string;
   action: string;
@@ -8,6 +11,7 @@ export interface AuditLogEntry {
   details?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
+  timestamp?: number;
 }
 
 export class AuditLogger {
@@ -23,15 +27,27 @@ export class AuditLogger {
   }
 
   /**
-   * Log a security-relevant action
-   * Note: Convex integration pending - currently logs to console
+   * Log a security-relevant action to Convex
+   * Implements graceful degradation - logs to console if Convex fails
+   * Requirements: 1.1, 1.4
    */
   async log(entry: AuditLogEntry): Promise<void> {
     try {
-      // Log to console for now - Convex integration pending
-      console.log("Audit log entry:", entry);
+      const convex = getConvex();
+      // @ts-expect-error - Convex API type depth issue (known limitation)
+      await convex.mutation(api.audit.logAuditEvent, {
+        userId: entry.userId,
+        action: entry.action,
+        resource: entry.resource,
+        details: entry.details as Record<string, never> | undefined,
+        ipAddress: entry.ipAddress,
+        userAgent: entry.userAgent,
+      });
     } catch (error) {
-      console.error("Failed to log audit entry:", error);
+      // Graceful degradation: log error and continue without throwing
+      // Requirements: 1.4, 5.1
+      console.error("Failed to log audit entry to Convex:", error);
+      console.log("Audit log entry (fallback):", entry);
     }
   }
 
@@ -233,31 +249,56 @@ export class AuditLogger {
   }
 
   /**
-   * Get user audit logs
-   * Note: Convex integration temporarily disabled for strict mode compliance
+   * Get user audit logs from Convex
+   * Requirements: 1.2
    */
-  async getUserAuditLogs(_userId: string, _limit = 50): Promise<AuditLogEntry[]> {
+  async getUserAuditLogs(clerkId: string, limit = 50): Promise<AuditLogEntry[]> {
     try {
-      // Temporary fallback - Convex integration pending
-      console.log("Getting audit logs for user:", _userId, "limit:", _limit);
-      return [];
+      const convex = getConvex();
+      const logs = await convex.query(api.audit.getUserAuditLogs, {
+        clerkId,
+        limit,
+      });
+
+      // Transform Convex response to AuditLogEntry[] format
+      return logs.map(log => ({
+        userId: log.clerkId ?? undefined,
+        action: log.action,
+        resource: log.resource,
+        details: log.details as Record<string, unknown> | undefined,
+        ipAddress: log.ipAddress ?? undefined,
+        userAgent: log.userAgent ?? undefined,
+        timestamp: log.timestamp,
+      }));
     } catch (error) {
-      console.error("Failed to get user audit logs:", error);
+      console.error("Failed to get user audit logs from Convex:", error);
       return [];
     }
   }
 
   /**
-   * Get security events
-   * Note: Convex integration temporarily disabled for strict mode compliance
+   * Get security events from Convex
+   * Requirements: 1.3
    */
-  async getSecurityEvents(_limit = 100): Promise<AuditLogEntry[]> {
+  async getSecurityEvents(limit = 100): Promise<AuditLogEntry[]> {
     try {
-      // Temporary fallback - Convex integration pending
-      const events: AuditLogEntry[] = [];
-      return events;
+      const convex = getConvex();
+      const events = await convex.query(api.audit.getSecurityEvents, {
+        limit,
+      });
+
+      // Transform Convex response to AuditLogEntry[] format
+      return events.map(event => ({
+        userId: event.clerkId ?? undefined,
+        action: event.action,
+        resource: event.resource,
+        details: event.details as Record<string, unknown> | undefined,
+        ipAddress: event.ipAddress ?? undefined,
+        userAgent: event.userAgent ?? undefined,
+        timestamp: event.timestamp,
+      }));
     } catch (error) {
-      console.error("Failed to get security events:", error);
+      console.error("Failed to get security events from Convex:", error);
       return [];
     }
   }
