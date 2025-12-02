@@ -1,24 +1,22 @@
 import "@jest/globals";
 import "@testing-library/jest-dom";
-import express from "express";
-import { TextDecoder, TextEncoder } from "util";
+import type { Request, Response, Router } from "express";
+import { TextDecoder, TextEncoder } from "node:util";
 
 // Polyfills for Node test environment
-// @ts-expect-error - Global polyfill for Node.js compatibility
-global.TextEncoder = TextEncoder;
-// @ts-expect-error - Global polyfill for Node.js compatibility
-global.TextDecoder = TextDecoder;
+globalThis.TextEncoder = TextEncoder;
+globalThis.TextDecoder = TextDecoder as typeof globalThis.TextDecoder;
 
 // Add setImmediate polyfill for Node.js compatibility
-// @ts-expect-error - Global polyfill for Node.js compatibility
-global.setImmediate =
-  global.setImmediate ||
-  ((fn: (...args: unknown[]) => void, ...args: unknown[]) => setTimeout(fn, 0, ...args));
+globalThis.setImmediate =
+  globalThis.setImmediate ||
+  ((fn: (...args: unknown[]) => void, ...args: unknown[]): NodeJS.Immediate =>
+    setTimeout(fn, 0, ...args) as unknown as NodeJS.Immediate);
 
 // Enhanced jsdom environment setup
-Object.defineProperty(window, "matchMedia", {
+Object.defineProperty(globalThis, "matchMedia", {
   writable: true,
-  value: jest.fn().mockImplementation(query => ({
+  value: jest.fn().mockImplementation((query: string) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -31,14 +29,14 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 // Mock ResizeObserver for client-side components
-global.ResizeObserver = jest.fn().mockImplementation(() => ({
+globalThis.ResizeObserver = jest.fn().mockImplementation(() => ({
   observe: jest.fn(),
   unobserve: jest.fn(),
   disconnect: jest.fn(),
 }));
 
 // Mock IntersectionObserver for lazy loading components
-global.IntersectionObserver = jest.fn().mockImplementation(() => ({
+globalThis.IntersectionObserver = jest.fn().mockImplementation(() => ({
   observe: jest.fn(),
   unobserve: jest.fn(),
   disconnect: jest.fn(),
@@ -75,19 +73,21 @@ Object.defineProperty(globalThis, "import", {
 });
 
 // Enhanced fetch mock for better test compatibility
-// @ts-expect-error - Global fetch mock for testing
-global.fetch = jest.fn(async () => ({
+globalThis.fetch = jest.fn(async () => ({
   ok: true,
   status: 200,
   json: async () => ({}),
   text: async () => "",
   blob: async () => new Blob(),
   headers: new Headers(),
-}));
+})) as jest.Mock;
 
 // Mock WooCommerce API calls to avoid real HTTP requests
 jest.mock("../server/routes/openGraph", () => {
-  const originalModule = jest.requireActual("../server/routes/openGraph");
+  const originalModule = jest.requireActual("../server/routes/openGraph") as Record<
+    string,
+    unknown
+  >;
   return {
     ...originalModule,
     // Mock the wcApiRequest function to avoid real WooCommerce calls
@@ -96,14 +96,15 @@ jest.mock("../server/routes/openGraph", () => {
 });
 
 jest.mock("../server/routes/schema", () => {
-  const express = jest.requireActual("express");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const express = require("express") as { Router: () => Router };
   const router = express.Router();
 
-  router.get("/beat/:id", (req: express.Request, res: express.Response) => {
+  router.get("/beat/:id", (_req: Request, res: Response) => {
     res.json({ schema: "mock beat schema" });
   });
 
-  router.get("/shop", (req: express.Request, res: express.Response) => {
+  router.get("/shop", (_req: Request, res: Response) => {
     res.json({ schema: "mock shop schema" });
   });
 
@@ -111,25 +112,26 @@ jest.mock("../server/routes/schema", () => {
 });
 
 jest.mock("../server/routes/openGraph", () => {
-  const express = jest.requireActual("express");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const express = require("express") as { Router: () => Router };
   const router = express.Router();
 
-  router.get("/beat/:id", (req: express.Request, res: express.Response) => {
+  router.get("/beat/:id", (_req: Request, res: Response) => {
     res.setHeader("Content-Type", "text/html");
     res.send("<html><head><title>Mock Beat</title></head><body>Mock Beat Page</body></html>");
   });
 
-  router.get("/shop", (req: express.Request, res: express.Response) => {
+  router.get("/shop", (_req: Request, res: Response) => {
     res.setHeader("Content-Type", "text/html");
     res.send("<html><head><title>Mock Shop</title></head><body>Mock Shop Page</body></html>");
   });
 
-  router.get("/home", (req: express.Request, res: express.Response) => {
+  router.get("/home", (_req: Request, res: Response) => {
     res.setHeader("Content-Type", "text/html");
     res.send("<html><head><title>Mock Home</title></head><body>Mock Home Page</body></html>");
   });
 
-  router.get("/page/:pageName", (req: express.Request, res: express.Response) => {
+  router.get("/page/:pageName", (req: Request, res: Response) => {
     res.setHeader("Content-Type", "text/html");
     res.send(
       `<html><head><title>Mock ${req.params.pageName}</title></head><body>Mock ${req.params.pageName} Page</body></html>`
