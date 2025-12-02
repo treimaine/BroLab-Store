@@ -57,7 +57,7 @@ export function sanitizeDashboardLimits(args: {
  * Ensures all amounts are properly converted between cents and dollars
  */
 export function sanitizeCurrencyAmount(amount: number | undefined, fromCents = true): number {
-  if (typeof amount !== "number" || isNaN(amount) || amount < 0) {
+  if (typeof amount !== "number" || Number.isNaN(amount) || amount < 0) {
     return 0;
   }
 
@@ -111,7 +111,18 @@ export function validateActivityType(type: string): boolean {
 /**
  * Sanitize beat data for dashboard display
  */
-export function sanitizeBeatData(beat: any) {
+interface BeatInput {
+  wordpressId?: number | string;
+  _id?: string;
+  title?: string;
+  genre?: string;
+  imageUrl?: string;
+  bpm?: number;
+  price?: number;
+  isActive?: boolean;
+}
+
+export function sanitizeBeatData(beat: BeatInput | null | undefined) {
   if (!beat) return null;
 
   return {

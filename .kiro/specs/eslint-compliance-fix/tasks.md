@@ -52,7 +52,7 @@
   - Fix `any` types in `client/src/lib/performanceMonitor.ts` (5 instances)
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 10. Replace `any` types in components
+- [x] 10. Replace `any` types in components
   - Fix `any` types in `client/src/components/loading/IntersectionLazyLoader.tsx` (8 instances)
   - Fix `any` types in `client/src/components/loading/LazyComponents.tsx` (9 instances)
   - Fix `any` types in `client/src/components/payments/ClerkPaymentTest.tsx` (1 instance)
@@ -61,13 +61,13 @@
   - Fix `any` types in `client/src/components/admin/FileManager.tsx` (5 instances)
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 11. Replace `any` types in pages and services
+- [x] 11. Replace `any` types in pages and services
   - Fix `any` types in `client/src/pages/reset-password.tsx` (1 instance)
   - Fix `any` types in `client/src/services/paypal.ts` (1 instance)
   - Fix `any` types in `client/src/utils/tracking.ts` (2 instances)
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 12. Replace `any` types in Convex functions
+- [x] 12. Replace `any` types in Convex functions
   - Fix `any` types in `convex/activity/getRecent.ts` (2 instances)
   - Fix `any` types in `convex/auth/roles.ts` (4 instances)
   - Fix `any` types in `convex/downloads/enriched.ts` (2 instances)

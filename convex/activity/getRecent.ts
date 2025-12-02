@@ -3,7 +3,7 @@ import { query } from "../_generated/server";
 export interface ActivityItem {
   _id: string;
   action: string;
-  details?: any;
+  details?: Record<string, unknown>;
   timestamp: number;
 }
 
@@ -26,9 +26,9 @@ export const getRecent = query({
       .take(50);
 
     return activities.map(a => ({
-      _id: a._id as any,
+      _id: a._id as string,
       action: a.action,
-      details: a.details,
+      details: a.details as Record<string, unknown> | undefined,
       timestamp: a.timestamp,
     }));
   },

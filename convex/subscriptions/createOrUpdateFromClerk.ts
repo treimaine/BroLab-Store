@@ -1,14 +1,32 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 
+// Clerk Billing webhook payload type
+interface ClerkSubscriptionData {
+  id?: string;
+  subscription_id?: string;
+  subscription?: { id?: string; status?: string };
+  user_id?: string;
+  customer_id?: string;
+  user?: { id?: string };
+  plan?: { name?: string };
+  plan_id?: string;
+  price?: { product?: { name?: string } };
+  status?: string;
+  current_period_start?: number;
+  current_period_end?: number;
+  period_start?: number;
+  period_end?: number;
+}
+
 // Upsert subscription from Clerk Billing webhook payload
 export const upsert = mutation({
   args: { data: v.any() },
-  handler: async (ctx, { data }) => {
+  handler: async (ctx, { data }: { data: ClerkSubscriptionData }) => {
     const now = Date.now();
 
-    const clerkSubscriptionId: string = data.id || data.subscription_id || data.subscription?.id;
-    const clerkUserId: string = data.user_id || data.customer_id || data.user?.id;
+    const clerkSubscriptionId = data.id || data.subscription_id || data.subscription?.id || "";
+    const clerkUserId = data.user_id || data.customer_id || data.user?.id || "";
     const planId: string = (
       data.plan?.name ||
       data.plan_id ||
@@ -57,6 +75,15 @@ export const upsert = mutation({
         updatedAt: now,
       });
     } else {
+      // Calculate download quota based on plan
+      const calculateDownloadQuota = (plan: string): number => {
+        if (plan === "ultimate") return -1;
+        if (plan === "artist") return 50;
+        return 10;
+      };
+
+      const downloadQuota = calculateDownloadQuota(planId);
+
       await ctx.db.insert("subscriptions", {
         userId: user._id,
         clerkSubscriptionId,
@@ -66,7 +93,7 @@ export const upsert = mutation({
         currentPeriodEnd,
         cancelAtPeriodEnd: false,
         features: [],
-        downloadQuota: planId === "ultimate" ? -1 : planId === "artist" ? 50 : 10,
+        downloadQuota,
         downloadUsed: 0,
         createdAt: now,
         updatedAt: now,
@@ -75,9 +102,9 @@ export const upsert = mutation({
       // Initialize quota for downloads
       await ctx.db.insert("quotas", {
         userId: user._id,
-        subscriptionId: undefined as any, // optional; could be linked in a follow-up query
+        subscriptionId: undefined, // optional; could be linked in a follow-up query
         quotaType: "downloads",
-        limit: planId === "ultimate" ? -1 : planId === "artist" ? 50 : 10,
+        limit: downloadQuota,
         used: 0,
         resetAt: currentPeriodEnd,
         resetPeriod: "monthly",
@@ -100,8 +127,9 @@ export const upsert = mutation({
 
 export const cancel = mutation({
   args: { data: v.any() },
-  handler: async (ctx, { data }) => {
-    const clerkSubscriptionId: string = data.id || data.subscription_id || data.subscription?.id;
+  handler: async (ctx, { data }: { data: ClerkSubscriptionData }) => {
+    const clerkSubscriptionId: string =
+      data.id || data.subscription_id || data.subscription?.id || "";
     const existing = await ctx.db
       .query("subscriptions")
       .withIndex("by_clerk_id", q => q.eq("clerkSubscriptionId", clerkSubscriptionId))

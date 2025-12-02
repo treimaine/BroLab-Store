@@ -45,13 +45,23 @@ export const getRateLimitStats = query({
   },
 });
 
+interface RateLimitStat {
+  key: string;
+  requests: number;
+  remaining: number;
+  resetTime: number;
+  windowStart: number;
+  blocked: number;
+  action?: string;
+}
+
 export const getAllRateLimitStats = query({
   args: {},
   handler: async ctx => {
     const rateLimits = await ctx.db.query("rateLimits").collect();
     const now = Date.now();
 
-    const stats: Record<string, any> = {};
+    const stats: Record<string, RateLimitStat> = {};
 
     for (const rateLimit of rateLimits) {
       const windowEnd = rateLimit.windowStart + rateLimit.windowMs;
@@ -80,7 +90,7 @@ export const getUserRateLimits = query({
       .collect();
 
     const now = Date.now();
-    const stats: Record<string, any> = {};
+    const stats: Record<string, RateLimitStat> = {};
 
     for (const rateLimit of rateLimits) {
       const windowEnd = rateLimit.windowStart + rateLimit.windowMs;

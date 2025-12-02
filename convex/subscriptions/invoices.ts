@@ -1,14 +1,31 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 
+// Clerk Invoice webhook payload type
+interface ClerkInvoiceData {
+  id?: string;
+  invoice_id?: string;
+  subscription_id?: string;
+  subscription?: { id?: string };
+  amount_due?: number;
+  amount_paid?: number;
+  total?: number;
+  currency?: string;
+  status?: string;
+  description?: string;
+  due_date?: number;
+  next_payment_attempt?: number;
+  paid_at?: number;
+}
+
 export const upsertInvoice = mutation({
   args: { data: v.any() },
-  handler: async (ctx, { data }) => {
+  handler: async (ctx, { data }: { data: ClerkInvoiceData }) => {
     const now = Date.now();
-    const clerkInvoiceId: string = data.id || data.invoice_id;
+    const clerkInvoiceId = data.id || data.invoice_id || "";
     if (!clerkInvoiceId) return { success: false };
 
-    const clerkSubscriptionId: string = data.subscription_id || data.subscription?.id;
+    const clerkSubscriptionId = data.subscription_id || data.subscription?.id || "";
     const amount: number = data.amount_due || data.amount_paid || data.total || 0;
     const currency: string = (data.currency || "eur").toString();
     const status: string = data.status || "open";
@@ -44,7 +61,7 @@ export const upsertInvoice = mutation({
     }
 
     await ctx.db.insert("invoices", {
-      subscriptionId: subscription?._id as any, // optional link
+      subscriptionId: subscription?._id ?? (undefined as never), // Required field - will fail if no subscription
       clerkInvoiceId,
       amount,
       currency,

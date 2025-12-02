@@ -12,7 +12,7 @@ export interface EnrichedDownload {
   imageUrl?: string;
   duration?: number;
   // Quota info
-  quotaLimit?: number | -1;
+  quotaLimit?: number;
   quotaUsed?: number;
   quotaRemaining?: number | "unlimited";
 }
@@ -57,25 +57,27 @@ export const getUserDownloadsEnriched = query({
           .first()
       )
     );
-    const beatMap = new Map<number, any>();
+    type BeatRecord = NonNullable<(typeof beats)[number]>;
+    const beatMap = new Map<number, BeatRecord>();
     beats.forEach(b => {
-      if (b) beatMap.set(b.wordpressId as number, b);
+      if (b) beatMap.set(b.wordpressId, b);
     });
 
-    const limit = quota
-      ? quota.limit
-      : subscription
-        ? subscription.planId === "ultimate"
-          ? -1
-          : subscription.planId === "artist"
-            ? 20
-            : 5
-        : 0;
+    // Calculate download limit based on quota or subscription plan
+    const calculateLimit = (): number => {
+      if (quota) return quota.limit;
+      if (!subscription) return 0;
+      if (subscription.planId === "ultimate") return -1;
+      if (subscription.planId === "artist") return 20;
+      return 5;
+    };
+
+    const limit = calculateLimit();
     const used = quota ? quota.used : downloads.length;
     const remaining = limit === -1 ? "unlimited" : Math.max(limit - used, 0);
 
     return downloads.map(d => ({
-      _id: d._id as any,
+      _id: d._id as string,
       beatId: d.beatId,
       licenseType: d.licenseType,
       timestamp: d.timestamp,

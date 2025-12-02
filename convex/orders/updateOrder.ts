@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { mutation } from "../_generated/server";
 
 export const updateOrder = mutation({
@@ -15,7 +16,7 @@ export const updateOrder = mutation({
     }
 
     // Convertir l'orderId string en Id
-    const orderId = args.orderId as any;
+    const orderId = args.orderId as Id<"orders">;
 
     // Vérifier que la commande existe et appartient à l'utilisateur
     const order = await ctx.db.get(orderId);
@@ -36,8 +37,7 @@ export const updateOrder = mutation({
 
     // Vérifier que la commande appartient à l'utilisateur
     // Utiliser une vérification de type appropriée
-    const orderData = order as any;
-    if (orderData.userId && orderData.userId !== user._id) {
+    if (order.userId && order.userId !== user._id) {
       throw new Error("Vous n'êtes pas autorisé à modifier cette commande");
     }
 

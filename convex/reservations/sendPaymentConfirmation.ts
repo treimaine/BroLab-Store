@@ -15,14 +15,27 @@ export const sendPaymentConfirmationEmail = action({
   },
   handler: async (ctx, args) => {
     // Get reservation details for all reservations
+    // Type for reservation query result
+    type ReservationResult = {
+      _id: string;
+      serviceType: string;
+      preferredDate: string;
+      durationMinutes: number;
+      totalPrice: number;
+      status: string;
+      notes?: string;
+      details: Record<string, unknown>;
+    };
+
     const reservations = await Promise.all(
       args.reservationIds.map(async reservationId => {
-        const reservation = await ctx.runQuery(
-          "reservations/listReservations:getReservation" as any,
+        const reservation = (await ctx.runQuery(
+          // @ts-expect-error - Dynamic query path for internal reservation lookup
+          "reservations/listReservations:getReservation",
           {
             reservationId,
           }
-        );
+        )) as ReservationResult | null;
         if (!reservation) {
           throw new Error(`Reservation ${reservationId} not found`);
         }
@@ -44,7 +57,7 @@ export const sendPaymentConfirmationEmail = action({
         },
         body: JSON.stringify({
           userEmail: args.userEmail,
-          reservations: reservations.map((reservation: any) => ({
+          reservations: reservations.map(reservation => ({
             id: reservation._id,
             serviceType: reservation.serviceType,
             preferredDate: reservation.preferredDate,

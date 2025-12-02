@@ -1,6 +1,15 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 
+interface QuotaUpdateData {
+  updatedAt: number;
+  used?: number;
+  limit?: number;
+  resetAt?: number;
+  isActive?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
 export const updateQuota = mutation({
   args: {
     quotaId: v.id("quotas"),
@@ -8,13 +17,19 @@ export const updateQuota = mutation({
     limit: v.optional(v.number()),
     resetAt: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
-    metadata: v.optional(v.any()),
+    metadata: v.optional(
+      v.object({
+        resourceType: v.optional(v.string()),
+        resourceSize: v.optional(v.number()),
+        resourceFormat: v.optional(v.string()),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     try {
       console.log(`🔄 Updating quota: ${args.quotaId}`);
 
-      const updateData: any = {
+      const updateData: QuotaUpdateData = {
         updatedAt: Date.now(),
       };
 

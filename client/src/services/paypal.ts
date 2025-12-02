@@ -1,4 +1,4 @@
-import { PayPalPaymentRequest, PayPalPaymentResponse } from "../config/paypal";
+import { PayPalOrder, PayPalPaymentRequest, PayPalPaymentResponse } from "../config/paypal";
 
 /**
  * Service PayPal côté client
@@ -99,7 +99,7 @@ export class PayPalClientService {
    * Obtient les détails d'une commande PayPal
    * ✅ CORRECTION: Utilise l'orderId PayPal
    */
-  static async getOrderDetails(orderId: string): Promise<any> {
+  static async getOrderDetails(orderId: string): Promise<PayPalOrder> {
     try {
       console.log("📋 Getting PayPal order details:", orderId);
 
@@ -161,7 +161,7 @@ export class PayPalClientService {
         throw new Error("Invalid PayPal approval link");
       }
 
-      window.location.href = approvalLink;
+      globalThis.location.href = approvalLink;
     } catch (error) {
       console.error("❌ Error redirecting to PayPal:", error);
       throw error;
