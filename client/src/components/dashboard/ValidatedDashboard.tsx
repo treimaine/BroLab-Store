@@ -280,41 +280,43 @@ export const ValidatedDashboard: React.FC<ValidatedDashboardProps> = ({
 
         {/* Freshness Indicators */}
         {showFreshnessIndicators && (
-          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 min-w-0">
+              <div className="flex items-center gap-2 shrink-0">
                 {syncStatus.connected ? (
                   <Wifi className="h-4 w-4 text-green-500" />
                 ) : (
                   <WifiOff className="h-4 w-4 text-red-500" />
                 )}
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                   {syncStatus.connected ? "Connected" : "Disconnected"}
                 </span>
               </div>
 
-              {showDetailedValidation ? (
-                <DetailedDataFreshnessIndicator onRefresh={handleRefresh} />
-              ) : (
-                <DataFreshnessIndicator
-                  detailed={false}
-                  showRefreshButton={true}
-                  onRefresh={handleRefresh}
-                />
-              )}
+              <div className="min-w-0 flex-1 sm:flex-none">
+                {showDetailedValidation ? (
+                  <DetailedDataFreshnessIndicator onRefresh={handleRefresh} />
+                ) : (
+                  <DataFreshnessIndicator
+                    detailed={false}
+                    showRefreshButton={true}
+                    onRefresh={handleRefresh}
+                  />
+                )}
+              </div>
             </div>
 
             {/* Data Quality Indicator */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {isValid ? (
                 <div className="flex items-center gap-1 text-green-600">
                   <Shield className="h-4 w-4" />
-                  <span className="text-sm font-medium">Validated</span>
+                  <span className="text-sm font-medium whitespace-nowrap">Validated</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1 text-red-600">
                   <AlertTriangle className="h-4 w-4" />
-                  <span className="text-sm font-medium">Issues Detected</span>
+                  <span className="text-sm font-medium whitespace-nowrap">Issues Detected</span>
                 </div>
               )}
             </div>
