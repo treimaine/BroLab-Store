@@ -63,9 +63,11 @@ if (!isValidClerkKey) {
   );
 }
 
-console.log("🚀 Starting React application...");
-console.log("📡 Convex URL:", convexUrl);
-console.log("🔐 Clerk configured with native PricingTable");
+if (import.meta.env.DEV) {
+  console.log("🚀 Starting React application...");
+  console.log("📡 Convex URL:", convexUrl);
+  console.log("🔐 Clerk configured with native PricingTable");
+}
 
 createRoot(document.getElementById("root")!).render(
   <ClerkErrorBoundary>
