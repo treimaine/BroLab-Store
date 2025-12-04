@@ -18,7 +18,7 @@ export interface SubmissionStep {
   name: string;
   description: string;
   action: () => Promise<unknown>;
-  retryable?: boolean;
+  canRetry?: boolean;
   timeout?: number;
 }
 
@@ -30,6 +30,25 @@ export interface UseEnhancedFormSubmissionOptions {
   onStepComplete?: (step: number, result: unknown) => void;
   onSubmissionComplete?: (result: unknown) => void;
   onSubmissionError?: (error: unknown) => void;
+}
+
+// Helper function to extract error message safely
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message;
+  }
+  if (typeof err === "string") {
+    return err;
+  }
+  return "An unexpected error occurred";
+}
+
+// Helper function to convert unknown error to Error instance
+function toError(err: unknown): Error {
+  if (err instanceof Error) {
+    return err;
+  }
+  return new Error(getErrorMessage(err));
 }
 
 /**
@@ -69,10 +88,10 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
       setHasError(true);
       setError(err);
 
-      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorMessage = getErrorMessage(err);
       const contextSuffix = context ? ` (${context})` : "";
       const logMessage = `Error in ${serviceName}${contextSuffix}`;
-      const errorForLog = err instanceof Error ? err : new Error(errorMessage);
+      const errorForLog = toError(err);
 
       logger.logError(logMessage, errorForLog, {
         errorType: "api",
@@ -91,7 +110,7 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
         onSubmissionError(err);
       }
 
-      return { retryable: true, message: errorMessage };
+      return { canRetry: true, message: errorMessage };
     },
     [serviceName, toast, onSubmissionError]
   );
@@ -123,12 +142,125 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
   // Get error display message
   const getErrorDisplay = useCallback(() => {
     if (!error) return null;
-    const errorMessage = error instanceof Error ? error.message : String(error);
     return {
-      message: errorMessage,
+      message: getErrorMessage(error),
       canRetry: retryCount < maxRetries,
     };
   }, [error, retryCount, maxRetries]);
+
+  /**
+   * Log and track step start
+   */
+  const logStepStart = useCallback(
+    (step: SubmissionStep, stepIndex: number, totalSteps: number): void => {
+      logger.logInfo(`Starting submission step: ${step.name}`, {
+        component: "enhanced_form_submission",
+        action: "step_start",
+        serviceName,
+        stepIndex,
+        stepName: step.name,
+        totalSteps,
+      });
+
+      addBreadcrumb({
+        category: "user_action",
+        message: `Starting submission step: ${step.name}`,
+        level: "info",
+        data: { serviceName, stepIndex, stepName: step.name, totalSteps },
+      });
+    },
+    [serviceName]
+  );
+
+  /**
+   * Log and track step completion
+   */
+  const logStepComplete = useCallback(
+    (step: SubmissionStep, stepIndex: number, stepTime: number): void => {
+      logger.logInfo(`Completed submission step: ${step.name}`, {
+        component: "enhanced_form_submission",
+        action: "step_complete",
+        serviceName,
+        stepIndex,
+        stepName: step.name,
+        stepTime,
+      });
+
+      addBreadcrumb({
+        category: "user_action",
+        message: `Completed submission step: ${step.name}`,
+        level: "info",
+        data: { serviceName, stepIndex, stepName: step.name, stepTime },
+      });
+
+      performanceMonitor.recordMetric(`${serviceName}_step_${stepIndex}_time`, stepTime, "ms", {
+        component: "enhanced_form_submission",
+        serviceName,
+        stepName: step.name,
+      });
+    },
+    [serviceName]
+  );
+
+  /**
+   * Log and track step error
+   */
+  const logStepError = useCallback(
+    (step: SubmissionStep, stepIndex: number, stepTime: number, err: unknown): void => {
+      logger.logError(`Failed submission step: ${step.name}`, err, {
+        errorType: "api",
+        component: "enhanced_form_submission",
+        action: "step_error",
+        serviceName,
+        stepIndex,
+        stepName: step.name,
+        stepTime,
+      });
+
+      addBreadcrumb({
+        category: "error",
+        message: `Failed submission step: ${step.name}`,
+        level: "error",
+        data: {
+          serviceName,
+          stepIndex,
+          stepName: step.name,
+          stepTime,
+          errorMessage: getErrorMessage(err),
+        },
+      });
+
+      performanceMonitor.recordMetric(
+        `${serviceName}_step_${stepIndex}_error_time`,
+        stepTime,
+        "ms",
+        {
+          component: "enhanced_form_submission",
+          serviceName,
+          stepName: step.name,
+          errorType: err instanceof Error ? err.name : "unknown",
+        }
+      );
+    },
+    [serviceName]
+  );
+
+  /**
+   * Execute step action with timeout
+   */
+  const executeStepWithTimeout = useCallback(async (step: SubmissionStep): Promise<unknown> => {
+    const timeoutMs = step.timeout ?? 30000;
+    const stepPromise = step.action();
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error(`Step "${step.name}" timed out after ${timeoutMs}ms`)),
+        timeoutMs
+      );
+    });
+
+    return Promise.race([stepPromise, timeoutPromise]);
+  }, []);
 
   /**
    * Execute a single submission step with error handling and timeout
@@ -138,137 +270,176 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
       const stepTimer = startTimer(`${serviceName}_step_${stepIndex}`);
 
       try {
-        // Log step start
-        logger.logInfo(`Starting submission step: ${step.name}`, {
-          component: "enhanced_form_submission",
-          action: "step_start",
-          serviceName,
-          stepIndex,
-          stepName: step.name,
-          totalSteps,
-        });
+        logStepStart(step, stepIndex, totalSteps);
 
-        // Add breadcrumb for step start
-        addBreadcrumb({
-          category: "user_action",
-          message: `Starting submission step: ${step.name}`,
-          level: "info",
-          data: {
-            serviceName,
-            stepIndex,
-            stepName: step.name,
-            totalSteps,
-          },
-        });
-
-        // Update progress
         setState(prev => ({
           ...prev,
           currentStep: stepIndex + 1,
           progress: Math.round(((stepIndex + 0.5) / totalSteps) * 100),
         }));
 
-        // Execute step with timeout
-        const timeoutMs = step.timeout || 30000; // 30 second default timeout
-        const stepPromise = step.action();
-
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(
-            () => reject(new Error(`Step "${step.name}" timed out after ${timeoutMs}ms`)),
-            timeoutMs
-          );
-        });
-
-        const result = await Promise.race([stepPromise, timeoutPromise]);
+        const result = await executeStepWithTimeout(step);
         const stepTime = stepTimer();
 
-        // Log step completion
-        logger.logInfo(`Completed submission step: ${step.name}`, {
-          component: "enhanced_form_submission",
-          action: "step_complete",
-          serviceName,
-          stepIndex,
-          stepName: step.name,
-          stepTime,
-        });
+        logStepComplete(step, stepIndex, stepTime);
 
-        // Add breadcrumb for step completion
-        addBreadcrumb({
-          category: "user_action",
-          message: `Completed submission step: ${step.name}`,
-          level: "info",
-          data: {
-            serviceName,
-            stepIndex,
-            stepName: step.name,
-            stepTime,
-          },
-        });
-
-        // Track step performance
-        performanceMonitor.recordMetric(`${serviceName}_step_${stepIndex}_time`, stepTime, "ms", {
-          component: "enhanced_form_submission",
-          serviceName,
-          stepName: step.name,
-        });
-
-        // Update progress to completed for this step
         setState(prev => ({
           ...prev,
           progress: Math.round(((stepIndex + 1) / totalSteps) * 100),
         }));
 
-        // Call step completion callback
         if (onStepComplete) {
           onStepComplete(stepIndex, result);
         }
 
         return result;
-      } catch (error) {
+      } catch (err) {
         const stepTime = stepTimer();
+        logStepError(step, stepIndex, stepTime, err);
+        throw err;
+      }
+    },
+    [
+      serviceName,
+      onStepComplete,
+      logStepStart,
+      logStepComplete,
+      logStepError,
+      executeStepWithTimeout,
+    ]
+  );
 
-        // Log step error
-        logger.logError(`Failed submission step: ${step.name}`, error, {
-          errorType: "api",
+  /**
+   * Log submission start
+   */
+  const logSubmissionStart = useCallback(
+    (steps: SubmissionStep[]): void => {
+      logger.logInfo(`Starting form submission for ${serviceName}`, {
+        component: "enhanced_form_submission",
+        action: "submission_start",
+        serviceName,
+        totalSteps: steps.length,
+        stepNames: steps.map(s => s.name),
+      });
+
+      addBreadcrumb({
+        category: "user_action",
+        message: `Starting form submission for ${serviceName}`,
+        level: "info",
+        data: {
+          serviceName,
+          totalSteps: steps.length,
+          stepNames: steps.map(s => s.name),
+        },
+      });
+    },
+    [serviceName]
+  );
+
+  /**
+   * Log submission success
+   */
+  const logSubmissionSuccess = useCallback(
+    (submissionTime: number, totalSteps: number): void => {
+      logger.logInfo(`Form submission completed successfully for ${serviceName}`, {
+        component: "enhanced_form_submission",
+        action: "submission_success",
+        serviceName,
+        submissionTime,
+        totalSteps,
+      });
+
+      addBreadcrumb({
+        category: "user_action",
+        message: `Form submission completed successfully for ${serviceName}`,
+        level: "info",
+        data: { serviceName, submissionTime, totalSteps },
+      });
+
+      performanceMonitor.recordMetric(`${serviceName}_submission_success`, submissionTime, "ms", {
+        component: "enhanced_form_submission",
+        serviceName,
+        totalSteps,
+      });
+    },
+    [serviceName]
+  );
+
+  /**
+   * Log submission error
+   */
+  const logSubmissionError = useCallback(
+    (err: unknown, submissionTime: number, currentStep: number, totalSteps: number): void => {
+      logger.logError(`Form submission failed for ${serviceName}`, err, {
+        errorType: "api",
+        component: "enhanced_form_submission",
+        action: "submission_error",
+        serviceName,
+        submissionTime,
+        currentStep,
+        totalSteps,
+      });
+
+      addBreadcrumb({
+        category: "error",
+        message: `Form submission failed for ${serviceName}`,
+        level: "error",
+        data: {
+          serviceName,
+          submissionTime,
+          currentStep,
+          totalSteps,
+          errorMessage: getErrorMessage(err),
+        },
+      });
+
+      performanceMonitor.recordMetric(`${serviceName}_submission_error`, submissionTime, "ms", {
+        component: "enhanced_form_submission",
+        serviceName,
+        errorType: err instanceof Error ? err.name : "unknown",
+        currentStep,
+      });
+    },
+    [serviceName]
+  );
+
+  /**
+   * Execute step with retry logic
+   */
+  const executeStepWithRetry = useCallback(
+    async (step: SubmissionStep, stepIndex: number, totalSteps: number): Promise<unknown> => {
+      try {
+        return await executeStep(step, stepIndex, totalSteps);
+      } catch (stepError) {
+        const categorizedError = handleError(stepError, `step_${stepIndex}_${step.name}`);
+        const canRetryStep =
+          step.canRetry !== false && categorizedError.canRetry && retryCount < maxRetries;
+
+        if (!canRetryStep) {
+          throw stepError;
+        }
+
+        logger.logInfo(`Retrying failed step: ${step.name}`, {
           component: "enhanced_form_submission",
-          action: "step_error",
+          action: "step_retry",
           serviceName,
           stepIndex,
           stepName: step.name,
-          stepTime,
+          retryCount: retryCount + 1,
         });
 
-        // Add breadcrumb for step error
-        addBreadcrumb({
-          category: "error",
-          message: `Failed submission step: ${step.name}`,
-          level: "error",
-          data: {
-            serviceName,
-            stepIndex,
-            stepName: step.name,
-            stepTime,
-            errorMessage: error instanceof Error ? error.message : String(error),
-          },
-        });
+        // Wait with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
 
-        // Track step error performance
-        performanceMonitor.recordMetric(
-          `${serviceName}_step_${stepIndex}_error_time`,
-          stepTime,
-          "ms",
-          {
-            component: "enhanced_form_submission",
-            serviceName,
-            stepName: step.name,
-            errorType: error instanceof Error ? error.name : "unknown",
-          }
-        );
-
-        throw error;
+        try {
+          return await executeStep(step, stepIndex, totalSteps);
+        } catch (retryError) {
+          handleError(retryError, `step_${stepIndex}_${step.name}_retry`);
+          throw retryError;
+        }
       }
     },
-    [serviceName, onStepComplete]
+    [executeStep, handleError, retryCount, maxRetries, serviceName]
   );
 
   /**
@@ -286,130 +457,43 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
       }
 
       const submissionTimer = startTimer(`${serviceName}_full_submission`);
+      clearError();
+
+      setState(prev => ({
+        ...prev,
+        isSubmitting: true,
+        currentStep: 0,
+        totalSteps: steps.length,
+        progress: 0,
+        lastSubmissionTime: Date.now(),
+      }));
+
+      logSubmissionStart(steps);
+
+      if (showProgressToast) {
+        toast({
+          title: "Processing Request",
+          description: `Starting ${serviceName} submission...`,
+          variant: "default",
+        });
+      }
 
       try {
-        // Clear any previous errors
-        clearError();
-
-        // Initialize submission state
-        setState(prev => ({
-          ...prev,
-          isSubmitting: true,
-          currentStep: 0,
-          totalSteps: steps.length,
-          progress: 0,
-          lastSubmissionTime: Date.now(),
-        }));
-
-        // Log submission start
-        logger.logInfo(`Starting form submission for ${serviceName}`, {
-          component: "enhanced_form_submission",
-          action: "submission_start",
-          serviceName,
-          totalSteps: steps.length,
-          stepNames: steps.map(s => s.name),
-        });
-
-        // Add breadcrumb for submission start
-        addBreadcrumb({
-          category: "user_action",
-          message: `Starting form submission for ${serviceName}`,
-          level: "info",
-          data: {
-            serviceName,
-            totalSteps: steps.length,
-            stepNames: steps.map(s => s.name),
-          },
-        });
-
-        // Show progress toast if enabled
-        if (showProgressToast) {
-          toast({
-            title: "Processing Request",
-            description: `Starting ${serviceName} submission...`,
-            variant: "default",
-          });
-        }
-
         let lastResult: unknown;
 
-        // Execute each step sequentially
         for (let i = 0; i < steps.length; i++) {
-          const step = steps[i];
-
-          try {
-            lastResult = await executeStep(step, i, steps.length);
-          } catch (stepError) {
-            // Handle step-specific error
-            const categorizedError = handleError(stepError, `step_${i}_${step.name}`);
-
-            // If step is retryable and we haven't exceeded max retries, retry the step
-            if (step.retryable !== false && categorizedError.retryable && retryCount < maxRetries) {
-              logger.logInfo(`Retrying failed step: ${step.name}`, {
-                component: "enhanced_form_submission",
-                action: "step_retry",
-                serviceName,
-                stepIndex: i,
-                stepName: step.name,
-                retryCount: retryCount + 1,
-              });
-
-              // Wait with exponential backoff
-              await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
-
-              // Retry the step
-              try {
-                lastResult = await executeStep(step, i, steps.length);
-              } catch (retryError) {
-                // If retry also fails, handle as final error
-                handleError(retryError, `step_${i}_${step.name}_retry`);
-                throw retryError;
-              }
-            } else {
-              // Step is not retryable or max retries exceeded
-              throw stepError;
-            }
-          }
+          lastResult = await executeStepWithRetry(steps[i], i, steps.length);
         }
 
         const submissionTime = submissionTimer();
+        logSubmissionSuccess(submissionTime, steps.length);
 
-        // Log successful submission
-        logger.logInfo(`Form submission completed successfully for ${serviceName}`, {
-          component: "enhanced_form_submission",
-          action: "submission_success",
-          serviceName,
-          submissionTime,
-          totalSteps: steps.length,
-        });
-
-        // Add breadcrumb for successful submission
-        addBreadcrumb({
-          category: "user_action",
-          message: `Form submission completed successfully for ${serviceName}`,
-          level: "info",
-          data: {
-            serviceName,
-            submissionTime,
-            totalSteps: steps.length,
-          },
-        });
-
-        // Track successful submission performance
-        performanceMonitor.recordMetric(`${serviceName}_submission_success`, submissionTime, "ms", {
-          component: "enhanced_form_submission",
-          serviceName,
-          totalSteps: steps.length,
-        });
-
-        // Update state to completed
         setState(prev => ({
           ...prev,
           isSubmitting: false,
           progress: 100,
         }));
 
-        // Show success toast if enabled
         if (showProgressToast) {
           toast({
             title: "Success!",
@@ -418,58 +502,22 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
           });
         }
 
-        // Call completion callback
         if (onSubmissionComplete) {
           onSubmissionComplete(lastResult);
         }
 
         return lastResult;
-      } catch (error) {
+      } catch (err) {
         const submissionTime = submissionTimer();
+        logSubmissionError(err, submissionTime, state.currentStep, steps.length);
 
-        // Log submission error
-        logger.logError(`Form submission failed for ${serviceName}`, error, {
-          errorType: "api",
-          component: "enhanced_form_submission",
-          action: "submission_error",
-          serviceName,
-          submissionTime,
-          currentStep: state.currentStep,
-          totalSteps: steps.length,
-        });
-
-        // Add breadcrumb for submission error
-        addBreadcrumb({
-          category: "error",
-          message: `Form submission failed for ${serviceName}`,
-          level: "error",
-          data: {
-            serviceName,
-            submissionTime,
-            currentStep: state.currentStep,
-            totalSteps: steps.length,
-            errorMessage: error instanceof Error ? error.message : String(error),
-          },
-        });
-
-        // Track failed submission performance
-        performanceMonitor.recordMetric(`${serviceName}_submission_error`, submissionTime, "ms", {
-          component: "enhanced_form_submission",
-          serviceName,
-          errorType: error instanceof Error ? error.name : "unknown",
-          currentStep: state.currentStep,
-        });
-
-        // Update state to error
         setState(prev => ({
           ...prev,
           isSubmitting: false,
         }));
 
-        // Handle the error (this will show appropriate toast and track error)
-        handleError(error, "form_submission");
-
-        throw error;
+        handleError(err, "form_submission");
+        throw err;
       }
     },
     [
@@ -479,11 +527,12 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
       clearError,
       showProgressToast,
       toast,
-      executeStep,
+      executeStepWithRetry,
       handleError,
-      retryCount,
-      maxRetries,
       onSubmissionComplete,
+      logSubmissionStart,
+      logSubmissionSuccess,
+      logSubmissionError,
     ]
   );
 
@@ -537,7 +586,7 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
             }
             return token;
           },
-          retryable: false,
+          canRetry: false,
           timeout: 10000,
         },
         {
@@ -563,7 +612,7 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
 
             return response.json();
           },
-          retryable: true,
+          canRetry: true,
           timeout: 30000,
         },
       ];
@@ -578,7 +627,7 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
             // This is a placeholder for the actual file upload implementation
             return { uploadedFiles: uploadFiles.length };
           },
-          retryable: true,
+          canRetry: true,
           timeout: 60000,
         });
       }
@@ -614,7 +663,7 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
 
             return response.json();
           },
-          retryable: true,
+          canRetry: true,
           timeout: 30000,
         });
       }

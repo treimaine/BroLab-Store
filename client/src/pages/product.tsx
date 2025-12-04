@@ -233,12 +233,12 @@ function WishlistButton({
   return (
     <Button
       onClick={onToggle}
-      className={`${fullWidth ? "w-full" : "flex-1"} text-lg py-4 ${
+      className={`${fullWidth ? "w-full" : "w-full sm:flex-1"} text-base sm:text-lg py-3 sm:py-4 min-w-0 ${
         isFav ? "bg-red-500 hover:bg-red-600 text-white" : "btn-secondary"
       }`}
     >
-      <Heart className={`w-5 h-5 mr-2 ${isFav ? "fill-current" : ""}`} />
-      {isFav ? "Remove from Wishlist" : "Add to Wishlist"}
+      <Heart className={`w-5 h-5 mr-2 flex-shrink-0 ${isFav ? "fill-current" : ""}`} />
+      <span className="truncate">{isFav ? "Remove from Wishlist" : "Add to Wishlist"}</span>
     </Button>
   );
 }
@@ -448,34 +448,38 @@ export default function Product(): JSX.Element {
               {/* Action Buttons */}
               <div className="space-y-4">
                 {isFree ? (
-                  <div className="flex space-x-4">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                     <Button
                       onClick={handleFreeDownload}
-                      className="flex-1 btn-primary text-lg py-4"
+                      className="w-full sm:flex-1 btn-primary text-base sm:text-lg py-3 sm:py-4"
                     >
-                      <Download className="w-5 h-5 mr-2" />
-                      Download Now
+                      <Download className="w-5 h-5 mr-2 flex-shrink-0" />
+                      <span className="truncate">Download Now</span>
                     </Button>
                     <WishlistButton
                       productId={product.id}
                       isFavorite={isFavorite(product.id)}
                       onToggle={handleAddToWishlist}
+                      fullWidth
                     />
                   </div>
                 ) : (
                   <>
-                    <div className="flex space-x-4">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                       <Button
                         onClick={() => setShowLicensePreview(true)}
                         variant="outline"
-                        className="flex-1 border-[var(--accent-purple)] text-[var(--accent-purple)] hover:bg-[var(--accent-purple)] hover:text-white text-lg py-4"
+                        className="w-full sm:flex-1 border-[var(--accent-purple)] text-[var(--accent-purple)] hover:bg-[var(--accent-purple)] hover:text-white text-base sm:text-lg py-3 sm:py-4 min-w-0"
                       >
-                        <FileText className="w-5 h-5 mr-2" />
-                        Preview License
+                        <FileText className="w-5 h-5 mr-2 flex-shrink-0" />
+                        <span className="truncate">Preview License</span>
                       </Button>
-                      <Button onClick={handleAddToCart} className="flex-1 btn-primary text-lg py-4">
-                        <ShoppingCart className="w-5 h-5 mr-2" />
-                        Add to Cart - ${selectedPrice}
+                      <Button
+                        onClick={handleAddToCart}
+                        className="w-full sm:flex-1 btn-primary text-base sm:text-lg py-3 sm:py-4 min-w-0"
+                      >
+                        <ShoppingCart className="w-5 h-5 mr-2 flex-shrink-0" />
+                        <span className="truncate">Add to Cart - ${selectedPrice}</span>
                       </Button>
                     </div>
                     <WishlistButton
