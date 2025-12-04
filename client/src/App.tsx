@@ -18,6 +18,8 @@ import { queryClient, warmCache } from "./lib/queryClient";
 import { Navbar } from "@/components/layout/navbar";
 
 import { ComponentPreloader } from "@/components/loading/ComponentPreloader";
+import { isFeatureEnabled } from "@/config/featureFlags";
+import { AdminRoutes, LegalRoutes, ServiceRoutes } from "@/config/routeChunks";
 import { useDeferredMountStaggered } from "@/hooks/useDeferredMount";
 import { useInteractionPreloader } from "@/hooks/useInteractionPreloader";
 import {
@@ -66,36 +68,18 @@ const Dashboard = createRouteLazyComponent(() => import("@/pages/dashboard"), "/
 // Secondary pages - route-based lazy loading with error handling
 const About = createRouteLazyComponent(() => import("@/pages/about"), "/about");
 const Contact = createRouteLazyComponent(() => import("@/pages/contact"), "/contact");
-const Copyright = createRouteLazyComponent(() => import("@/pages/copyright"), "/copyright");
 const FAQ = createRouteLazyComponent(() => import("@/pages/faq"), "/faq");
-const Licensing = createRouteLazyComponent(() => import("@/pages/licensing"), "/licensing");
 const MembershipPage = createRouteLazyComponent(
   () => import("@/pages/MembershipPageFixed"),
   "/membership"
 );
-const Privacy = createRouteLazyComponent(() => import("@/pages/privacy"), "/privacy");
-const Refund = createRouteLazyComponent(() => import("@/pages/refund"), "/refund");
-const Terms = createRouteLazyComponent(() => import("@/pages/terms"), "/terms");
 const WishlistPage = createRouteLazyComponent(() => import("@/pages/wishlist"), "/wishlist");
 
-// Service pages - route-based lazy loading with error handling
-const CustomBeats = createRouteLazyComponent(() => import("@/pages/custom-beats"), "/custom-beats");
-const MixingMastering = createRouteLazyComponent(
-  () => import("@/pages/mixing-mastering"),
-  "/mixing-mastering"
-);
-const PremiumDownloads = createRouteLazyComponent(
-  () => import("@/pages/premium-downloads"),
-  "/premium-downloads"
-);
-const ProductionConsultation = createRouteLazyComponent(
-  () => import("@/pages/production-consultation"),
-  "/production-consultation"
-);
-const RecordingSessions = createRouteLazyComponent(
-  () => import("@/pages/recording-sessions"),
-  "/recording-sessions"
-);
+// Legal pages - grouped via feature flags (low-traffic routes)
+// Using LegalRoutes from routeChunks for optimized bundling
+
+// Service pages - grouped via feature flags (medium-traffic routes)
+// Using ServiceRoutes from routeChunks for optimized bundling
 
 // Auth pages - route-based lazy loading with error handling
 const ResetPasswordPage = createRouteLazyComponent(
@@ -130,13 +114,8 @@ const PaymentCancel = createRouteLazyComponent(
   "/payment/cancel"
 );
 
-// Admin and test pages - route-based lazy loading with error handling
-const AdminFiles = createRouteLazyComponent(() => import("@/pages/admin/files"), "/admin/files");
-const TestConvex = createRouteLazyComponent(() => import("@/pages/test-convex"), "/test-convex");
-const TestMockAlert = createRouteLazyComponent(
-  () => import("@/pages/test-mock-alert"),
-  "/test-mock-alert"
-);
+// Admin and test pages - grouped via feature flags (low-traffic routes)
+// Using AdminRoutes from routeChunks for optimized bundling
 
 // PaymentTestComponent removed - using Clerk native interface
 import {
@@ -149,8 +128,14 @@ import NotFound from "@/pages/not-found";
 import { CacheProvider } from "./providers/CacheProvider";
 
 function Router() {
+  // Feature flags for route groups
+  const isLegalEnabled = isFeatureEnabled("enableLegalRoutes");
+  const isAdminEnabled = isFeatureEnabled("enableAdminRoutes");
+  const isServiceEnabled = isFeatureEnabled("enableServiceRoutes");
+
   return (
     <Switch>
+      {/* Core routes - always enabled */}
       <Route path="/" component={Home} />
       <Route path="/shop" component={Shop} />
       <Route path="/product/:id" component={Product} />
@@ -158,36 +143,56 @@ function Router() {
       <Route path="/clerk-checkout" component={ClerkCheckout} />
       <Route path="/order-confirmation" component={OrderConfirmation} />
 
+      {/* Info routes */}
       <Route path="/contact" component={Contact} />
       <Route path="/faq" component={FAQ} />
-      <Route path="/terms" component={Terms} />
-      <Route path="/privacy" component={Privacy} />
-      <Route path="/licensing" component={Licensing} />
-      <Route path="/refund" component={Refund} />
-      <Route path="/copyright" component={Copyright} />
-      <Route path="/login" component={Login} />
-      <Route path="/signup" component={Login} />
       <Route path="/about" component={About} />
-      <Route path="/dashboard" component={Dashboard} />
       <Route path="/membership" component={MembershipPage} />
       <Route path="/wishlist" component={WishlistPage} />
 
-      <Route path="/mixing-mastering" component={MixingMastering} />
+      {/* Legal routes - grouped for low-traffic optimization */}
+      {isLegalEnabled && (
+        <>
+          <Route path="/terms" component={LegalRoutes.Terms} />
+          <Route path="/privacy" component={LegalRoutes.Privacy} />
+          <Route path="/licensing" component={LegalRoutes.Licensing} />
+          <Route path="/refund" component={LegalRoutes.Refund} />
+          <Route path="/copyright" component={LegalRoutes.Copyright} />
+        </>
+      )}
+
+      {/* Auth routes */}
+      <Route path="/login" component={Login} />
+      <Route path="/signup" component={Login} />
+      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/verify-email" component={VerifyEmailPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
+
+      {/* Service routes - grouped for medium-traffic optimization */}
+      {isServiceEnabled && (
+        <>
+          <Route path="/mixing-mastering" component={ServiceRoutes.MixingMastering} />
+          <Route path="/recording-sessions" component={ServiceRoutes.RecordingSessions} />
+          <Route path="/custom-beats" component={ServiceRoutes.CustomBeats} />
+          <Route path="/production-consultation" component={ServiceRoutes.ProductionConsultation} />
+          <Route path="/premium-downloads" component={ServiceRoutes.PremiumDownloads} />
+        </>
+      )}
+
+      {/* Checkout routes */}
       <Route path="/checkout" component={Checkout} />
       <Route path="/checkout-success" component={CheckoutSuccess} />
       <Route path="/payment/success" component={PaymentSuccess} />
       <Route path="/payment/cancel" component={PaymentCancel} />
-      <Route path="/premium-downloads" component={PremiumDownloads} />
-      <Route path="/recording-sessions" component={RecordingSessions} />
-      <Route path="/custom-beats" component={CustomBeats} />
-      <Route path="/production-consultation" component={ProductionConsultation} />
 
-      <Route path="/verify-email" component={VerifyEmailPage} />
-      <Route path="/reset-password" component={ResetPasswordPage} />
-      <Route path="/admin/files" component={AdminFiles} />
-      <Route path="/test-convex" component={TestConvex} />
-      <Route path="/test-mock-alert" component={TestMockAlert} />
-      {/* PaymentTestComponent removed - using Clerk native interface */}
+      {/* Admin routes - grouped for low-traffic optimization */}
+      {isAdminEnabled && (
+        <>
+          <Route path="/admin/files" component={AdminRoutes.AdminFiles} />
+          <Route path="/test-convex" component={AdminRoutes.TestConvex} />
+          <Route path="/test-mock-alert" component={AdminRoutes.TestMockAlert} />
+        </>
+      )}
 
       <Route component={NotFound} />
     </Switch>

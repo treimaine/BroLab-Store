@@ -7,6 +7,12 @@ export interface FeatureFlags {
   // Route chunking flags
   enableLazyRoutes: boolean;
   enableRoutePreloading: boolean;
+  enableRouteGrouping: boolean; // Group low-traffic routes into single chunks
+
+  // Route group flags - control which route groups are enabled
+  enableLegalRoutes: boolean; // /terms, /privacy, /licensing, /refund, /copyright
+  enableAdminRoutes: boolean; // /admin/*, /test-*
+  enableServiceRoutes: boolean; // /mixing-mastering, /recording-sessions, etc.
 
   // Feature-specific flags
   enableNewsletter: boolean;
@@ -33,12 +39,18 @@ const defaultFlags: FeatureFlags = {
   // Route chunking - enabled by default for better performance
   enableLazyRoutes: true,
   enableRoutePreloading: true,
+  enableRouteGrouping: true, // Group low-traffic routes for smaller initial bundle
+
+  // Route groups - all enabled by default
+  enableLegalRoutes: true,
+  enableAdminRoutes: import.meta.env.DEV, // Admin routes only in development by default
+  enableServiceRoutes: true,
 
   // Core features - enabled by default
   enableNewsletter: true,
   enableOfflineMode: true,
-  enablePerformanceMonitoring: process.env.NODE_ENV === "development",
-  enableBundleAnalyzer: process.env.NODE_ENV === "development",
+  enablePerformanceMonitoring: import.meta.env.DEV,
+  enableBundleAnalyzer: import.meta.env.DEV,
 
   // Services - enabled by default
   enableMixingMastering: true,
@@ -94,6 +106,14 @@ function loadEnvFlags(): Partial<FeatureFlags> {
 
   if (import.meta.env.VITE_ENABLE_ROUTE_PRELOADING !== undefined) {
     envFlags.enableRoutePreloading = import.meta.env.VITE_ENABLE_ROUTE_PRELOADING === "true";
+  }
+
+  if (import.meta.env.VITE_ENABLE_ROUTE_GROUPING !== undefined) {
+    envFlags.enableRouteGrouping = import.meta.env.VITE_ENABLE_ROUTE_GROUPING === "true";
+  }
+
+  if (import.meta.env.VITE_ENABLE_ADMIN_ROUTES !== undefined) {
+    envFlags.enableAdminRoutes = import.meta.env.VITE_ENABLE_ADMIN_ROUTES === "true";
   }
 
   if (import.meta.env.VITE_ENABLE_EXPERIMENTAL !== undefined) {

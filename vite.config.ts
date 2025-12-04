@@ -1,5 +1,5 @@
 import react from "@vitejs/plugin-react";
-import path from "path";
+import path from "node:path";
 import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
 
