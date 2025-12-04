@@ -48,6 +48,17 @@ export function validateRequestBody<T>(schema: ZodSchema<T>) {
 }
 
 /**
+ * Extended request interface with validated data properties
+ */
+export interface ValidatedRequest<TBody = unknown, TQuery = unknown, TParams = unknown>
+  extends Request {
+  validatedQuery?: TQuery;
+  validatedData?: TBody | TQuery;
+  body: TBody;
+  params: TParams & Record<string, string>;
+}
+
+/**
  * Create validation middleware for query parameters
  */
 export function validateRequestQuery<T>(schema: ZodSchema<T>) {
@@ -55,7 +66,7 @@ export function validateRequestQuery<T>(schema: ZodSchema<T>) {
     try {
       const validatedData = schema.parse(req.query);
       // Store validated data in a separate property to avoid type conflicts
-      (req as any).validatedQuery = validatedData;
+      (req as ValidatedRequest<unknown, T>).validatedQuery = validatedData;
       next();
     } catch (error) {
       if (error instanceof ZodError) {
@@ -115,13 +126,14 @@ export function createValidationMiddleware<T>(schema: ZodSchema<T>) {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       const validatedData = schema.parse(req.method === "GET" ? req.query : req.body);
+      const validatedReq = req as ValidatedRequest<T, T>;
       // Store validated data in both places for compatibility
       if (req.method === "GET") {
-        (req as any).validatedQuery = validatedData;
+        validatedReq.validatedQuery = validatedData;
       } else {
         req.body = validatedData;
       }
-      (req as any).validatedData = validatedData;
+      validatedReq.validatedData = validatedData;
       next();
     } catch (error) {
       if (error instanceof ZodError) {

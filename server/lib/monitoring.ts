@@ -46,42 +46,36 @@ interface ExtendedResponse extends Response {
 }
 
 class MonitoringService {
-  private metrics: Map<string, MetricValue> = new Map();
+  private readonly metrics: Map<string, MetricValue> = new Map();
   private healthChecks: HealthCheck[] = [];
-  private requestCounts: Map<string, number> = new Map();
-  private errorCounts: Map<string, number> = new Map();
+  private readonly requestCounts: Map<string, number> = new Map();
+  private readonly errorCounts: Map<string, number> = new Map();
 
-  // Database health check
+  // Database health check using Convex
   async checkDatabaseHealth(): Promise<HealthCheck> {
     const startTime = Date.now();
     try {
-      // TODO: Implement with Convex
-      // const { data, error } = await supabaseAdmin
-      //   .from('users')
-      //   .select('id')
-      //   .limit(1)
-      //   .single();
+      const convex = getConvex();
+      // Query health check endpoint to verify Convex connectivity
+      const result = await convex.query(api.health.check.checkHealth);
 
-      // const responseTime = Date.now() - startTime;
-
-      // if (error && error.code !== 'PGRST116') {
-      //   throw error;
-      // }
-
-      // return {
-      //   service: 'database',
-      //   status: 'healthy',
-      //   responseTime,
-      //   timestamp: new Date().toISOString()
-      // };
-
-      // Placeholder implementation
       const responseTime = Date.now() - startTime;
+      const isHealthy = result.status === "healthy";
+
+      // Determine status based on health and response time
+      let status: "healthy" | "degraded" | "down" = "healthy";
+      if (!isHealthy) {
+        status = "down";
+      } else if (responseTime > 2000) {
+        status = "degraded";
+      }
+
       return {
         service: "database",
-        status: "healthy",
+        status,
         responseTime,
         timestamp: new Date().toISOString(),
+        error: isHealthy ? undefined : "Database connectivity issue",
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unknown database error";
@@ -95,36 +89,24 @@ class MonitoringService {
     }
   }
 
-  // Storage service health check
+  // Storage service health check using Convex storage
   async checkStorageHealth(): Promise<HealthCheck> {
     const startTime = Date.now();
     try {
-      // TODO: Implement with Convex
-      // const { data, error } = await supabaseAdmin.storage
-      //   .from('uploads')
-      //   .list('', { limit: 1 });
-
-      // const responseTime = Date.now() - startTime;
-
-      // if (error) {
-      //   throw error;
-      // }
-
-      // return {
-      //   service: 'storage',
-      //   status: 'healthy',
-      //   responseTime,
-      //   timestamp: new Date().toISOString()
-      // };
-
-      // Placeholder implementation
-      const responseTime = Date.now() - startTime;
-      return {
-        service: "storage",
-        status: "healthy",
-        responseTime,
-        timestamp: new Date().toISOString(),
-      };
+      // Convex storage is integrated with the database
+      // We verify connectivity by checking if we can access the Convex client
+      const convex = getConvex();
+      // Simple connectivity check - if getConvex() succeeds, storage is available
+      if (convex) {
+        const responseTime = Date.now() - startTime;
+        return {
+          service: "storage",
+          status: responseTime > 1000 ? "degraded" : "healthy",
+          responseTime,
+          timestamp: new Date().toISOString(),
+        };
+      }
+      throw new Error("Convex client not available");
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unknown storage error";
       return {
@@ -141,9 +123,13 @@ class MonitoringService {
   async checkWooCommerceHealth(): Promise<HealthCheck> {
     const startTime = Date.now();
     try {
+      const wcKey = process.env.VITE_WC_KEY || "";
+      const wcSecret = process.env.VITE_WC_SECRET || "";
+      const credentials = Buffer.from(`${wcKey}:${wcSecret}`).toString("base64");
+
       const response = await fetch(`${process.env.VITE_WOOCOMMERCE_URL}/products?per_page=1`, {
         headers: {
-          Authorization: `Basic ${Buffer.from(`${process.env.VITE_WC_KEY}:${process.env.VITE_WC_SECRET}`).toString("base64")}`,
+          Authorization: `Basic ${credentials}`,
           "User-Agent": "BroLab-Beats-Store/1.0",
         },
       });
@@ -198,7 +184,7 @@ class MonitoringService {
     // Cleanup old entries (keep last 5 minutes)
     const cutoff = minute - 5;
     Array.from(this.requestCounts.keys()).forEach(k => {
-      const keyMinute = parseInt(k.split(":")[0]);
+      const keyMinute = Number.parseInt(k.split(":")[0], 10);
       if (keyMinute < cutoff) {
         this.requestCounts.delete(k);
         this.errorCounts.delete(k);
@@ -216,7 +202,7 @@ class MonitoringService {
     let errors = 0;
 
     Array.from(this.requestCounts.entries()).forEach(([key, count]) => {
-      const keyMinute = parseInt(key.split(":")[0]);
+      const keyMinute = Number.parseInt(key.split(":")[0], 10);
       if (keyMinute === currentMinute - 1) {
         requestsPerMinute += count;
         errors += this.errorCounts.get(key) || 0;
@@ -235,29 +221,31 @@ class MonitoringService {
     };
   }
 
-  // Log system events
-  async logSystemEvent(event: SystemEvent) {
+  // Log system events to Convex
+  async logSystemEvent(event: SystemEvent): Promise<void> {
     try {
-      // TODO: Implement with Convex
-      // await supabaseAdmin
-      //   .from('activity_log')
-      //   .insert({
-      //     user_id: null,
-      //     action: `system_${event.type}`,
-      //     details: {
-      //       service: event.service,
-      //       message: event.message,
-      //       ...event.details
-      //     }
-      //   });
+      const convex = getConvex();
+      await convex.mutation(api.audit.logAuditEvent, {
+        action: `system_${event.type}`,
+        resource: event.service,
+        details: {
+          message: event.message,
+          ...event.details,
+        },
+      });
 
-      // Placeholder implementation - just log to console
+      // Also log to console for immediate visibility
       console.log(
         `[${event.type.toUpperCase()}] ${event.service}: ${event.message}`,
         event.details
       );
     } catch (error) {
-      console.error("Failed to log system event:", error);
+      // Graceful degradation - log to console if Convex fails
+      console.error("Failed to log system event to Convex:", error);
+      console.log(
+        `[${event.type.toUpperCase()}] ${event.service}: ${event.message}`,
+        event.details
+      );
     }
   }
 

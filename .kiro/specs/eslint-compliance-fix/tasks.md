@@ -87,7 +87,7 @@
 - [x] 13. Replace `any` types in client source files (partial)
   - _Requirements: 1.1, 1.3, 1.4_
 
-- [ ] 14. Replace `any` types in server lib and middleware
+- [x] 14. Replace `any` types in server lib and middleware
   - Fix `any` types in `server/lib/accessControl.ts` (7 instances)
   - Fix `any` types in `server/lib/logger.ts` (1 instance)
   - Fix `any` types in `server/lib/openGraphGenerator.ts` (2 instances)
@@ -96,7 +96,7 @@
   - Fix `any` types in `server/middleware/clerkAuth.ts` (4 instances)
   - _Requirements: 1.1, 1.3, 1.4_
 
-- [ ] 15. Replace `any` types in server routes and services
+- [x] 15. Replace `any` types in server routes and services
   - Fix `any` types in `server/config/paypal.ts` (1 instance)
   - Fix `any` types in `server/routes/internal.ts` (1 instance)
   - Fix `any` types in `server/routes/uploads.ts` (1 instance)

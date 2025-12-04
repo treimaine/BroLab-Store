@@ -10,7 +10,7 @@ import { cache, CACHE_KEYS, CACHE_TTL } from "../lib/cache";
 
 interface WarmingTask {
   key: string;
-  fetcher: () => Promise<any>;
+  fetcher: () => Promise<unknown>;
   ttl: number;
   tags?: string[];
   priority: "critical" | "high" | "medium" | "low";
@@ -21,9 +21,9 @@ interface WarmingTask {
  * Cache Warming Service
  */
 export class CacheWarmingService {
-  private warmingTasks: Map<string, WarmingTask> = new Map();
+  private readonly warmingTasks: Map<string, WarmingTask> = new Map();
   private isWarming = false;
-  private warmingStats = {
+  private readonly warmingStats = {
     totalTasks: 0,
     successfulTasks: 0,
     failedTasks: 0,
@@ -370,7 +370,7 @@ export const warmingUtils = {
 
   // Warm cache for beat details
   warmBeatDetails: async (beatId: string) => {
-    const numericBeatId = parseInt(beatId);
+    const numericBeatId = Number.parseInt(beatId, 10);
     cacheWarmingService.addTask(`beat-${numericBeatId}-details`, {
       key: CACHE_KEYS.BEAT_DETAILS(String(numericBeatId)),
       fetcher: async () => {
