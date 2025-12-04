@@ -70,17 +70,17 @@
   }
 
   .beat-card {
-    @apply bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-6 transition-all duration-300 hover:border-[var(--accent-purple)] hover:shadow-lg;
+    @apply bg-[var(--dark-gray)] border border-[var(--medium-gray)] rounded-xl p-6 transition-all duration-300 hover:border-[var(--accent-purple)] hover:shadow-lg overflow-hidden hover:scale-105;
     box-shadow: var(--shadow-card);
   }
 
   .beat-card:hover {
     box-shadow: var(--glow-accent);
-    transform: translateY(-4px);
+    transform: translateY(-4px) scale(1.05);
   }
 
   .nav-link {
-    @apply text-[var(--color-text-primary)] hover:text-[var(--accent-purple)] transition-colors duration-200;
+    @apply text-white hover:text-[var(--accent-purple)] transition-colors duration-200;
   }
 
   .fade-in {
@@ -140,7 +140,10 @@
 
   /* Form input improvements */
   .form-input {
-    @apply bg-[var(--medium-gray)] border border-[var(--medium-gray)] text-white placeholder-gray-400 focus:border-[var(--accent-purple)] focus:ring-2 focus:ring-purple-500/20 outline-none;
+    @apply bg-[var(--dark-gray)] border border-[var(--medium-gray)] text-white placeholder-gray-400 rounded-lg px-4 py-3 focus:border-[var(--accent-purple)] focus:ring-1 focus:ring-[var(--accent-purple)] transition-colors outline-none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
   }
 
   .form-input::-webkit-search-decoration,
@@ -148,6 +151,7 @@
   .form-input::-webkit-search-results-button,
   .form-input::-webkit-search-results-decoration {
     display: none;
+    -webkit-appearance: none;
   }
 
   /* Waveform player styles */
@@ -198,9 +202,7 @@
     @apply bg-[var(--medium-gray)] rounded-xl border border-[var(--medium-gray)];
   }
 
-  .nav-link {
-    @apply text-white hover:text-[var(--accent-purple)] transition-colors duration-200;
-  }
+  /* Note: .nav-link is already defined above - removed duplicate */
 
   .gradient-bg {
     background: linear-gradient(
@@ -211,9 +213,7 @@
     );
   }
 
-  .beat-card {
-    @apply card-dark overflow-hidden hover:transform hover:scale-105 transition-all duration-300;
-  }
+  /* Note: .beat-card is already defined above - removed duplicate */
 
   .audio-progress {
     @apply bg-[var(--dark-gray)] rounded-full h-2;
@@ -251,34 +251,14 @@
   @apply w-12 h-12 bg-[var(--accent-purple)] hover:bg-purple-600 rounded-full flex items-center justify-center transition-colors cursor-pointer;
 }
 
-/* Form input styling with search appearance removal */
-.form-input {
-  @apply bg-[var(--dark-gray)] border border-[var(--medium-gray)] text-white placeholder-gray-400 rounded-lg px-4 py-3 focus:border-[var(--accent-purple)] focus:ring-1 focus:ring-[var(--accent-purple)] transition-colors;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-}
-
-.form-input::-webkit-search-cancel-button,
-.form-input::-webkit-search-decoration {
-  -webkit-appearance: none;
-}
+/* Note: .form-input is already defined in @layer components with search appearance removal */
 
 .form-label {
   @apply text-gray-300 text-sm font-medium mb-2 block;
 }
 
 /* Animation utilities */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* Note: @keyframes fadeIn is already defined in @layer components */
 
 @keyframes slideInFromLeft {
   from {
