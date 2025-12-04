@@ -46,7 +46,7 @@ self.addEventListener("install", event => {
       }),
     ]).then(() => {
       // Force activation of new service worker
-      return self.skipWaiting();
+      return globalThis.skipWaiting();
     })
   );
 });
@@ -73,7 +73,7 @@ self.addEventListener("activate", event => {
         );
       }),
       // Take control of all clients
-      self.clients.claim(),
+      globalThis.clients.claim(),
     ])
   );
 });
@@ -298,7 +298,7 @@ self.addEventListener("push", event => {
     const data = event.data.json();
 
     event.waitUntil(
-      self.registration.showNotification(data.title, {
+      globalThis.registration.showNotification(data.title, {
         body: data.body,
         icon: data.icon || "/favicon.ico",
         badge: "/favicon.ico",
@@ -319,7 +319,7 @@ self.addEventListener("notificationclick", event => {
     clients.matchAll({ type: "window" }).then(clientList => {
       // If app is already open, focus it
       for (const client of clientList) {
-        if (client.url === self.location.origin && "focus" in client) {
+        if (client.url === globalThis.location.origin && "focus" in client) {
           return client.focus();
         }
       }
@@ -339,7 +339,7 @@ self.addEventListener("message", event => {
   if (event.data && event.data.type) {
     switch (event.data.type) {
       case "SKIP_WAITING":
-        self.skipWaiting();
+        globalThis.skipWaiting();
         break;
       case "CACHE_URLS":
         cacheUrls(event.data.urls);

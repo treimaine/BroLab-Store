@@ -4,16 +4,26 @@
  */
 
 import { createRouteLazyComponent } from "@/utils/lazyLoading";
-import { ComponentType, LazyExoticComponent } from "react";
-import { featureFlags } from "./featureFlags";
+import { ComponentType, lazy, LazyExoticComponent } from "react";
+import { featureFlags, isFeatureEnabled } from "./featureFlags";
 
 export type RoutePriority = "high" | "medium" | "low";
+export type RouteGroup =
+  | "core"
+  | "commerce"
+  | "auth"
+  | "services"
+  | "info"
+  | "legal"
+  | "payment"
+  | "admin";
 
 export interface RouteChunk {
-  name: string;
+  name: RouteGroup;
   routes: string[];
   priority: RoutePriority;
   preload?: boolean;
+  featureFlag?: keyof typeof featureFlags;
 }
 
 // Define route chunks by priority and usage patterns
@@ -34,7 +44,7 @@ export const routeChunks: RouteChunk[] = [
     name: "auth",
     routes: ["/login", "/signup", "/dashboard", "/verify-email", "/reset-password"],
     priority: "high",
-    preload: false, // Only preload when user shows intent to authenticate
+    preload: false,
   },
   {
     name: "services",
@@ -46,6 +56,7 @@ export const routeChunks: RouteChunk[] = [
     ],
     priority: "medium",
     preload: false,
+    featureFlag: "enableServiceRoutes",
   },
   {
     name: "info",
@@ -58,6 +69,7 @@ export const routeChunks: RouteChunk[] = [
     routes: ["/terms", "/privacy", "/licensing", "/refund", "/copyright"],
     priority: "low",
     preload: false,
+    featureFlag: "enableLegalRoutes",
   },
   {
     name: "payment",
@@ -70,14 +82,25 @@ export const routeChunks: RouteChunk[] = [
     routes: ["/admin/files", "/test-convex", "/test-mock-alert"],
     priority: "low",
     preload: false,
+    featureFlag: "enableAdminRoutes",
   },
 ];
 
-// Helper to get chunk for a route
+/**
+ * Check if a route group is enabled based on feature flags
+ */
+export function isRouteGroupEnabled(group: RouteGroup): boolean {
+  const chunk = routeChunks.find(c => c.name === group);
+  if (!chunk?.featureFlag) return true;
+  return isFeatureEnabled(chunk.featureFlag);
+}
+
+/**
+ * Get chunk for a route path
+ */
 export function getRouteChunk(path: string): RouteChunk | undefined {
   return routeChunks.find(chunk =>
     chunk.routes.some(route => {
-      // Simple pattern matching (can be enhanced with path-to-regexp)
       const pattern = route.replaceAll(/:[^/]+/g, "[^/]+");
       const regex = new RegExp(`^${pattern}$`);
       return regex.test(path);
@@ -85,39 +108,164 @@ export function getRouteChunk(path: string): RouteChunk | undefined {
   );
 }
 
-// Helper to preload route chunks based on priority
+/**
+ * Preload route chunks based on priority
+ */
 export function preloadRouteChunks(priority: RoutePriority): void {
   if (!featureFlags.enableRoutePreloading) return;
 
-  const chunksToPreload = routeChunks.filter(chunk => chunk.priority === priority && chunk.preload);
+  const chunksToPreload = routeChunks.filter(
+    chunk => chunk.priority === priority && chunk.preload && isRouteGroupEnabled(chunk.name)
+  );
 
   for (const chunk of chunksToPreload) {
     for (const route of chunk.routes) {
-      // Preload logic would go here
-      // This is a placeholder for actual preloading implementation
-      if (process.env.NODE_ENV === "development") {
+      if (import.meta.env.DEV) {
         console.log(`Preloading route chunk: ${chunk.name} - ${route}`);
       }
     }
   }
 }
 
-// Helper to create lazy route with chunk awareness
+/**
+ * Create lazy route with chunk awareness
+ */
 export function createChunkedRoute<P = object>(
   importFn: () => Promise<{ default: ComponentType<P> }>,
   routePath: string
 ): LazyExoticComponent<ComponentType<P>> {
   if (!featureFlags.enableLazyRoutes) {
-    // If lazy routes are disabled, load immediately
     return createRouteLazyComponent<P>(importFn, routePath);
   }
 
-  // Create lazy component with chunk-aware preloading
-  // Future enhancement: use chunk info for smarter preloading
   return createRouteLazyComponent<P>(importFn, routePath);
 }
 
-// Helper to get routes by priority for progressive loading
+/**
+ * Get routes by priority for progressive loading
+ */
 export function getRoutesByPriority(priority: RoutePriority): string[] {
-  return routeChunks.filter(chunk => chunk.priority === priority).flatMap(chunk => chunk.routes);
+  return routeChunks
+    .filter(chunk => chunk.priority === priority && isRouteGroupEnabled(chunk.name))
+    .flatMap(chunk => chunk.routes);
+}
+
+// ============================================================================
+// GROUPED ROUTE COMPONENTS - Low-traffic routes bundled together
+// ============================================================================
+
+/**
+ * Legal pages grouped into a single chunk for reduced bundle size
+ * These pages are rarely visited and can share a single lazy boundary
+ */
+export const LegalRoutes = {
+  Terms: lazy(() =>
+    featureFlags.enableRouteGrouping
+      ? import("@/pages/terms").then(m => ({ default: m.default }))
+      : import("@/pages/terms")
+  ),
+  Privacy: lazy(() =>
+    featureFlags.enableRouteGrouping
+      ? import("@/pages/privacy").then(m => ({ default: m.default }))
+      : import("@/pages/privacy")
+  ),
+  Licensing: lazy(() =>
+    featureFlags.enableRouteGrouping
+      ? import("@/pages/licensing").then(m => ({ default: m.default }))
+      : import("@/pages/licensing")
+  ),
+  Refund: lazy(() =>
+    featureFlags.enableRouteGrouping
+      ? import("@/pages/refund").then(m => ({ default: m.default }))
+      : import("@/pages/refund")
+  ),
+  Copyright: lazy(() =>
+    featureFlags.enableRouteGrouping
+      ? import("@/pages/copyright").then(m => ({ default: m.default }))
+      : import("@/pages/copyright")
+  ),
+};
+
+/**
+ * Admin/Test pages grouped into a single chunk
+ * Only loaded in development or when explicitly enabled
+ */
+export const AdminRoutes = {
+  AdminFiles: lazy(() => import("@/pages/admin/files")),
+  TestConvex: lazy(() => import("@/pages/test-convex")),
+  TestMockAlert: lazy(() => import("@/pages/test-mock-alert")),
+};
+
+/**
+ * Service pages grouped for medium-traffic optimization
+ */
+export const ServiceRoutes = {
+  MixingMastering: lazy(() => import("@/pages/mixing-mastering")),
+  RecordingSessions: lazy(() => import("@/pages/recording-sessions")),
+  CustomBeats: lazy(() => import("@/pages/custom-beats")),
+  ProductionConsultation: lazy(() => import("@/pages/production-consultation")),
+  PremiumDownloads: lazy(() => import("@/pages/premium-downloads")),
+};
+
+/**
+ * Hook to check if grouped routes should be rendered
+ */
+export function useRouteGrouping(): {
+  isLegalEnabled: boolean;
+  isAdminEnabled: boolean;
+  isServiceEnabled: boolean;
+  isGroupingEnabled: boolean;
+} {
+  return {
+    isLegalEnabled: isFeatureEnabled("enableLegalRoutes"),
+    isAdminEnabled: isFeatureEnabled("enableAdminRoutes"),
+    isServiceEnabled: isFeatureEnabled("enableServiceRoutes"),
+    isGroupingEnabled: isFeatureEnabled("enableRouteGrouping"),
+  };
+}
+
+/**
+ * Get all enabled routes for sitemap generation
+ */
+export function getEnabledRoutes(): string[] {
+  return routeChunks
+    .filter(chunk => isRouteGroupEnabled(chunk.name))
+    .flatMap(chunk => chunk.routes);
+}
+
+/**
+ * Preload a specific route group on demand
+ */
+export async function preloadRouteGroup(group: RouteGroup): Promise<void> {
+  if (!isRouteGroupEnabled(group)) return;
+
+  switch (group) {
+    case "legal":
+      await Promise.all([
+        import("@/pages/terms"),
+        import("@/pages/privacy"),
+        import("@/pages/licensing"),
+        import("@/pages/refund"),
+        import("@/pages/copyright"),
+      ]);
+      break;
+    case "admin":
+      await Promise.all([
+        import("@/pages/admin/files"),
+        import("@/pages/test-convex"),
+        import("@/pages/test-mock-alert"),
+      ]);
+      break;
+    case "services":
+      await Promise.all([
+        import("@/pages/mixing-mastering"),
+        import("@/pages/recording-sessions"),
+        import("@/pages/custom-beats"),
+        import("@/pages/production-consultation"),
+        import("@/pages/premium-downloads"),
+      ]);
+      break;
+    default:
+      break;
+  }
 }
