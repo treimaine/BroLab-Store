@@ -20,6 +20,7 @@ import type * as admin_cleanSubscriptions from "../admin/cleanSubscriptions.js";
 import type * as admin_verifySubscriptions from "../admin/verifySubscriptions.js";
 import type * as audit from "../audit.js";
 import type * as auth_roles from "../auth/roles.js";
+import type * as beats_fetchFromWooCommerce from "../beats/fetchFromWooCommerce.js";
 import type * as cartItems from "../cartItems.js";
 import type * as clerk_billing from "../clerk/billing.js";
 import type * as clerk_simpleWebhook from "../clerk/simpleWebhook.js";
@@ -117,6 +118,7 @@ declare const fullApi: ApiFromModules<{
   "admin/verifySubscriptions": typeof admin_verifySubscriptions;
   audit: typeof audit;
   "auth/roles": typeof auth_roles;
+  "beats/fetchFromWooCommerce": typeof beats_fetchFromWooCommerce;
   cartItems: typeof cartItems;
   "clerk/billing": typeof clerk_billing;
   "clerk/simpleWebhook": typeof clerk_simpleWebhook;

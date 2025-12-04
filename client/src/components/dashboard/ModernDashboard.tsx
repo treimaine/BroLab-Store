@@ -15,6 +15,7 @@
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { isFallbackTitle, useBeatTitleResolver } from "@/hooks/useBeatTitleResolver";
 import { useIsMobile, useIsTablet } from "@/hooks/useBreakpoint";
 import { useDashboardConfig } from "@/hooks/useDashboardConfig";
 import { useDashboardStore, useSyncStatus } from "@/stores/useDashboardStore";
@@ -70,12 +71,35 @@ const RecommendationsPanel = memo(
     const isMobile = useIsMobile();
     const maxRecommendations = isMobile ? 3 : 4;
 
+    // Hook to resolve missing beat titles from WooCommerce
+    const { fetchMissingTitles, resolvedTitles } = useBeatTitleResolver();
+
+    // Auto-fetch missing titles when favorites change
+    useEffect(() => {
+      const missingTitleIds = favorites
+        .filter(f => f.beatId && isFallbackTitle(f.beatTitle))
+        .map(f => f.beatId);
+
+      if (missingTitleIds.length > 0) {
+        fetchMissingTitles(missingTitleIds);
+      }
+    }, [favorites, fetchMissingTitles]);
+
+    // Transform favorites with resolved titles
+    const favoritesWithResolvedTitles = useMemo(() => {
+      return favorites.map(f => ({
+        ...f,
+        beatTitle:
+          f.beatId && resolvedTitles[f.beatId] ? resolvedTitles[f.beatId].title : f.beatTitle,
+      }));
+    }, [favorites, resolvedTitles]);
+
     if (isLoading) {
       return <RecommendationsSkeleton />;
     }
 
     // Use only real favorites data - no fallbacks or mock data
-    const displayFavorites = favorites?.slice(0, maxRecommendations) || [];
+    const displayFavorites = favoritesWithResolvedTitles?.slice(0, maxRecommendations) || [];
 
     return (
       <Card className="bg-gray-900/50 border-gray-700/50 backdrop-blur-sm">
@@ -536,6 +560,7 @@ export const ModernDashboard = memo(() => {
                       downloads={
                         downloads?.map((d: Download) => ({
                           id: d.id,
+                          beatId: d.beatId,
                           beatTitle: d.beatTitle,
                           artist: d.beatArtist,
                           fileSize: d.fileSize || 0,
