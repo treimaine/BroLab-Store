@@ -9,6 +9,7 @@ import { ArrowLeft, CheckCircle, CreditCard, ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
+// PaymentService type matching EnhancedPaymentForm expectations
 interface PaymentService {
   clientSecret?: string;
   service: string;
@@ -209,7 +210,7 @@ export default function Checkout(): JSX.Element {
 
             <div className="space-y-4 mb-6">
               {/* Display all services */}
-              {pendingServices.map((service: PaymentService) => {
+              {pendingServices.map((service: PaymentService, index: number) => {
                 const getServiceName = (svc: PaymentService): string => {
                   if (svc.serviceName) return svc.serviceName;
 
@@ -231,9 +232,14 @@ export default function Checkout(): JSX.Element {
                   }
                 };
 
+                // Use reservationId if available, otherwise combine service type, price and index for uniqueness
+                const uniqueKey = service.reservationId
+                  ? `service-${service.reservationId}`
+                  : `service-${service.service}-${service.price}-${index}`;
+
                 return (
                   <div
-                    key={`service-${service.reservationId}`}
+                    key={uniqueKey}
                     className="flex items-center justify-between p-4 bg-[var(--card-bg)] rounded-lg"
                   >
                     <div className="flex-1">
@@ -245,9 +251,11 @@ export default function Checkout(): JSX.Element {
                         {service.serviceDetails && (
                           <span className="text-gray-400 text-sm">{service.serviceDetails}</span>
                         )}
-                        <span className="text-gray-400 text-sm">
-                          • ID: {service.reservationId.slice(-8)}
-                        </span>
+                        {service.reservationId && (
+                          <span className="text-gray-400 text-sm">
+                            • ID: {service.reservationId.slice(-8)}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">

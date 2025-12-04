@@ -1,12 +1,13 @@
 import { ConvexHttpClient } from "convex/browser";
 import { Request, Response, Router } from "express";
+import Stripe from "stripe";
 import type { Id } from "../../convex/_generated/dataModel";
 import type {
   CreatePaymentSessionResponse,
   PaymentWebhookRequest,
 } from "../../shared/types/apiEndpoints";
-import { CreatePaymentIntentSchema, validateBody } from "../../shared/validation/index";
-import { urls } from "../config/urls";
+import { createPaymentSessionRequestSchema, validateBody } from "../../shared/validation/index";
+import PayPalService from "../services/paypal";
 import type { CreatePaymentSessionHandler } from "../types/ApiTypes";
 import { handleRouteError } from "../types/routes";
 
@@ -277,10 +278,23 @@ async function handleOrderWebhook(
   }
 }
 
-// Create payment session
+// Initialize Stripe client
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+let stripeClient: Stripe | null = null;
+
+if (stripeSecretKey) {
+  stripeClient = new Stripe(stripeSecretKey, {
+    apiVersion: "2025-08-27.basil",
+  });
+}
+
+/**
+ * Create real payment session with Stripe or PayPal
+ * Replaces the mock URL generation with actual payment provider integration
+ */
 const createPaymentSession: CreatePaymentSessionHandler = async (req, res) => {
   try {
-    const { reservationId, amount, currency, description, metadata } = req.body; // Already validated
+    const { reservationId, amount, currency, description, metadata } = req.body;
 
     // Verify user authentication
     if (!req.user?.id) {
@@ -293,28 +307,122 @@ const createPaymentSession: CreatePaymentSessionHandler = async (req, res) => {
       return;
     }
 
-    // Create payment URL - Clerk Billing integration pending
-    const paymentUrl = urls.genericCheckout(reservationId, amount, currency);
+    const userId = String(req.user.id);
+    const userEmail = req.user.email || "";
+
+    // Determine payment provider from metadata or default to Stripe
+    const paymentProvider = (metadata?.paymentProvider as string) || "stripe";
+
+    console.log(`💳 Creating ${paymentProvider} payment session for reservation: ${reservationId}`);
+
+    if (paymentProvider === "paypal") {
+      // Create PayPal order
+      const paypalResult = await PayPalService.createPaymentOrder({
+        serviceType: (metadata?.serviceType as string) || "service",
+        amount: amount / 100, // PayPal expects amount in dollars, not cents
+        currency: currency.toUpperCase(),
+        description,
+        reservationId,
+        userId,
+        customerEmail: userEmail,
+      });
+
+      if (!paypalResult.success || !paypalResult.paymentUrl) {
+        res.status(500).json({
+          error: "Failed to create PayPal payment session",
+          message: paypalResult.error || "Unknown error",
+        });
+        return;
+      }
+
+      const response: CreatePaymentSessionResponse = {
+        success: true,
+        checkoutUrl: paypalResult.paymentUrl,
+        sessionId: paypalResult.orderId || `paypal_${Date.now()}`,
+        amount,
+        currency,
+        description,
+        metadata: { ...metadata, provider: "paypal" },
+      };
+
+      console.log(`✅ PayPal payment session created: ${paypalResult.orderId}`);
+      res.json(response);
+      return;
+    }
+
+    // Default: Create Stripe checkout session
+    if (!stripeClient) {
+      console.error("❌ Stripe client not initialized - STRIPE_SECRET_KEY missing");
+      res.status(500).json({
+        error: "Payment service unavailable",
+        message: "Stripe is not configured. Please contact support.",
+      });
+      return;
+    }
+
+    // Build success and cancel URLs
+    const baseUrl = process.env.CLIENT_URL || "https://brolabentertainment.com";
+    const successUrl = `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&reservation_id=${reservationId}`;
+    const cancelUrl = `${baseUrl}/payment/cancel?reservation_id=${reservationId}`;
+
+    // Create Stripe checkout session
+    const session = await stripeClient.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: currency.toLowerCase(),
+            product_data: {
+              name: description || "Service Payment",
+              description: `Reservation: ${reservationId}`,
+            },
+            unit_amount: amount, // Amount in cents
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      customer_email: userEmail || undefined,
+      metadata: {
+        reservationId,
+        userId,
+        type: "reservation_payment",
+        ...(metadata as Record<string, string> | undefined),
+      },
+      expires_at: Math.floor(Date.now() / 1000) + 30 * 60, // 30 minutes expiration
+    });
+
+    if (!session.url) {
+      res.status(500).json({
+        error: "Failed to create Stripe checkout session",
+        message: "No checkout URL returned from Stripe",
+      });
+      return;
+    }
 
     const response: CreatePaymentSessionResponse = {
       success: true,
-      checkoutUrl: paymentUrl,
-      sessionId: `session_${Date.now()}`,
+      checkoutUrl: session.url,
+      sessionId: session.id,
       amount,
       currency,
       description,
-      metadata,
+      metadata: { ...metadata, provider: "stripe" },
     };
 
+    console.log(`✅ Stripe checkout session created: ${session.id}`);
     res.json(response);
   } catch (error: unknown) {
+    console.error("❌ Error creating payment session:", error);
     handleRouteError(error, res, "Failed to create payment session");
   }
 };
 
 router.post(
   "/create-payment-session",
-  validateBody(CreatePaymentIntentSchema),
+  validateBody(createPaymentSessionRequestSchema),
   createPaymentSession as never
 );
 
