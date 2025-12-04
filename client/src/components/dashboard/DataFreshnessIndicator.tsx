@@ -243,9 +243,9 @@ const FreshnessStatusDisplay: React.FC<FreshnessStatusDisplayProps> = ({
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2 min-w-0">
       {/* Connection Status */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 shrink-0">
         {status.isActive ? (
           <Wifi className="h-4 w-4 text-green-500" />
         ) : (
@@ -254,19 +254,27 @@ const FreshnessStatusDisplay: React.FC<FreshnessStatusDisplayProps> = ({
       </div>
 
       {/* Freshness Status */}
-      <div className={cn("flex items-center gap-1", getStatusColor(status.overallStatus))}>
+      <div className={cn("flex items-center gap-1 shrink-0", getStatusColor(status.overallStatus))}>
         {getStatusIcon(status.overallStatus)}
-        {detailed && <span className="text-sm font-medium">{getStatusMessage()}</span>}
+        {detailed && (
+          <span className="text-sm font-medium truncate max-w-[150px] sm:max-w-none">
+            {getStatusMessage()}
+          </span>
+        )}
       </div>
 
       {/* Last Updated */}
-      {detailed && <span className="text-xs text-gray-500">Updated {getLastUpdatedMessage()}</span>}
+      {detailed && (
+        <span className="text-xs text-gray-500 whitespace-nowrap shrink-0">
+          Updated {getLastUpdatedMessage()}
+        </span>
+      )}
 
       {/* Mock Data Warning */}
       {integrityReport?.sourceValidation.hasMockData && (
-        <div className="flex items-center gap-1 text-red-500">
+        <div className="flex items-center gap-1 text-red-500 shrink-0">
           <AlertCircle className="h-4 w-4" />
-          <span className="text-xs font-medium">Mock Data</span>
+          <span className="text-xs font-medium whitespace-nowrap">Mock Data</span>
         </div>
       )}
 
@@ -275,7 +283,7 @@ const FreshnessStatusDisplay: React.FC<FreshnessStatusDisplayProps> = ({
         <button
           onClick={onRefresh}
           className={cn(
-            "flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors",
+            "flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors shrink-0",
             "hover:bg-gray-100 dark:hover:bg-gray-800",
             status.refreshInProgress && "opacity-50 cursor-not-allowed"
           )}
