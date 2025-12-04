@@ -1,20 +1,53 @@
 import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
 import { NextFunction, Request, Response } from "express";
 
+/**
+ * Clerk actor information for impersonation scenarios
+ */
+interface ClerkActor {
+  sub: string;
+  iss?: string;
+  sid?: string;
+  aud?: string;
+}
+
+/**
+ * Clerk session claims structure
+ */
+interface ClerkSessionClaims {
+  azp?: string;
+  exp?: number;
+  iat?: number;
+  iss?: string;
+  nbf?: number;
+  sid?: string;
+  sub?: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
+/**
+ * Options for getToken method
+ */
+interface GetTokenOptions {
+  template?: string;
+  leewayInSeconds?: number;
+  skipCache?: boolean;
+}
+
 // Interface pour étendre Request avec les données Clerk
 export interface ClerkRequest extends Request {
   auth?: {
     userId: string;
     sessionId: string;
-    actor?: any;
-    sessionClaims?: any;
-    getToken: (options?: any) => Promise<string | null>;
+    actor?: ClerkActor;
+    sessionClaims?: ClerkSessionClaims;
+    getToken: (options?: GetTokenOptions) => Promise<string | null>;
   };
 }
 
 // Middleware pour ajouter les données Clerk à toutes les requêtes
 export const withClerkAuth = ClerkExpressWithAuth({
-  onError: (error: any) => {
+  onError: (error: Error) => {
     console.error("Clerk auth error:", error);
     return {
       error: "Non autorisé",

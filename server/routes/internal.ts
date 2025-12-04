@@ -129,16 +129,18 @@ router.post(
         return;
       }
 
-      const reservationData: ReservationEmailData[] = reservations.map((r: any) => ({
-        id: r.id,
-        serviceType: r.serviceType,
-        preferredDate: r.preferredDate,
-        durationMinutes: r.durationMinutes,
-        totalPrice: r.totalPrice,
-        status: r.status,
-        notes: r.notes,
-        details: r.details,
-      }));
+      const reservationData: ReservationEmailData[] = reservations.map(
+        (r: ReservationEmailData) => ({
+          id: r.id,
+          serviceType: r.serviceType,
+          preferredDate: r.preferredDate,
+          durationMinutes: r.durationMinutes,
+          totalPrice: r.totalPrice,
+          status: r.status,
+          notes: r.notes,
+          details: r.details,
+        })
+      );
 
       const paymentData = {
         amount: payment.amount,

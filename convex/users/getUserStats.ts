@@ -71,6 +71,27 @@ export const getUserStats = query({
         .take(10),
     ]);
 
+    // Collect unique beat IDs from favorites and downloads for batch lookup
+    const beatIds = new Set<number>();
+    for (const fav of favorites) {
+      if (fav.beatId) beatIds.add(fav.beatId);
+    }
+    for (const download of downloads) {
+      if (download.beatId) beatIds.add(download.beatId);
+    }
+
+    // Batch fetch beats by wordpressId for title lookup
+    const beatTitleMap = new Map<number, string>();
+    for (const beatId of beatIds) {
+      const beat = await ctx.db
+        .query("beats")
+        .withIndex("by_wordpress_id", q => q.eq("wordpressId", beatId))
+        .first();
+      if (beat?.title) {
+        beatTitleMap.set(beatId, beat.title);
+      }
+    }
+
     // Calculate total spent
     const totalSpent = orders.reduce((sum, order) => {
       if (order.status === "completed" || order.status === "paid") {
@@ -90,20 +111,20 @@ export const getUserStats = query({
       beatTitle: activity.details?.beatTitle,
     }));
 
-    // Format favorites
+    // Format favorites with beat titles from lookup
     const favoritesData = favorites.map(fav => ({
       id: fav._id,
       beatId: fav.beatId,
-      beatTitle: `Beat ${fav.beatId}`, // TODO: Join with beats table
+      beatTitle: beatTitleMap.get(fav.beatId) || `Beat ${fav.beatId}`,
     }));
 
-    // Format downloads
+    // Format downloads with beat titles from lookup
     const downloadsData = downloads.map(download => ({
       id: download._id,
       beatId: download.beatId,
       licenseType: download.licenseType,
       timestamp: download.timestamp,
-      beatTitle: `Beat ${download.beatId}`, // TODO: Join with beats table
+      beatTitle: beatTitleMap.get(download.beatId) || `Beat ${download.beatId}`,
     }));
 
     // Format orders

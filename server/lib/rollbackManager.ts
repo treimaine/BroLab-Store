@@ -3,18 +3,37 @@ import { ConvexHttpClient } from "convex/browser";
 import { logger } from "./logger";
 
 /**
+ * Backup entry structure for storing state snapshots
+ */
+interface BackupEntry {
+  resourceId: string;
+  state: unknown;
+  timestamp: number;
+  compressed: boolean;
+}
+
+/**
+ * Interface for Convex client operations used by RollbackManager
+ * This abstraction allows for proper typing while supporting dynamic function names
+ */
+interface ConvexClientOperations {
+  mutation(functionName: string, args: Record<string, unknown>): Promise<unknown>;
+  query(functionName: string, args: Record<string, unknown>): Promise<unknown>;
+}
+
+/**
  * RollbackManager handles operation rollback system for failed transactions,
  * data backup and restore mechanisms, and rollback testing and validation.
  */
 export class RollbackManager {
-  private rollbackOperations: Map<string, RollbackOperation> = new Map();
-  private backupStorage: Map<string, any> = new Map();
-  private convexClient: ConvexHttpClient;
-  private maxRollbackHistory: number = 1000;
-  private rollbackTimeoutMs: number = 24 * 60 * 60 * 1000; // 24 hours
+  private readonly rollbackOperations: Map<string, RollbackOperation> = new Map();
+  private readonly backupStorage: Map<string, BackupEntry> = new Map();
+  private readonly convexClient: ConvexClientOperations;
+  private readonly rollbackTimeoutMs: number = 24 * 60 * 60 * 1000; // 24 hours
 
   constructor(convexClient: ConvexHttpClient) {
-    this.convexClient = convexClient;
+    // Cast to our interface to allow dynamic function name calls
+    this.convexClient = convexClient as unknown as ConvexClientOperations;
     this.startCleanupTimer();
   }
 
@@ -53,7 +72,7 @@ export class RollbackManager {
       this.rollbackOperations.set(rollbackId, rollbackOperation);
 
       // Store in Convex for persistence
-      await this.convexClient.mutation("rollback:store" as any, {
+      await this.callConvexMutation("rollback:store", {
         rollbackId,
         operation: rollbackOperation,
       });
@@ -86,7 +105,7 @@ export class RollbackManager {
       this.rollbackOperations.set(rollbackId, rollbackOperation);
 
       // Update in Convex
-      await this.convexClient.mutation("rollback:update" as any, {
+      await this.callConvexMutation("rollback:update", {
         rollbackId,
         currentState: newState,
       });
@@ -139,7 +158,7 @@ export class RollbackManager {
       this.rollbackOperations.set(rollbackId, rollbackOperation);
 
       // Update in Convex
-      await this.convexClient.mutation("rollback:markRolledBack" as any, {
+      await this.callConvexMutation("rollback:markRolledBack", {
         rollbackId,
         reason,
       });
@@ -167,7 +186,7 @@ export class RollbackManager {
       });
 
       // Store backup in Convex for persistence
-      await this.convexClient.mutation("backup:store" as any, {
+      await this.callConvexMutation("backup:store", {
         backupId,
         resourceId,
         state,
@@ -193,10 +212,10 @@ export class RollbackManager {
       }
 
       // Get backup data
-      let backup = this.backupStorage.get(backupId);
+      let backup: BackupEntry | null = this.backupStorage.get(backupId) ?? null;
       if (!backup) {
         // Try to get from Convex
-        backup = await this.convexClient.query("backup:get" as any, { backupId });
+        backup = (await this.callConvexQuery("backup:get", { backupId })) as BackupEntry | null;
         if (!backup) {
           throw new Error(`Backup not found: ${backupId}`);
         }
@@ -249,7 +268,7 @@ export class RollbackManager {
       if (backupId) {
         const backupExists =
           this.backupStorage.has(backupId) ||
-          (await this.convexClient.query("backup:exists" as any, { backupId }));
+          (await this.callConvexQuery("backup:exists", { backupId }));
         if (!backupExists) {
           errors.push("Backup data not found");
         }
@@ -336,7 +355,7 @@ export class RollbackManager {
       }
 
       // Clean up in Convex
-      await this.convexClient.mutation("rollback:cleanup" as any, {
+      await this.callConvexMutation("rollback:cleanup", {
         expiredBefore: Date.now() - this.rollbackTimeoutMs,
       });
 
@@ -383,6 +402,28 @@ export class RollbackManager {
 
   // Private helper methods
 
+  /**
+   * Helper method to call Convex mutations with proper typing
+   * Uses dynamic function references that are resolved at runtime
+   */
+  private async callConvexMutation(
+    functionName: string,
+    args: Record<string, unknown>
+  ): Promise<unknown> {
+    return this.convexClient.mutation(functionName, args);
+  }
+
+  /**
+   * Helper method to call Convex queries with proper typing
+   * Uses dynamic function references that are resolved at runtime
+   */
+  private async callConvexQuery(
+    functionName: string,
+    args: Record<string, unknown>
+  ): Promise<unknown> {
+    return this.convexClient.query(functionName, args);
+  }
+
   private isExpired(operation: RollbackOperation): boolean {
     const expiresAt = operation.metadata?.expiresAt as number;
     return expiresAt ? Date.now() > expiresAt : false;
@@ -395,7 +436,7 @@ export class RollbackManager {
 
     for (const dependencyId of operation.dependencies) {
       const dependency = this.rollbackOperations.get(dependencyId);
-      if (dependency && dependency.canRollback) {
+      if (dependency?.canRollback) {
         throw new Error(`Cannot rollback: dependency ${dependencyId} must be rolled back first`);
       }
     }
@@ -410,32 +451,37 @@ export class RollbackManager {
       // Map operation types to appropriate restore methods
       switch (operationType) {
         case "update_user":
-        case "update_preferences":
-          await this.convexClient.mutation("users:restore" as any, { userId: resourceId, state });
+        case "update_preferences": {
+          await this.callConvexMutation("users:restore", { userId: resourceId, state });
           break;
+        }
         case "update_order":
-        case "create_order":
-          await this.convexClient.mutation("orders:restore" as any, { orderId: resourceId, state });
+        case "create_order": {
+          await this.callConvexMutation("orders:restore", { orderId: resourceId, state });
           break;
-        case "update_product":
-          await this.convexClient.mutation("products:restore" as any, {
+        }
+        case "update_product": {
+          await this.callConvexMutation("products:restore", {
             productId: resourceId,
             state,
           });
           break;
-        case "update_favorites":
-          await this.convexClient.mutation("restore:restoreFavorites" as any, {
+        }
+        case "update_favorites": {
+          await this.callConvexMutation("restore:restoreFavorites", {
             resourceId,
             state,
           });
           break;
-        default:
+        }
+        default: {
           // Generic restore using data consistency functions
-          await this.convexClient.mutation("data:restore" as any, {
+          await this.callConvexMutation("data:restore", {
             operationType,
             resourceId,
             state,
           });
+        }
       }
 
       logger.info("Data restored successfully", { operationType, resourceId });

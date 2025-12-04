@@ -14,6 +14,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as activity_getRecent from "../activity/getRecent.js";
+import type * as activity_getUserActivity from "../activity/getUserActivity.js";
 import type * as activity_logActivity from "../activity/logActivity.js";
 import type * as admin_cleanSubscriptions from "../admin/cleanSubscriptions.js";
 import type * as admin_verifySubscriptions from "../admin/verifySubscriptions.js";
@@ -34,12 +35,14 @@ import type * as favorites_add from "../favorites/add.js";
 import type * as favorites_getFavorites from "../favorites/getFavorites.js";
 import type * as favorites_remove from "../favorites/remove.js";
 import type * as favorites_restore from "../favorites/restore.js";
+import type * as favorites_serverFunctions from "../favorites/serverFunctions.js";
 import type * as files_createFile from "../files/createFile.js";
 import type * as files_deleteFile from "../files/deleteFile.js";
 import type * as files_getFile from "../files/getFile.js";
 import type * as files_listFiles from "../files/listFiles.js";
 import type * as files_storage from "../files/storage.js";
 import type * as files from "../files.js";
+import type * as health_check from "../health/check.js";
 import type * as http from "../http.js";
 import type * as invoices_createInvoiceRecord from "../invoices/createInvoiceRecord.js";
 import type * as invoices_generateInvoiceNumber from "../invoices/generateInvoiceNumber.js";
@@ -108,6 +111,7 @@ import type * as utils_priceCorrection from "../utils/priceCorrection.js";
  */
 declare const fullApi: ApiFromModules<{
   "activity/getRecent": typeof activity_getRecent;
+  "activity/getUserActivity": typeof activity_getUserActivity;
   "activity/logActivity": typeof activity_logActivity;
   "admin/cleanSubscriptions": typeof admin_cleanSubscriptions;
   "admin/verifySubscriptions": typeof admin_verifySubscriptions;
@@ -128,12 +132,14 @@ declare const fullApi: ApiFromModules<{
   "favorites/getFavorites": typeof favorites_getFavorites;
   "favorites/remove": typeof favorites_remove;
   "favorites/restore": typeof favorites_restore;
+  "favorites/serverFunctions": typeof favorites_serverFunctions;
   "files/createFile": typeof files_createFile;
   "files/deleteFile": typeof files_deleteFile;
   "files/getFile": typeof files_getFile;
   "files/listFiles": typeof files_listFiles;
   "files/storage": typeof files_storage;
   files: typeof files;
+  "health/check": typeof health_check;
   http: typeof http;
   "invoices/createInvoiceRecord": typeof invoices_createInvoiceRecord;
   "invoices/generateInvoiceNumber": typeof invoices_generateInvoiceNumber;

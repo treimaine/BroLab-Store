@@ -6,6 +6,7 @@ import { uploadToSupabase, validateFile } from "../lib/upload";
 import { enhancedFileUploadSecurity, fileUploadRateLimit } from "../middleware/fileUploadSecurity";
 import { uploadRateLimit } from "../middleware/rateLimiter";
 import { validateFileUpload } from "../middleware/validation";
+import { AuthenticatedRequest } from "../types/express";
 import { handleRouteError } from "../types/routes";
 
 const router = Router();
@@ -86,7 +87,7 @@ router.post(
       const { path, url } = await uploadToSupabase(req.file, filePath);
 
       // Include security information in response
-      const securityInfo = (req as any).fileSecurity || {};
+      const securityInfo = (req as AuthenticatedRequest).fileSecurity || {};
 
       res.json({
         success: true,

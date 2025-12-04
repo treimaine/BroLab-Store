@@ -18,12 +18,23 @@ console.log(`🔐 PayPal ${paypalMode.toUpperCase()} credentials loaded:`, {
 // Configuration de l'environnement (sandbox par défaut pour les tests)
 const environment = paypalMode === "production" ? Environment.Production : Environment.Sandbox;
 
+/**
+ * PayPal SDK Client Configuration
+ * Type assertion needed for PayPal SDK v1.1.0 compatibility
+ * The SDK's type definitions don't fully match the runtime API
+ */
+interface PayPalClientConfig {
+  environment: typeof Environment.Sandbox | typeof Environment.Production;
+  clientId: string;
+  clientSecret: string;
+}
+
 // Client PayPal avec credentials - Configuration pour v1.1.0 (LATEST)
 export const paypalClient = new Client({
   environment,
   clientId,
   clientSecret,
-} as any); // Type assertion nécessaire pour la compatibilité v1.1.0
+} as PayPalClientConfig as ConstructorParameters<typeof Client>[0]);
 
 // Configuration des webhooks
 export const PAYPAL_WEBHOOK_ID = process.env.PAYPAL_WEBHOOK_ID;

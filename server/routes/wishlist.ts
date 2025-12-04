@@ -1,44 +1,47 @@
-import { Router } from "express";
-import { getCurrentUser, isAuthenticated } from "../auth";
+import { getAuth } from "@clerk/express";
+import { Request, Router } from "express";
+import { api } from "../../convex/_generated/api";
+import { isAuthenticated } from "../auth";
+import { getConvex } from "../lib/convex";
 import { handleRouteError } from "../types/routes";
-// import { supabaseAdmin } from '../lib/supabaseAdmin'; // Removed - using Convex for data
 
 const router = Router();
 
-// GET /api/wishlist - Récupérer la wishlist de l'utilisateur
+// Helper to get clerkId from request
+function getClerkId(req: Request): string | null {
+  try {
+    const { userId } = getAuth(req);
+    return userId;
+  } catch {
+    return null;
+  }
+}
+
+// GET /api/wishlist - Get user's wishlist
 router.get("/", isAuthenticated, async (req, res): Promise<void> => {
   try {
-    const user = await getCurrentUser(req);
-    if (!user) {
+    const clerkId = getClerkId(req);
+    if (!clerkId) {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
 
-    // TODO: Implement with Convex
-    // const { data, error } = await supabaseAdmin
-    //   .from('wishlist')
-    //   .select('*')
-    //   .eq('user_id', user.id)
-    //   .order('created_at', { ascending: false });
+    const convex = getConvex();
+    const favorites = await convex.query(api.favorites.serverFunctions.getFavoritesByClerkId, {
+      clerkId,
+    });
 
-    // if (error) {
-    //   console.error('Error fetching wishlist:', error);
-    //   res.status(500).json({ error: 'Failed to fetch wishlist' });
-    return;
-    // }
-
-    // res.json(data || []);
-    res.json([]);
+    res.json(favorites);
   } catch (error: unknown) {
     handleRouteError(error, res, "Failed to fetch wishlist");
   }
 });
 
-// POST /api/wishlist - Ajouter un beat à la wishlist
+// POST /api/wishlist - Add a beat to wishlist
 router.post("/", isAuthenticated, async (req, res): Promise<void> => {
   try {
-    const user = await getCurrentUser(req);
-    if (!user) {
+    const clerkId = getClerkId(req);
+    if (!clerkId) {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
@@ -50,70 +53,54 @@ router.post("/", isAuthenticated, async (req, res): Promise<void> => {
       return;
     }
 
-    // TODO: Implement with Convex
-    // const { data: beatData, error: beatError } = await supabaseAdmin
-    //   .from('beats')
-    //   .select('id')
-    //   .eq('wordpress_id', beat_id)
-    //   .single();
+    const convex = getConvex();
 
-    // if (beatError || !beatData) {
-    //   console.error('Beat not found in database:', beatError);
-    //   res.status(404).json({ error: 'Beat not found in database' });
-    return;
-    // }
+    try {
+      const result = await convex.mutation(api.favorites.serverFunctions.addFavoriteByClerkId, {
+        clerkId,
+        beatId: beat_id,
+      });
 
-    // const { error } = await supabaseAdmin
-    //   .from('wishlist')
-    //   .insert({
-    //     user_id: user.id,
-    //     beat_id: beatData.id, // Utiliser l'ID de la table beats, pas le wordpress_id
-    //   });
+      if (result.alreadyExists) {
+        res.status(409).json({ error: "Beat is already in your wishlist" });
+        return;
+      }
 
-    // if (error) {
-    //   if (error.code === '23505') { // Unique constraint violation
-    //     res.status(409).json({ error: 'Beat is already in your wishlist' });
-    return;
-    //   }
-    //   console.error('Error adding to wishlist:', error);
-    //   res.status(500).json({ error: 'Failed to add to wishlist' });
-    return;
-    // }
-
-    res.status(201).json({ message: "Added to wishlist successfully" });
+      res.status(201).json({ message: "Added to wishlist successfully", id: result.id });
+    } catch (convexError) {
+      const errorMessage = convexError instanceof Error ? convexError.message : "Unknown error";
+      if (errorMessage.includes("Beat not found")) {
+        res.status(404).json({ error: "Beat not found in database" });
+        return;
+      }
+      throw convexError;
+    }
   } catch (error: unknown) {
     handleRouteError(error, res, "Failed to add to wishlist");
   }
 });
 
-// DELETE /api/wishlist/:beatId - Supprimer un beat de la wishlist
+// DELETE /api/wishlist/:beatId - Remove a beat from wishlist
 router.delete("/:beatId", isAuthenticated, async (req, res): Promise<void> => {
   try {
-    const user = await getCurrentUser(req);
-    if (!user) {
+    const clerkId = getClerkId(req);
+    if (!clerkId) {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
 
-    const beatId = parseInt(req.params.beatId);
+    const beatId = Number.parseInt(req.params.beatId, 10);
 
-    if (isNaN(beatId)) {
+    if (Number.isNaN(beatId)) {
       res.status(400).json({ error: "Valid beat_id is required" });
       return;
     }
 
-    // TODO: Implement with Convex
-    // const { error } = await supabaseAdmin
-    //   .from('wishlist')
-    //   .delete()
-    //   .eq('user_id', user.id)
-    //   .eq('beat_id', beatId);
-
-    // if (error) {
-    //   console.error('Error removing from wishlist:', error);
-    //   res.status(500).json({ error: 'Failed to remove from wishlist' });
-    return;
-    // }
+    const convex = getConvex();
+    await convex.mutation(api.favorites.serverFunctions.removeFavoriteByClerkId, {
+      clerkId,
+      beatId,
+    });
 
     res.json({ message: "Removed from wishlist successfully" });
   } catch (error: unknown) {
@@ -121,28 +108,21 @@ router.delete("/:beatId", isAuthenticated, async (req, res): Promise<void> => {
   }
 });
 
-// DELETE /api/wishlist - Vider toute la wishlist
+// DELETE /api/wishlist - Clear entire wishlist
 router.delete("/", isAuthenticated, async (req, res): Promise<void> => {
   try {
-    const user = await getCurrentUser(req);
-    if (!user) {
+    const clerkId = getClerkId(req);
+    if (!clerkId) {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
 
-    // TODO: Implement with Convex
-    // const { error } = await supabaseAdmin
-    //   .from('wishlist')
-    //   .delete()
-    //   .eq('user_id', user.id);
+    const convex = getConvex();
+    const result = await convex.mutation(api.favorites.serverFunctions.clearFavoritesByClerkId, {
+      clerkId,
+    });
 
-    // if (error) {
-    //   console.error('Error clearing wishlist:', error);
-    //   res.status(500).json({ error: 'Failed to clear wishlist' });
-    return;
-    // }
-
-    res.json({ message: "Wishlist cleared successfully" });
+    res.json({ message: "Wishlist cleared successfully", deletedCount: result.deletedCount });
   } catch (error: unknown) {
     handleRouteError(error, res, "Failed to clear wishlist");
   }
