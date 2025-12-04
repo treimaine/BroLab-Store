@@ -51,6 +51,9 @@ export {
 export { CreateOrderSchema, CreatePaymentIntentSchema } from "./OrderValidation";
 export { CreateReservationSchema, ServiceDetailsSchema } from "./ReservationValidation";
 
+// Re-export payment session schema from apiEndpoints
+export { createPaymentSessionRequestSchema } from "../types/apiEndpoints";
+
 // ================================
 // COMMON VALIDATION SCHEMAS
 // ================================

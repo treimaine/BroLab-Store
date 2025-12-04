@@ -1,6 +1,8 @@
-import { Router } from "express";
+import { Request, Response, Router } from "express";
 import { z } from "zod";
+import type { ReservationStatusEnum, ServiceTypeEnum } from "../../shared/schema";
 import { ReservationStatus } from "../../shared/schema";
+import type { CreateReservation } from "../../shared/validation/ReservationValidation";
 import {
   CommonParams,
   CreateReservationSchema,
@@ -17,6 +19,221 @@ import { handleRouteError } from "../types/routes";
 import { generateICS } from "../utils/calendar";
 
 const router = Router();
+
+// ============================================================================
+// Helper Types & Functions - Extracted to reduce cognitive complexity
+// ============================================================================
+
+interface ReservationUser {
+  id: string;
+  clerkId?: string;
+  email: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: string;
+}
+
+interface TypedReservationRequest extends Request {
+  user?: ReservationUser & Record<string, unknown>;
+  body: CreateReservation;
+}
+
+interface StatusUpdateRequest extends Request {
+  user?: ReservationUser & Record<string, unknown>;
+  body: { status: ReservationStatusEnum };
+}
+
+/**
+ * Get display name for user in emails
+ */
+function getUserDisplayName(user: ReservationUser): string {
+  if (user.username && typeof user.username === "string") {
+    return user.username;
+  }
+  if (user.email && typeof user.email === "string") {
+    return user.email;
+  }
+  return "User";
+}
+
+/**
+ * Build confirmation email HTML content
+ */
+function buildConfirmationEmailContent(
+  user: ReservationUser,
+  reservation: {
+    service_type: string;
+    preferred_date: string;
+    duration_minutes: number;
+    total_price: number;
+    id: string;
+  }
+): string {
+  const displayName = getUserDisplayName(user);
+  const formattedDate = new Date(reservation.preferred_date).toLocaleDateString("en-US");
+  const formattedTime = new Date(reservation.preferred_date).toLocaleTimeString("en-US");
+  const formattedPrice = (reservation.total_price / 100).toFixed(2);
+
+  return `
+    <h2>Reservation Confirmation</h2>
+    <p>Hello ${displayName},</p>
+    <p>We have received your reservation for a ${reservation.service_type} session.</p>
+    <div style="background: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0;">
+      <p><strong>Date:</strong> ${formattedDate}</p>
+      <p><strong>Time:</strong> ${formattedTime}</p>
+      <p><strong>Duration:</strong> ${reservation.duration_minutes} minutes</p>
+      <p><strong>Price:</strong> ${formattedPrice}</p>
+      <p><strong>Reservation Number:</strong> ${reservation.id}</p>
+    </div>
+    <p>We will contact you shortly to confirm your time slot.</p>
+    <p>Thank you for your trust!<br>The BroLab Team</p>
+  `;
+}
+
+/**
+ * Send confirmation email to user (non-blocking)
+ */
+async function sendConfirmationEmail(
+  userEmail: string,
+  reservation: {
+    service_type: string;
+    preferred_date: string;
+    duration_minutes: number;
+    total_price: number;
+    id: string;
+  },
+  user: ReservationUser
+): Promise<void> {
+  try {
+    const emailContent = buildConfirmationEmailContent(user, reservation);
+    await sendMail({
+      to: userEmail,
+      subject: "BroLab Reservation Confirmation",
+      html: emailContent,
+    });
+    console.log("📧 Confirmation email sent successfully");
+  } catch (emailError) {
+    console.error("⚠️ Failed to send confirmation email:", emailError);
+  }
+}
+
+/**
+ * Send admin notification for new reservation (non-blocking)
+ */
+async function sendAdminNotification(
+  user: ReservationUser,
+  reservation: {
+    service_type: string;
+    preferred_date: string;
+    duration_minutes: number;
+    total_price: number;
+    id: string;
+    status: string;
+    notes?: string | null;
+  },
+  clientPhone: string,
+  notes?: string
+): Promise<void> {
+  try {
+    const fullName =
+      user.username || `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email;
+
+    const adminUser: User = {
+      id: user.clerkId || "unknown",
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      fullName,
+    };
+
+    const reservationData = {
+      id: reservation.id,
+      serviceType: reservation.service_type,
+      preferredDate: reservation.preferred_date,
+      durationMinutes: reservation.duration_minutes,
+      totalPrice: reservation.total_price / 100,
+      status: reservation.status,
+      notes: reservation.notes,
+      details: {
+        name: fullName,
+        email: user.email,
+        phone: clientPhone || "Not provided",
+        requirements: notes || reservation.notes || undefined,
+      },
+    };
+
+    await sendAdminReservationNotification(adminUser, reservationData);
+    console.log("📧 Admin notification sent successfully");
+  } catch (adminEmailError) {
+    console.error("⚠️ Failed to send admin notification:", adminEmailError);
+  }
+}
+
+/**
+ * Handle specific reservation creation errors
+ */
+function handleReservationError(error: unknown, res: Response): boolean {
+  if (error instanceof Error) {
+    if (error.message.includes("User not found")) {
+      res.status(401).json({
+        error: "Authentication error: User account not found. Please log out and log back in.",
+        code: "USER_NOT_FOUND",
+      });
+      return true;
+    }
+    if (error.message.includes("Authentication")) {
+      res.status(401).json({
+        error: "Authentication failed. Please ensure you are properly logged in.",
+        code: "AUTH_FAILED",
+      });
+      return true;
+    }
+    if (error.message.includes("clerkId")) {
+      res.status(400).json({
+        error: "Invalid user session. Please log out and log back in.",
+        code: "INVALID_SESSION",
+      });
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if user has access to a reservation
+ */
+function hasReservationAccess(
+  reservationUserId: number | null | undefined,
+  user: ReservationUser
+): boolean {
+  if (user.role === "service_role") return true;
+  if (reservationUserId == null) return false;
+  return reservationUserId === Number.parseInt(user.id, 10);
+}
+
+/**
+ * Extract user data from authenticated request
+ */
+function extractUserFromRequest(req: Request): ReservationUser | null {
+  const reqWithUser = req as Request & { user?: ReservationUser & Record<string, unknown> };
+  const user = reqWithUser.user;
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    clerkId: user.clerkId,
+    email: user.email,
+    username: user.username,
+    firstName: typeof user.firstName === "string" ? user.firstName : undefined,
+    lastName: typeof user.lastName === "string" ? user.lastName : undefined,
+    role: user.role,
+  };
+}
+
+// ============================================================================
+// Routes
+// ============================================================================
 
 // Public endpoint - Get available services (no auth required)
 router.get("/services", async (_req, res) => {
@@ -77,25 +294,33 @@ router.post(
   "/",
   requireAuth,
   validateBody(CreateReservationSchema),
-  async (req, res): Promise<void> => {
+  async (req: TypedReservationRequest, res): Promise<void> => {
     try {
+      const user = extractUserFromRequest(req);
+      if (!user) {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
+
+      const body = req.body;
+
       console.log("🚀 Creating reservation with authentication");
       console.log("👤 Authenticated user:", {
-        id: req.user?.id,
+        id: user.id,
         clerkId:
-          req.user?.clerkId && typeof req.user.clerkId === "string"
-            ? `${req.user.clerkId.substring(0, 8)}...`
+          user.clerkId && typeof user.clerkId === "string"
+            ? `${user.clerkId.substring(0, 8)}...`
             : "undefined",
-        email: req.user?.email,
+        email: user.email,
       });
       console.log("📝 Request body:", {
-        serviceType: req.body.serviceType,
-        preferredDate: req.body.preferredDate,
-        clientInfo: req.body.clientInfo,
+        serviceType: body.serviceType,
+        preferredDate: body.preferredDate,
+        clientInfo: body.clientInfo,
       });
 
       // Validate that we have the required clerkId
-      if (!req.user?.clerkId || typeof req.user.clerkId !== "string") {
+      if (!user.clerkId || typeof user.clerkId !== "string") {
         console.error("❌ Missing or invalid clerkId in authenticated user");
         res.status(400).json({
           error: "Authentication error: Missing user identifier. Please log out and log back in.",
@@ -104,21 +329,34 @@ router.post(
       }
 
       // Transform validated data to storage format
+      // Map extended service types to base service types for storage compatibility
+      const serviceTypeMap: Record<string, ServiceTypeEnum> = {
+        mixing: "mixing",
+        mastering: "mastering",
+        recording: "recording",
+        custom_beat: "custom_beat",
+        consultation: "consultation",
+        vocal_tuning: "mixing", // Map to mixing
+        beat_remake: "custom_beat", // Map to custom_beat
+        full_production: "recording", // Map to recording
+      };
+      const mappedServiceType = serviceTypeMap[body.serviceType] || "consultation";
+
       const reservationData = {
-        user_id: parseInt(req.user.id),
-        clerkId: req.user.clerkId, // Use actual Clerk ID from authenticated user
-        service_type: req.body.serviceType,
+        user_id: Number.parseInt(user.id, 10),
+        clerkId: user.clerkId,
+        service_type: mappedServiceType,
         details: {
-          name: `${req.body.clientInfo.firstName} ${req.body.clientInfo.lastName}`.trim(),
-          email: req.body.clientInfo.email,
-          phone: req.body.clientInfo.phone,
-          requirements: req.body.notes || "",
+          name: `${body.clientInfo.firstName} ${body.clientInfo.lastName}`.trim(),
+          email: body.clientInfo.email,
+          phone: body.clientInfo.phone,
+          requirements: body.notes || "",
           referenceLinks: [],
         },
-        preferred_date: req.body.preferredDate,
-        duration_minutes: req.body.preferredDuration,
-        total_price: req.body.budget || 0,
-        notes: req.body.notes || null,
+        preferred_date: body.preferredDate,
+        duration_minutes: body.preferredDuration,
+        total_price: body.budget || 0,
+        notes: body.notes || null,
       };
 
       console.log("🔄 Creating reservation with data:", {
@@ -138,96 +376,16 @@ router.post(
         status: reservation.status,
       });
 
-      // Send confirmation email
-      const emailContent = `
-      <h2>Reservation Confirmation</h2>
-      <p>Hello ${req.user!.username || req.user!.email || "User"},</p>
-      <p>We have received your reservation for a ${reservation.service_type} session.</p>
-      <div style="background: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0;">
-        <p><strong>Date:</strong> ${new Date(reservation.preferred_date).toLocaleDateString("en-US")}</p>
-        <p><strong>Time:</strong> ${new Date(reservation.preferred_date).toLocaleTimeString("en-US")}</p>
-        <p><strong>Duration:</strong> ${reservation.duration_minutes} minutes</p>
-        <p><strong>Price:</strong> $${(reservation.total_price / 100).toFixed(2)}</p>
-        <p><strong>Reservation Number:</strong> ${reservation.id}</p>
-      </div>
-      <p>We will contact you shortly to confirm your time slot.</p>
-      <p>Thank you for your trust!<br>The BroLab Team</p>
-    `;
-
-      try {
-        await sendMail({
-          to: req.user!.email,
-          subject: "BroLab Reservation Confirmation",
-          html: emailContent,
-        });
-        console.log("📧 Confirmation email sent successfully");
-      } catch (emailError) {
-        console.error("⚠️ Failed to send confirmation email:", emailError);
-        // Don't fail the reservation if email fails
-      }
-
-      // Send admin notification for new reservation
-      try {
-        const user: User = {
-          id: req.user!.clerkId || "unknown",
-          email: req.user!.email,
-          firstName: req.user!.firstName as string | undefined,
-          lastName: req.user!.lastName as string | undefined,
-          fullName:
-            (req.user!.username as string) ||
-            `${(req.user!.firstName as string) || ""} ${(req.user!.lastName as string) || ""}`.trim(),
-        };
-
-        const reservationData = {
-          id: reservation.id.toString(),
-          serviceType: reservation.service_type,
-          preferredDate: reservation.preferred_date,
-          durationMinutes: reservation.duration_minutes,
-          totalPrice: reservation.total_price / 100, // Convert from cents
-          status: reservation.status,
-          notes: reservation.notes,
-          details: {
-            name: user.fullName || user.email,
-            email: user.email,
-            phone: req.body.clientInfo?.phone || "Not provided",
-            requirements: req.body.notes || reservation.notes,
-          },
-        };
-
-        await sendAdminReservationNotification(user, reservationData);
-        console.log("📧 Admin notification sent successfully");
-      } catch (adminEmailError) {
-        console.error("⚠️ Failed to send admin notification:", adminEmailError);
-        // Don't fail the reservation if admin email fails
-      }
+      // Send emails asynchronously (non-blocking)
+      void sendConfirmationEmail(user.email, reservation, user);
+      void sendAdminNotification(user, reservation, body.clientInfo?.phone, body.notes);
 
       res.status(201).json(reservation);
     } catch (error: unknown) {
       console.error("❌ Reservation creation failed:", error);
 
-      // Enhanced error handling with specific error messages
-      if (error instanceof Error) {
-        if (error.message.includes("User not found")) {
-          res.status(401).json({
-            error: "Authentication error: User account not found. Please log out and log back in.",
-            code: "USER_NOT_FOUND",
-          });
-          return;
-        }
-        if (error.message.includes("Authentication")) {
-          res.status(401).json({
-            error: "Authentication failed. Please ensure you are properly logged in.",
-            code: "AUTH_FAILED",
-          });
-          return;
-        }
-        if (error.message.includes("clerkId")) {
-          res.status(400).json({
-            error: "Invalid user session. Please log out and log back in.",
-            code: "INVALID_SESSION",
-          });
-          return;
-        }
+      if (handleReservationError(error, res)) {
+        return;
       }
 
       handleRouteError(error, res, "Failed to create reservation");
@@ -238,7 +396,12 @@ router.post(
 // Get user's reservations
 router.get("/me", requireAuth, async (req, res): Promise<void> => {
   try {
-    const reservations = await storage.getUserReservations(req.user!.id);
+    const user = extractUserFromRequest(req);
+    if (!user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    const reservations = await storage.getUserReservations(user.id);
     res.json(reservations);
   } catch (error: unknown) {
     handleRouteError(error, res, "Failed to fetch user reservations");
@@ -252,12 +415,18 @@ router.get(
   validateParams(CommonParams.id),
   async (req, res): Promise<void> => {
     try {
+      const user = extractUserFromRequest(req);
+      if (!user) {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
+
       const reservation = await storage.getReservation(req.params.id);
       if (!reservation) {
         res.status(404).json({ error: "Reservation not found" });
         return;
       }
-      if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
+      if (!hasReservationAccess(reservation.user_id, user)) {
         res.status(403).json({ error: "Unauthorized" });
         return;
       }
@@ -273,36 +442,44 @@ router.patch(
   "/:id/status",
   requireAuth,
   validateRequest(z.object({ status: z.enum(ReservationStatus) })),
-  async (req, res): Promise<void> => {
+  async (req: StatusUpdateRequest, res): Promise<void> => {
     try {
+      const user = extractUserFromRequest(req);
+      if (!user) {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
+
       const reservation = await storage.getReservation(req.params.id);
       if (!reservation) {
         res.status(404).json({ error: "Reservation not found" });
         return;
       }
-      if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
+      if (!hasReservationAccess(reservation.user_id, user)) {
         res.status(403).json({ error: "Unauthorized" });
         return;
       }
 
-      const updatedReservation = await storage.updateReservationStatus(
-        req.params.id,
-        req.body.status
-      );
+      const body = req.body;
+      const updatedReservation = await storage.updateReservationStatus(req.params.id, body.status);
 
       // Send status update email
+      const displayName = getUserDisplayName(user);
+      const formattedDate = new Date(updatedReservation.preferred_date).toLocaleDateString("fr-FR");
+      const formattedTime = new Date(updatedReservation.preferred_date).toLocaleTimeString("fr-FR");
+
       const statusUpdateContent = `
         <h2>Mise à jour de votre réservation</h2>
-        <p>Bonjour ${req.user!.username},</p>
+        <p>Bonjour ${displayName},</p>
         <p>Le statut de votre réservation pour ${updatedReservation.service_type} a été mis à jour.</p>
-        <p><strong>Nouveau statut :</strong> ${req.body.status}</p>
-        <p><strong>Date :</strong> ${new Date(updatedReservation.preferred_date).toLocaleDateString("fr-FR")}</p>
-        <p><strong>Heure :</strong> ${new Date(updatedReservation.preferred_date).toLocaleTimeString("fr-FR")}</p>
+        <p><strong>Nouveau statut :</strong> ${body.status}</p>
+        <p><strong>Date :</strong> ${formattedDate}</p>
+        <p><strong>Heure :</strong> ${formattedTime}</p>
       `;
 
       await sendMail({
-        to: req.user!.email,
-        subject: `Mise à jour de votre réservation - ${req.body.status}`,
+        to: user.email,
+        subject: `Mise à jour de votre réservation - ${body.status}`,
         html: statusUpdateContent,
       });
 
@@ -316,12 +493,18 @@ router.patch(
 // Get reservation ICS file
 router.get("/:id/calendar", requireAuth, async (req, res): Promise<void> => {
   try {
+    const user = extractUserFromRequest(req);
+    if (!user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
     const reservation = await storage.getReservation(req.params.id);
     if (!reservation) {
       res.status(404).json({ error: "Reservation not found" });
       return;
     }
-    if (reservation.user_id !== parseInt(req.user!.id) && req.user!.role !== "service_role") {
+    if (!hasReservationAccess(reservation.user_id, user)) {
       res.status(403).json({ error: "Unauthorized" });
       return;
     }
@@ -347,14 +530,21 @@ router.get("/:id/calendar", requireAuth, async (req, res): Promise<void> => {
 // Get reservations by date range (admin only)
 router.get("/range/:start/:end", requireAuth, async (req, res): Promise<void> => {
   try {
-    if (req.user!.role !== "service_role") {
+    const user = extractUserFromRequest(req);
+    if (!user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    if (user.role !== "service_role") {
       res.status(403).json({ error: "Unauthorized. Admin access required." });
       return;
     }
+
     const startDate = new Date(req.params.start);
     const endDate = new Date(req.params.end);
 
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
       res.status(400).json({ error: "Invalid date format" });
       return;
     }

@@ -125,11 +125,13 @@ export default function CustomBeats() {
     const totalPrice = baseBudget + priorityFee;
 
     // Convert custom beat request to reservation format using REAL user data
+    // Note: lastName must have at least 1 character per CreateReservationSchema validation
     const reservationData = {
       serviceType: "custom_beat" as const,
       clientInfo: {
         firstName: clerkUser.firstName || clerkUser.fullName?.split(" ")[0] || "User",
-        lastName: clerkUser.lastName || clerkUser.fullName?.split(" ").slice(1).join(" ") || "",
+        lastName:
+          clerkUser.lastName || clerkUser.fullName?.split(" ").slice(1).join(" ") || "Customer",
         email: clerkUser.emailAddresses[0]?.emailAddress || "",
         phone: clerkUser.phoneNumbers?.[0]?.phoneNumber || "0000000000",
       },
