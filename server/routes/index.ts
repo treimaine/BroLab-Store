@@ -41,14 +41,12 @@ export async function registerRoutes(app: Express) {
   app.use("/api/storage", storageRouter);
   app.use("/api/uploads", uploadsRouter);
   app.use("/api/wishlist", wishlistRouter);
-  app.use("/api/woo", wooRouter);
   app.use("/api/wp", wpRouter);
 
   // Clerk Billing webhook - handles subscription and invoice events
   app.use("/api/webhooks/clerk-billing", clerkBillingRouter);
 
-  // WordPress and WooCommerce routes
-  app.use("/api/products", wooRouter);
+  // WooCommerce routes - canonical path: /api/woocommerce
   app.use("/api/woocommerce", wooRouter);
 
   // Sitemap and other routes

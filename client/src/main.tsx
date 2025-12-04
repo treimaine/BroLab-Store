@@ -1,8 +1,11 @@
 import { ClerkProvider, useAuth } from "@clerk/clerk-react";
+import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { ClerkErrorBoundary } from "./components/auth/ClerkErrorBoundary";
+import { EnvConfigError } from "./components/errors/EnvConfigError";
+import { validateClerkKeyFormat, validateEnvConfig } from "./components/errors/envConfigUtils";
 import "./index.css";
 import { initializePerformanceMonitoring } from "./lib/performanceMonitoring";
 import "./styles/z-index.css";
@@ -40,41 +43,45 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
   });
 }
 
-// Simple Convex initialization
-import { ConvexReactClient } from "convex/react";
-const convexUrl = import.meta.env.VITE_CONVEX_URL;
-if (!convexUrl) {
-  throw new Error("Missing Convex URL");
-}
-const convex = new ConvexReactClient(convexUrl);
+// Validate environment configuration gracefully
+const envValidation = validateEnvConfig();
+const convexUrl = import.meta.env.VITE_CONVEX_URL as string | undefined;
+const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
-// Clerk configuration with validation
-const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-if (!clerkPublishableKey) {
-  throw new Error("Missing Clerk Publishable Key");
+// Check for invalid Clerk key format
+const missingVars = [...envValidation.missingVars];
+if (clerkPublishableKey && !validateClerkKeyFormat(clerkPublishableKey)) {
+  missingVars.push("VITE_CLERK_PUBLISHABLE_KEY (invalid format: expected pk_test_* or pk_live_*)");
 }
 
-// Verify Clerk publishable key format (pk_test_* or pk_live_*)
-const isValidClerkKey = /^pk_(test|live)_/.test(clerkPublishableKey);
-if (!isValidClerkKey) {
-  console.error("Invalid Clerk publishable key format. Expected pk_test_* or pk_live_*");
-  throw new Error(
-    "Invalid Clerk Publishable Key format. Please check your environment configuration."
-  );
-}
+const hasConfigError = missingVars.length > 0;
 
-if (import.meta.env.DEV) {
+// Only initialize clients if config is valid
+const convex = !hasConfigError && convexUrl ? new ConvexReactClient(convexUrl) : null;
+
+if (import.meta.env.DEV && !hasConfigError) {
   console.log("🚀 Starting React application...");
   console.log("📡 Convex URL:", convexUrl);
   console.log("🔐 Clerk configured with native PricingTable");
 }
 
-createRoot(document.getElementById("root")!).render(
-  <ClerkErrorBoundary>
-    <ClerkProvider publishableKey={clerkPublishableKey} telemetry={false}>
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <App />
-      </ConvexProviderWithClerk>
-    </ClerkProvider>
-  </ClerkErrorBoundary>
-);
+// Render error page or app based on config validity
+const rootElement = document.getElementById("root")!;
+
+if (hasConfigError) {
+  // Render graceful error page instead of crashing
+  createRoot(rootElement).render(
+    <EnvConfigError missingVars={missingVars} isDev={import.meta.env.DEV} />
+  );
+} else {
+  // Normal app rendering with all providers
+  createRoot(rootElement).render(
+    <ClerkErrorBoundary>
+      <ClerkProvider publishableKey={clerkPublishableKey!} telemetry={false}>
+        <ConvexProviderWithClerk client={convex!} useAuth={useAuth}>
+          <App />
+        </ConvexProviderWithClerk>
+      </ClerkProvider>
+    </ClerkErrorBoundary>
+  );
+}

@@ -38,13 +38,13 @@ export class ErrorBoundary extends Component<Props, State> {
     });
 
     // Log error to monitoring service
-    if (typeof window !== "undefined") {
+    if (globalThis.window !== undefined) {
       // You can integrate with error monitoring services here
       // e.g., Sentry, LogRocket, etc.
     }
   }
 
-  private handleRetry = () => {
+  private readonly handleRetry = (): void => {
     this.setState({
       hasError: false,
       error: null,
@@ -52,19 +52,21 @@ export class ErrorBoundary extends Component<Props, State> {
     });
   };
 
-  private handleReportIssue = () => {
+  private readonly handleReportIssue = (): void => {
     const subject = encodeURIComponent("BroLab App Error Report");
     const body = encodeURIComponent(
       `I encountered an error while using the BroLab app:\n\n` +
         `Error: ${this.state.error?.message}\n` +
         `Stack: ${this.state.error?.stack}\n` +
         `Component Stack: ${this.state.errorInfo?.componentStack}\n` +
-        `URL: ${window.location.href}\n` +
+        `URL: ${globalThis.window.location.href}\n` +
         `User Agent: ${navigator.userAgent}\n` +
         `Timestamp: ${new Date().toISOString()}`
     );
 
-    window.open(`mailto:support@brolabentertainment.com?subject=${subject}&body=${body}`);
+    globalThis.window.open(
+      `mailto:support@brolabentertainment.com?subject=${subject}&body=${body}`
+    );
   };
 
   public override render() {
@@ -124,14 +126,14 @@ export class ErrorBoundary extends Component<Props, State> {
 
               <div className="pt-4 border-t border-zinc-800">
                 <p className="text-sm text-gray-500">
-                  You can also try refreshing the page or navigating back to the{" "}
+                  {"You can also try refreshing the page or navigating back to the "}
                   <a
                     href="/"
                     className="text-[var(--color-accent)] hover:text-[var(--color-accent-alt)] underline"
                   >
                     BroLab beats store
                   </a>
-                  .
+                  <span>.</span>
                 </p>
               </div>
             </CardContent>
@@ -145,12 +147,12 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 // Hook version for functional components
-export function useErrorHandler() {
-  return (error: Error, errorInfo?: ErrorInfo) => {
+export function useErrorHandler(): (error: Error, errorInfo?: ErrorInfo) => void {
+  return (error: Error, errorInfo?: ErrorInfo): void => {
     console.error("Manual error report:", error, errorInfo);
 
     // You can integrate with error monitoring services here
-    if (typeof window !== "undefined") {
+    if (globalThis.window !== undefined) {
       // Report to monitoring service
     }
   };

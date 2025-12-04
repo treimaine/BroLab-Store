@@ -135,12 +135,31 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest(method: string, url: string, data?: unknown): Promise<Response> {
+/**
+ * Credential mode for fetch requests
+ * - "same-origin": Only send credentials for same-origin requests (default, more secure)
+ * - "include": Send credentials for all requests including cross-origin (opt-in)
+ * - "omit": Never send credentials
+ */
+export type CredentialsMode = "same-origin" | "include" | "omit";
+
+export interface BaseRequestOptions {
+  credentials?: CredentialsMode;
+}
+
+export async function apiRequest(
+  method: string,
+  url: string,
+  data?: unknown,
+  options: BaseRequestOptions = {}
+): Promise<Response> {
+  const { credentials = "same-origin" } = options;
+
   const res = await fetch(url, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+    credentials,
   });
 
   await throwIfResNotOk(res);
@@ -148,7 +167,7 @@ export async function apiRequest(method: string, url: string, data?: unknown): P
 }
 
 // Enhanced API request with retry mechanism and better error handling
-export interface ApiRequestOptions {
+export interface ApiRequestOptions extends BaseRequestOptions {
   retries?: number;
   retryDelay?: number;
   timeout?: number;
@@ -324,7 +343,8 @@ async function executeFetchAttempt(
   method: string,
   data: unknown,
   customHeaders: Record<string, string> | undefined,
-  timeout: number
+  timeout: number,
+  credentials: CredentialsMode = "same-origin"
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -334,7 +354,7 @@ async function executeFetchAttempt(
       method,
       headers: buildRequestHeaders(data, customHeaders),
       body: data ? JSON.stringify(data) : undefined,
-      credentials: "include",
+      credentials,
       signal: controller.signal,
     });
 
@@ -371,6 +391,7 @@ export async function enhancedApiRequest(
     timeout = 30000,
     onRetry,
     headers: customHeaders,
+    credentials = "same-origin",
   } = options;
 
   checkCircuitBreaker(url);
@@ -379,7 +400,7 @@ export async function enhancedApiRequest(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      return await executeFetchAttempt(url, method, data, customHeaders, timeout);
+      return await executeFetchAttempt(url, method, data, customHeaders, timeout, credentials);
     } catch (error) {
       const { error: processedError, shouldThrow } = processError(error, url);
       lastError = processedError;
@@ -399,6 +420,11 @@ export async function enhancedApiRequest(
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
+
+export interface QueryFnOptions {
+  on401: UnauthorizedBehavior;
+  credentials?: CredentialsMode;
+}
 
 // Trusted API URL prefixes for security validation
 const TRUSTED_API_PREFIXES = ["/api/", "/api"] as const;
@@ -440,14 +466,14 @@ function validateApiPath(queryKey: readonly unknown[]): string {
   return path;
 }
 
-export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
+export const getQueryFn: <T>(options: QueryFnOptions) => QueryFunction<T> =
+  ({ on401: unauthorizedBehavior, credentials = "same-origin" }) =>
   async ({ queryKey }) => {
     // Validate and build the API path securely
     const apiPath = validateApiPath(queryKey);
 
     const res = await fetch(apiPath, {
-      credentials: "include",
+      credentials,
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
