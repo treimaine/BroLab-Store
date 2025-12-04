@@ -8,9 +8,10 @@ export type ProductLike = {
 };
 
 // Extended user type with access control properties
+// Plan keys synced with Clerk Billing Dashboard configuration
 export interface AccessControlUser extends User {
   role?: "admin" | "user" | "moderator";
-  plan?: "basic" | "artist" | "ultimate" | "free";
+  plan?: "free_user" | "basic" | "artist" | "ultimate_pass" | "ultimate" | "free";
   trialActive?: boolean;
 }
 
@@ -29,25 +30,29 @@ export interface QuotaInfo {
 
 /**
  * Monthly download limits by plan type
- * - basic: 10 downloads/month
- * - artist: 50 downloads/month
- * - ultimate: unlimited (-1)
- * - free/trial: 3 downloads/month
+ * Synced with Clerk Billing Dashboard configuration
+ * - free_user: 1 download/month
+ * - basic: 5 downloads/month
+ * - artist: 20 downloads/month
+ * - ultimate_pass: unlimited (-1)
  */
 export const PLAN_DOWNLOAD_LIMITS: Record<string, number> = {
-  basic: 10,
-  artist: 50,
-  ultimate: -1, // unlimited
-  free: 3,
-  trial: 3,
+  free_user: 1,
+  basic: 5,
+  artist: 20,
+  ultimate_pass: -1, // unlimited
+  // Legacy aliases for backward compatibility
+  free: 1,
+  trial: 1,
+  ultimate: -1,
 };
 
 /**
  * Check if user has remaining quota for downloads
  */
 export function hasRemainingQuota(quota: QuotaInfo | undefined, plan?: string): boolean {
-  // Ultimate plan has unlimited downloads
-  if (plan === "ultimate") return true;
+  // Ultimate Pass plan has unlimited downloads
+  if (plan === "ultimate_pass" || plan === "ultimate") return true;
 
   // No quota info means we can't verify - deny by default for safety
   if (!quota) return false;
@@ -63,8 +68,8 @@ export function hasRemainingQuota(quota: QuotaInfo | undefined, plan?: string): 
  * Get remaining downloads for a user
  */
 export function getRemainingDownloads(quota: QuotaInfo | undefined, plan?: string): number {
-  // Ultimate plan has unlimited downloads
-  if (plan === "ultimate") return -1; // -1 indicates unlimited
+  // Ultimate Pass plan has unlimited downloads
+  if (plan === "ultimate_pass" || plan === "ultimate") return -1; // -1 indicates unlimited
 
   // No quota info
   if (!quota) return 0;
@@ -105,8 +110,8 @@ export function isLicenseAllowedForUser(
   // 1. admin - full access
   if (accessUser.role === "admin") return true;
 
-  // 2. ultimate - full access
-  if (accessUser.plan === "ultimate") return true;
+  // 2. ultimate_pass - full access
+  if (accessUser.plan === "ultimate_pass" || accessUser.plan === "ultimate") return true;
 
   // 3. exclusive product (takes priority over plans except admin/ultimate)
   if (
@@ -128,7 +133,7 @@ export function isLicenseAllowedForUser(
   // 5. basic plan - basic license only with monthly quota
   if (accessUser.plan === "basic") {
     if (license === "basic") {
-      // Enforce monthly download quota (10 downloads/month for basic plan)
+      // Enforce monthly download quota (5 downloads/month for basic plan)
       return hasRemainingQuota(quota, accessUser.plan);
     }
     return false;

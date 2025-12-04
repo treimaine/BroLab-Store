@@ -64,11 +64,14 @@ export const getUserDownloadsEnriched = query({
     });
 
     // Calculate download limit based on quota or subscription plan
+    // Synced with Clerk Billing Dashboard configuration
     const calculateLimit = (): number => {
       if (quota) return quota.limit;
-      if (!subscription) return 0;
-      if (subscription.planId === "ultimate") return -1;
+      if (!subscription) return 1; // Free tier: 1 download
+      if (subscription.planId === "ultimate_pass" || subscription.planId === "ultimate") return -1;
       if (subscription.planId === "artist") return 20;
+      if (subscription.planId === "basic") return 5;
+      if (subscription.planId === "free_user") return 1;
       return 5;
     };
 

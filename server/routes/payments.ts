@@ -43,13 +43,15 @@ async function handleSubscriptionWebhook(
     (webhookData.currentPeriodEnd as number) ||
     Date.now() + 30 * 24 * 60 * 60 * 1000;
 
-  // Map plan to download quota
+  // Map plan to download quota - Synced with Clerk Billing Dashboard
   const quotaMap: Record<string, number> = {
-    basic: 10,
-    artist: 50,
-    ultimate: 999999,
+    free_user: 1,
+    basic: 5,
+    artist: 20,
+    ultimate_pass: 999999,
+    ultimate: 999999, // Legacy alias
   };
-  const downloadQuota = quotaMap[planId] || 10;
+  const downloadQuota = quotaMap[planId] || 5;
 
   try {
     // Find user by Clerk ID

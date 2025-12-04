@@ -47,12 +47,14 @@ export const handleSubscriptionCreated = mutation({
       throw new Error(`User not found for Clerk ID: ${clerkUserId}`);
     }
 
-    // Determine quota based on plan
-    let downloadQuota = 10; // Default: basic plan
-    if (planId === "ultimate") {
+    // Determine quota based on plan - Synced with Clerk Billing Dashboard
+    let downloadQuota = 5; // Default: basic plan
+    if (planId === "ultimate_pass") {
       downloadQuota = -1; // Unlimited
     } else if (planId === "artist") {
-      downloadQuota = 50;
+      downloadQuota = 20;
+    } else if (planId === "free_user") {
+      downloadQuota = 1;
     }
 
     // Create subscription
@@ -138,12 +140,14 @@ export const handleSubscriptionUpdated = mutation({
     // Check if plan changed
     const planChanged = subscription.planId !== planId;
 
-    // Determine new quota based on plan
-    let newDownloadQuota = 10; // Default: basic plan
-    if (planId === "ultimate") {
+    // Determine new quota based on plan - Synced with Clerk Billing Dashboard
+    let newDownloadQuota = 5; // Default: basic plan
+    if (planId === "ultimate_pass") {
       newDownloadQuota = -1; // Unlimited
     } else if (planId === "artist") {
-      newDownloadQuota = 50;
+      newDownloadQuota = 20;
+    } else if (planId === "free_user") {
+      newDownloadQuota = 1;
     }
 
     // Update subscription
@@ -218,7 +222,7 @@ export const handleSubscriptionDeleted = mutation({
       updatedAt: now,
     });
 
-    // Reset quota to free tier (10 downloads)
+    // Reset quota to free tier (1 download)
     const quota = await ctx.db
       .query("quotas")
       .withIndex("by_subscription", q => q.eq("subscriptionId", subscription._id))
@@ -227,7 +231,7 @@ export const handleSubscriptionDeleted = mutation({
 
     if (quota) {
       await ctx.db.patch(quota._id, {
-        limit: 10, // Free tier quota
+        limit: 1, // Free tier quota (1 download/month)
         isActive: false,
         updatedAt: now,
       });

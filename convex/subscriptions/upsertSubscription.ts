@@ -22,19 +22,22 @@ export const upsertSubscription = mutation({
 
     try {
       // Determine download quota based on plan
+      // Synced with Clerk Billing Dashboard configuration
       let downloadQuota: number;
       switch (args.planId.toLowerCase()) {
-        case "ultimate":
+        case "ultimate_pass":
+        case "ultimate": // Legacy alias
           downloadQuota = -1; // Unlimited
           break;
         case "artist":
-          downloadQuota = 50;
+          downloadQuota = 20;
           break;
         case "basic":
-          downloadQuota = 10;
+          downloadQuota = 5;
           break;
+        case "free_user":
         default:
-          downloadQuota = 5; // Free tier default
+          downloadQuota = 1; // Free tier
       }
 
       // Find existing subscription by clerkSubscriptionId

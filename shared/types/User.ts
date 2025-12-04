@@ -56,12 +56,13 @@ export enum InvoiceStatus {
 
 /**
  * Subscription plan types
+ * Plan keys match Clerk Billing Dashboard configuration
  */
 export enum SubscriptionPlan {
-  FREE = "free",
+  FREE = "free_user",
   BASIC = "basic",
-  PREMIUM = "premium",
-  UNLIMITED = "unlimited",
+  ARTIST = "artist",
+  ULTIMATE_PASS = "ultimate_pass",
   PRODUCER = "producer",
 }
 
@@ -604,38 +605,50 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   },
 } as const;
 
-/** Subscription plan features */
+/** Subscription plan features - Synced with Clerk Billing Dashboard */
 export const SUBSCRIPTION_FEATURES: Record<
   SubscriptionPlan,
   {
     monthlyDownloads: number;
     price: number;
+    annualPrice: number;
+    displayName: string;
     features: readonly string[];
   }
 > = {
   [SubscriptionPlan.FREE]: {
-    monthlyDownloads: 3,
+    monthlyDownloads: 1,
     price: 0,
-    features: ["3 downloads per month", "Basic quality", "Community support"],
+    annualPrice: 0,
+    displayName: "Free",
+    features: ["1 download per month", "Basic quality", "Community support"],
   },
   [SubscriptionPlan.BASIC]: {
-    monthlyDownloads: 10,
+    monthlyDownloads: 5,
     price: 9.99,
-    features: ["10 downloads per month", "High quality", "Email support", "Basic license"],
+    annualPrice: 35.88,
+    displayName: "Basic",
+    features: ["5 downloads per month", "High quality", "Email support", "Basic license"],
   },
-  [SubscriptionPlan.PREMIUM]: {
-    monthlyDownloads: 50,
-    price: 29.99,
-    features: ["50 downloads per month", "Premium quality", "Priority support", "Premium license"],
+  [SubscriptionPlan.ARTIST]: {
+    monthlyDownloads: 20,
+    price: 19.99,
+    annualPrice: 59.88,
+    displayName: "Artist",
+    features: ["20 downloads per month", "Premium quality", "Priority support", "Premium license"],
   },
-  [SubscriptionPlan.UNLIMITED]: {
+  [SubscriptionPlan.ULTIMATE_PASS]: {
     monthlyDownloads: -1, // Unlimited
-    price: 99.99,
+    price: 49.99,
+    annualPrice: 119.88,
+    displayName: "Ultimate Pass",
     features: ["Unlimited downloads", "Highest quality", "24/7 support", "Unlimited license"],
   },
   [SubscriptionPlan.PRODUCER]: {
     monthlyDownloads: -1, // Unlimited
     price: 199.99,
+    annualPrice: 2399.88,
+    displayName: "Producer",
     features: ["Unlimited downloads", "Producer tools", "Analytics", "Revenue sharing"],
   },
 } as const;

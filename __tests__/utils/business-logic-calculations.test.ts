@@ -289,19 +289,20 @@ describe("Order Calculations", () => {
 // ================================
 
 describe("Subscription Pricing", () => {
+  // Tests updated to match Clerk Billing Dashboard configuration
   test("should have correct subscription features and pricing", () => {
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.FREE].price).toBe(0);
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.BASIC].price).toBe(9.99);
-    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.PREMIUM].price).toBe(29.99);
-    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.UNLIMITED].price).toBe(99.99);
+    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.ARTIST].price).toBe(19.99);
+    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.ULTIMATE_PASS].price).toBe(49.99);
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.PRODUCER].price).toBe(199.99);
   });
 
   test("should have correct download limits", () => {
-    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.FREE].monthlyDownloads).toBe(3);
-    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.BASIC].monthlyDownloads).toBe(10);
-    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.PREMIUM].monthlyDownloads).toBe(50);
-    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.UNLIMITED].monthlyDownloads).toBe(-1); // Unlimited
+    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.FREE].monthlyDownloads).toBe(1);
+    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.BASIC].monthlyDownloads).toBe(5);
+    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.ARTIST].monthlyDownloads).toBe(20);
+    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.ULTIMATE_PASS].monthlyDownloads).toBe(-1); // Unlimited
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.PRODUCER].monthlyDownloads).toBe(-1); // Unlimited
   });
 
@@ -309,8 +310,8 @@ describe("Subscription Pricing", () => {
     const plans = [
       SUBSCRIPTION_FEATURES[SubscriptionPlan.FREE].price,
       SUBSCRIPTION_FEATURES[SubscriptionPlan.BASIC].price,
-      SUBSCRIPTION_FEATURES[SubscriptionPlan.PREMIUM].price,
-      SUBSCRIPTION_FEATURES[SubscriptionPlan.UNLIMITED].price,
+      SUBSCRIPTION_FEATURES[SubscriptionPlan.ARTIST].price,
+      SUBSCRIPTION_FEATURES[SubscriptionPlan.ULTIMATE_PASS].price,
       SUBSCRIPTION_FEATURES[SubscriptionPlan.PRODUCER].price,
     ];
 
@@ -320,12 +321,10 @@ describe("Subscription Pricing", () => {
   });
 
   test("should have appropriate features for each plan", () => {
-    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.FREE].features).toContain(
-      "3 downloads per month"
-    );
+    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.FREE].features).toContain("1 download per month");
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.BASIC].features).toContain("Basic license");
-    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.PREMIUM].features).toContain("Premium license");
-    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.UNLIMITED].features).toContain(
+    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.ARTIST].features).toContain("Premium license");
+    expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.ULTIMATE_PASS].features).toContain(
       "Unlimited downloads"
     );
     expect(SUBSCRIPTION_FEATURES[SubscriptionPlan.PRODUCER].features).toContain("Revenue sharing");
@@ -483,7 +482,7 @@ describe("Complex Business Scenarios", () => {
 
   test("should validate subscription upgrade pricing", () => {
     const currentPlan = SUBSCRIPTION_FEATURES[SubscriptionPlan.BASIC];
-    const newPlan = SUBSCRIPTION_FEATURES[SubscriptionPlan.PREMIUM];
+    const newPlan = SUBSCRIPTION_FEATURES[SubscriptionPlan.ARTIST];
 
     // Prorated upgrade calculation
     const daysRemaining = 15;
