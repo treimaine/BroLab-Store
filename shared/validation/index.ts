@@ -88,15 +88,15 @@ export const CommonQueries = {
     page: z
       .string()
       .optional()
-      .transform(val => (val ? parseInt(val, 10) : 1)),
+      .transform(val => (val ? Number.parseInt(val, 10) : 1)),
     limit: z
       .string()
       .optional()
-      .transform(val => (val ? Math.min(parseInt(val, 10), 100) : 20)),
+      .transform(val => (val ? Math.min(Number.parseInt(val, 10), 100) : 20)),
     offset: z
       .string()
       .optional()
-      .transform(val => (val ? parseInt(val, 10) : 0)),
+      .transform(val => (val ? Number.parseInt(val, 10) : 0)),
   }),
 
   sorting: z.object({

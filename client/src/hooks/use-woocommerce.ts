@@ -47,6 +47,8 @@ export function useWooCommerce() {
         const data = await response.json();
         return data;
       },
+      // Disable query when id is invalid (0, empty, or NaN)
+      enabled: Boolean(id) && id !== "0" && !Number.isNaN(Number(id)),
     });
   };
 
