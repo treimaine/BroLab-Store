@@ -1,10 +1,8 @@
-import { useCartContext } from "@/components/cart/cart-provider";
-import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { cn } from "@/lib/utils";
 import { useAudioStore } from "@/stores/useAudioStore";
 import { useUser } from "@clerk/clerk-react";
-import { Headphones, Home, Music, ShoppingCart, User } from "lucide-react";
+import { Headphones, Home, Music, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -30,25 +28,17 @@ const navItems = [
     href: "/dashboard",
     requiresAuth: true,
   },
-  {
-    icon: ShoppingCart,
-    label: "Cart",
-    href: "/cart",
-    showBadge: true,
-  },
+  // Cart removed - already accessible in top navbar to avoid duplication
 ];
 
 export function MobileBottomNav() {
   const [location] = useLocation();
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
-  const { getItemCount } = useCartContext();
   const { currentTrack } = useAudioStore();
   const isMobile = useIsMobile();
 
   // Check if user is authenticated using Clerk
   const { isSignedIn } = useUser();
-
-  const cartItemCount = getItemCount();
 
   // Detect if keyboard is open on mobile
   useEffect(() => {
@@ -122,17 +112,7 @@ export function MobileBottomNav() {
                 isActive ? "text-[var(--accent-purple)]" : "text-gray-400 hover:text-white"
               )}
             >
-              <div className="relative">
-                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                {item.showBadge && cartItemCount > 0 && (
-                  <Badge
-                    variant="secondary"
-                    className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center text-xs bg-[var(--accent-purple)] text-white border-0"
-                  >
-                    {cartItemCount}
-                  </Badge>
-                )}
-              </div>
+              <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="text-xs font-medium leading-tight">{item.label}</span>
             </Link>
           );
