@@ -7,6 +7,7 @@ import {
 } from "@/components/providers/LoadingStateProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useAuth } from "@clerk/clerk-react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Suspense, useEffect, useState } from "react";
 import { HelmetProvider } from "react-helmet-async";
@@ -17,6 +18,7 @@ import { queryClient, warmCache } from "./lib/queryClient";
 import { Navbar } from "@/components/layout/navbar";
 
 import { ComponentPreloader } from "@/components/loading/ComponentPreloader";
+import { useDeferredMountStaggered } from "@/hooks/useDeferredMount";
 import { useInteractionPreloader } from "@/hooks/useInteractionPreloader";
 import {
   bundleOptimization,
@@ -201,25 +203,37 @@ function useNewsletterModalLazy() {
 
 function App() {
   const { isOpen, closeModal } = useNewsletterModalLazy();
+  const { isSignedIn, isLoaded } = useAuth();
+
+  // Defer non-critical component mounting after main content renders
+  // Staggered mounting: OfflineIndicator (0ms), MobileBottomNav (150ms), AudioPlayer (300ms)
+  const [mountOffline, mountMobileNav, mountAudioPlayer] = useDeferredMountStaggered(3, 150);
 
   // Use interaction-based preloading
   useInteractionPreloader();
 
-  // Initialize performance optimizations
+  // Initialize performance optimizations (non-auth dependent)
   useEffect(() => {
     // Preload critical components after initial render
     bundleOptimization.preloadCriticalComponents();
 
     // Setup user interaction-based preloading
     bundleOptimization.preloadOnUserInteraction();
+  }, []);
 
-    // Warm cache with critical data
+  // Warm cache only when authenticated
+  useEffect(() => {
+    // Wait for auth to be loaded and user to be signed in
+    if (!isLoaded || !isSignedIn) {
+      return;
+    }
+
     warmCache().catch(error => {
       if (import.meta.env.DEV) {
         console.error("Cache warming failed:", error);
       }
     });
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -241,12 +255,14 @@ function App() {
                   {/* Global loading indicator */}
                   <GlobalLoadingIndicator />
 
-                  {/* Offline indicator - lazy loaded */}
-                  <div className="fixed bottom-4 right-4 z-40">
-                    <Suspense fallback={null}>
-                      <OfflineIndicator showDetails />
-                    </Suspense>
-                  </div>
+                  {/* Offline indicator - lazy loaded and deferred */}
+                  {mountOffline && (
+                    <div className="fixed bottom-4 right-4 z-40">
+                      <Suspense fallback={null}>
+                        <OfflineIndicator showDetails />
+                      </Suspense>
+                    </div>
+                  )}
 
                   {/* Navbar always visible for navigation */}
                   <Navbar />
@@ -274,15 +290,19 @@ function App() {
                     <Footer />
                   </Suspense>
 
-                  {/* Mobile bottom navigation - lazy loaded */}
-                  <Suspense fallback={null}>
-                    <MobileBottomNav />
-                  </Suspense>
+                  {/* Mobile bottom navigation - lazy loaded and deferred */}
+                  {mountMobileNav && (
+                    <Suspense fallback={null}>
+                      <MobileBottomNav />
+                    </Suspense>
+                  )}
 
-                  {/* Global audio player - lazy loaded as it's heavy */}
-                  <Suspense fallback={<OptimizedLoadingFallback type="audio" />}>
-                    <EnhancedGlobalAudioPlayer />
-                  </Suspense>
+                  {/* Global audio player - lazy loaded, deferred as it's heavy */}
+                  {mountAudioPlayer && (
+                    <Suspense fallback={<OptimizedLoadingFallback type="audio" />}>
+                      <EnhancedGlobalAudioPlayer />
+                    </Suspense>
+                  )}
 
                   {/* Newsletter modal - lazy loaded */}
                   {isOpen && (
