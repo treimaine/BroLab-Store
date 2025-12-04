@@ -8,8 +8,6 @@
  * - 2.4: Consistent patterns across all components
  */
 
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { useDashboardConfig } from "@/hooks/useDashboardConfig";
@@ -18,14 +16,13 @@ import {
   Activity,
   BarChart3,
   Download,
-  Menu,
   Settings,
   ShoppingCart,
   Star,
   TrendingUp,
   User,
 } from "lucide-react";
-import React, { memo, useCallback, useMemo, useState } from "react";
+import React, { memo, useCallback, useMemo } from "react";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -110,7 +107,6 @@ export const DashboardLayout = memo<DashboardLayoutProps>(
   ({ children, activeTab, onTabChange, className }) => {
     const isMobile = useIsMobile();
     const { config } = useDashboardConfig();
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     // Memoize tab triggers to prevent unnecessary re-renders
     const tabTriggers = useMemo(() => {
@@ -121,11 +117,8 @@ export const DashboardLayout = memo<DashboardLayoutProps>(
     const handleTabChange = useCallback(
       (value: string) => {
         onTabChange(value);
-        if (isMobile) {
-          setIsMobileMenuOpen(false);
-        }
       },
-      [onTabChange, isMobile]
+      [onTabChange]
     );
 
     return (
@@ -151,34 +144,7 @@ export const DashboardLayout = memo<DashboardLayoutProps>(
               </nav>
             </aside>
 
-            {/* Mobile Menu Button */}
-            <div className="md:hidden fixed top-[4.5rem] left-3 z-50 shadow-lg">
-              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="bg-gray-900/95 border-gray-700/50 text-white hover:bg-gray-800 shadow-xl"
-                    aria-label="Open navigation menu"
-                  >
-                    <Menu className="w-5 h-5" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent
-                  side="left"
-                  className="w-64 bg-gray-900/95 border-r border-gray-700/50 p-0"
-                >
-                  <nav className="flex-1 px-3 py-6">
-                    <TabsList
-                      aria-label="User dashboard tabs"
-                      className="flex flex-col w-full bg-transparent gap-1 p-0 h-auto"
-                    >
-                      {tabTriggers}
-                    </TabsList>
-                  </nav>
-                </SheetContent>
-              </Sheet>
-            </div>
+            {/* Mobile Menu Button - Removed: Now handled by main navbar hamburger menu */}
 
             {/* Main Content Area */}
             <main className="flex-1 md:ml-64 w-full">

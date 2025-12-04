@@ -24,6 +24,7 @@ import type { Download, Favorite } from "@shared/types/dashboard";
 import { motion } from "framer-motion";
 import { Music, Star } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useSearch } from "wouter";
 
 // Import dashboard components (no lazy loading for better performance and simpler architecture)
 import { ActivityFeed } from "./ActivityFeed";
@@ -178,8 +179,21 @@ export const ModernDashboard = memo(() => {
   const forceSyncUser = useMutation("users/clerkSync:forceSyncCurrentUser" as never);
   const [hasSyncedUser, setHasSyncedUser] = useState(false);
 
-  // State management
-  const [activeTab, setActiveTab] = useState("overview");
+  // URL-based tab management for mobile menu navigation
+  const [, setLocation] = useLocation();
+  const searchString = useSearch();
+  const urlParams = new URLSearchParams(searchString);
+  const tabFromUrl = urlParams.get("tab");
+
+  // State management - initialize from URL if present
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "overview");
+
+  // Sync tab state with URL changes
+  useEffect(() => {
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl, activeTab]);
   // Only show debug panels in development mode
   const [showConsistencyInfo, setShowConsistencyInfo] = useState(
     process.env.NODE_ENV === "development"
@@ -286,10 +300,15 @@ export const ModernDashboard = memo(() => {
     return stats;
   }, [stats, favorites?.length, orders?.length, downloads?.length]);
 
-  // Handle tab changes
-  const handleTabChange = useCallback((tab: string) => {
-    setActiveTab(tab);
-  }, []);
+  // Handle tab changes - update both state and URL
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      setActiveTab(tab);
+      // Update URL without full page reload
+      setLocation(`/dashboard?tab=${tab}`, { replace: true });
+    },
+    [setLocation]
+  );
 
   // Handle refresh using unified hook
   const handleRefresh = useCallback(async () => {

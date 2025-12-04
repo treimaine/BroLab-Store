@@ -2,9 +2,38 @@ import { useCartContext } from "@/components/cart/cart-provider";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { SignOutButton, useUser } from "@clerk/clerk-react";
-import { LogOut, Menu, ShoppingCart, User } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  Download,
+  HelpCircle,
+  Home,
+  Info,
+  LogOut,
+  Mail,
+  Menu,
+  Music,
+  Settings,
+  ShoppingCart,
+  Star,
+  TrendingUp,
+  User,
+  Wrench,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
+
+// Dashboard menu items for mobile navigation
+const DASHBOARD_MENU_ITEMS = [
+  { value: "overview", label: "Overview", icon: TrendingUp },
+  { value: "activity", label: "Activity", icon: Activity },
+  { value: "analytics", label: "Analytics", icon: BarChart3 },
+  { value: "orders", label: "Orders", icon: ShoppingCart },
+  { value: "downloads", label: "Downloads", icon: Download },
+  { value: "reservations", label: "Reservations", icon: Star },
+  { value: "profile", label: "Profile", icon: User },
+  { value: "settings", label: "Settings", icon: Settings },
+] as const;
 
 export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -36,6 +65,17 @@ export function Navbar() {
     { href: "/faq", label: "FAQ" },
   ];
 
+  // Mobile menu items - combines main nav with dashboard items
+  const mobileMenuItems = [
+    { href: "/", label: "Home", icon: Home },
+    { href: "/shop", label: "Beats", icon: Music },
+    { href: "/membership", label: "Membership", icon: Star },
+    { href: "/mixing-mastering", label: "Services", icon: Wrench },
+    { href: "/about", label: "About", icon: Info },
+    { href: "/contact", label: "Contact", icon: Mail },
+    { href: "/faq", label: "FAQ", icon: HelpCircle },
+  ];
+
   const isActive = (href: string) => {
     if (href === "/" && location === "/") return true;
     if (href !== "/" && location.startsWith(href)) return true;
@@ -65,8 +105,136 @@ export function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16 md:h-20 lg:h-24">
-          {/* Logo */}
-          <div className="flex items-center">
+          {/* Mobile Menu Button - Left side on mobile */}
+          <div className="md:hidden flex items-center">
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-[var(--medium-gray)] min-w-[44px] min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]"
+                >
+                  <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <span className="sr-only">Open navigation menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="left"
+                className="w-full sm:w-80 bg-[var(--dark-gray)] border-r border-[var(--medium-gray)] h-full overflow-y-auto"
+              >
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center justify-between mb-6 sm:mb-8">
+                    <img
+                      src="/attached_assets/Brolab logo trans_1752780961016.png"
+                      alt="BroLab Entertainment"
+                      className="h-10 w-auto sm:h-12"
+                    />
+                  </div>
+
+                  {/* Main Navigation Links */}
+                  <nav className="flex-1">
+                    <div className="space-y-1">
+                      {mobileMenuItems.map(item => {
+                        const Icon = item.icon;
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={`
+                              flex items-center gap-3 px-4 py-3 text-base font-medium rounded-lg transition-colors
+                              ${
+                                isActive(item.href)
+                                  ? "text-[var(--accent-purple)] bg-[var(--accent-purple)]/10"
+                                  : "text-white hover:text-[var(--accent-purple)] hover:bg-[var(--medium-gray)]"
+                              }
+                            `}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <Icon className="w-5 h-5 flex-shrink-0" />
+                            {item.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+
+                    {/* Dashboard Section - Only for signed in users */}
+                    {isSignedIn && (
+                      <div className="mt-6 pt-6 border-t border-[var(--medium-gray)]">
+                        <p className="px-4 mb-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                          Dashboard
+                        </p>
+                        <div className="space-y-1">
+                          {DASHBOARD_MENU_ITEMS.map(item => {
+                            const Icon = item.icon;
+                            const dashboardPath = `/dashboard?tab=${item.value}`;
+                            return (
+                              <Link
+                                key={item.value}
+                                href={dashboardPath}
+                                className={`
+                                  flex items-center gap-3 px-4 py-3 text-base font-medium rounded-lg transition-colors
+                                  ${
+                                    location.includes(`tab=${item.value}`)
+                                      ? "text-[var(--accent-purple)] bg-[var(--accent-purple)]/10"
+                                      : "text-white hover:text-[var(--accent-purple)] hover:bg-[var(--medium-gray)]"
+                                  }
+                                `}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                              >
+                                <Icon className="w-5 h-5 flex-shrink-0" />
+                                {item.label}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </nav>
+
+                  {/* User Actions */}
+                  <div className="border-t border-[var(--medium-gray)] pt-4 sm:pt-6 space-y-3 sm:space-y-4">
+                    <Link
+                      href="/cart"
+                      className="flex items-center gap-3 px-4 py-3 text-white hover:text-[var(--accent-purple)] hover:bg-[var(--medium-gray)] rounded-lg transition-colors"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <ShoppingCart className="w-5 h-5" />
+                      <span>Cart ({getItemCount()})</span>
+                    </Link>
+
+                    {isSignedIn ? (
+                      <div className="space-y-2">
+                        <div className="px-4 py-2 text-sm text-gray-400">
+                          Welcome,{" "}
+                          {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || "User"}
+                        </div>
+                        <SignOutButton>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start gap-2"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <LogOut className="w-4 h-4" />
+                            Logout
+                          </Button>
+                        </SignOutButton>
+                      </div>
+                    ) : (
+                      <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                        <Button className="w-full justify-start gap-2 btn-primary">
+                          <User className="w-4 h-4" />
+                          Login
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          {/* Logo - Centered on mobile, left on desktop */}
+          <div className="absolute left-1/2 transform -translate-x-1/2 md:relative md:left-0 md:transform-none flex items-center">
             <Link href="/" className="flex items-center" aria-label="Brolab Home">
               <img
                 src="/attached_assets/Brolab logo trans_1752780961016.png"
@@ -123,145 +291,9 @@ export function Navbar() {
                 </Button>
               </Link>
             )}
-
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="md:hidden text-white hover:bg-[var(--medium-gray)] min-w-[44px] min-h-[44px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)]"
-                >
-                  <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
-                  <span className="sr-only">Open navigation menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent
-                side="right"
-                className="w-full sm:w-80 bg-[var(--dark-gray)] border-l border-[var(--medium-gray)] h-[90vh] overflow-y-auto"
-              >
-                <div className="flex flex-col h-full">
-                  <div className="flex items-center justify-between mb-6 sm:mb-8">
-                    <img
-                      src="/attached_assets/Brolab logo trans_1752780961016.png"
-                      alt="BroLab Entertainment"
-                      className="h-10 w-auto sm:h-12"
-                    />
-                  </div>
-
-                  {/* Navigation Links */}
-                  <nav className="flex-1">
-                    <div className="space-y-3 sm:space-y-4">
-                      {navItems.map(item => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={`
-                            block px-4 py-3 text-base sm:text-lg font-medium rounded-lg transition-colors
-                            ${
-                              isActive(item.href)
-                                ? "text-[var(--accent-purple)] bg-[var(--accent-purple)]/10"
-                                : "text-white hover:text-[var(--accent-purple)] hover:bg-[var(--medium-gray)]"
-                            }
-                          `}
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          {item.label}
-                        </Link>
-                      ))}
-                    </div>
-                  </nav>
-
-                  {/* User Actions */}
-                  <div className="border-t border-[var(--medium-gray)] pt-4 sm:pt-6 space-y-3 sm:space-y-4">
-                    <Link
-                      href="/cart"
-                      className="flex items-center gap-3 px-4 py-3 text-white hover:text-[var(--accent-purple)] hover:bg-[var(--medium-gray)] rounded-lg transition-colors"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <ShoppingCart className="w-5 h-5" />
-                      <span>Cart ({getItemCount()})</span>
-                    </Link>
-
-                    {isSignedIn ? (
-                      <div className="space-y-2">
-                        <div className="px-4 py-2 text-sm text-gray-400">
-                          Welcome,{" "}
-                          {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || "User"}
-                        </div>
-                        <SignOutButton>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start gap-2"
-                            onClick={() => setIsMobileMenuOpen(false)}
-                          >
-                            <LogOut className="w-4 h-4" />
-                            Logout
-                          </Button>
-                        </SignOutButton>
-                      </div>
-                    ) : (
-                      <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                        <Button className="w-full justify-start gap-2 btn-primary">
-                          <User className="w-4 h-4" />
-                          Login
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
           </div>
         </div>
       </div>
-
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-[var(--dark-gray)] border-t border-[var(--medium-gray)]">
-          <div className="px-4 py-2 space-y-2">
-            {navItems.map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`block py-2 nav-link ${
-                  isActive(item.href) ? "text-[var(--accent-purple)]" : ""
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
-
-            {/* Mobile Auth Section */}
-            <div className="border-t border-[var(--medium-gray)] pt-2 mt-2">
-              {isSignedIn ? (
-                <div className="space-y-2">
-                  <div className="py-2 text-white text-sm">
-                    Welcome, {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || "User"}
-                  </div>
-                  <SignOutButton>
-                    <Button
-                      variant="outline"
-                      className="w-full flex items-center gap-2"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Logout
-                    </Button>
-                  </SignOutButton>
-                </div>
-              ) : (
-                <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button className="w-full flex items-center gap-2 btn-primary">
-                    <User className="w-4 h-4" />
-                    Login
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </nav>
   );
 }
