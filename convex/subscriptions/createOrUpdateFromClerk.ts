@@ -76,10 +76,13 @@ export const upsert = mutation({
       });
     } else {
       // Calculate download quota based on plan
+      // Synced with Clerk Billing Dashboard configuration
       const calculateDownloadQuota = (plan: string): number => {
-        if (plan === "ultimate") return -1;
-        if (plan === "artist") return 50;
-        return 10;
+        if (plan === "ultimate_pass" || plan === "ultimate") return -1;
+        if (plan === "artist") return 20;
+        if (plan === "basic") return 5;
+        if (plan === "free_user") return 1;
+        return 5; // Default to basic
       };
 
       const downloadQuota = calculateDownloadQuota(planId);

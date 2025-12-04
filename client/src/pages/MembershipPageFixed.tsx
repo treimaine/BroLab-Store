@@ -3,7 +3,7 @@ import { StandardHero } from "@/components/ui/StandardHero";
 import { useToast } from "@/hooks/use-toast";
 import { PricingTable } from "@clerk/clerk-react";
 import { Download, Music, Zap } from "lucide-react";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 
 interface OrderItem {
   title: string;
@@ -59,11 +59,56 @@ export default function MembershipPage(): JSX.Element {
     }
   }, [toast]);
 
-  const handleBillingCycleChange = (cycle: "monthly" | "yearly") => {
+  const pricingTableRef = useRef<HTMLDivElement>(null);
+
+  // Synchronize custom toggle with Clerk's internal "Billed annually" toggles
+  const syncClerkToggles = useCallback((isYearly: boolean): void => {
+    if (!pricingTableRef.current) return;
+
+    // Wait for Clerk's PricingTable to render, then find all billing toggles
+    const syncToggles = (): void => {
+      const container = pricingTableRef.current;
+      if (!container) return;
+
+      // Find all Clerk billing toggle switches (they contain "Billed annually" text)
+      const toggleButtons = container.querySelectorAll<HTMLButtonElement>(
+        'button[role="switch"], input[type="checkbox"], [data-checked]'
+      );
+
+      toggleButtons.forEach((toggle: Element) => {
+        const htmlToggle = toggle as HTMLElement;
+        const isCurrentlyChecked =
+          toggle.getAttribute("aria-checked") === "true" ||
+          htmlToggle.dataset.checked === "true" ||
+          (toggle as HTMLInputElement).checked === true;
+
+        // Click to toggle if state doesn't match desired state
+        if (isCurrentlyChecked !== isYearly) {
+          (toggle as HTMLElement).click();
+        }
+      });
+    };
+
+    // Retry a few times to ensure Clerk's components are fully rendered
+    syncToggles();
+    setTimeout(syncToggles, 100);
+    setTimeout(syncToggles, 300);
+  }, []);
+
+  const handleBillingCycleChange = (cycle: "monthly" | "yearly"): void => {
     startTransition(() => {
       setBillingCycle(cycle);
+      syncClerkToggles(cycle === "yearly");
     });
   };
+
+  // Sync on initial render after Clerk PricingTable loads
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      syncClerkToggles(billingCycle === "yearly");
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [billingCycle, syncClerkToggles]);
 
   return (
     <div className="min-h-screen bg-[var(--deep-black)]">
@@ -136,7 +181,7 @@ export default function MembershipPage(): JSX.Element {
         </div>
 
         {/* Clerk Pricing Table native UNIQUEMENT */}
-        <div className="max-w-4xl mx-auto">
+        <div ref={pricingTableRef} className="max-w-4xl mx-auto">
           <PricingTable />
         </div>
 

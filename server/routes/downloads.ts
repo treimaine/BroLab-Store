@@ -168,6 +168,16 @@ router.get("/export", isAuthenticated, async (req, res): Promise<void> => {
   }
 });
 
+// Quota response interface from Convex checkDownloadQuota
+interface QuotaResponse {
+  canDownload: boolean;
+  reason: string;
+  quota: { limit: number; used: number; remaining: number };
+  planId?: string;
+  subscriptionId?: string;
+  currentPeriodEnd?: number;
+}
+
 // GET /api/downloads/quota - Get user's download quota using Convex
 router.get("/quota", isAuthenticated, async (req, res): Promise<void> => {
   try {
@@ -184,25 +194,34 @@ router.get("/quota", isAuthenticated, async (req, res): Promise<void> => {
       return;
     }
 
-    // For now, return a basic quota response since checkDownloadQuota returns unlimited
+    // Fetch actual quota from user's subscription plan via Convex
     const convexClient = convex as {
-      query: (name: string, args: Record<string, unknown>) => Promise<unknown[]>;
+      query: (name: string, args: Record<string, unknown>) => Promise<unknown>;
     };
-    const downloads = await convexClient.query("downloads:getUserDownloads", {});
+    const quotaResult = (await convexClient.query(
+      "subscriptions/checkDownloadQuota:checkDownloadQuota",
+      {}
+    )) as QuotaResponse;
 
-    const downloadsUsed = downloads.length;
-    const quota = 10; // Basic quota
-    const remaining = Math.max(quota - downloadsUsed, 0);
-    const progress = Math.min((downloadsUsed / quota) * 100, 100);
+    const downloadsUsed = quotaResult.quota.used;
+    const quota = quotaResult.quota.limit === Infinity ? -1 : quotaResult.quota.limit;
+    const remaining = quotaResult.quota.remaining === Infinity ? -1 : quotaResult.quota.remaining;
+    const isUnlimited = quota === -1;
+    const progress = isUnlimited ? 0 : Math.min((downloadsUsed / quota) * 100, 100);
 
-    console.log(`🔍 Quota API - User ${user.id}: ${downloadsUsed}/${quota} downloads`);
+    console.log(
+      `🔍 Quota API - User ${user.id}: ${downloadsUsed}/${isUnlimited ? "unlimited" : quota} downloads (plan: ${quotaResult.planId || "unknown"})`
+    );
 
     res.json({
       downloadsUsed,
       quota,
       remaining,
       progress,
-      licenseType: "basic",
+      isUnlimited,
+      canDownload: quotaResult.canDownload,
+      licenseType: quotaResult.planId || "free",
+      currentPeriodEnd: quotaResult.currentPeriodEnd,
     });
   } catch (error: unknown) {
     handleRouteError(error, res, "Failed to fetch download quota");
@@ -235,8 +254,8 @@ router.get("/quota/test", async (req, res): Promise<void> => {
     // This endpoint requires authentication in Convex, so we'll return a test response
     res.json({
       downloadsUsed: 0,
-      quota: 10,
-      remaining: 10,
+      quota: 5, // Basic plan default
+      remaining: 5,
       progress: 0,
       test: true,
       message: "Test endpoint - authentication required for actual data",

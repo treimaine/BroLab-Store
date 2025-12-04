@@ -149,15 +149,15 @@ describe("License Validation Utilities", () => {
         canUserPurchaseLicense(LicenseType.UNLIMITED, SubscriptionPlan.BASIC, "customer")
       ).toBe(false);
 
-      // Premium plan can purchase all licenses
-      expect(canUserPurchaseLicense(LicenseType.BASIC, SubscriptionPlan.PREMIUM, "customer")).toBe(
+      // Artist plan can purchase all licenses
+      expect(canUserPurchaseLicense(LicenseType.BASIC, SubscriptionPlan.ARTIST, "customer")).toBe(
+        true
+      );
+      expect(canUserPurchaseLicense(LicenseType.PREMIUM, SubscriptionPlan.ARTIST, "customer")).toBe(
         true
       );
       expect(
-        canUserPurchaseLicense(LicenseType.PREMIUM, SubscriptionPlan.PREMIUM, "customer")
-      ).toBe(true);
-      expect(
-        canUserPurchaseLicense(LicenseType.UNLIMITED, SubscriptionPlan.PREMIUM, "customer")
+        canUserPurchaseLicense(LicenseType.UNLIMITED, SubscriptionPlan.ARTIST, "customer")
       ).toBe(true);
     });
   });
@@ -289,33 +289,33 @@ describe("Subscription Utilities", () => {
     test("should calculate prorated upgrade correctly", () => {
       const result = calculateSubscriptionChange(
         SubscriptionPlan.BASIC,
-        SubscriptionPlan.PREMIUM,
+        SubscriptionPlan.ARTIST,
         15, // 15 days remaining
         "monthly"
       );
 
       expect(result.creditAmount).toBe(5); // $9.99 * 15/30 = ~$5.00 (rounded)
-      expect(result.chargeAmount).toBe(15); // $29.99 * 15/30 = ~$15.00 (rounded)
-      expect(result.netAmount).toBe(10); // $15.00 - $5.00 = $10.00
+      expect(result.chargeAmount).toBe(10); // $19.99 * 15/30 = ~$10.00 (rounded)
+      expect(result.netAmount).toBe(5); // $10.00 - $5.00 = $5.00
     });
 
     test("should handle annual billing correctly", () => {
       const result = calculateSubscriptionChange(
         SubscriptionPlan.BASIC,
-        SubscriptionPlan.PREMIUM,
+        SubscriptionPlan.ARTIST,
         180, // 180 days remaining
         "annual"
       );
 
-      expect(result.creditAmount).toBe(59); // $119.88 * 180/365 (rounded)
-      expect(result.chargeAmount).toBe(177); // $359.88 * 180/365 (rounded)
-      expect(result.netAmount).toBe(118); // Difference
+      expect(result.creditAmount).toBe(18); // $35.88 * 180/365 (rounded)
+      expect(result.chargeAmount).toBe(30); // $59.88 * 180/365 (rounded)
+      expect(result.netAmount).toBe(12); // Difference
     });
   });
 
   describe("checkDownloadQuota", () => {
     test("should handle unlimited plans correctly", () => {
-      const result = checkDownloadQuota(SubscriptionPlan.UNLIMITED, 100);
+      const result = checkDownloadQuota(SubscriptionPlan.ULTIMATE_PASS, 100);
 
       expect(result.hasQuota).toBe(true);
       expect(result.remainingDownloads).toBe(-1);
@@ -323,15 +323,15 @@ describe("Subscription Utilities", () => {
     });
 
     test("should calculate remaining downloads for limited plans", () => {
-      const result = checkDownloadQuota(SubscriptionPlan.BASIC, 5);
+      const result = checkDownloadQuota(SubscriptionPlan.BASIC, 3);
 
       expect(result.hasQuota).toBe(true);
-      expect(result.remainingDownloads).toBe(5); // 10 - 5 = 5
+      expect(result.remainingDownloads).toBe(2); // 5 - 3 = 2
       expect(result.isUnlimited).toBe(false);
     });
 
     test("should handle quota exceeded", () => {
-      const result = checkDownloadQuota(SubscriptionPlan.BASIC, 15);
+      const result = checkDownloadQuota(SubscriptionPlan.BASIC, 10);
 
       expect(result.hasQuota).toBe(false);
       expect(result.remainingDownloads).toBe(0);

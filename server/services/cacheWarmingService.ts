@@ -184,9 +184,10 @@ export class CacheWarmingService {
       key: CACHE_KEYS.SUBSCRIPTION_PLANS,
       fetcher: async () => {
         // In a real implementation, fetch from your API
+        // Synced with Clerk Billing Dashboard configuration
         return [
-          { id: 1, name: "Basic", price: 29.99, features: ["10 downloads", "Basic license"] },
-          { id: 2, name: "Premium", price: 49.99, features: ["50 downloads", "Premium license"] },
+          { id: 1, name: "Basic", price: 9.99, features: ["5 downloads", "Basic license"] },
+          { id: 2, name: "Artist", price: 19.99, features: ["20 downloads", "Premium license"] },
           {
             id: 3,
             name: "Unlimited",

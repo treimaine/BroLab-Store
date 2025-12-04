@@ -126,21 +126,21 @@ const PROCESSING_FEES: Record<string, { percentage: number; fixed: number }> = {
   paypal: { percentage: 0.034, fixed: 30 },
 };
 
-/** Subscription prices (monthly in dollars) */
+/** Subscription prices (monthly in dollars) - Synced with Clerk Billing Dashboard */
 const SUBSCRIPTION_PRICES_MONTHLY: Record<SubscriptionPlan, number> = {
   [SubscriptionPlan.FREE]: 0,
   [SubscriptionPlan.BASIC]: 9.99,
-  [SubscriptionPlan.PREMIUM]: 29.99,
-  [SubscriptionPlan.UNLIMITED]: 99.99,
+  [SubscriptionPlan.ARTIST]: 19.99,
+  [SubscriptionPlan.ULTIMATE_PASS]: 49.99,
   [SubscriptionPlan.PRODUCER]: 199.99,
 };
 
-/** Subscription prices (annual in dollars) */
+/** Subscription prices (annual in dollars) - Synced with Clerk Billing Dashboard */
 const SUBSCRIPTION_PRICES_ANNUAL: Record<SubscriptionPlan, number> = {
   [SubscriptionPlan.FREE]: 0,
-  [SubscriptionPlan.BASIC]: 119.88,
-  [SubscriptionPlan.PREMIUM]: 359.88,
-  [SubscriptionPlan.UNLIMITED]: 1199.88,
+  [SubscriptionPlan.BASIC]: 35.88,
+  [SubscriptionPlan.ARTIST]: 59.88,
+  [SubscriptionPlan.ULTIMATE_PASS]: 119.88,
   [SubscriptionPlan.PRODUCER]: 2399.88,
 };
 
@@ -238,14 +238,14 @@ export function canUserPurchaseLicense(
   // Admin can purchase any license
   if (userRole === "admin") return true;
 
-  // Check subscription restrictions
+  // Check subscription restrictions - Synced with Clerk Billing plans
   switch (subscriptionPlan) {
     case SubscriptionPlan.FREE:
       return licenseType === LicenseType.BASIC;
     case SubscriptionPlan.BASIC:
       return licenseType === LicenseType.BASIC || licenseType === LicenseType.PREMIUM;
-    case SubscriptionPlan.PREMIUM:
-    case SubscriptionPlan.UNLIMITED:
+    case SubscriptionPlan.ARTIST:
+    case SubscriptionPlan.ULTIMATE_PASS:
     case SubscriptionPlan.PRODUCER:
       return true;
     default:
