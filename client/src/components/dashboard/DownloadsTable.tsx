@@ -1,12 +1,22 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, CheckCircle, Clock, Download, FileAudio, RefreshCw } from "lucide-react";
-import { memo, useCallback, useMemo } from "react";
+import { isFallbackTitle, useBeatTitleResolver } from "@/hooks/useBeatTitleResolver";
+import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Download,
+  FileAudio,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
+import { memo, useCallback, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import InteractiveDataTable, { TableColumn, TableData } from "./InteractiveDataTable";
 
 interface DownloadItem {
   id: string;
+  beatId?: number;
   beatTitle: string;
   artist?: string;
   fileSize: number; // en MB
@@ -30,6 +40,33 @@ interface DownloadsTableProps {
 
 const DownloadsTable = memo<DownloadsTableProps>(
   ({ downloads, isLoading = false, onRefresh, className }) => {
+    // Hook to resolve missing beat titles from WooCommerce
+    const {
+      fetchMissingTitles,
+      isLoading: isTitleLoading,
+      resolvedTitles,
+    } = useBeatTitleResolver();
+
+    // Auto-fetch missing titles when downloads change
+    useEffect(() => {
+      const missingTitleIds = downloads
+        .filter(d => d.beatId && isFallbackTitle(d.beatTitle))
+        .map(d => d.beatId as number);
+
+      if (missingTitleIds.length > 0) {
+        fetchMissingTitles(missingTitleIds);
+      }
+    }, [downloads, fetchMissingTitles]);
+
+    // Transform downloads with resolved titles
+    const downloadsWithResolvedTitles = useMemo(() => {
+      return downloads.map(d => ({
+        ...d,
+        beatTitle:
+          d.beatId && resolvedTitles[d.beatId] ? resolvedTitles[d.beatId].title : d.beatTitle,
+      }));
+    }, [downloads, resolvedTitles]);
+
     // Configuration of columns - memoized to prevent recreation on every render
     const columns: TableColumn[] = useMemo(
       () => [
@@ -39,13 +76,20 @@ const DownloadsTable = memo<DownloadsTableProps>(
           sortable: true,
           filterable: true,
           render: (value: unknown, row: TableData) => {
-            const title = typeof value === "string" ? value : String(value);
             const download = row as unknown as DownloadItem;
+            const title = typeof value === "string" ? value : String(value);
+            const isResolving = download.beatId ? isTitleLoading(download.beatId) : false;
+
             return (
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <FileAudio className="w-4 h-4 text-blue-500" />
-                  <p className="font-medium">{title}</p>
+                  <p className="font-medium">
+                    {title}
+                    {isResolving && (
+                      <Loader2 className="inline-block w-3 h-3 ml-2 animate-spin text-muted-foreground" />
+                    )}
+                  </p>
                 </div>
                 {download.artist && (
                   <p className="text-sm text-muted-foreground">par {download.artist}</p>
@@ -199,7 +243,7 @@ const DownloadsTable = memo<DownloadsTableProps>(
           },
         },
       ],
-      []
+      [isTitleLoading]
     );
 
     // Download handling
@@ -277,11 +321,12 @@ const DownloadsTable = memo<DownloadsTableProps>(
       [downloads, columns]
     );
 
-    // Données formatées pour le tableau - memoized to prevent recreation
+    // Données formatées pour le tableau - using resolved titles
     const tableData: TableData[] = useMemo(
       () =>
-        downloads.map(download => ({
+        downloadsWithResolvedTitles.map(download => ({
           id: download.id,
+          beatId: download.beatId,
           beatTitle: download.beatTitle,
           artist: download.artist,
           fileSize: download.fileSize,
@@ -295,7 +340,7 @@ const DownloadsTable = memo<DownloadsTableProps>(
           isExpired: download.isExpired,
           expiresAt: download.expiresAt,
         })),
-      [downloads]
+      [downloadsWithResolvedTitles]
     );
 
     // Quick stats - memoized for performance

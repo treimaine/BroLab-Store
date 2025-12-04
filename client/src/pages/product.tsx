@@ -421,9 +421,7 @@ export default function Product(): JSX.Element {
                   {isFree ? (
                     <span className="text-2xl font-bold text-[var(--accent-green)]">FREE</span>
                   ) : (
-                    <span className="text-2xl font-bold text-white">
-                      ${typeof product.price === "number" ? product.price : 0}
-                    </span>
+                    <span className="text-2xl font-bold text-white">${selectedPrice}</span>
                   )}
                 </div>
               </div>
