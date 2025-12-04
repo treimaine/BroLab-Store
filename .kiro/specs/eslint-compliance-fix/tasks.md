@@ -105,7 +105,7 @@
   - Fix `any` types in `server/services/wp.ts` (8 instances)
   - _Requirements: 1.1, 1.3, 1.4_
 
-- [ ] 15a. Replace `any` types in shared utilities
+- [x] 15a. Replace `any` types in shared utilities
   - Fix `any` types in `shared/types/ConvexOrder.ts` (6 instances)
   - Fix `any` types in `shared/types/dashboard.ts` (1 instance)
   - _Requirements: 1.1, 1.3, 1.4, 1.5_

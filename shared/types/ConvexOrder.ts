@@ -6,7 +6,16 @@
  */
 
 import { Id } from "../../convex/_generated/dataModel";
-import { Order, OrderItem } from "./Order";
+import { LicenseType } from "./Beat";
+import {
+  Currency,
+  Order,
+  OrderItem,
+  OrderItemType,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from "./Order";
 
 /**
  * Convex Order type that matches the actual Convex schema
@@ -87,14 +96,14 @@ export function convexOrderToOrder(convexOrder: ConvexOrder, items: ConvexOrderI
   const orderItems: OrderItem[] = items.map(item => ({
     id: extractNumericOrderItemId(item._id),
     productId: item.productId,
-    type: item.type as any, // Type assertion for enum compatibility
+    type: item.type as OrderItemType,
     title: item.title,
     sku: item.sku,
     quantity: item.quantity,
     unitPrice: item.unitPrice,
     totalPrice: item.totalPrice,
     discountAmount: item.discountAmount,
-    licenseType: item.licenseType as any, // Type assertion for enum compatibility
+    licenseType: item.licenseType as LicenseType,
     metadata: {
       ...item.metadata,
     },
@@ -110,12 +119,12 @@ export function convexOrderToOrder(convexOrder: ConvexOrder, items: ConvexOrderI
     subtotal: convexOrder.subtotal,
     taxAmount: convexOrder.taxAmount,
     processingFee: convexOrder.processingFee,
-    currency: convexOrder.currency as any, // Type assertion for enum compatibility
-    status: convexOrder.status as any, // Type assertion for enum compatibility
+    currency: convexOrder.currency as Currency,
+    status: convexOrder.status as OrderStatus,
     items: orderItems,
     payment: {
-      method: "stripe" as any, // Default to stripe
-      status: "pending" as any, // Default status
+      method: PaymentMethod.STRIPE,
+      status: PaymentStatus.PENDING,
       stripePaymentIntentId: convexOrder.stripePaymentIntentId,
       paypalTransactionId: convexOrder.paypalTransactionId,
     },
@@ -147,33 +156,35 @@ export function convexOrderToOrder(convexOrder: ConvexOrder, items: ConvexOrderI
 }
 
 /**
+ * Generic helper to extract numeric ID from any Convex ID
+ * Uses the last 8 characters as hex and converts to number
+ */
+function extractNumericIdFromConvexId(convexId: { toString(): string }): number {
+  const idString = convexId.toString();
+  const numericPart = idString.slice(-8);
+  const parsed = Number.parseInt(numericPart, 16);
+  return parsed || Math.floor(Math.random() * 1000000);
+}
+
+/**
  * Extract numeric ID from Convex order ID
  */
 export function extractNumericOrderId(convexId: Id<"orders">): number {
-  const idString = convexId.toString();
-  const numericPart = idString.slice(-8);
-  const parsed = parseInt(numericPart, 16);
-  return parsed || Math.floor(Math.random() * 1000000);
+  return extractNumericIdFromConvexId(convexId);
 }
 
 /**
  * Extract numeric ID from Convex user ID
  */
 export function extractNumericUserId(convexId: Id<"users">): number {
-  const idString = convexId.toString();
-  const numericPart = idString.slice(-8);
-  const parsed = parseInt(numericPart, 16);
-  return parsed || Math.floor(Math.random() * 1000000);
+  return extractNumericIdFromConvexId(convexId);
 }
 
 /**
  * Extract numeric ID from Convex order item ID
  */
 export function extractNumericOrderItemId(convexId: Id<"orderItems">): number {
-  const idString = convexId.toString();
-  const numericPart = idString.slice(-8);
-  const parsed = parseInt(numericPart, 16);
-  return parsed || Math.floor(Math.random() * 1000000);
+  return extractNumericIdFromConvexId(convexId);
 }
 
 /**

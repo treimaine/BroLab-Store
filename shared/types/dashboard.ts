@@ -123,7 +123,7 @@ export interface Activity {
     | "beat_preview";
   description: string;
   timestamp: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   beatId?: string;
   beatTitle?: string;
   severity?: "info" | "warning" | "error" | "success";
