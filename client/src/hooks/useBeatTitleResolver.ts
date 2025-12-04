@@ -75,7 +75,7 @@ export function useBeatTitleResolver(
 
     try {
       console.log(`🔄 Fetching beat title for ID: ${beatId}`); // Debug log
-      const response = await fetch(`/api/woo/products/${beatId}`);
+      const response = await fetch(`/api/woocommerce/products/${beatId}`);
 
       if (!response.ok) {
         if (response.status === 404) {

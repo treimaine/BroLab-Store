@@ -32,9 +32,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register authentication routes
   registerAuthRoutes(app);
 
-  // Register WooCommerce routes (returns sample data in tests if env not set)
+  // WooCommerce routes - canonical path: /api/woocommerce
   app.use("/api/woocommerce", wooRouter);
-  app.use("/api/woo", wooRouter);
 
   // Note: Subscription routes now handled by Clerk/Convex
 

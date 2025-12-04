@@ -265,7 +265,7 @@ export class SyncManager extends BrowserEventEmitter {
       const response = await fetch(`${this.config.pollingUrl}/validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        credentials: "same-origin",
       });
 
       if (!response.ok) {
@@ -491,7 +491,7 @@ export class SyncManager extends BrowserEventEmitter {
       const response = await fetch(this.config.pollingUrl, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        credentials: "same-origin",
       });
 
       if (!response.ok) {

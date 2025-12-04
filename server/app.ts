@@ -94,15 +94,12 @@ app.use("/api/service-orders", apiRateLimiter, serviceOrdersRouter);
 app.use("/api/storage", apiRateLimiter, storageRouter);
 app.use("/api/uploads", apiRateLimiter, uploadsRouter);
 app.use("/api/wishlist", apiRateLimiter, wishlistRouter);
-app.use("/api/woo", apiRateLimiter, wooRouter);
 app.use("/api/wp", apiRateLimiter, wpRouter);
 app.use("/api/sync", apiRateLimiter, syncRouter);
 app.use("/api/categories", apiRateLimiter, categoriesRouter);
 app.use("/api/reservations", apiRateLimiter, reservationsRouter);
 
-// WordPress and WooCommerce routes
-app.use("/api/products", apiRateLimiter, wooRouter);
-app.use("/api/woo", apiRateLimiter, wooRouter);
+// WooCommerce routes - canonical path: /api/woocommerce
 app.use("/api/woocommerce", apiRateLimiter, wooRouter);
 
 // Sitemap and other routes
