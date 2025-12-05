@@ -105,13 +105,15 @@ export function Footer(): JSX.Element {
               that inspire creativity and drive success.
             </p>
             <div className="flex space-x-4">
-              <button
-                type="button"
+              <a
+                href="https://www.instagram.com/treigua/"
+                target="_blank"
+                rel="noopener noreferrer"
                 aria-label="Follow us on Instagram"
                 className="w-10 h-10 bg-[var(--medium-gray)] hover:bg-[var(--accent-purple)] rounded-full flex items-center justify-center transition-colors"
               >
                 <InstagramIcon className="w-5 h-5 text-white" />
-              </button>
+              </a>
               <button
                 type="button"
                 aria-label="Follow us on X"
@@ -119,13 +121,15 @@ export function Footer(): JSX.Element {
               >
                 <XIcon className="w-5 h-5 text-white" />
               </button>
-              <button
-                type="button"
+              <a
+                href="https://www.youtube.com/@TreiguawiththeMix"
+                target="_blank"
+                rel="noopener noreferrer"
                 aria-label="Subscribe to our YouTube channel"
                 className="w-10 h-10 bg-[var(--medium-gray)] hover:bg-[var(--accent-purple)] rounded-full flex items-center justify-center transition-colors"
               >
                 <YoutubeIcon className="w-5 h-5 text-white" />
-              </button>
+              </a>
             </div>
           </div>
 
