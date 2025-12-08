@@ -20,6 +20,9 @@ export interface FeatureFlags {
   enablePerformanceMonitoring: boolean;
   enableBundleAnalyzer: boolean;
 
+  // Audio player flags
+  enableSonaarModernPlayer: boolean; // Use new Sonaar Modern Player (Example 097 style)
+
   // Service flags
   enableMixingMastering: boolean;
   enableRecordingSessions: boolean;
@@ -51,6 +54,9 @@ const defaultFlags: FeatureFlags = {
   enableOfflineMode: true,
   enablePerformanceMonitoring: import.meta.env.DEV,
   enableBundleAnalyzer: import.meta.env.DEV,
+
+  // Audio player - new Sonaar Modern Player enabled by default
+  enableSonaarModernPlayer: true,
 
   // Services - enabled by default
   enableMixingMastering: true,
@@ -118,6 +124,10 @@ function loadEnvFlags(): Partial<FeatureFlags> {
 
   if (import.meta.env.VITE_ENABLE_EXPERIMENTAL !== undefined) {
     envFlags.enableExperimentalFeatures = import.meta.env.VITE_ENABLE_EXPERIMENTAL === "true";
+  }
+
+  if (import.meta.env.VITE_ENABLE_SONAAR_MODERN_PLAYER !== undefined) {
+    envFlags.enableSonaarModernPlayer = import.meta.env.VITE_ENABLE_SONAAR_MODERN_PLAYER === "true";
   }
 
   return envFlags;

@@ -333,6 +333,88 @@
   justify-content: center;
 }
 
+/* Sonaar Modern Player Styles (Example 097) */
+.sonaar-modern-player {
+  --srp-waveform-played: #a259ff;
+  --srp-waveform-unplayed: #4a4a4a;
+  --srp-play-button-bg: rgba(162, 89, 255, 0.9);
+  --srp-play-button-border: #ffffff;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+}
+
+.sonaar-modern-player .play-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--srp-play-button-bg);
+  border: 3px solid var(--srp-play-button-border);
+  box-shadow: 0 4px 15px rgba(162, 89, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.sonaar-modern-player .play-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(162, 89, 255, 0.5);
+}
+
+.sonaar-modern-player .play-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Bicolor Waveform Styles */
+.sonaar-waveform {
+  position: relative;
+  height: 48px;
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sonaar-waveform canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Volume Slider Sonaar Style */
+.sonaar-volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.sonaar-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-purple);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.sonaar-volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.sonaar-volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-purple);
+  cursor: pointer;
+  border: none;
+}
+
 /* Progress Bar Styles */
 .sonaar-progress .relative {
   height: 6px;
