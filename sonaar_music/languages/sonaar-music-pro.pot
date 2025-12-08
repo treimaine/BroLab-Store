@@ -1,0 +1,863 @@
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: MP3 Audio Player by Sonaar - Pro Addon\n"
+"POT-Creation-Date: 2023-06-28 11:28-0400\n"
+"PO-Revision-Date: 2023-06-28 11:26-0400\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+"X-Generator: Poedit 3.3.2\n"
+"X-Poedit-Basepath: ..\n"
+"X-Poedit-Flags-xgettext: --add-comments=translators:\n"
+"X-Poedit-WPHeader: sonaar-music-pro.php\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"X-Poedit-KeywordsList: __;_e;_n:1,2;_x:1,2c;_ex:1,2c;_nx:4c,1,2;esc_attr__;"
+"esc_attr_e;esc_attr_x:1,2c;esc_html__;esc_html_e;esc_html_x:1,2c;_n_noop:1,2;"
+"_nx_noop:3c,1,2;__ngettext_noop:1,2\n"
+"X-Poedit-SearchPath-0: .\n"
+"X-Poedit-SearchPathExcluded-0: *.min.js\n"
+"X-Poedit-SearchPathExcluded-1: vendor\n"
+"X-Poedit-SearchPathExcluded-2: node_modules\n"
+
+#. Author of the plugin/theme
+#: admin/class-sonaar-music-pro-admin.php:227
+#: admin/class-sonaar-music-pro-admin.php:242
+#: admin/class-sonaar-music-pro-admin.php:257
+msgid "Sonaar Music"
+msgstr ""
+
+#: admin/class-sonaar-music-pro-admin.php:231
+msgid "Statistics"
+msgstr ""
+
+#: admin/class-sonaar-music-pro-admin.php:246
+msgid "Tools"
+msgstr ""
+
+#: admin/class-sonaar-music-pro-admin.php:261
+#: includes/class-woocommerce.php:808
+msgid "License"
+msgstr ""
+
+#: admin/class-sonaar-music-pro-admin.php:341
+msgid "Published"
+msgstr ""
+
+#: admin/class-sonaar-music-pro-admin.php:405
+msgid ""
+"An Unexpected HTTP Error occurred during the API request.</p> <p><a href=\"?"
+"\" onclick=\"document.location.reload(); return false;\">Try again</a>"
+msgstr ""
+
+#: admin/class-sonaar-music-pro-admin.php:410
+msgid "An unknown error occurred"
+msgstr ""
+
+#. translators: %s is the number of tracks found.
+#: admin/class-sonaar-music-pro-admin.php:721
+#, php-format
+msgid "%s track"
+msgid_plural "%s tracks"
+msgstr[0] ""
+msgstr[1] ""
+
+#: admin/class-sonaar-music-pro-admin.php:772
+msgid "An error occurred while retrieving the audio attachments lists."
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:13
+msgid "Import From CSV File"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:21
+msgid "Create Single or multiple posts and import audio based on a CSV File."
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:22
+#, php-format
+msgid " Example of CSV File format %1s."
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:22
+msgid "here"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:39
+#: admin/partials/sonaar-music-pro-tools-display.php:200
+msgid "Select Post Type"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:50
+#: admin/partials/sonaar-music-pro-tools-display.php:213
+#: admin/partials/sonaar-music-pro-tools-display.php:227
+msgid "Simple Product"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:51
+#: admin/partials/sonaar-music-pro-tools-display.php:214
+#: admin/partials/sonaar-music-pro-tools-display.php:228
+msgid "Variable Product"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:56
+#: admin/partials/sonaar-music-pro-tools-display.php:233
+msgid "Select Product Attribute (eg: License)"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:82
+msgid "Import & Create Post(s)"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:128
+msgid "Batch Creation Tool"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:135
+msgid ""
+"Use this tool to quickly add playlist into new post in 1-click! You can "
+"either create multiple posts with 1 track each, or create 1 post with "
+"multiple tracks. "
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:136
+msgid ""
+"Files below are the ones found in your media library. You can review and "
+"publish the draft(s) in bulk once they have been created"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:137
+msgid ""
+"* If tracks have been already used into your posts, they will appear in gray "
+"below"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:161
+msgid "Search Post:"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:168
+msgid "Number of items per page"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:170
+msgid "Select per page"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:184
+msgid "MP3 items list"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:192
+msgid "Select all"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:192
+msgid "Deselect all"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:217
+msgid "Price"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:246
+msgid "Set the audio file(s) as the purchased file(s)"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:247
+msgid "I will add the purchased file manually"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:267
+msgid "Create Post(s) for Each Selected Track(s)"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:268
+msgid "Or"
+msgstr ""
+
+#: admin/partials/sonaar-music-pro-tools-display.php:269
+msgid "Create One Post With All Selected Tracks"
+msgstr ""
+
+#: includes/class-sonaar-chips.php:29
+msgctxt "Widget"
+msgid "Add Chips from the URL Query"
+msgstr ""
+
+#: includes/class-sonaar-chips.php:38
+msgctxt "Widget"
+msgid "Sonaar: Chips"
+msgstr ""
+
+#: includes/class-sonaar-filters.php:22
+msgctxt "Widget"
+msgid "Add Filters to your Tracklist"
+msgstr ""
+
+#: includes/class-sonaar-filters.php:37
+msgctxt "Widget"
+msgid "Sonaar: Filters"
+msgstr ""
+
+#: includes/class-sonaar-music-licences.php:183
+msgid "WordPress requires MP3 Music Player by Sonaar to be updated to v."
+msgstr ""
+
+#: includes/class-sonaar-music-licences.php:184
+msgid "Update MP3 Player Now"
+msgstr ""
+
+#: includes/class-sonaar-music-licences.php:200
+msgid ""
+"MP3 Player Pro is not working because you need to activate the MP3 Player "
+"Free plugin."
+msgstr ""
+
+#: includes/class-sonaar-music-licences.php:201
+msgid "Activate MP3 Player Now"
+msgstr ""
+
+#: includes/class-sonaar-music-licences.php:220
+msgid ""
+"MP3 Player Pro is not working because you need to install the MP3 Player "
+"Free plugin."
+msgstr ""
+
+#: includes/class-sonaar-music-licences.php:221
+msgid "Install MP3 Player Now"
+msgstr ""
+
+#: includes/class-sonaar-music-licences.php:244
+msgid "Welcome to MP3 Audio Player Pro"
+msgstr ""
+
+#: includes/class-sonaar-music-licences.php:245
+#, php-format
+msgid ""
+"Please <a href=\"%1$s\" >activate your license</a> to get feature updates, "
+"statistic reports and premium support"
+msgstr ""
+
+#: includes/class-sonaar-music-licences.php:270
+msgid "Oh no! Your license key is <strong>"
+msgstr ""
+
+#: includes/class-sonaar-search.php:31
+msgctxt "Widget"
+msgid "Add Search for your Tracklist"
+msgstr ""
+
+#: includes/class-sonaar-search.php:39
+msgctxt "Widget"
+msgid "Sonaar: Search"
+msgstr ""
+
+#: includes/class-sonaar-search.php:48
+msgid "Search"
+msgstr ""
+
+#: includes/class-sonaar-search.php:49 includes/widgets/sr-search.php:67
+msgid "Enter any keyword"
+msgstr ""
+
+#: includes/class-woocommerce.php:428 includes/class-woocommerce.php:497
+msgid " + "
+msgstr ""
+
+#: includes/class-woocommerce.php:447
+msgid "mp3"
+msgstr ""
+
+#: includes/class-woocommerce.php:450
+msgid "wav"
+msgstr ""
+
+#: includes/class-woocommerce.php:453
+msgid "stems"
+msgstr ""
+
+#: includes/class-woocommerce.php:456
+msgid "yes"
+msgstr ""
+
+#: includes/class-woocommerce.php:459
+msgid "no"
+msgstr ""
+
+#: includes/class-woocommerce.php:474
+msgid "{value} included"
+msgstr ""
+
+#: includes/class-woocommerce.php:475
+msgid "Distribute up to {value} copies"
+msgstr ""
+
+#: includes/class-woocommerce.php:476
+msgid "{value} audio streams"
+msgstr ""
+
+#: includes/class-woocommerce.php:477
+msgid "{value} music videos"
+msgstr ""
+
+#: includes/class-woocommerce.php:478
+msgid "Radio broadcasting rights ({value} stations)"
+msgstr ""
+
+#: includes/class-woocommerce.php:479
+msgid "{value} free downloads"
+msgstr ""
+
+#: includes/class-woocommerce.php:480
+msgid "{value} video streams"
+msgstr ""
+
+#: includes/class-woocommerce.php:481
+msgid "For paid performances? {value}"
+msgstr ""
+
+#: includes/class-woocommerce.php:578
+msgid "Preview License"
+msgstr ""
+
+#: includes/class-woocommerce.php:678
+msgid "Total:"
+msgstr ""
+
+#: includes/class-woocommerce.php:679
+msgid "Add to cart"
+msgstr ""
+
+#: includes/class-woocommerce.php:735 includes/class-woocommerce.php:745
+msgid "License Details"
+msgstr ""
+
+#: includes/class-woocommerce.php:755 includes/class-woocommerce.php:807
+msgid "Product"
+msgstr ""
+
+#: includes/class-woocommerce.php:756
+msgid "License PDF Link"
+msgstr ""
+
+#: includes/class-woocommerce.php:769
+msgid "Download License Agreement"
+msgstr ""
+
+#: includes/class-woocommerce.php:801
+msgid "Review Licenses"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:34
+msgid "Chips Result"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:58 includes/widgets/sr-chips.php:65
+msgid "Chips & Tags"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:72 includes/widgets/sr-filters.php:180
+#: includes/widgets/sr-search.php:105
+msgid "Target Player ID"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:78 includes/widgets/sr-filters.php:186
+#: includes/widgets/sr-search.php:112
+msgid ""
+"Add your player id WITHOUT the Pound key. e.g: my-id. Leave blank if only "
+"one player is used in this page"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:86
+msgid "Chips Style"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:93 includes/widgets/sr-filters.php:208
+#: includes/widgets/sr-filters.php:634
+msgctxt "Flex Container Control"
+msgid "Justify Content"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:99 includes/widgets/sr-filters.php:214
+#: includes/widgets/sr-filters.php:640
+msgctxt "Flex Container Control"
+msgid "Start"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:103 includes/widgets/sr-filters.php:218
+#: includes/widgets/sr-filters.php:644
+msgctxt "Flex Container Control"
+msgid "Center"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:107 includes/widgets/sr-filters.php:222
+#: includes/widgets/sr-filters.php:648
+msgctxt "Flex Container Control"
+msgid "End"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:111 includes/widgets/sr-filters.php:226
+#: includes/widgets/sr-filters.php:652
+msgctxt "Flex Container Control"
+msgid "Space Between"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:115 includes/widgets/sr-filters.php:230
+#: includes/widgets/sr-filters.php:656
+msgctxt "Flex Container Control"
+msgid "Space Around"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:119 includes/widgets/sr-filters.php:234
+#: includes/widgets/sr-filters.php:660
+msgctxt "Flex Container Control"
+msgid "Space Evenly"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:132 includes/widgets/sr-filters.php:275
+#: includes/widgets/sr-filters.php:400 includes/widgets/sr-filters.php:626
+#: includes/widgets/sr-search.php:176
+msgid "Typography"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:143 includes/widgets/sr-filters.php:437
+#: includes/widgets/sr-filters.php:673
+msgid "Normal"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:149 includes/widgets/sr-chips.php:189
+#: includes/widgets/sr-filters.php:246 includes/widgets/sr-filters.php:363
+#: includes/widgets/sr-filters.php:443 includes/widgets/sr-filters.php:474
+#: includes/widgets/sr-filters.php:539 includes/widgets/sr-filters.php:679
+#: includes/widgets/sr-filters.php:720 includes/widgets/sr-filters.php:761
+#: includes/widgets/sr-search.php:243
+msgid "Color"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:161 includes/widgets/sr-chips.php:201
+#: includes/widgets/sr-filters.php:691 includes/widgets/sr-filters.php:732
+#: includes/widgets/sr-filters.php:773
+msgid "Background"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:171 includes/widgets/sr-chips.php:211
+#: includes/widgets/sr-filters.php:703 includes/widgets/sr-filters.php:744
+#: includes/widgets/sr-filters.php:788
+msgid "Border Color"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:183 includes/widgets/sr-filters.php:468
+#: includes/widgets/sr-filters.php:714
+msgid "Hover"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:226
+msgid "Padding"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:239 includes/widgets/sr-filters.php:330
+#: includes/widgets/sr-filters.php:512 includes/widgets/sr-search.php:215
+msgid "Border Type"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:242 includes/widgets/sr-filters.php:333
+#: includes/widgets/sr-filters.php:515 includes/widgets/sr-search.php:218
+msgid "None"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:243 includes/widgets/sr-filters.php:334
+#: includes/widgets/sr-filters.php:516 includes/widgets/sr-search.php:219
+msgctxt "Border Control"
+msgid "Solid"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:244 includes/widgets/sr-filters.php:335
+#: includes/widgets/sr-filters.php:517 includes/widgets/sr-search.php:220
+msgctxt "Border Control"
+msgid "Dotted"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:245 includes/widgets/sr-filters.php:336
+#: includes/widgets/sr-filters.php:518 includes/widgets/sr-search.php:221
+msgctxt "Border Control"
+msgid "Dashed"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:256
+msgid "Border Width"
+msgstr ""
+
+#: includes/widgets/sr-chips.php:267
+msgid "Chip Radius"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:33
+msgid "Filter Select & Tags"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:57
+msgid "Audio Player Filters"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:65
+msgid "Filter Type "
+msgstr ""
+
+#: includes/widgets/sr-filters.php:79
+msgid "Filter Title"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:91
+msgid "Source "
+msgstr ""
+
+#: includes/widgets/sr-filters.php:101
+msgid "ACF Field"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:102
+msgid "Only field types Select/Checkbox/Radio or Taxonomy are accepted"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:118
+msgid "Meta Field"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:119
+msgid "Only metafield types Select/Checkbox or Radio are accepted"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:133
+msgid "Object Field"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:144
+msgid "Custom Meta Key"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:145
+msgid ""
+"Only custom key that outputs an array with multiple choices are accepted"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:156
+msgid "Select Type"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:159
+msgid "Single Select"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:160
+msgid "Multiple Select"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:169
+msgid "Add New Filter"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:198
+msgid "Dropdown Style"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:261 includes/widgets/sr-filters.php:455
+#: includes/widgets/sr-filters.php:486 includes/widgets/sr-search.php:164
+msgid "Background Color"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:283
+msgid "Dropdown Width"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:307
+msgid "Dropdown Height (px)"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:348 includes/widgets/sr-filters.php:528
+#: includes/widgets/sr-search.php:185 includes/widgets/sr-search.php:232
+msgid "Width"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:377 includes/widgets/sr-filters.php:549
+#: includes/widgets/sr-search.php:253
+msgid "Radius"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:389
+msgid "Dropdown Options Style"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:408
+msgid "Space Top"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:425
+msgid "Item Padding"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:500
+msgid "Separator Color"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:565
+msgid "Button Style"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:575
+msgid "Hide Label"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:589
+msgid "Label Typography"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:600
+msgid "Label Color"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:615
+msgid "Use Rainbow Colors on Active"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:755
+msgid "Active"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:803
+msgid "Button Width"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:826
+msgid "Text Alignment"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:830 sonaar-music-pro.php:115
+msgid "Left"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:834 sonaar-music-pro.php:119
+msgid "Center"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:838 sonaar-music-pro.php:123
+msgid "Right"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:890
+msgid "Post/Term/User/Object Data"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:910
+msgid "Player"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:912 includes/widgets/sr-filters.php:967
+msgid "Select..."
+msgstr ""
+
+#: includes/widgets/sr-filters.php:913
+#, php-format
+msgid "%1$s Category"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:914
+#, php-format
+msgid "%1$s Tag"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:920
+msgid "Podcast Show"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:925
+msgid "WooCommerce"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:927
+msgid "Product Categories"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:928
+msgid "Product Tags"
+msgstr ""
+
+#: includes/widgets/sr-filters.php:1071
+msgid "Options"
+msgstr ""
+
+#: includes/widgets/sr-search.php:33
+msgid "Search Tracklist"
+msgstr ""
+
+#: includes/widgets/sr-search.php:57
+msgid "Search Bar"
+msgstr ""
+
+#: includes/widgets/sr-search.php:64
+msgid "Placeholder Text"
+msgstr ""
+
+#: includes/widgets/sr-search.php:77
+msgid "Redirect the search to another URL "
+msgstr ""
+
+#: includes/widgets/sr-search.php:86
+msgid "URL"
+msgstr ""
+
+#: includes/widgets/sr-search.php:88
+msgid "https://your-link.com"
+msgstr ""
+
+#: includes/widgets/sr-search.php:124
+msgid "Search Bar Style"
+msgstr ""
+
+#: includes/widgets/sr-search.php:131
+msgid "Placeholder Color"
+msgstr ""
+
+#: includes/widgets/sr-search.php:142
+msgid "Keyword Color"
+msgstr ""
+
+#: includes/widgets/sr-search.php:153
+msgid "Reset Color"
+msgstr ""
+
+#: includes/widgets/sr-search.php:204
+msgid "Search Bar Padding"
+msgstr ""
+
+#: includes/widgets/sr-search.php:264
+msgid "Search Bar Container Padding"
+msgstr ""
+
+#: includes/widgets/sr-search.php:276
+msgid "Search Bar Container Background"
+msgstr ""
+
+#: includes/widgets/srpro-buttonplayer.php:28
+msgid "Launch the Sticky Audio Player"
+msgstr ""
+
+#: includes/widgets/srpro-buttonplayer.php:35
+msgid "Launch Sticky Audio Player"
+msgstr ""
+
+#: includes/widgets/srpro-buttonplayer.php:38
+msgid ""
+"Important: Make sure the button link parameter is blank in the section above "
+"(eg: remove the hashtag #)"
+msgstr ""
+
+#: includes/widgets/srpro-buttonplayer.php:47
+msgid "Play Most Recent Playlist"
+msgstr ""
+
+#: includes/widgets/srpro-buttonplayer.php:59
+msgid "Select Playlist(s)"
+msgstr ""
+
+#: includes/widgets/srpro-buttonplayer.php:70
+msgid "Play its own Post Tracklist"
+msgstr ""
+
+#: includes/widgets/srpro-buttonplayer.php:71
+msgid ""
+"Check this case if you want to launch the sticky player with the tracks "
+"found in this post"
+msgstr ""
+
+#: includes/widgets/srpro-buttonplayer.php:73
+msgid "Yes"
+msgstr ""
+
+#: includes/widgets/srpro-buttonplayer.php:74
+msgid "No"
+msgstr ""
+
+#: public/class-sonaar-music-pro-public.php:159
+msgid "Play"
+msgstr ""
+
+#: public/class-sonaar-music-pro-public.php:160
+msgid "Pause"
+msgstr ""
+
+#: sonaar-music-pro.php:83
+msgid "Artwork"
+msgstr ""
+
+#: sonaar-music-pro.php:90
+msgid "Artwork Width"
+msgstr ""
+
+#: sonaar-music-pro.php:103
+msgid "Artwork Padding"
+msgstr ""
+
+#: sonaar-music-pro.php:111
+msgid "Artwork Alignment"
+msgstr ""
+
+#: sonaar-music-pro.php:135
+msgid "Playlist"
+msgstr ""
+
+#: sonaar-music-pro.php:142
+msgid "Title Options"
+msgstr ""
+
+#: sonaar-music-pro.php:147
+msgid "Hide Title"
+msgstr ""
+
+#: sonaar-music-pro.php:156
+msgid "Title Color"
+msgstr ""
+
+#: sonaar-music-pro.php:168
+msgid "Title Typography"
+msgstr ""
+
+#: sonaar-music-pro.php:207
+msgid "Sticky Audio Player"
+msgstr ""
+
+#: sonaar-music-pro.php:235
+msgid "Display sticky player when page is loaded. Select playlist:"
+msgstr ""
+
+#: sonaar-music-pro.php:237
+msgid "- Select -"
+msgstr ""
+
+#: sonaar-music-pro.php:245
+msgid "Current Post Tracklist"
+msgstr ""
+
+#: sonaar-music-pro.php:261
+msgid "Enable Shuffle"
+msgstr ""
+
+#. Plugin Name of the plugin/theme
+msgid "MP3 Audio Player by Sonaar - Pro Addon"
+msgstr ""
+
+#. Plugin URI of the plugin/theme
+#. Author URI of the plugin/theme
+msgid ""
+"https://sonaar.io/?"
+"utm_source=Sonaar%20Music%20Free%20Plugin&utm_medium=plugin"
+msgstr ""
+
+#. Description of the plugin/theme
+msgid ""
+"Unlock the full power of MP3 Audio Player by Sonaar. Many Customizable "
+"Options, Unlocked Features and Statistic Reports Available."
+msgstr ""

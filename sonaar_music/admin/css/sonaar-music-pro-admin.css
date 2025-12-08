@@ -1,0 +1,324 @@
+/**
+ * All of the CSS for your admin-specific functionality should be
+ * included in this file.
+ */
+ @font-face {
+    font-family: 'CircularStd-Book';
+    src: url('../fonts/CircularStd-Book.eot'); 
+    src: url('../fonts/CircularStd-Book.eot?#iefix') format('embedded-opentype'), 
+    url('../fonts/CircularStd-Book.woff2') format('woff2'), 
+    url('../fonts/CircularStd-Book.woff') format('woff'), 
+    url('../fonts/CircularStd-Book.ttf') format('truetype'),
+    url('../fonts/CircularStd-Book.svg#svgFontName') format('svg');
+  }
+@font-face{
+  font-family: 'CircularStd-Medium';
+    src: url('../fonts/CircularStd-Medium.eot');
+    src: url('../fonts/CircularStd-Medium.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/CircularStd-Medium.woff2') format('woff2'),
+    url('../fonts/CircularStd-Medium.woff') format('woff'),
+    url('../fonts/CircularStd-Medium.ttf') format('truetype'),
+    url('../fonts/CircularStd-Medium.svg#svgFontName') format('svg');
+}
+
+/*#sonaar_pro .jumbotron{
+    font-family:"CircularStd-Book";
+    background: url("../img/sonaar-music-banner-orange.jpg") no-repeat left top; 
+    background-size: cover!important;
+}
+#sonaar_pro .jumbotron h1{
+    font-family:"CircularStd-Medium";
+    font-size:75px;
+    line-height: 54px;
+}
+#sonaar_pro .jumbotron .tagline {
+    font-size: 1.4rem;
+}*/
+#validate_licence .message h3{
+  color:#fff;
+
+}
+#sonaar_pro .headertxt {
+    max-width: 650px;
+    display: inline-block;
+}
+#sonaar_pro{
+  margin-left:-20px;
+  opacity: 0;
+  transition: opacity 1s ease-out;
+}
+#sonaar_pro.ready{
+  opacity: 1;
+}
+#sonaar_pro .logo {
+    text-align: left;
+}
+#sonaar_pro .jumbotron{
+  padding: 30px;
+  border-radius: 0;
+}
+#sonaar_pro .card{
+  padding: 0;
+  max-width: 100%;
+}
+
+#sonaar_pro .card-deck{
+  padding:0;
+}
+
+#sonaar_pro .stats-box .card-body{
+  padding: 30px 0 20px;
+}
+#sonaar_pro .stats-box .card-body h2{
+  font-size: 4rem;
+}
+
+
+#sonaar_pro .stats-table .card-body{
+   padding: 0;
+}
+#sonaar_pro .chart-container {
+  position: relative;
+  margin: auto;
+  height: 450px;
+  width: 100%;
+}
+#sonaar_pro .breadcrumb{
+  margin-left: 0;
+}
+
+#sonaar_pro #sonaar-daterange{
+  float: right;
+}
+
+.wp-list-table #alb_stats{
+  width: 24px;
+}
+
+.wp-list-table .alb_icon a{
+  display: block;
+  position: relative;
+  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+}
+.wp-list-table .alb_icon a img{
+  border-radius: 50%;
+  content:'';
+  width: 64px;
+  height: 64px;
+  background: rgb(20, 21, 31);
+  box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4)
+}
+.wp-list-table .alb_icon a:hover{
+  animation: rotate 4s linear infinite;
+
+}
+@keyframes rotate{
+  100%{ transform: rotate(360deg) }
+}
+.wp-list-table .alb_icon a::before,
+.wp-list-table .alb_icon a::after{
+  content:'';
+  width: 5px;
+  height: 5px;
+  background: #fff;
+  position: absolute;
+  border-radius: 100%;
+  top: 50%;
+  left:50%;
+  transform: translateX(-50%) translateY(-50%);
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.75)
+}
+.wp-list-table .alb_icon a::before{
+  width: 25px;
+  height: 25px;
+  background:rgba(0, 0, 0, 0.75);
+  box-shadow: none;
+}
+
+button.btn {
+  text-transform: uppercase !important;
+  padding: 20px 40px 20px 40px !important;
+  letter-spacing: 0.15em !important;
+  font-size: 14px !important;
+  border: none;
+  border-radius:4px;
+  background-color: #00c78f;
+  color: #000;
+  -webkit-transition: all .3s ease;
+  transition: all .3s ease;
+
+}
+button:focus {
+  background-color: #000;
+  color: #fff;
+  box-shadow: 0 4px 20px -5px rgba(0,0,0,0.5);
+}
+button.btn-hidden{
+  display:none;
+}
+
+.message {
+  margin-top: 40px;
+  margin-bottom: 30px;
+   display: inline-block;
+  padding: 30px;
+  width: 700px;
+  background-color: #202020;
+  border-radius: 6px;
+}
+.message.display h3 {
+line-height: 21px;
+  border-bottom: none!important;
+}
+.message .error {
+  color: #ff4800;
+}
+.current-version{
+font-size: 0.8rem!important;
+font-weight: 100;
+  letter-spacing: 1px;
+color: #787878;
+}
+.sub-lead {
+  font-size: 13px !important;
+  color: #ccc;
+}
+#licenceKey {
+  max-width: 760px;
+  width:100%;
+  padding: 20px;
+  font-size: 24px;
+  letter-spacing: 6px;
+  margin:20px auto;
+  text-align:center;
+  border-radius: 6px;
+  border:none;
+}
+.button-enter-active {
+  transition: all .2s cubic-bezier(0.55, 0.085, 0.68, 0.53);
+}
+
+.button-leave-active {
+  transition: all .25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.button-enter, .button-leave-to {
+  opacity: 0;
+}
+
+.store-content{
+  display: none; 
+}
+.srmp3_currrent_plan {
+  font-size: 14px;
+  display: inline-block;
+  width: fit-content;
+  padding: 10px 20px;
+  background-color: #000;
+  color: #fff;
+  border-radius: 100px;
+}
+.post-type-sr_advanced_triggers{
+  display:none;
+}
+.post-type-sr_advanced_triggers .cmb-type-title {
+  background-color: #c3c4c7;;
+  color: #000000;
+  padding: 5px 10px !important;
+}
+.post-type-sr_advanced_triggers .cmb2-metabox-title{
+  font-size:16px;
+}
+.post-type-sr_advanced_triggers .cmb-row{
+  border:unset!important;
+}
+.post-type-sr_advanced_triggers .srmp3-settings--subitem{
+  background:unset!important;
+  border:unset!important;
+}
+.post-type-sr_advanced_triggers .cmb-row:not(.cmb-type-title) {
+  font-size:13px;
+  margin-left: 25px;
+  margin-right: 25px;
+}
+.post-type-sr_advanced_triggers .cmb-row-parent:first-child {
+  margin-top: 20px;
+}
+.post-type-sr_advanced_triggers .cmb-row-parent {
+  border: 1px solid #c3c4c7;
+  background-color: #fbfbfb;
+  border-radius: 4px;
+  box-shadow: 3px 3px 7px 0px #0000001f;
+  margin-bottom: 20px;
+}
+.post-type-sr_advanced_triggers .cmb-type-group .cmb-th, .post-type-sr_advanced_triggers .cmb2-postbox .cmb-th {
+  width: 375px;
+  padding: 0 0% 0 0;
+}
+.post-type-sr_advanced_triggers .cmb-type-group .cmb-th+.cmb-td, .post-type-sr_advanced_triggers .cmb2-postbox .cmb-th+.cmb-td {
+  width:60%;
+  float:left;
+}
+.post-type-sr_advanced_triggers .cmb2-metabox-description {
+  display: block;
+}
+.post-type-sr_advanced_triggers #srp_advanced_triggers_cmb2_box .postbox-header {
+  display: none;
+}
+.post-type-sr_advanced_triggers #srp_advanced_triggers_cmb2_box {
+  border:unset;
+  background:unset;
+}
+.post-type-sr_advanced_triggers #side-sortables .cmb2-wrap input+input:not(.wp-picker-clear){
+  display:none!important;
+}
+.sr-advanced-trigger-editscreen-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+
+.sr-advanced-trigger-editscreen-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sr-advanced-trigger-editscreen-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 34px;
+}
+
+.sr-advanced-trigger-editscreen-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+.sr-advanced-trigger-editscreen-switch input:checked + .sr-advanced-trigger-editscreen-slider {
+  background-color: #2196F3;
+}
+
+.sr-advanced-trigger-editscreen-switch input:checked + .sr-advanced-trigger-editscreen-slider:before {
+  transform: translateX(20px);
+}
+
+.php-edit.post-type-sr_advanced_triggers .srmp3-settings--subitem:before{
+  content:'';
+}

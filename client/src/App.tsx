@@ -11,7 +11,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Suspense, useEffect, useState } from "react";
 import { HelmetProvider } from "react-helmet-async";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import { queryClient, warmCache } from "./lib/queryClient";
 
 // Critical components - loaded immediately for core UX
@@ -53,6 +53,15 @@ const EnhancedGlobalAudioPlayer = createLazyComponent(
     return { default: module.EnhancedGlobalAudioPlayer };
   },
   { preloadDelay: 2000 } // Preload after 2 seconds
+);
+
+// Sonaar Modern Player (Example 097 style) - lazy loaded
+const SonaarModernPlayer = createLazyComponent(
+  async () => {
+    const module = await import("@/components/audio/SonaarModernPlayer");
+    return { default: module.SonaarModernPlayer };
+  },
+  { preloadDelay: 2000 }
 );
 
 // Core pages - only Home loaded immediately, others lazy loaded for better initial load
@@ -206,6 +215,28 @@ function useNewsletterModalLazy() {
   return { isOpen, closeModal };
 }
 
+// Wrapper component for global audio player that checks current route
+function GlobalAudioPlayerWrapper(): JSX.Element | null {
+  const [location] = useLocation();
+
+  // Hide global audio player on product pages (product page has its own player)
+  const isProductPage = location.startsWith("/product/");
+
+  if (isProductPage) {
+    return null;
+  }
+
+  return (
+    <Suspense fallback={<OptimizedLoadingFallback type="audio" />}>
+      {isFeatureEnabled("enableSonaarModernPlayer") ? (
+        <SonaarModernPlayer />
+      ) : (
+        <EnhancedGlobalAudioPlayer />
+      )}
+    </Suspense>
+  );
+}
+
 function App() {
   const { isOpen, closeModal } = useNewsletterModalLazy();
   const { isSignedIn, isLoaded } = useAuth();
@@ -303,11 +334,8 @@ function App() {
                   )}
 
                   {/* Global audio player - lazy loaded, deferred as it's heavy */}
-                  {mountAudioPlayer && (
-                    <Suspense fallback={<OptimizedLoadingFallback type="audio" />}>
-                      <EnhancedGlobalAudioPlayer />
-                    </Suspense>
-                  )}
+                  {/* Hidden on product pages where ProductArtworkPlayer handles playback */}
+                  {mountAudioPlayer && <GlobalAudioPlayerWrapper />}
 
                   {/* Newsletter modal - lazy loaded */}
                   {isOpen && (

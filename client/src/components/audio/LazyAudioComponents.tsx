@@ -82,6 +82,15 @@ const EnhancedGlobalAudioPlayer = createLazyComponent(
   { preloadDelay: 2000, retryOnError: true }
 );
 
+// Sonaar Modern Player (Example 097 style) with lazy loading
+const SonaarModernPlayer = createLazyComponent(
+  async () => {
+    const module = await import("@/components/audio/SonaarModernPlayer");
+    return { default: module.SonaarModernPlayer };
+  },
+  { preloadDelay: 2000, retryOnError: true }
+);
+
 // Define proper prop types for audio components
 interface WaveformAudioPlayerProps {
   src: string;
@@ -176,6 +185,18 @@ export function LazyGlobalAudioPlayer() {
   );
 }
 
+/**
+ * Wrapper component for lazy-loaded Sonaar Modern Player (Example 097 style)
+ * Features: Bicolor waveform, round play button with white border, dark gradient background
+ */
+export function LazySonaarModernPlayer() {
+  return (
+    <Suspense fallback={<AudioLoadingFallback type="player" />}>
+      <SonaarModernPlayer />
+    </Suspense>
+  );
+}
+
 // Export all lazy audio components
 // Note: useAudioComponentPreloader is now in @/hooks/useAudioComponentPreloader
 // Note: audioLibraryPreloader is now in @/utils/audioLibraryPreloader
@@ -184,5 +205,6 @@ export {
   EnhancedWaveformPlayer,
   SimpleAudioPlayer,
   SonaarAudioPlayer,
+  SonaarModernPlayer,
   WaveformAudioPlayer,
 };

@@ -1,3 +1,4 @@
+import { ProductArtworkPlayer } from "@/components/audio/ProductArtworkPlayer";
 import { useCartContext } from "@/components/cart/cart-provider";
 import { LicensePreviewModal } from "@/components/licenses/LicensePreviewModal";
 import { LazyBeatSimilarityRecommendations } from "@/components/loading/LazyComponents";
@@ -13,7 +14,7 @@ import { useDownloads } from "@/hooks/useDownloads";
 import { useWishlist } from "@/hooks/useWishlist";
 import { LicensePricing, LicenseTypeEnum } from "@shared/schema";
 import { LicenseType } from "@shared/types/Beat";
-import { ArrowLeft, Download, FileText, Heart, Music, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Download, FileText, Heart, ShoppingCart } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRoute } from "wouter";
 
@@ -148,29 +149,6 @@ function ProductNotFound({ productId }: Readonly<{ productId: number }>): JSX.El
             Go Back
           </Button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// Product image component
-interface ProductImageProps {
-  readonly product: { images?: Array<{ src: string }>; name: string };
-}
-
-function ProductImage({ product }: ProductImageProps): JSX.Element {
-  return (
-    <div className="space-y-6">
-      <div className="relative aspect-square bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center overflow-hidden group">
-        {product.images?.[0]?.src ? (
-          <img
-            src={product.images[0].src}
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <Music className="w-24 h-24 text-white/20" />
-        )}
       </div>
     </div>
   );
@@ -406,8 +384,13 @@ export default function Product(): JSX.Element {
           </Button>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Product Image with Integrated Audio Preview */}
-            <ProductImage product={product} />
+            {/* Product Artwork with Play/Pause and Spectrum Animation */}
+            <ProductArtworkPlayer
+              imageSrc={product.images?.[0]?.src}
+              productName={product.name}
+              audioUrl={product.audio_url}
+              productId={product.id}
+            />
 
             {/* Product Details */}
             <div className="space-y-6">

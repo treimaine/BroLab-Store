@@ -1,0 +1,912 @@
+----------------------------------------------
+V.5.9.3 - 2024-12-16
+----------------------------------------------
+- Fix: Compatiblity issue with Elementor 3.26. Elementor new update caused the plugin not loading/crash on Elementor pages. https://github.com/elementor/elementor/issues/29425
+- New: Fetch playlist based on authors names https://drops.sonaar.io/i/8F4UB1
+- New: Added 'srmp3_disable_wc_player' filter hook to disable player on the WC product thumbnails
+- Fix: Anchor RSS feed importation issue
+- Fix: CSV Import issue when CSV uses commas as delimiter
+- Fix: Mobile issue with the Download & Buy buttons in some case
+- Fix: Improved admin UI to make sure the user can click only 1 time on Activate my License
+- Fix: Admin column order for Music Licenses CPT
+- Fix: Broken Access Control vulnerability
+- Tweak: Allow to list tracks based on tags, not only on categories
+- Tweak: Advanced Triggers - Audio was muted when using advanced rules in some case
+- Tweak: Track Memory. Add a status "completed" in the json storage when the track has been completed
+- Tweak: Improved UI of the Import Template Admin Area
+- Tweak: Optimized the speed of the backend
+
+----------------------------------------------
+V.5.9.2 - 2024-11-21
+----------------------------------------------
+- Fix: Advanced Triggers issue when aiming only 1 player with CSS Selector
+- Fix: Advanced Triggers and its option Remember Ask for Email
+- Fix: Play icon in the Grid layout redirects to the single post when not clicked precisely
+
+----------------------------------------------
+V.5.9.1 - 2024-11-14
+----------------------------------------------
+- Hotfix: Carousel Slider not working since last update
+- Hotfix: Artist Names not displaying in the tracklist since last update
+
+----------------------------------------------
+V.5.9 - 2024-11-13
+----------------------------------------------
+- New: Introducing Advanced Triggers. Engage listeners with playback actions and download buttons, including previews, watermarks, ads, popups, redirects, scrolling, and role-based interactive enhancements.
+- New: Add PHP filters for developers to filter track title, album title, artist name and album covers with their own custom fields
+- Tweak: Improved the loading speed in both frontend and backend
+- Tweak: Updated the Twitter icon to the new X logo
+- Tweak: The previous button now resets the track to the beginning if over 2 seconds have played, or skips to the previous track
+- Tweak: The single template shortcode in the settings is now effective for the taxonomy template as well
+- Tweak: Merged v5.8 Collected Emails to its own CPT
+- Tweak: Sticky Player Metabox now display only on public CPT
+- Fix: Excluded Categories now working with Post Categories
+- Fix: issue when using barbaJS and the share/favorite buttons
+- Fix: Issue with Search Widget and WooCommerce Archive when using a block theme
+- Fix: Remember Track Progress option now working from global settings
+- Fix: Display Artist Name below Track Title option since last Elementor update
+- Fix: User Recently Played Track when we start track from the player widget
+- Fix: Audio Preview not working in some special cases
+- Fix: Multiplayer Soundwaves issue
+- Fix: Minor Admin Tweaks and JS optimization
+- Fix: Resolved a security vulnerability
+
+----------------------------------------------
+V.5.8 - 2024-09-24
+----------------------------------------------
+- New: Introducing Ask for Email to Access Download for Business Plan users. Turn your download buttons into a powerful lead generation tool. By enabling dynamic visibility on your download button, you can easily configure it to prompt users for their email, after which the file will be delivered automatically. [Learn More](https://sonaar.io/docs/ask-for-email-to-access-download/)
+- New: Introducing Make an Offer / Negotiate Button for Business Plan users. You can give your audience the flexibility to negotiate the price. Say goodbye to rigid pricing structures and hello to customer-driven sales. [Learn More](https://sonaar.io/docs/make-an-offer-negotiate-your-price/)
+- New: Option to display Next/Previous/Tracklist button directly in the mobile sticky bar
+- New: Option to support artwork background image with the shortcode builder
+- New: Collected Emails tab in the plugin settings to export emails collected from the Ask For Email feature
+- New: Option to display the track artwork as a blurred background image in the lightbox (Product Variations, Ask For Emails, Make an Offer)
+- Tweak: Ability to play the related audio file from the popup modal
+- Tweak: Moved Download Button settings into its own tab in the plugin settings
+- Tweak: You can now add a next/previous button on the boxed layout
+- Tweak: When disabling the continuous player, it was still displaying on the frontend until cookies were cleared
+- Fix: Audio Previews generating a Content-Length header not set in some case
+- Fix: Prevent JS error with the sticky CTA when playing another player widget
+- Fix: Matomo Plugin not collecting player statistic since their last update
+- Fix: Display issues with some themes that use the .content class
+- Fix: Sticky Player not showing in some conditions caused by jQuery
+- Fix: PHP notice with the Elementor Editor in some conditions
+- Fix: Track Ordering when ordered by total sales
+- Fix: Excluding continuous player on the product pages with custom slugs is now working
+
+----------------------------------------------
+V.5.7.1 - 2024-08-26
+----------------------------------------------
+- Fix: Issue when removing Favorites if you are not using the sticky player
+- Fix: Issue with Most Recent Played Track in some conditions
+- Fix: Issue with pagination if you are not using the sticky player
+- Fix: Issue with Preview Generation when using .dev domain
+- Fix: PHP 8.2 Warning - Creation of dynamic property is deprecated
+
+----------------------------------------------
+V.5.7.0.1 - 2024-07-24
+----------------------------------------------
+- Hotfix: Tracks not displaying under very specific conditions since yesterday update (5.7)
+
+----------------------------------------------
+V.5.7 - 2024-07-23
+----------------------------------------------
+- New: Audio Previews, Audio Watermarks, Audio Ads, Fade-in and Fade-out audio generation in 1-click are now available for ALL our Business Plan (or higher) users without the needs to have FFMPEG installed! All audio processing is done off-site via our external API server, ensuring your audio files remain hosted on your own server while leveraging our external processing capabilities.
+- New: Option to set an info icon button on the mini player widget to display the track description.
+- Tweak: You can now set an external URL for the audio preview.
+- Tweak: Unified the Repeat Icon size with the other control buttons.
+- Fix: JS error related to srp_var in edit post area
+- Fix: Prevent PHP error with third party plugins using CMB2 conditionals.
+- Fix: Shuffle button not highlighted if Enable Shuffle is set on the player widget
+- Fix: Avoid scrolling to top when using pagination. Add the class srp-scrolltotracklisttop-disable to the player to disable the auto scroll.
+- Removed sonaar_events table creation on plugin activation. Built-in stats are officially deprecated.
+- Code Optimization
+
+----------------------------------------------
+V.5.6 - 2024-07-09
+----------------------------------------------
+- New: Add Repeat Control Buttons in the widget players. You can enable it site-wide from WP-Admin > MP3 Player > Widget/Sticky Player > Display Repeat Button. Additionally, you can enable it for individual widget instances.
+- New: Azuracast radio support to display whats currently playing
+- Tweak: Shuffle Icon design
+- Tweak: Added title attribute for player controls. You can translate them in MP3 Player > Settings > Widget Player
+- Tweak: New action hook srmp3_pre_get_playlist for get_playlist function
+- Fix: Issue with Elementor DB Update cause a fatal error in some case
+- Fix: Track color titles in shortcode builder in darkmode.
+- Fix: Duplicate search value with single quote, with the Right Single Quotation Mark Hexo code. Eg : Search for "O'Brien" and "O’Brien"
+- Fix: Compatibility issue with Icecast Player Plugin.
+- Fix: Sticky Player download button: redirection issue when condition is not Met
+- Fix: Security patch related with XSS in some case
+
+----------------------------------------------
+V.5.5 - 2024-06-03
+----------------------------------------------
+- New: Dark mode for the admin settings and shortcode builder
+- New: Shortcode Builder. Add option to set a preview background color in the builder
+- New: Option to set filename as tracktitle in the main admin page
+- Tweak: Optimized admin speed and prevent useless API Check
+- Tweak: Shortcode Builder UI. No admin notice + Use scrollbars in the builder for better UI
+- Tweak: Admin CSS now use SCSS
+- Fix: When using audio spectrum, the browser memory pilled up even if the track was not playing
+- Fix: PHP error when "this widget" is selected as source and no artwork is set
+- Fix: Set the carousel to Track when current post is used in the player source
+- Fix: Shortcode Builder. The category multicheck was always visible when no category is available
+
+----------------------------------------------
+V.5.4 - 2024-05-21
+----------------------------------------------
+- New: Introducing our new visual Shortcode Player Builder that allows you to create and customize audio players using shortcodes in real-time. The old shortcode generator has been removed. [Screenshot](https://drops.sonaar.io/i/CzIKc0)
+- New: Introducing a Shortcode Template library where you can import pre-designed shortcodes (Pro version)
+- New: Remember Track Progress. Enable this feature on your player widget to have tracks resume from where the user last stopped listening. Useful for Audio Books, Podcasts and eLearning.
+- New: User Recently Player Track feed type. This feature offers a personalized experience for your site visitors by displaying a player with their most recently played tracks. [Documentation](https://sonaar.io/docs/user-recently-played-tracks-feature/)
+- Tweak: Improved the loading speed in the admin area
+- Tweak: Admin UI
+- Fix: Call to action in the mobile sticky were not displayed under certain conditions.
+- Fix: Icecast player that has a cover set in the json will now display
+- Fix: Issue with Waveform peak generation in admin area not working
+- Fix: Prevent sticky player to start if the page has access restriction with WC Membership plugin
+- Fix: Allow target="_blank" into track description
+- Fix: PHP Warning displayed with specific condition
+- Code Optimization
+
+----------------------------------------------
+V.5.3 - 2024-04-22
+----------------------------------------------
+- New: UI redesign of the admin settings
+- New: Support for the new Text to Speech AI Plugin for MP3 Audio Player by Sonaar which is currently under review.
+- New: The filter widget and tracklist columns now support all post and custom post type (CPT) taxonomies. Previously, only the sr_playlist CPT and the Product CPT were compatible.
+- New: Added an option to hide album title in the sticky player.
+- New: Added the ability to display track description in the mini player metas
+- Tweak: Mobile Sticky Player extender panel when no artwork is set. The sticky player extender panel was full height.
+- Tweak: Ability to remove our custom post type (eg: All Tracks & Playlists) from the admin menu
+- Tweak: Set default settings when installing the plugin for the first time
+- Tweak: Improved the admin hooks
+- Fix: Pause button bug in the elementor editor when lazyload is enable
+- Fix: Issue with player not working when track title was only a number.
+- Fix: Prevent displaying 'Track 1' on the frontend if no MP3 set.
+- Fix: Sticky player tracklist background color no appearing with specific condition
+- Fix: Offset alignment with track title and an empty artist title
+- Fix: PHP warning if player has a taxonomy term set but user removes the taxonomy term.
+
+----------------------------------------------
+V.5.2 - 2024-03-26
+----------------------------------------------
+- New: Option to enable search bar in the filter dropdowns
+- New: Tool to Export Playlist & Epsiodes created with the Sonaar Theme into MP3 Audio Player
+- New: Allow to import a CSV file and create multiple posts for each audio
+- Fix: iOS Lock Screen : audio stop when using Audio Spectrum
+- Fix: iOS Lock Screen : next track wont start in some conditions
+- Fix: Issue with tracks indexation tools in admin not working since last update
+- Fix: When using RSS feed, track title was not displaying in player widget
+- Fix: Tracklist waves width issue when we navigate through pagination (without lazyload enabled)
+- Fix: Popover Background Color in Elementor Editor
+- Fix: Soundwaves did not appear on players coming from tabs, accordions, and other hidden elements in some conditions
+- Tweak: Set default BG for sticky player as it fix an issue when sticky option no saved a first time
+- Tweak: Lyrics not appearing in some conditions
+- Tweak: Replace json_encore and unlink php functions by their native WP functions
+
+----------------------------------------------
+V.5.1.1 - 2024-03-13
+----------------------------------------------
+- New: Add Clear All button on the chip filter
+- Add support to use player inside archive tags template
+- Tweak: FFMPEG was not detected on some Linux server
+- Tweak: display full width bar with inline option + flexwrap on CTA
+- Fix: i icon button not appearing with grid tracklist and waveform
+- Fix: JS notice in some condition when using Icecast
+- Fix: track store in mobile sticky player to be formatted like the other CTA
+- Fix: JS error in edit page when sticky is set to load on all pages
+- Fix: Waveform is resized on scrolling on mobile caused by address bar
+- Fix: Vulnerabiity with Broken Access Control
+- Fix: Vulnerability with Cross Site Scripting
+
+----------------------------------------------
+V.5.1 - 2024-03-05
+----------------------------------------------
+- New: Option to set custom titles & metas in the mini player widget. Users can now include any fields, including custom ones, in the player widget, enhancing both design versatility and functional capabilities. [Screenshot](https://drops.sonaar.io/i/tBw733)
+- New: Option to display track artwork image as player background. This option enables the track's artwork image to serve as the background for the player, adding a visual element that enhances the user experience. [Screenshot](https://drops.sonaar.io/i/MjjJ6u)
+- New: Add support for playlist and product categories when importing CSV files
+- New: Support live streams from radio.co. We also display what is currently playing and album artwork.
+- Tweak: Display the track title instead of the album title by default in the boxed player widget. Prior this update, only the album/playlist title was displayed
+- Tweak: Waveform resize correctly when resizing the browser window
+- Tweak: Add player radius control in Elementor
+- Tweak: Renamed WP Menu : All Tracks is now called All Playlists & Tracks
+- Tweak: Add option to set an expirationto the continuous player
+- Tweak: Add support for author tags when importing podcasts RSS feed
+- Tweak: If using our Sonaar theme, we now display a deprecated notice in the menu to prevent confusion
+- Tweak: Create filter hook to get empty terms in the term dropdown of Elementor.
+- Tweak: Issues with radio stations and broken image artwork in some condition
+- Tweak: Mobile sticky player: remove three dots when not required
+- Tweak: Slider filter: Set the initial range values when its filter chip is reset
+- Fix: Prevent sticky player to update when using icecast in an inactive player in the same page.
+- Fix: Set default tracklist title width when cf columns is enabled
+- Fix: The track download button not appearing in the sticky player in some condition
+- Fix: Prevent fatal error when using CSV file with columns missmatch
+- Fix: Issue where tracks were not displaying as expected when using Lazyload with specific categories
+- Fix: Dates in the tracklist were not displayed according to the language sets in WordPress
+- Fix: Tag filters button needed 2 clicks to activate in some condition
+- Fix: Issue with "Do not skip tracklist" option when shuffle is enable in some condition
+- Fix: Suppress PHP warning regarding file_exists and the ffmpeg path
+- Fix: Issue with sticky player and WeGlot plugin
+- Fix: PHP 8.2 warning in some condition
+
+----------------------------------------------
+V.5.0.3 - 2024-02-01
+----------------------------------------------
+- Fix: Since WordPress 6.4.3, pro plugin could not be installed https://core.trac.wordpress.org/ticket/60398
+- Fix: Audio not playing since last version in some case
+- Fix: Plugin could not be activated in some case when using PHP 7.3 or earlier
+- Fix: Dates in the tracklist were not displayed according to the language sets in WordPress.
+
+----------------------------------------------
+V.5.0.2 - 2024-01-29
+----------------------------------------------
+- Tweak: Add Watermark Loop Control to set how often watermark will be looped
+- Fix: Player not displaying (when using Adaptive Color)
+- Fix: PHP Notice in PHP 8.1+
+- Fix: Skip Backward Button in sticky player not visible
+- Fix: Responsive sticky player Extend panel background color
+- Fix: Compatiblity issue with PHP 7.3 or earlier
+- Fix: Firefox with URL containing a # cause the player not start
+
+----------------------------------------------
+V.5.0.1 - 2024-01-23
+----------------------------------------------
+- Fix: Empty column gap when using Custom Fields Columns
+- Fix: Mobile Sticky Player Gap in the extender when using Sonaar Theme
+
+----------------------------------------------
+V.5.0 - 2024-01-22
+----------------------------------------------
+- New! Our latest update introduces authentic soundwave and waveform displays for your audio, moving away from the fake ('synthetic') waveform. The previous "Dynamic Waveform" option, which relied on Wavesurfer.js, has been phased out due to its impact on website performance and plugin size. We've optimized the waveform rendering by generating compact but very slick peaks, ensuring that both your audio and its visual representation load with exceptional speed. This improvement eliminates the need for Wavesurfer.js, streamlining the overall user experience. we've introduced an efficient server-side peak generation for audio tracks, with each peak file being a mere 4KB in size. This feature enhances the audio visualization while maintaining a minimal footprint. However, we understand the importance of flexibility, so we've included an option to opt-out of peak generation. Users preferring the previous version's placeholder soundwave can easily continue using it. Additionally, soundwaves are now dynamically generated upon the initial play of each track by a user. For bulk processing, users can generate peaks for all their tracks conveniently through the WP-Admin panel by navigating to MP3 Player > Tools > WAVEFORM & PEAKS GENERATION
+- New! [Pro Feature]: Option to add soundwaves for each track in your tracklist
+- New! [Pro Feature]: We've undertaken a full-scale redesign of our mobile sticky player, focusing on enhancing both its aesthetic appeal and functionality. This revamp addresses user experience on mobile devices, ensuring that the player is not only more visually appealing but also more intuitive and responsive
+- New! [Pro Feature]: Option to add Icons for the column values
+- New! Add option to disable adaptive colors in the sticky
+- Tweak: Option to disable sticky player is now working when using our Sonaar Theme
+- Tweak: New Share Icon to be more actual
+- Tweak: Allow Shortcodes in track description
+- Tweak: Uniformize AJAX Calls/Nonce
+- Tweak: Add 'alt' attribute on the img tags in the tracklist
+- Tweak: We now hide the license key in the admin
+- Fix: "Do not skip tracklist" not working when shuffle is enable and sticky disabled
+- Fix: Pro Version could not be automatically updated in some case
+- Fix: "Select Playlist IDs to play in Sticky Player when site loads" issue when Shuffle is enable
+- Fix: Issue with a data variable to conflict with other plugins
+- Fix: Keep speedrate when changing track
+- Fix: Issue with Wordfence scan which failed in some case
+- Fix: The carousel option was not visbible with the starter plan
+- Fix: Issue with multi-currency websites. Apply the correct price currency in the tracklist
+- Fix: The download file name was always "true" (the download attribute value) since v4.10
+- Fix: PHP warning with this->shortcodeParams['orderby'] in some case.
+
+----------------------------------------------
+V.4.10.2 - 2023-11-14
+----------------------------------------------
+- Add support for Matomo Analytics
+- Fix URL encoding with Audio Preview
+- Fix Security issue with AJAX request by Implementing Nonce Verification
+
+----------------------------------------------
+V.4.10.1 - 2023-11-10
+----------------------------------------------
+- Fix PHP Fatal Error in some case (When free version was deactivated)
+- Show shell_exec notice if disabled with FFMpeg AudioPreview
+
+----------------------------------------------
+V.4.10 - 2023-11-02
+----------------------------------------------
+- New! [Pro Feature]: Audio Preview! This feature is engineered not only to provide users with a sneak peek of the audio content (eg: 30 seconds clips), but also to manipulate the audio by outputting pre-roll or post-roll advertising or watermark to the audio. Whether you run an online music stores on WooCommerce, podcast platforms, or any audio-centric website, the Audio Preview protect and enhances content presentation and user interaction. [Learn More](https://sonaar.io/docs/how-to-add-audio-preview-in-wordpress/)
+- New! [Pro Feature]: Option to change order of the tracks in the tracklist
+- New! Gutenberg/block: Add a Shortcode parameters field to extend our gutenberg player with extra shortcode parameters
+- New! Option to exclude post IDs and term IDs in the player
+- Fix: Filter Widgets now working inside an Elementor Popup
+- Fix: Issue with list js pagination when we are going back on the first page
+- Fix: Mini Player with Lazy load mode
+- Fix: No Loop Tracklist option when sticky is enable
+- Fix: Filter Widget issue with sticky: some special character as "+ or :" breaks parameters in the json file url
+- Tweak: Rename MP3 Player > Playlists for MP3 Player > Tracks in the admin
+- Tweak: Merged the admin JS files into one single file.
+- Code Optimization for faster loading
+
+----------------------------------------------
+V.4.9 - 2023-10-11
+----------------------------------------------
+- New! [Pro Feature]: Lazyload Playlist (Beta). Designed specifically for website who manage extensive tracks in their audio player playlists. [Learn More](https://sonaar.io/docs/lazyload/)
+- New! [Pro Feature]: Range Slider option in the Filter Widget. You can use a range selector type to filters min/max BPM, Duration or Number type custom fields. Available only when using Lazyload pagination.
+- New! [Pro Feature]: Option to display a Show More button below the tags filter to gain more space. Usefull if you have many tags to filter.
+- New! [Pro Feature]: Add Download Button Support when using the feed parameter in the shortcode.
+- New! [Pro Feature]: Add option for the dropdown filter to display the filter always open. It acts as a Filtering "list" option.
+- New! [Pro Feature]: Add option for the dropdown filter to set a dropdown height.
+- New! Add option on setPlayerAndPlay() to pass notrackskip and nolooptracklist parameters.
+- Tweak: Display correct tracks when selecting a parent category with children category.
+- Tweak: Show only associated terms in the filter dropdown based on the terms selected in the player.
+- Tweak: Refactored the tags widget in vueJS.
+- Fix: Filter dropdown not working in some case since version 4.8.1
+- Fix: Player not working when using pagination in the tracklist in some case since version 4.8.1
+- Fix: Favorite Icon displaying wrong label in the sticky player. Created new label option in the settings.
+- Fix: Favorite Icon in the sticky player when using Continuous Player
+- Fix: Sticky Favorite Button in product archive page
+- Fix: Unwanted three dot for call-to-action buttons when Custom fields column was enabled
+- Fix: JS error observed with feed_rss shortcode parameter
+- Fix: Duplicated license values were displayed in license lightbox in some case
+- Code optimization
+
+----------------------------------------------
+V.4.8.1 - 2023-09-14
+----------------------------------------------
+- Add option to enabled HTML Text Editor for track description - wysiwyg. Disabled by default.
+- Add Product Thumbnail in the checkout page order summary
+- Fix: When using 'All Posts' as source in the widget, it brokes the sticky player in some case
+- Fix: Reverse tracklist option is now working correctly.
+- Fix: Artist name field not saving correctly since 4.8
+- Fix: Issue with Polyang & Album Store List
+- Fix: track length not showing in the sticky tracklist
+- Optimized the loading time when having many tracks in a player. We process the cf-data through server-side instead of JS
+
+----------------------------------------------
+V.4.8 - 2023-09-06
+----------------------------------------------
+- Now compatible with WordPress 6.3.x
+- Now compatible with PHP 8.2.x
+- New! [Pro Feature]: Add to Favorites. Visitor and logged-in users can now add tracks to their favorites. You can create a page with a player that will contains a list of the user's favorites. Check the settings in WP-Admin > MP3 Player > Settings > Add to Favorites
+- New! [Pro Feature]: Dynamic Visibility: Set visibility rules for the Downloads, Favorites, and Share buttons based on user roles, like administrators or subscribers, or non-logged users. A use case would be to to show the download button exclusively to logged-in users, while directing non-logged users to a sign-up page.
+- New! [Pro Feature]: Choose between 1000 different icons for the call-to-actions. This must be enabled in WP-Admin > MP3 Player > Settings > Widget Player > Optional Call-to-Action Buttons
+- New! Order your tracks simply by using drag and drop in the admin page! We have also added a Collapse/Expand tracks in your tracklist in the admin area.
+- New! Added a visual icon picker for call-to-action icons.
+- New! RSS Feed: Added an option to disable the plugin's RSS Feed. This is usefull if you want to use another RSS feed from another plugin such as Seriously Simple Podcasting (SPP).
+- New! Add custom link for the lightbox variation popup. A custom link may be added beside the Add to Cart button in the lightbox panel. This can be useful for directing users to a license comparison page or to the individual product page for more details.
+- New! Support ACF fields from WooCommerce Produce in the Music & Contract License
+- Tweak: Now it runs faster! We have optimized many queries.
+- Tweak: Support for Sharing Tracks using the navigator.share() method of the Web Share API.
+- Tweak: Replace TinyMCE by a simple HTML text area for track description. TinyMCE was very heavy. If you have many tracks (eg: 50+), you should see a faster loading time when you edit your playlist.
+- Tweak: Improved the UI in the plugin settings.
+- Fix: Gutenberg block was showing blank in some occasion. A page reload was needed.
+- Fix: Filter by post tag is now working
+- Fix: Share a track: button and other icon from srp_track_cta was invisble on boxed player from single post when the tracklist only have one track.
+- Fix: WooCommerce: Make the Preview License button translatable.
+- Fix: WooCommerce: Issue with related WC Product and the license popup not showing up
+- Code optimization
+
+----------------------------------------------
+V.4.7 - 2023-07-14
+----------------------------------------------
+- New! [Pro Feature]: Share your track on Facebook, Twitter, WhatsApp, SMS, Emails! You have now the option to add a share button to share a specific track from your tracklist. Customize it in WP-Admin > MP3 Player > Settings > Share a Track
+- New! [Pro Feature]: Improved the Bulk Importer by adding an Order by Name button to sort the list.
+- Tweak: Add image cover in the product variation license popup.
+- Fix: Prevent PHP warning in the WP dashboard.
+- Fix: Play Button not showing the Play Icon since last update.
+- Fix: Elementor Player not playing in some case when used in Elementor Popup and Archives.
+- Update FontAwesome Library to 5.15.4
+
+----------------------------------------------
+V.4.6 - 2023-06-28
+----------------------------------------------
+- New! Slider & Coverflow Player! Create dynamic, customizable sliders of music album or podcast covers, enhancing audience engagement across all devices. Many customization options such as slide shadows, reflection FX, and control over dimensions, this feature brings a new level of interactivity to your site. Enjoy seamless transitions, keyboard control, infinite loops and more. [Learn More](https://sonaar.io/tips-and-tricks/introducing-player-carousel-3d-coverflow-with-mp3-audio-player-pro/)
+- New! Display tracklist dynamically from the current term taxonomy. Usefull to create dynamic category archive templates
+- New! Add PDF Icon in the CTA Store
+- Tweak: Moved the store-list DOM ouput into a reusable function
+- Tweak: If you use your own custom fields (ag: ACF) to pulls your audio source (using audio_meta_field), you can now enjoy the continuous audio playback functionality. Continuous Playback was not working when using your own custom fields.
+- Tweak: Add Elementor control to customize track description in the tracklist
+- Tweak: Set the Force download CTA to target "_blank"
+- Tweak: WordPress_audio_meta function to make it works on wp.com hosting
+- Tweak: Add force dl button option when using the audio meta field source
+- Tweak: Make the lyrics works with ttml file with multiple times formats.
+- Fix: Set Add to Cart button to true automatically when bulk import from media
+- Fix: Adaptive Color issues in some case
+- Fix: Fix Mini player behavior when we are using Filter and Search - No sticky
+- Fix: Minifying JS with cache plugins should now works.
+- Fix: Error on use_play_label_with_icon="true" && use_play_label not set.
+- Fix: Issue with Paypal redirection. We now init the initCPT function with the init hook instead of shortcode_button_load hook.
+- Fix: Issue with time duration when using RSS feed in some case
+- Fix: Hide cover option was not working when using RSS feed as source
+- Fix: CSV Template link was not working
+- Fix: Issue with CTA Popup when using CSV file
+- Fix: Fix PHP error when $metakey_value has array inside the array
+- Fix: Fix sticky player issue when using gutenberg block in some case
+- Fix: Prevent php 8.1 deprecated error with null $feed
+
+----------------------------------------------
+V.4.5.1 - 2023-04-18
+----------------------------------------------
+- Fix: Removed the download php proxy script that cause 403 forbidden error on download
+
+----------------------------------------------
+V.4.5 - 2023-04-13
+----------------------------------------------
+- New! Full RSS Feed support to create Podcast Players directly from your RSS Feed. You can use RSS feed within your Elementor Widget, or Shortcode attribute. Simply input your RSS feed and you are done. New episodes added to your RSS feed will immediately reflect on your website. No Cron job needed.
+- New! Support for Tags taxonomy in the playlist CPT.
+- Tweak [Pro Feature]: Bulk Importer Improvement. Now you are able to automatically create product variations and assign them with a price and a file download for your WooCommerce Products.
+- Tweak: External stream URL can be downloaded without opening in a new browser tab.
+- New! [Pro Feature]: Bulk import audio tracks directly from a CSV File.
+- New! [Pro Feature]: Use CSV File or RSS feed to create playlist in your post. [Screenshot](https://drops.sonaar.io/i/IpDqqU)
+- Fix: Issue with poor quality audio when using animated spectrum
+- Fix: Ninor Gutenberg CSS issues related to playlist search bar and background.
+- Fix: iTunes title tag in the rss feed was not working
+- Fix: Sticky mobile issue when track has no image, play button is not visible in some case.
+- Fix: Volume issue since version 4.4 when using Dynamic Waveform
+- Code optimization
+
+----------------------------------------------
+V.4.4.2 - 2023-03-16
+----------------------------------------------
+- HotFix: PLAY/PAUSE bug from mini player when sticky/dynamicWave are disabled
+- HotFix: Cannot skip audio with the progress bar
+
+----------------------------------------------
+V.4.4.1 - 2023-03-15
+----------------------------------------------
+- Fix: Fixed the player not playing audio when clicking play since version 4.4
+- Fix: Sometimes the sticky player was shown in a archive or shhop page even if it was not set
+- Tweak: We are now showing a Pause Icon for the button layout when the track is playing.
+
+----------------------------------------------
+V.4.4 - 2023-03-08
+----------------------------------------------
+- New! Icecast Support!
+- New! [Pro Feature] Full Icecast Support where we display what is currently playing from your Icecast live station.
+- New! [Pro Feature] New tool to easily import Elementor Player Templates from the Sonaar.io library. Find the tool in WP-Admin > MP3 Player > Import Templates.
+- New! [Pro Feature] Add Download CTA option that can be enabled on all your tracklist at once. No need to create your button one by one on each tracks anymore.
+- New! [Pro Feature] Add Post Link CTA option that can be enabled on all your tracklist at once. 
+- New! Add Aria-Label on buttons for an Accessible Web
+- New! Option to set default volume for your site.
+- Tweak: RTL: make the progressbar with synthetic wave RTL compatible
+- Tweak: Display audio spectrum below the track labels
+- Tweak: Moved CTA Buttons styles from the tracklist to their own style panel in Elementor Editor.
+- Tweak: Added More CTA buttons style options such as padding and X/Y position
+- Tweak: You can use the progress bar inline in the boxed player and skin button
+- Tweak: [Pro Feature] License registration API
+- Fix: Issue with Rankmath when saving Titles & Meta settings
+
+----------------------------------------------
+V.4.3.1 - 2023-02-15
+----------------------------------------------
+- Fix: Make the ajax add-to-cart works when WC product type is single 
+
+----------------------------------------------
+V.4.3 - 2023-02-14
+----------------------------------------------
+- New! [Pro Feature] Animated Audio Spectrum! Experience music & podcast like never before with a dynamic Visual Audio Spectrum - an animated visual representation of the audio frequency. Choose from 5 animated presets: Bars, Bricks, Shockwave, String and CSS Selector Bounce. Enabled it through the Elementor Audio Player widget, Shortcode attribute or in the Sticky Player.
+- New! [Pro Feature] Option to set the progress bar Synthetic or Simple Bar on specific players.
+- Tweak: Option to adjust the height of the Synthetic waveform for each players.
+- Tweak: Allow to upload any audio file type, not just mp3 files.
+- Fix: Prevent PHP error with $show_searchbar
+- Fix: issue with the wave_color parameter since dynamic color feature
+- Fix: WooCommerce Audio Player now works when using ajax filters in the product archive
+- Fix: Tracklist Grid Layout issue with the date location on mobile
+- Fix: JS Error related to the adaptive color feature: jquery.min.js?ver=3.6.1:2 jQuery.Deferred exception: Cannot read properties of null (reading 'adaptiveColors') TypeError: Cannot read properties of null (reading 'adaptiveColors')
+- Fix: CMB2 Conditional Library - Fix error with RankMath
+
+----------------------------------------------
+V.4.2.1 - 2023-01-13
+----------------------------------------------
+- Hotfix: The wavecolor could not be set correctly with the Elementor Audio Player widget
+- Fix: Resolved the autoplay annoying issue when using Wavesurfer. The player will not autoplay the track when the page load in some case.
+
+----------------------------------------------
+V.4.2 - 2023-01-11
+----------------------------------------------
+- New! [Pro Feature] Adaptive Colors: Click ‘Adaptive Colors’ option, and we will match the skin of the audio player with your image artwork in real-time. Thanks to our AI algorithms! The option is available in Elementor as well as a shortcode attribute.
+- Fix: Progress bar navigation through a radio (infinity) stream
+- Fix: External audio source URL containing query strings are now working
+- Fix: In the mobile media center, we dont see HTML code anymore
+- Fix: Track list thumbnail size issue
+- Fix: Tracklist title overlapping issue on mobile https://drops.sonaar.io/i/ufLtuh
+- Tweak: PHP function str_contains replaced by a PHP 7 compatible function.
+- Tweak: Restructured the order of the Audio Player Option in Elementor to be more user-friendly.
+
+----------------------------------------------
+V.4.1.3 - 2022-12-29
+----------------------------------------------
+- New! [Pro Feature] You can now change the playback speed options in the plugin settings.
+- Fix: WooCommerce orders are now working.
+- Fix: White screen showing up on the front-end when using Elementor Pro header and footers.
+- Fix: Grid Layout displays correctly when using scrollbar option.
+- Fix: Sticky player tracklist when "this widget" is selected as the source.
+- Fix: Guterberg Block search tracklist is now working.
+- Fix: Remove PHP notice when using ACF in some case.
+- Tweak: Optimized a js function to load only when needed.
+- Tweak: When using audio_meta_field attribute and the MP3 is pulled from your media library, we now show its image artwork.
+- Tweak: WooCommerce price settings are reflecting correctly.
+
+----------------------------------------------
+V.4.1.2 - 2022-12-12
+----------------------------------------------
+- Fix: Since Elementor Pro 3.9, players not displaying in Elementor Popup
+- Fix: You can now wildcard slugs to exclude them to play continuous playback. eg: /product/* will exclude any product to load the continuous player.
+- Fix: Player not playing when using a search bar widget in some occasion.
+- Fix: HTML code <span class="srp_trackartist"> showing up in track title was displaying in track title in some occasion.
+- Fix: Play Pause button were not toggling when using player in a WooCommerce shortcode and while using Wavesurfer.js
+- Tweak: Filter dropdown default value is now single select instead of multi select.
+
+----------------------------------------------
+V.4.1.1 - 2022-12-09
+----------------------------------------------
+- Fix: Filters were not displaying
+
+----------------------------------------------
+V.4.1 - 2022-12-09
+----------------------------------------------
+- New! Display your tracklist in a GRID format! See demo: https://templates.sonaar.io/rebirth/beats-grid/ See backend: https://d.pr/i/HRHxgk
+- New! Shortcode attribute to display tracklist in a GRID format! Use attribute: tracklist_layout="grid" grid_column_number="5,3,2"  
+- New! Add WooCommerce product attributes to create filters and custom fields
+- New! Transition FX for tracklist hover for smoooother UX
+- New! Added Artist wrap option to display the artist name below the title
+- New! Option to set play button to overlay the track artwork
+- Fix: PHP Warning when using chips shortcode
+- Tweak: When using filters, no need to set custom fields columns in the tracklist anymore.
+- Tweak: Renammed the volume .icon class for .sricon-volume to prevent conflicts.
+- Tweak: Filter dropdown is now clickable entirely
+- Fix: No volume icon (X) was not showing in the player widget
+- Fix: Volume slider triggered a mute sometimes
+- Fix: Dont hook the audio player in wp-admin columns to replace the featured image
+- Fix: Issue when using filters with the continuous player
+
+----------------------------------------------
+V.4.0 - 2022-11-23
+----------------------------------------------
+- New! [Pro Business Plan] Add to Cart via AJAX so page will not refresh when you add items to the WooCommerce cart.
+- New! [Pro Business Plan] Search Bar Elementor Widget and Shortcode: [sonaar_search] to add search bar within your tracklist. View documentation here https://sonaar.io/docs/add-audio-player-with-shortcode/#h-search-bar-widget-shortcode
+- New! [Pro Business Plan] Dropdown/Tag Filters and Shortcode: [sonaar_filter] to add dropdown or tag selector to filter your tracklist. View documentation here https://sonaar.io/docs/add-audio-player-with-shortcode/#h-filter-dropdowns-tags-shortcode
+- New! [Pro Business Plan] Chips result and Shortcode: [sonaar_chips] to add chip tags when you search or filter your tracklist. View documentation here https://sonaar.io/docs/add-audio-player-with-shortcode/#h-chips-active-filters-shortcode
+- New! [Pro Business Plan] Pagination. You have now the ability to add a pagination within your tracklist (as well as a scrollbar).
+- New! [Pro Business Plan] Support URL param querys. This is usefull if you want to share URL to a specific track within the tracklist.
+- New! [Pro Business Plan] Add any custom fields in your tracklist. You can create any custom fields from ACF, JetEngine, Metabox etc. and display them directly in the tracklist.
+- NEW! [Pro Business Plan] All these new shortcodes are also available as Elementor Wigets.
+- New! [Pro Business Plan] Added product title in the Music & License Contract PDF.
+- New! [Pro Starter Plan] Option to resize the Play/Pause button on the boxed layout player.
+- New! [Pro Starter Plan] Option to remove sticky player from the excluded URL Settings.
+- Fix: Generating PDF for the music license now fully working.
+- Fix: WooCommerce product image in admin area that was not being displayed in some cases.
+- Fix: Progress bar height controler in Elementor editor.
+- Fix: The no loop tracklist option without a sticky player was not working.
+- Fix: When using WeGlot plugin to translate the product variation modal, some fields were not translated.
+- Fix: Variation lightbox was not working when using a JetEngine smart filter.
+- Fix: Remove Perfect Scrollbar source mapping not found in the console.
+- Tweak: Now using medium image size on the image cover of the Sticky Player for better quality.
+- Tweak: Track title space was too narrow in the sticky player when using no cover image.
+- Podcast import: Add option to not overwrite existing content on manual RSS Feed import.
+- Podcast import with empty content episode is now working.
+- Multiple minor tweaks.
+- Code optimization for faster Speed.
+
+
+----------------------------------------------
+V.3.6 - 2022-05-24
+----------------------------------------------
+- New! Shortcode [sonaar_license] to display license terms anywhere on your site. View documentation here https://sonaar.io/docs/add-audio-player-with-shortcode/#h-license-preview-shortcode
+- New! Create your own custom options if you sell music licenses [Pro Feature]
+- New! Input your play/pause text label for the boxed and button layout. play_text and pause_text attributes have been added to the shortcode attribute.
+- New! Icon picker to the podcast show external links & license terms
+- Improved the [sonaar_ts] shortcode to add play/pause button icons beside your links and chapters.
+- Improved AJAX requests UX by adding a spinner animation
+- Changed the translation slugname for sonaar-music-pro instead of sonaar-music
+- Updated the .pot file for translation
+- Fix issue with lyrics conflict with many players but when no sticky player is active
+- Fix lyrics scrolling when using dynamic waveform
+- Fix conflict with third party plugins that use perfect scrollbar library
+- Fix issue with the player that does not start the fist time when soundwave is hidden AND dynamic waveform is set
+
+----------------------------------------------
+V.3.5 - 2022-04-14
+----------------------------------------------
+- New! Music Licenses & Contracts for WooCommerce! Add a nice lightbox on your product variations to allow the user select a music license to buy. Similar to Beatstars, Soundee and Airbit. Documentation: https://sonaar.io/docs/music-licenses-contracts/
+- Fix invisible player issue when we navigate with the continuous player minimized
+- Fix Shuffle button issue when shuffle not enable by default and the sticky player is disable
+- Refactored Skip 15s / 30s icons. Instead of a complex XML/SVG, we load it as a webfont.
+- Optimized the DOM
+- Code Santization for better security
+- Code optimization
+
+----------------------------------------------
+V.3.4 - 2022-03-23
+----------------------------------------------
+- Tweak: You can now use track popups to display lyrics with Karaoke mode
+- Fix: When track End the pause icon is not replaced by the play icon
+- Fix: Mobile Control Panel not opening the second time
+- Fix: Issue with dynamic waveform when the current page does not contain a player widget
+- Fix: Remove console warning with moment.min.js.map
+- Updated perfect scrollbar to 1.5.3
+
+----------------------------------------------
+V.3.3 - 2022-02-24
+----------------------------------------------
+- New: Lyrics & Karaoke Mode! We now fully support Lyrics with full Timed Text Markup Language (TTML) file. Edit your playlist and upload your .ttml file. You can generate your TTML file here: https://lyricpotato.com/
+- New: Shortcode [sonaar_lyrics_placeholder] to place lyrics of the current song playing anywhere in your page content.
+- Tweak: Remove the dot dragbar on the progress bar in mobile
+- Tweak: Make the progress bar draggable on mobile
+- Fix: Pagination issue in the bulk import tool
+- Fix: Player is now loading correctly when using AJAX scripts
+- Fix: Issue with "Move Links below soundwave" and "Boxed template" options are enable.
+- Fix: CTA hover issue when the Boxed template is set and when tracklist has only one track
+- Fix: Float progress bar offset issue
+- Fix: Sticky Player now set default color on the open button RECT
+- Fix: Sticky Player Progress bar issue on Mobile since 3.2
+- Fix: Issues when the display related tracks and the continuous player options is enable together
+- Fix: Overall Sticky Player:  unwanted 5 playlists limit  https://d.pr/i/2QzisU
+- Fix: Play button from track list when Dynamic waveform selected. Wave disappear when we click on it twice
+- Fix: Issue with TranslatePress plugin
+- Code Santization for better security
+- Code optimization for admin area
+
+----------------------------------------------
+V.3.2 - 2022-01-21
+----------------------------------------------
+- New! [Pro Feature] Shortcode [sonaar_ts] to create href text links in your content and control the player. Usefull to create chapters and timestamps. [Documentation](https://sonaar.io/docs/add-audio-player-with-shortcode/)
+- New! [Pro Feature] Support for ACF, JetEngine, Toolset, Metabox for dynamic custom fields - audio URL and repeater group supported.
+- New! [Pro Feature] no_loop_tracklist shortcode attribute to prevent playlist looping.
+- Fix: Uncaught (in promise) DOMException: The play() request was interrupted by a new load request in some case.
+- Fix: Issue with the Hide Soundwave option in Elementor Editor.
+- Fix: Minor PHP warning on reverse tracklist when not set
+- Fix: Prevent download on CTA when popup action is used
+- Tweak: Add Download Button option when bulk importing MP3
+- Tweak: Display value of the global settings in the Elementor widget options for better UI
+- Tweak: Add href link on track cover if linked to post is enabled.
+
+----------------------------------------------
+V.3.1 - 2021-12-21
+----------------------------------------------
+- New! Google Analytics integration for Pro user. From now, you can use Google Analytics to track your view and downloads. The old built-in statistic report is deprecated and will be removed September 30th 2022. If you wish to use or retrieve the old built-in statistic tool, you must enable it in Settings > Stats & Reports. 
+- New! We have added a control extender on the sticky player on mobile. You can now use all controls available for the sticky player on mobile by touching the sticky player.
+- Javascript API: Added seekTime function to our API to jump directly to a specific time in the current player. eg: IRON.sonaar.player.seekTime('00:25')
+- Javascript API: Added time parameter in the setPlayerAndPlayer function to start the player at a specific time. eg: IRON.sonaar.player.setPlayerAndPlay({ id:"158", trackid:"0", time:"00:25"})
+- Tweaked Media Session API for mobile center notification
+- Fixed CTA store container opening issue when using three dots in some case
+- Fixed lightbox popup when using Revert Tracklist
+- Code optimization
+----------------------------------------------
+V.3.0.1 - 2021-11-30
+----------------------------------------------
+- Fix sticky player not showing up with Elementor Button
+- Fix sticky player issue not showing the correct playlist when related track is enabled.
+- Fix image not correctly switching on the widget player when using the sticky prev/next button
+- Remove controls on artwork if no image set
+
+----------------------------------------------
+V.3.0 - 2021-11-24
+----------------------------------------------
+- New! Podcast Player!
+- New! Import Podcast from any major Podcast distributor
+- New! Player layout. Choose between floated and boxed player template
+- New! Refactored the setting options with better UI and tabs
+- New! Add playlist and player background
+- New! Many shortcode attributes available for both free and pro version
+- New! Display all playlist from specific playlist categories.
+- New! Display tracklist of every items that belong to the same category in the sticky player
+- New! Display track description eg: BPM, Hashtags, Episode description etc below each tracks.
+- New! Add Background Image and Gradient on the Elementor Widget
+- New! Option to use your own shortcode attributes in the single page
+- New! Option to change slug name for single playlist and categories
+- Improved Gutenberg block styling without refreshing the block
+- Improved slow performance when you have many playlist posts
+- New shortcode attribute: show_meta_duration = true, false
+- New shortcode attribute: show_publish_date = true, false
+- New shortcode attribute: show_tracks_count = true, false
+- New shortcode attribute: show_skip_bt = true, false
+- New shortcode attribute: show_shuffle_bt = true, false
+- New shortcode attribute: show_speed_bt = true, false
+- New shortcode attribute: show_volume_bt = true, false
+- New shortcode attribute: strip_html_track_desc = true, false
+- New shortcode attribute: track_desc_lenght = number
+- New shortcode attribute: hide_trackdesc = true, false. Will hide track description.
+- New shortcode attribute: category = category ID separated by comas or 'all' for all posts.
+- New shortcode attribute: $posts_per_pages = number. When category attribute is used, you can set a maximum number of posts to load
+- New shortcode attribute: show_cat_description = true, false. Show category description set in the taxonomy description field. Default = false.
+- New shortcode attribute: album_store_position = 'top'. Apply to boxed player only. Show external link buttons in the boxed player instead of below the playlist.
+
+----------------------------------------------
+V.2.4.1 - 2021-09-27
+----------------------------------------------
+- Fix: Safari issue with the volume icon not showing on sticky and the waveform.
+- Fix: volume slider clickable zone to prevent mute on click
+- Fix: Sticky player display on the left when set to float right
+- Tweak: Loading icon position and opacity
+- Tweak: WooCommerce. Remove unwanted margin below artwork in WooCommerce loop
+- Tweak: JS function to start, pause and toggle play/pause the sticky player
+
+----------------------------------------------
+V.2.4 - 2021-07-20
+----------------------------------------------
+- New! [Pro Feature] Added popup Lightbox option for call-to-action buttons beside the tracks. Embed anything from lyrics, videos, html or shortcode in the Lightbox. Edit your playlist track's call-to-action and you will see the popup option available.
+- New! [Pro Feature] Gutenburg block has now all the options to customize your player the way you want! Create stunning and unique player look and feel without leaving Gutenburg editor!
+- Fix: Issue with audio player not loading when used in Elementor Popups or lightboxes.
+- Fix: avoid loading the sticky player in the Gutenburg editor
+- Fix: resolved an issue with the sticky player appear 1 second before the page load in some situation.
+- Fix: shuffle issue when using the Gutenburg block
+- Fix: when using very long track title, it overlapped the control buttons
+- Fix: No Skip track issue when there is no widget in the page
+- Tweak: Updated moment.js library to 2.29.1
+
+----------------------------------------------
+V.2.3.2 - 2021-04-26
+----------------------------------------------
+- New! [Pro Feature] Added new sticky players layouts: Introducing the Float Interactive Sticky Player with drag and drop option and Full-width Mini Sticky
+- Tweak: Add Flex CSS on sticky player for more controls on CSS (pro)
+- Tweak: Load sr-scripts.js file only if using Elementor
+- Tweak: Added Current Post option in Playlist Source dropdown in Elementor Widget. Useful when using dynamic page templates. Eg: Elementor Pro Theme Builder
+- Tweak: Renamed Google Play for YouTube Music, iTunes for Apple Music
+- Tweak: improvement to the bulk import tool (pro)
+- Tweak: Do not sanitize CTA URLs textfield to prevent ascii character from being stripped
+- Tweak: tracklist item li 100vw instead of 100% so all li displays with same width
+- Tweak: Prevent theme text-decoration on button CTA
+- Fix issue with cmb2_render_select_multiple_field_type classname conflict with other third party plugins
+- Fix: Optional Track image option now displayed when editing Pages
+- Fix issue when playing same track number with 2 different player
+- Fix issue with the progress bar displacement caused by the time progress
+- Fix to prevent track numbers to wrap on track 10th and more
+- Fix to prevent time duration to wrap
+- Fix PHP error / blank page on front-end when using pro without free version activated
+- Fix issue with 1 track playlist that was always looping even if the option do not skip to next track was disabled
+
+----------------------------------------------
+V.2.3.1 - 2021-03-29
+----------------------------------------------
+- Fix issue where Pro player don't appear if you don't use Elementor.
+
+----------------------------------------------
+V.2.3 - 2021-03-24
+----------------------------------------------
+- New! Introducing the Pro WooCommerce Edition which add full support with WooCommerce. Ability to show player on shop page (loop) and in the single product page automatically. It also automatically add Buy now / Add to Cart buttons in the playlist and sticky player. Demos at https://beatstore.sonaar.io/rebirth/
+- New! [Pro Feature] Tool for Import/Create Bulk Playlist for any post, playlist and WooCommerce product. Simply select which audio file to use and it will automatically create new post draft in 1-click.
+- New! [Pro Feature] Display track thumbnails beside each tracks in the playlist.
+- New! Add optional track cover images for each of your track
+- New! Simple progress bar design option
+- New! Option to adjust the bar width and spacing of the synthetic waveform
+- New! Option to adjust the height of the all waveform types.
+- New! Shortcode attributes: display_control_artwork, progressbar_inline, hide_progress, hide_track_title, hide_times . More info https://sonaar.io/docs/add-audio-player-with-shortcode/
+- Tweak: Show number of tracks in admin columns for enabled CPT
+- Tweak: We now use flex grid CSS for the player controls
+- Tweak: You can select any kind of playlist's post-type in the shortcode generator or Elementor widget.
+- Tweak: Major Speed Improvement with Synthetic waveform type: We have replaced waveform's thousands of SVG nodes by Canvas HTML.
+- Tweak: Replaced a tags for div on control buttons
+- Tweak: Removed widget class in the iron-audioplayer div to prevent conflicts with certain themes
+- Fix issue where {{playlisttitle}} flashes when loading page on mobile.
+- Fix issue where typography color was not applied in some case. It was always white.
+- Fix minor issue with image encoding on some website
+- Fix minor CSS incoherence
+
+----------------------------------------------
+V.2.2.5 - 2021-02-23
+----------------------------------------------
+- Added compatibility for PHP 8
+- Fix issue with album title not changing when no sticky player is used
+- Fix issue with player not playing when used in Elementor Popup
+
+----------------------------------------------
+V.2.2.4 - 2021-01-24
+----------------------------------------------
+- Major page loading optimization on front-end
+- Prevent License check on Sonaar API too many times
+
+----------------------------------------------
+V.2.2.3 - 2021-01-13
+----------------------------------------------
+- Add admin notice to install free version if its not installed yet.
+
+----------------------------------------------
+V.2.2.2 - 2021-01-11
+----------------------------------------------
+- Now the audio tracks launch much faster when clicking play, especialy on mobile.
+- Fix URL Encode and Decode for artwork images to resolve issue with some URL Queries
+- Pro! New option to exclude Continuous Audio Playback from specific URL
+
+----------------------------------------------
+V.2.2.1 - 2020-11-19
+----------------------------------------------
+- Fix issue with script enqueue loaded when not required
+- Fix issue with shuffle option
+
+----------------------------------------------
+V.2.2 - 2020-10-15
+----------------------------------------------
+- New! Continuous Audio Playback is finally here!
+Turn on the option in WP-Admin > MP3 Player > Settings > Continuous Audio Playback. This is done via Session Cookies which means there will be a small audio gap on page loads. Read More here: https://sonaar.io/blog/
+- New! Our Elementor Audio Player Widget has a new facelift! You can now upload tracks directly into Elementor Editor ! No need to add a playlist anymore!
+- New! Option to reverse tracklist in the front-end. 
+- New! Feed attribute added in the shortcode. This open doors to dynamic contents. Example: Use [sonaar_audioplayer feed="https://domain.com/01.mp3 || https://domain.com/02.mp3" feed_title="Track Title 01 || Track Title 02"] on any pages.
+- Removed Next-Previous button in the sticky when only 1 track is present
+- Fix compatibility issue with some themes
+- Fix autoplay issue when using wavesurfer
+- Fix statistic report issue
+- Fix console error with audio promises
+- Improved options and codes
+
+
+----------------------------------------------
+V.2.1 - 2020-06-15
+----------------------------------------------
+- New! General option to add Sticky Player on All Pages
+- New! Full Gutenburg Support. We have added a Gutenburg block called MP3 Player
+- New! Add scrollbars within your tracklist ( Pro feature )
+- New! Add shuffle option in the sticky player on page load
+- New! Fix hours duration in the sticky player
+- Updated PerfectScrollbar library to 1.5
+- Fix issue with soundwave color not changing via Elementor and the Shortcode widget
+- Fix statistic when sticky player is disabled 
+- Fix download tag option in the sticky so the window popups immediately instead of opening in new window
+- Fix issue with the playlist title that does not change when changing tracks
+
+
+----------------------------------------------
+V.2.0.2 - 2020-05-09
+----------------------------------------------
+- Fix issue where the plugin breaks the Elementor Editor from scrolling
+
+----------------------------------------------
+V.2.0.1 - 2020-05-08
+----------------------------------------------
+- Fix issue with synthetic soundwave not showing up in the sticky player when launched from a button or javascript
+- Fix issue with the size of the synthetic soundwave in the sticky player
+
+----------------------------------------------
+V.2.0 - 2020-05-07
+----------------------------------------------
+- New! You can upload audio tracks from any posts, custom posts, or pages! Enable media uploads for your post types in WP-Admin > MP3 Player > Settings. Before this update, you had to create a playlist, upload your tracks and then embed the playlist widget or shortcode on the posts you wanted to display the player. Now simply edit any post, upload tracks and add the player widget, all at once. See quick video here: https://d.pr/v/l2NKHa
+- New! We now fully support long audio tracks and streaming files. The player used to crash on mobile or not display waveforms when using heavy mp3 files. We have added a new waveform skin called Synthetic Waveform in WP-Admin > MP3 Player > Settings
+- New! Waveform display intanstanly without lag time. Make sure to select Synthetic Waveform in WP-Admin > MP3 Player > Settings.
+- New! SEO improvement: You can now control the playlist and soundwave title HTML tag and specifiy which heading to use. 
+- Improved: MP3 is not being preloaded anymore if you are not displaying the waveform
+- Improved: Condition logics for the setting panel
+- Improved: Added query strings for the CSS and JS files to avoid cache issues when updating
+- Improved: Minor UI work on the settings page
+- Fix: When no playlist/album is specified in the shortcode, try to play the current post tracklist
+- Fix: Condition JS library for better Gutenburg support
+- Fix: Issue with font loading in some case
+- Fix: Color pickers now display correctly
+- Fix: No more 404 page not found on the Playlist custom posts.
+- Fix: Featured Album was disable on some theme that don't support featured image
+- Fix: Issue with UTF8 character encoding in sticky player
+- Fix: Issue with sticky typography color not applied on the sticky player
+
+----------------------------------------------
+V.1.7 - 2020-02-13
+----------------------------------------------
+- New! Option to add artist name in the tracklist. You can enable this option in WP-Admin > MP3 Player > Settings
+- Fixed issue where the soundwave does not show up in the sticky player in some case
+
+----------------------------------------------
+V.1.6 - 2020-02-05
+----------------------------------------------
+- New! Added a page option to fire the sticky player on page load. You can set a sticky payer to load on specific pages, posts, and custom post types.
+- New! Added a progress bar to the sticky player for mobile user. It allow the user to navigate accross the track when using mobile device.
+- Fixed double-click issue when Do Not Skip to the Next track is selected
+
+----------------------------------------------
+V.1.5 - 2019-12-19
+----------------------------------------------
+- Fixed automatic plugin updates
+- Fixed next track that was not playing automatically after track finish
+- Fixed hour stamp in the time duration that was not showing up
+- Refactored and optimized the Licence Check API. You can now enter your license key in MP3 Player > License for automatic updates.
+
+----------------------------------------------
+V.1.4.1 - 2019-11-21
+----------------------------------------------
+- Fixed waveform not showing up in some case
+
+----------------------------------------------
+V.1.4 - 2019-11-12
+----------------------------------------------
+- Fixed issue on iOS 13. Audio is no longer muted
+- Fixed Scrollbar in playlist when you have a lot of tracks
+- Fixed waveform not showing up when using more than 1 player on the same page
+- Fixed notice on error 404 (page not found)
+- Optimized the time-duration function
+
+----------------------------------------------
+V.1.3 - 2019-10-15
+----------------------------------------------
+- Extended the Elementor Button widget to add an option to fire the sticky player in pro version (free plugin update required)
+- Optimized code structure by enqueuing the player files only if a player is present.
+- Removed Sticky player H1s and replaced it by standard div
+- Added Cross-origin anonymous to load audio files from subdomains
+- Renamed class progress to sr-progress to avoid conflicts with third parties
+
+----------------------------------------------
+V.1.2 - 2019-09-06
+----------------------------------------------
+- Added Full Elementor Compatibility
+
+
+----------------------------------------------
+V.1.0 - 2018-05-23
+----------------------------------------------
+- Initial Version
