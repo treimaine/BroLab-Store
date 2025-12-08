@@ -51,12 +51,13 @@ const CarouselItem = memo(function CarouselItem({
   onAddToCart,
 }: CarouselItemProps): JSX.Element {
   // Calculate 3D transform based on position
+  // Note: Must include -50% translate to maintain centering since style.transform overrides CSS classes
   const getTransform = (): string => {
     const absPos = Math.abs(position);
     const direction = position < 0 ? -1 : 1;
 
     if (position === 0) {
-      return "translateX(0) translateZ(0) rotateY(0deg) scale(1)";
+      return "translate(-50%, -50%) translateZ(0) rotateY(0deg) scale(1)";
     }
 
     const translateX = direction * (absPos * 180 + 100);
@@ -64,7 +65,7 @@ const CarouselItem = memo(function CarouselItem({
     const rotateY = direction * -45;
     const scale = Math.max(0.6, 1 - absPos * 0.15);
 
-    return `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`;
+    return `translate(calc(-50% + ${translateX}px), -50%) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`;
   };
 
   const getOpacity = (): number => {
@@ -86,7 +87,7 @@ const CarouselItem = memo(function CarouselItem({
   return (
     <div
       className={cn(
-        "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+        "absolute left-1/2 top-1/2",
         "w-64 sm:w-72 md:w-80 transition-all duration-500 ease-out",
         "cursor-pointer"
       )}
@@ -119,8 +120,8 @@ const CarouselItem = memo(function CarouselItem({
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-          {/* Play Button - Only on active */}
-          {isActive && (
+          {/* Play Button - Only on active items with audio */}
+          {isActive && beat.audioUrl && (
             <button
               onClick={e => {
                 e.stopPropagation();

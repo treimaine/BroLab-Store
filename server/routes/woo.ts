@@ -43,34 +43,79 @@ function parseTrackData(value: unknown): unknown {
   return value;
 }
 
-// Helper function to extract audio URL from alb_tracklist metadata
-function extractAudioUrl(
+// Audio track interface for multi-track products
+interface AudioTrack {
+  url: string;
+  title?: string;
+  artist?: string;
+  duration?: string;
+}
+
+// Helper function to extract all audio tracks from alb_tracklist metadata
+function extractAudioTracks(
   albTracklistMeta: WooCommerceMetaData | undefined,
   audioUrlMeta: WooCommerceMetaData | undefined,
   productId: number
-): string | null {
-  let audioUrl: string | null = null;
+): AudioTrack[] {
+  const tracks: AudioTrack[] = [];
 
   if (albTracklistMeta?.value) {
     const trackData = parseTrackData(albTracklistMeta.value);
 
     if (Array.isArray(trackData) && trackData.length > 0) {
-      const firstTrack = trackData[0] as Record<string, unknown>;
-      audioUrl = extractAudioFromTrack(firstTrack);
-      console.log(`🎵 Product ${productId} - Found audio URL (array):`, audioUrl);
+      for (const track of trackData) {
+        const trackRecord = track as Record<string, unknown>;
+        const url = extractAudioFromTrack(trackRecord);
+        if (url) {
+          tracks.push({
+            url,
+            title:
+              safeString(trackRecord.title) || safeString(trackRecord.track_title) || undefined,
+            artist:
+              safeString(trackRecord.artist) || safeString(trackRecord.track_artist) || undefined,
+            duration:
+              safeString(trackRecord.duration) ||
+              safeString(trackRecord.track_duration) ||
+              undefined,
+          });
+        }
+      }
+      console.log(`🎵 Product ${productId} - Found ${tracks.length} audio tracks`);
     } else if (trackData && typeof trackData === "object") {
-      audioUrl = extractAudioFromTrack(trackData as Record<string, unknown>);
-      console.log(`🎵 Product ${productId} - Found audio URL (object):`, audioUrl);
+      const url = extractAudioFromTrack(trackData as Record<string, unknown>);
+      if (url) {
+        const trackRecord = trackData as Record<string, unknown>;
+        tracks.push({
+          url,
+          title: safeString(trackRecord.title) || undefined,
+          artist: safeString(trackRecord.artist) || undefined,
+          duration: safeString(trackRecord.duration) || undefined,
+        });
+      }
+      console.log(`🎵 Product ${productId} - Found audio URL (object):`, url);
     }
   }
 
-  // Fallback to audio_url metadata
-  if (!audioUrl && audioUrlMeta?.value) {
-    audioUrl = safeString(audioUrlMeta.value);
-    console.log(`🎵 Product ${productId} - Fallback audio URL:`, audioUrl);
+  // Fallback to audio_url metadata if no tracks found
+  if (tracks.length === 0 && audioUrlMeta?.value) {
+    const audioUrl = safeString(audioUrlMeta.value);
+    if (audioUrl) {
+      tracks.push({ url: audioUrl });
+      console.log(`🎵 Product ${productId} - Fallback audio URL:`, audioUrl);
+    }
   }
 
-  return audioUrl;
+  return tracks;
+}
+
+// Helper function to extract primary audio URL (backward compatibility)
+function extractAudioUrl(
+  albTracklistMeta: WooCommerceMetaData | undefined,
+  audioUrlMeta: WooCommerceMetaData | undefined,
+  productId: number
+): string | null {
+  const tracks = extractAudioTracks(albTracklistMeta, audioUrlMeta, productId);
+  return tracks.length > 0 ? tracks[0].url : null;
 }
 
 // Helper function to find metadata value
@@ -111,13 +156,19 @@ function mapProductToBeat(product: WooCommerceProduct) {
     (meta: WooCommerceMetaData) => meta.key === "audio_url"
   );
 
-  const audioUrl = extractAudioUrl(albTracklistMeta, audioUrlMeta, product.id);
+  const audioTracks = extractAudioTracks(albTracklistMeta, audioUrlMeta, product.id);
+  const audioUrl = audioTracks.length > 0 ? audioTracks[0].url : null;
 
-  console.log(`✅ Product ${product.id} - Final audio_url:`, audioUrl);
+  console.log(
+    `✅ Product ${product.id} - Final audio_url:`,
+    audioUrl,
+    `(${audioTracks.length} tracks)`
+  );
 
   return {
     ...product,
     audio_url: audioUrl,
+    audio_tracks: audioTracks, // All tracks for multi-track navigation
     hasVocals:
       findMetaValue(product.meta_data, "has_vocals") === "yes" ||
       hasTagWithName(product.tags, "vocals"),

@@ -1,10 +1,13 @@
 import { DiscountBanner } from "@/components/alerts/DiscountBanner";
 import { HoverPlayButton } from "@/components/audio/HoverPlayButton";
+import {
+  SonaarCarouselCoverflow,
+  type CarouselBeat,
+} from "@/components/audio/SonaarCarouselCoverflow";
 import { SearchHero } from "@/components/layout/SearchHero";
 import { ServicesStrip } from "@/components/layout/ServicesStrip";
 import { SocialProofStrip } from "@/components/layout/SocialProofStrip";
 import { SubscriberPerksStrip } from "@/components/subscriptions/SubscriberPerksStrip";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
@@ -19,8 +22,8 @@ import {
 } from "@/utils/woocommerce-helpers";
 import type { BroLabWooCommerceProduct } from "@shared/types";
 import { Eye, Info, Music, TrendingUp } from "lucide-react";
-import { startTransition, useEffect, useMemo, useState } from "react";
-import { Link } from "wouter";
+import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "wouter";
 
 interface LoadingSkeletonProps {
   readonly count?: number;
@@ -48,6 +51,7 @@ function LoadingSkeleton({
 
 export default function Home() {
   useScrollToTop();
+  const [, setLocation] = useLocation();
   const { useProducts } = useWooCommerce();
 
   const [localBeats, setLocalBeats] = useState<BroLabWooCommerceProduct[]>([]);
@@ -70,17 +74,35 @@ export default function Home() {
     });
   }, [beats, isLoading, error]);
 
-  const { featuredBeats, trendingDisplayBeats } = useMemo(() => {
-    const featured = localBeats?.slice(0, 3) || [];
-    const trending = localBeats?.slice(3, 9) || [];
-    const remaining = localBeats?.slice(9, 15) || [];
+  const { featuredCarouselBeats, trendingDisplayBeats } = useMemo(() => {
+    const featured = localBeats?.slice(0, 6) || [];
+    const trending = localBeats?.slice(6, 12) || [];
+    const remaining = localBeats?.slice(12, 18) || [];
     const trendingDisplay = remaining.length > 0 ? remaining : trending;
 
+    // Transform to CarouselBeat format
+    const carouselBeats: CarouselBeat[] = featured.map(beat => ({
+      id: beat.id,
+      title: beat.name,
+      genre: getGenre(beat),
+      price: beat.price || "0",
+      imageUrl: getImageUrl(beat),
+      audioUrl: checkHasRealAudio(beat) ? getAudioUrl(beat) : undefined,
+      isFree: isFreeProduct(beat),
+    }));
+
     return {
-      featuredBeats: featured,
+      featuredCarouselBeats: carouselBeats,
       trendingDisplayBeats: trendingDisplay,
     };
   }, [localBeats]);
+
+  const handleBeatSelect = useCallback(
+    (beat: CarouselBeat) => {
+      setLocation(`/product/${beat.id}`);
+    },
+    [setLocation]
+  );
 
   return (
     <div className="min-h-screen bg-[var(--deep-black)]">
@@ -133,81 +155,28 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Beats */}
+      {/* Featured Beats - Coverflow Carousel */}
       <section className="py-20 bg-[var(--deep-black)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-8">
             <h2 className="text-4xl font-bold text-white mb-4">Featured Beats</h2>
             <p className="text-xl text-gray-300">Hand-picked premium tracks from top producers</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {localIsLoading || !localBeats || localBeats.length === 0 ? (
+          {localIsLoading || featuredCarouselBeats.length === 0 ? (
+            <div className="grid md:grid-cols-3 gap-8">
               <LoadingSkeleton count={3} />
-            ) : (
-              featuredBeats.map((beat: BroLabWooCommerceProduct) => (
-                <Card
-                  key={beat.id}
-                  className="bg-[var(--dark-gray)] border-[var(--medium-gray)] overflow-hidden hover:border-[var(--accent-purple)] transition-all duration-300 group"
-                >
-                  <CardContent className="p-0">
-                    <div className="relative">
-                      <img
-                        src={getImageUrl(beat)}
-                        alt={beat.name}
-                        className="w-full h-48 object-cover"
-                      />
-                      {checkHasRealAudio(beat) && (
-                        <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <HoverPlayButton
-                            audioUrl={getAudioUrl(beat)}
-                            productId={beat.id.toString()}
-                            productName={beat.name}
-                            imageUrl={getImageUrl(beat)}
-                            size="lg"
-                          />
-                        </div>
-                      )}
-                      <Badge className="absolute top-3 left-3 bg-[var(--accent-purple)]">
-                        Featured
-                      </Badge>
-                    </div>
-                    <div className="p-6">
-                      <h3 className="text-xl font-bold text-white mb-2">{beat.name}</h3>
-                      <p className="text-gray-400 mb-4">{getGenre(beat)}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-2xl font-bold text-[var(--accent-purple)]">
-                          {isFreeProduct(beat) ? (
-                            <span className="text-[var(--accent-cyan)]">FREE</span>
-                          ) : (
-                            `$${getFormattedPrice(beat)}`
-                          )}
-                        </span>
-                        <Link href={`/product/${beat.id}`}>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[var(--accent-purple)] text-[var(--accent-purple)] hover:bg-[var(--accent-purple)] hover:text-white"
-                          >
-                            View Details
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
+            </div>
+          ) : (
+            <SonaarCarouselCoverflow
+              beats={featuredCarouselBeats}
+              onBeatSelect={handleBeatSelect}
+              autoPlay={true}
+              autoPlayInterval={6000}
+            />
+          )}
         </div>
       </section>
-
-      {/* Recently Viewed Beats */}
-      {/* <section className="py-20 bg-[var(--deep-black)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <RecentlyViewedBeats maxDisplay={6} />
-        </div>
-      </section> */}
 
       {/* Social Proof Strip */}
       <SocialProofStrip />
@@ -288,7 +257,7 @@ export default function Home() {
                             {isFreeProduct(beat) ? (
                               <span className="text-[var(--accent-cyan)]">FREE</span>
                               ) : (
-                                `$${getFormattedPrice(beat)}`
+                                `${getFormattedPrice(beat)}`
                               )}
                           </span>
                           <div className="flex items-center text-xs text-gray-400">
@@ -304,6 +273,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-[var(--accent-purple)] to-[var(--accent-cyan)]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
