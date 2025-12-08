@@ -9,10 +9,19 @@
  * - Smooth transitions and hover effects
  */
 
+import { cn } from "@/lib/utils";
 import { useAudioStore } from "@/stores/useAudioStore";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Music, Pause, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Music, Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+/** Audio track for multi-track products */
+export interface AudioTrack {
+  readonly url: string;
+  readonly title?: string;
+  readonly artist?: string;
+  readonly duration?: string;
+}
 
 // Sonaar-style colors
 const PLAYER_COLORS = {
@@ -74,6 +83,7 @@ interface ProductArtworkPlayerProps {
   readonly imageSrc?: string;
   readonly productName: string;
   readonly audioUrl?: string;
+  readonly audioTracks?: AudioTrack[]; // Multiple tracks for albums/playlists
   readonly productId?: number;
 }
 
@@ -81,23 +91,43 @@ export function ProductArtworkPlayer({
   imageSrc,
   productName,
   audioUrl,
+  audioTracks,
   productId,
 }: ProductArtworkPlayerProps): JSX.Element {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlayingLocal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+
+  // Build tracks array from audioTracks or fallback to single audioUrl
+  const tracks: AudioTrack[] = useMemo(() => {
+    if (audioTracks && audioTracks.length > 0) {
+      return audioTracks;
+    }
+    if (audioUrl) {
+      return [{ url: audioUrl, title: productName }];
+    }
+    return [];
+  }, [audioTracks, audioUrl, productName]);
+
+  const hasMultipleTracks = tracks.length > 1;
+  const currentTrackData = tracks[currentTrackIndex];
+  const currentAudioUrl = currentTrackData?.url;
 
   // Use global audio store to stop other players when this one plays
   const { currentTrack, setCurrentTrack, setIsPlaying: setGlobalIsPlaying, stop } = useAudioStore();
 
-  // Generate a unique track ID for this product
-  const trackId = useMemo(() => `product-${productId ?? productName}`, [productId, productName]);
+  // Generate a unique track ID for this product and track
+  const trackId = useMemo(
+    () => `product-${productId ?? productName}-${currentTrackIndex}`,
+    [productId, productName, currentTrackIndex]
+  );
 
   // Handle play/pause toggle - manages local audio with global store sync
   const handleTogglePlay = useCallback(async (): Promise<void> => {
     const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
+    if (!audio || !currentAudioUrl) return;
 
     if (isPlaying) {
       // Pause local audio
@@ -115,12 +145,14 @@ export function ProductArtworkPlayer({
         }
 
         // Update global store to mark this track as current (for other components to know)
+        const trackTitle =
+          currentTrackData?.title || `${productName} - Track ${currentTrackIndex + 1}`;
         setCurrentTrack({
           id: trackId,
-          title: productName,
-          artist: "BroLab Entertainment",
-          url: audioUrl,
-          audioUrl: audioUrl,
+          title: trackTitle,
+          artist: currentTrackData?.artist || "BroLab Entertainment",
+          url: currentAudioUrl,
+          audioUrl: currentAudioUrl,
           artwork: imageSrc,
           imageUrl: imageSrc,
         });
@@ -139,16 +171,58 @@ export function ProductArtworkPlayer({
       }
     }
   }, [
-    audioUrl,
+    currentAudioUrl,
     isPlaying,
     currentTrack,
     trackId,
     productName,
+    currentTrackIndex,
+    currentTrackData,
     imageSrc,
     setCurrentTrack,
     setGlobalIsPlaying,
     stop,
   ]);
+
+  // Handle track navigation
+  const handlePreviousTrack = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const newIndex = currentTrackIndex > 0 ? currentTrackIndex - 1 : tracks.length - 1;
+      setCurrentTrackIndex(newIndex);
+      // Auto-play the new track if currently playing
+      if (isPlaying) {
+        setIsPlayingLocal(false);
+        // Will trigger play on next render via effect
+      }
+    },
+    [currentTrackIndex, tracks.length, isPlaying]
+  );
+
+  const handleNextTrack = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const newIndex = currentTrackIndex < tracks.length - 1 ? currentTrackIndex + 1 : 0;
+      setCurrentTrackIndex(newIndex);
+      // Auto-play the new track if currently playing
+      if (isPlaying) {
+        setIsPlayingLocal(false);
+      }
+    },
+    [currentTrackIndex, tracks.length, isPlaying]
+  );
+
+  // Auto-play when track changes (if was playing)
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !currentAudioUrl) return;
+
+    // Update audio source when track changes
+    if (audio.src !== currentAudioUrl) {
+      audio.src = currentAudioUrl;
+      audio.load();
+    }
+  }, [currentAudioUrl]);
 
   // Audio event handlers
   useEffect(() => {
@@ -212,13 +286,13 @@ export function ProductArtworkPlayer({
     return <Play className="w-8 h-8 text-white ml-1" />;
   };
 
-  const showPlayButton = audioUrl && !hasError;
+  const showPlayButton = currentAudioUrl && !hasError;
 
   return (
     <div className="space-y-4">
       {/* Local audio element for product page playback */}
-      {audioUrl && (
-        <audio ref={audioRef} src={audioUrl} preload="metadata">
+      {currentAudioUrl && (
+        <audio ref={audioRef} src={currentAudioUrl} preload="metadata">
           <track kind="captions" />
         </audio>
       )}
@@ -231,30 +305,99 @@ export function ProductArtworkPlayer({
           <Music className="w-24 h-24 text-white/20" />
         )}
 
-        {/* Play/Pause overlay - visible on hover (via group-hover) or when playing */}
+        {/* Play/Pause overlay with multi-track navigation - visible on hover or when playing */}
         {showPlayButton && (
           <div
-            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+            className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-200 ${
               isPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             }`}
             style={{ backgroundColor: PLAYER_COLORS.overlay }}
           >
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className="w-20 h-20 rounded-full flex items-center justify-center transition-all"
-              style={{
-                background: PLAYER_COLORS.playButtonBg,
-                border: `4px solid ${PLAYER_COLORS.playButtonBorder}`,
-                boxShadow: "0 4px 20px rgba(162, 89, 255, 0.5)",
-              }}
-              onClick={() => void handleTogglePlay()}
-              disabled={isLoading}
-              aria-label={isPlaying ? "Pause audio" : "Play audio"}
-            >
-              {renderPlayButtonIcon()}
-            </motion.button>
+            {/* Navigation Controls */}
+            <div className="flex items-center gap-3">
+              {/* Previous Button - only for multi-track */}
+              {hasMultipleTracks && (
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-12 h-12 rounded-full flex items-center justify-center bg-black/50 hover:bg-black/70 text-white backdrop-blur-sm transition-all"
+                  onClick={handlePreviousTrack}
+                  aria-label="Previous track"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </motion.button>
+              )}
+
+              {/* Play/Pause Button */}
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                className="w-20 h-20 rounded-full flex items-center justify-center transition-all"
+                style={{
+                  background: isPlaying ? "rgba(0, 200, 200, 0.9)" : PLAYER_COLORS.playButtonBg,
+                  border: `4px solid ${PLAYER_COLORS.playButtonBorder}`,
+                  boxShadow: isPlaying
+                    ? "0 4px 20px rgba(0, 200, 200, 0.5)"
+                    : "0 4px 20px rgba(162, 89, 255, 0.5)",
+                }}
+                onClick={() => void handleTogglePlay()}
+                disabled={isLoading}
+                aria-label={isPlaying ? "Pause audio" : "Play audio"}
+              >
+                {renderPlayButtonIcon()}
+              </motion.button>
+
+              {/* Next Button - only for multi-track */}
+              {hasMultipleTracks && (
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-12 h-12 rounded-full flex items-center justify-center bg-black/50 hover:bg-black/70 text-white backdrop-blur-sm transition-all"
+                  onClick={handleNextTrack}
+                  aria-label="Next track"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </motion.button>
+              )}
+            </div>
+
+            {/* Track Indicator Dots - only for multi-track */}
+            {hasMultipleTracks && (
+              <div className="flex items-center gap-1.5 mt-4">
+                {tracks.map((_, index) => (
+                  <button
+                    key={`track-dot-${index}`}
+                    type="button"
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      setCurrentTrackIndex(index);
+                    }}
+                    className={cn(
+                      "w-2 h-2 rounded-full transition-all duration-200",
+                      index === currentTrackIndex
+                        ? "bg-[var(--accent-purple)] w-4"
+                        : "bg-white/50 hover:bg-white/80"
+                    )}
+                    aria-label={`Go to track ${index + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Current Track Info - only for multi-track */}
+            {hasMultipleTracks && currentTrackData && (
+              <div className="mt-3 text-center">
+                <p className="text-white text-sm font-medium truncate max-w-[200px]">
+                  {currentTrackData.title || `Track ${currentTrackIndex + 1}`}
+                </p>
+                <p className="text-white/60 text-xs">
+                  {currentTrackIndex + 1} / {tracks.length}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

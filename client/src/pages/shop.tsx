@@ -1,16 +1,17 @@
+import {
+  SonaarFiltersSearch,
+  type ActiveFilters,
+  type FilterOptions,
+} from "@/components/audio/SonaarFiltersSearch";
+import { SonaarGridLayout, type GridBeat } from "@/components/audio/SonaarGridLayout";
 import { TableBeatView } from "@/components/beats/TableBeatView";
-import { BeatCard } from "@/components/beats/beat-card";
-import { UnifiedFilterPanel } from "@/components/filters/UnifiedFilterPanel";
 import { StandardHero } from "@/components/ui/StandardHero";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { useUnifiedFilters } from "@/hooks/useUnifiedFilters";
-import { UnifiedFilters } from "@/lib/unifiedFilters";
 import type { BeatProduct } from "@shared/schema";
-import { Grid3X3, List, RotateCcw } from "lucide-react";
-import { useCallback, useState } from "react";
+import { LayoutGrid, List, RotateCcw } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
 type WooCategory = { id: number; name: string };
@@ -101,22 +102,17 @@ function isProductFree(product: BeatProductWithWoo): boolean {
 export default function Shop() {
   const [, setLocation] = useLocation();
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
-  const [showFilters, setShowFilters] = useState(false);
 
   // Use unified filtering system
   const {
     products,
-    filters,
     availableOptions,
     availableRanges,
     stats,
     isLoading,
     error,
-    updateFilter,
-    updateFilters,
     clearFilters,
     setCurrentPage,
-    hasActiveFilters,
   } = useUnifiedFilters({
     initialFilters: {
       sortBy: "date",
@@ -125,32 +121,184 @@ export default function Shop() {
     pageSize: 12,
   });
 
-  const handleSearch = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    // Search is now handled by the unified system
+  // Sonaar filters state
+  const [sonaarFilters, setSonaarFilters] = useState<ActiveFilters>({
+    search: "",
+    genres: [],
+    moods: [],
+    keys: [],
+    bpmMin: null,
+    bpmMax: null,
+    priceMin: null,
+    priceMax: null,
+    isFree: null,
+    sortBy: "newest",
+  });
+
+  // Transform availableOptions to FilterOptions for SonaarFiltersSearch
+  // Extract unique genres from products
+  const uniqueGenres = useMemo(() => {
+    const genres = new Set<string>();
+    products.forEach(p => {
+      const genre = getProductGenre(p as BeatProductWithWoo);
+      if (genre) genres.add(genre);
+    });
+    return Array.from(genres);
+  }, [products]);
+
+  const filterOptions: FilterOptions = useMemo(
+    () => ({
+      genres: uniqueGenres,
+      moods: availableOptions?.moods || [],
+      keys: availableOptions?.keys || [],
+      bpmRange: {
+        min: availableRanges?.bpm?.min || 60,
+        max: availableRanges?.bpm?.max || 200,
+      },
+      priceRange: {
+        min: 0,
+        max: 500,
+      },
+    }),
+    [uniqueGenres, availableOptions, availableRanges]
+  );
+
+  // Filter products based on Sonaar filters
+  const filteredProducts = useMemo(() => {
+    let result = [...products];
+
+    // Search filter
+    if (sonaarFilters.search) {
+      const searchLower = sonaarFilters.search.toLowerCase();
+      result = result.filter(
+        p =>
+          p.name?.toLowerCase().includes(searchLower) ||
+          getProductGenre(p as BeatProductWithWoo)
+            .toLowerCase()
+            .includes(searchLower)
+      );
+    }
+
+    // Genre filter
+    if (sonaarFilters.genres.length > 0) {
+      result = result.filter(p =>
+        sonaarFilters.genres.includes(getProductGenre(p as BeatProductWithWoo))
+      );
+    }
+
+    // BPM filter
+    if (sonaarFilters.bpmMin !== null || sonaarFilters.bpmMax !== null) {
+      result = result.filter(p => {
+        const bpm = getProductBpm(p as BeatProductWithWoo);
+        if (!bpm) return false;
+        if (sonaarFilters.bpmMin !== null && bpm < sonaarFilters.bpmMin) return false;
+        if (sonaarFilters.bpmMax !== null && bpm > sonaarFilters.bpmMax) return false;
+        return true;
+      });
+    }
+
+    // Price filter
+    if (sonaarFilters.priceMin !== null || sonaarFilters.priceMax !== null) {
+      result = result.filter(p => {
+        const price = typeof p.price === "string" ? Number.parseFloat(p.price) : p.price || 0;
+        if (sonaarFilters.priceMin !== null && price < sonaarFilters.priceMin) return false;
+        if (sonaarFilters.priceMax !== null && price > sonaarFilters.priceMax) return false;
+        return true;
+      });
+    }
+
+    // Free filter
+    if (sonaarFilters.isFree === true) {
+      result = result.filter(p => isProductFree(p as BeatProductWithWoo));
+    }
+
+    // Sort
+    switch (sonaarFilters.sortBy) {
+      case "price-low":
+        result.sort((a, b) => {
+          const priceA = typeof a.price === "string" ? Number.parseFloat(a.price) : a.price || 0;
+          const priceB = typeof b.price === "string" ? Number.parseFloat(b.price) : b.price || 0;
+          return priceA - priceB;
+        });
+        break;
+      case "price-high":
+        result.sort((a, b) => {
+          const priceA = typeof a.price === "string" ? Number.parseFloat(a.price) : a.price || 0;
+          const priceB = typeof b.price === "string" ? Number.parseFloat(b.price) : b.price || 0;
+          return priceB - priceA;
+        });
+        break;
+      case "oldest":
+        result.sort((a, b) => {
+          const dateA = (a as BeatProductWithWoo & { date_created?: string }).date_created;
+          const dateB = (b as BeatProductWithWoo & { date_created?: string }).date_created;
+          return new Date(dateA || 0).getTime() - new Date(dateB || 0).getTime();
+        });
+        break;
+      case "newest":
+      default:
+        result.sort((a, b) => {
+          const dateA = (a as BeatProductWithWoo & { date_created?: string }).date_created;
+          const dateB = (b as BeatProductWithWoo & { date_created?: string }).date_created;
+          return new Date(dateB || 0).getTime() - new Date(dateA || 0).getTime();
+        });
+        break;
+    }
+
+    return result;
+  }, [products, sonaarFilters]);
+
+  const handleSonaarFiltersChange = useCallback((newFilters: ActiveFilters) => {
+    setSonaarFilters(newFilters);
   }, []);
 
-  const handleClearFilters = useCallback(() => {
+  const handleClearAllFilters = useCallback(() => {
+    setSonaarFilters({
+      search: "",
+      genres: [],
+      moods: [],
+      keys: [],
+      bpmMin: null,
+      bpmMax: null,
+      priceMin: null,
+      priceMax: null,
+      isFree: null,
+      sortBy: "newest",
+    });
     clearFilters();
   }, [clearFilters]);
-
-  const handleToggleFilters = useCallback(() => {
-    setShowFilters(prev => !prev);
-  }, []);
 
   const handleViewModeChange = useCallback((mode: "grid" | "table") => {
     setViewMode(mode);
   }, []);
 
-  const handleSortChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const [sortBy, sortOrder] = e.target.value.split("-") as [
-        "date" | "price" | "title" | "popularity",
-        "asc" | "desc",
-      ];
-      updateFilters({ sortBy, sortOrder });
+  // Transform filtered products to GridBeat format for SonaarGridLayout
+  const gridBeats: GridBeat[] = filteredProducts.map(product => {
+    // Extract audio tracks from product (for multi-track products like albums/playlists)
+    const productWithTracks = product as BeatProductWithWoo & {
+      audio_tracks?: Array<{ url: string; title?: string; artist?: string; duration?: string }>;
+    };
+
+    return {
+      id: product.id,
+      title: product.name || "Untitled",
+      genre: getProductGenre(product as BeatProductWithWoo),
+      bpm: getProductBpm(product as BeatProductWithWoo),
+      price: product.price || "0",
+      imageUrl: product.images?.[0]?.src || "",
+      audioUrl: product.audio_url || "",
+      audioTracks: productWithTracks.audio_tracks, // Pass all tracks for multi-track navigation
+      duration: product.duration ? String(product.duration) : undefined,
+      isFree: isProductFree(product as BeatProductWithWoo),
+      tags: getProductTags(product as BeatProductWithWoo),
+    };
+  });
+
+  const handleGridBeatSelect = useCallback(
+    (beat: GridBeat) => {
+      setLocation(`/product/${beat.id}`);
     },
-    [updateFilters]
+    [setLocation]
   );
 
   const handleProductView = useCallback(
@@ -189,194 +337,56 @@ export default function Shop() {
       />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* Search and Filters Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mb-6">
-          {/* Search */}
-          <div className="flex-1">
-            <form onSubmit={handleSearch} className="relative">
-              <Input
-                type="search"
-                placeholder="Search beats by title, genre, BPM..."
-                className="px-4 py-2 sm:py-3 form-input w-full"
-                value={filters.search || ""}
-                onChange={e => updateFilter("search", e.target.value)}
-              />
-            </form>
-          </div>
-
-          {/* View Mode Toggle */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant={viewMode === "grid" ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleViewModeChange("grid")}
-              className="flex items-center gap-2"
-            >
-              <Grid3X3 className="w-4 h-4" />
-              <span className="hidden sm:inline">Grid</span>
-            </Button>
-            <Button
-              variant={viewMode === "table" ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleViewModeChange("table")}
-              className="flex items-center gap-2"
-            >
-              <List className="w-4 h-4" />
-              <span className="hidden sm:inline">Table</span>
-            </Button>
-          </div>
-
-          {/* Filters Toggle */}
+        {/* View Mode Toggle */}
+        <div className="flex items-center justify-end gap-2 mb-6">
           <Button
-            variant="outline"
+            variant={viewMode === "grid" ? "default" : "outline"}
             size="sm"
-            onClick={handleToggleFilters}
+            onClick={() => handleViewModeChange("grid")}
             className="flex items-center gap-2"
           >
-            <span className="hidden sm:inline">Filters</span>
+            <LayoutGrid className="w-4 h-4" />
+            <span className="hidden sm:inline">Grid</span>
+          </Button>
+          <Button
+            variant={viewMode === "table" ? "default" : "outline"}
+            size="sm"
+            onClick={() => handleViewModeChange("table")}
+            className="flex items-center gap-2"
+          >
+            <List className="w-4 h-4" />
+            <span className="hidden sm:inline">Table</span>
           </Button>
         </div>
 
-        {/* Active Filters */}
-        {hasActiveFilters && (
-          <div className="flex flex-wrap items-center gap-2 mb-6">
-            <span className="text-sm text-gray-400">Active filters:</span>
-            {Object.entries(filters).map(([key, value]) => {
-              if (!value || key === "search") return null;
-
-              // Check that the key is a valid UnifiedFilters key
-              if (
-                key === "search" ||
-                key === "categories" ||
-                key === "priceRange" ||
-                key === "sortBy" ||
-                key === "sortOrder" ||
-                key === "bpmRange" ||
-                key === "keys" ||
-                key === "moods" ||
-                key === "instruments" ||
-                key === "producers" ||
-                key === "tags" ||
-                key === "timeSignature" ||
-                key === "duration" ||
-                key === "isFree" ||
-                key === "hasVocals" ||
-                key === "stems"
-              ) {
-                return (
-                  <Badge
-                    key={key}
-                    variant="secondary"
-                    className="bg-[var(--accent-purple)]/20 text-[var(--accent-purple)] border-[var(--accent-purple)]/30"
-                  >
-                    {key}: {Array.isArray(value) ? value.join(", ") : value}
-                    <button
-                      onClick={() => updateFilter(key as keyof UnifiedFilters, "")}
-                      className="ml-2 hover:text-white"
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                );
-              }
-              return null;
-            })}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClearFilters}
-              className="text-gray-400 hover:text-white"
-            >
-              <RotateCcw className="w-4 h-4 mr-1" />
-              Clear all
-            </Button>
-          </div>
-        )}
-
-        {/* Filters Panel */}
-        {showFilters && (
-          <div className="mb-6">
-            <UnifiedFilterPanel
-              filters={filters}
-              availableOptions={availableOptions}
-              availableRanges={availableRanges}
-              onFiltersChange={updateFilters}
-              onClearAll={clearFilters}
-              stats={{
-                totalProducts: stats?.totalProducts || 0,
-                filteredProducts: products.length,
-                hasActiveFilters: hasActiveFilters,
-              }}
-            />
-          </div>
-        )}
-
-        {/* Sort and Results */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="text-sm text-gray-400">
-            {isLoading
-              ? "Loading..."
-              : `Showing ${products.length} of ${stats?.totalProducts || 0} beats`}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label htmlFor="sort" className="text-sm text-gray-400">
-              Sort by:
-            </label>
-            <select
-              id="sort"
-              value={`${filters.sortBy}-${filters.sortOrder}`}
-              onChange={handleSortChange}
-              className="bg-[var(--dark-gray)] border border-[var(--medium-gray)] text-white rounded-lg px-3 py-2 text-sm focus:border-[var(--accent-purple)] focus:ring-1 focus:ring-[var(--accent-purple)] outline-none"
-            >
-              <option value="date-desc">Newest First</option>
-              <option value="date-asc">Oldest First</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-              <option value="title-asc">Title: A to Z</option>
-              <option value="title-desc">Title: Z to A</option>
-              <option value="popularity-desc">Most Popular</option>
-            </select>
-          </div>
-        </div>
+        {/* Sonaar Filters & Search */}
+        <SonaarFiltersSearch
+          options={filterOptions}
+          filters={sonaarFilters}
+          onFiltersChange={handleSonaarFiltersChange}
+          onClearAll={handleClearAllFilters}
+          totalResults={stats?.totalProducts || 0}
+          filteredResults={filteredProducts.length}
+          variant="horizontal"
+        />
       </div>
 
       {/* Products Grid/Table */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        {viewMode === "grid" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {isLoading
-              ? Array.from({ length: 8 }).map((_, i) => (
-                <div key={`skeleton-${String(i)}`} className="card-dark p-4 sm:p-6 animate-pulse">
-                  <div className="w-full h-48 bg-[var(--medium-gray)] rounded-lg mb-4" />
-                  <div className="h-4 bg-[var(--medium-gray)] rounded mb-2" />
-                  <div className="h-3 bg-[var(--medium-gray)] rounded w-2/3" />
-                </div>
-                ))
-              : products.map(product => (
-                <BeatCard
-                  key={product.id}
-                  id={product.id}
-                  title={product.name || "Untitled"}
-                  genre={getProductGenre(product as BeatProductWithWoo)}
-                  bpm={getProductBpm(product as BeatProductWithWoo)}
-                  price={product.price}
-                  imageUrl={product.images?.[0]?.src || ""}
-                  audioUrl={product.audio_url || ""}
-                  tags={getProductTags(product as BeatProductWithWoo)}
-                  featured={product.featured}
-                  downloads={product.downloads || 0}
-                  duration={product.duration}
-                  isFree={isProductFree(product as BeatProductWithWoo)}
-                  onViewDetails={() => handleProductView(product.id)}
-                />
-                ))}
-          </div>
-        ) : (
+        {viewMode === "grid" && (
+          <SonaarGridLayout
+            beats={gridBeats}
+            onBeatSelect={handleGridBeatSelect}
+            columns={4}
+            isLoading={isLoading}
+          />
+        )}
+
+        {viewMode === "table" && (
           <div className="overflow-x-auto">
             <TableBeatView
               products={
-                products as unknown as import("@shared/types/WooCommerceApi").BroLabWooCommerceProduct[]
+                filteredProducts as unknown as import("@shared/types/WooCommerceApi").BroLabWooCommerceProduct[]
               }
               onViewDetails={handleProductView}
             />

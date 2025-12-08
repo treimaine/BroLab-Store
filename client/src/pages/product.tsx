@@ -384,11 +384,12 @@ export default function Product(): JSX.Element {
           </Button>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Product Artwork with Play/Pause and Spectrum Animation */}
+            {/* Product Artwork with Play/Pause, Spectrum Animation, and Multi-Track Navigation */}
             <ProductArtworkPlayer
               imageSrc={product.images?.[0]?.src}
               productName={product.name}
               audioUrl={product.audio_url}
+              audioTracks={product.audio_tracks}
               productId={product.id}
             />
 
