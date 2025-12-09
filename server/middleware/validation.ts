@@ -25,10 +25,17 @@ export const createValidationMiddleware = <T extends z.ZodSchema>(
       const requestId =
         (req.headers["x-request-id"] as string) ||
         (req.headers["x-correlation-id"] as string) ||
-        `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
       // Get data from the specified source
-      const data = source === "body" ? req.body : source === "query" ? req.query : req.params;
+      let data: unknown;
+      if (source === "body") {
+        data = req.body;
+      } else if (source === "query") {
+        data = req.query;
+      } else {
+        data = req.params;
+      }
 
       // Validate the data
       const result = await schema.safeParseAsync(data);
@@ -112,6 +119,101 @@ export const validateParams = <T extends z.ZodSchema>(schema: T) => {
 // BUSINESS VALIDATION MIDDLEWARE
 // ================================
 
+// File validation error type
+type FileValidationError = { field: string; value: unknown; message: string };
+
+// Dangerous file extensions set for O(1) lookup
+const DANGEROUS_EXTENSIONS = new Set([
+  ".exe",
+  ".bat",
+  ".cmd",
+  ".scr",
+  ".com",
+  ".pif",
+  ".js",
+  ".vbs",
+]);
+
+/**
+ * Validate file size against maximum allowed
+ */
+const validateFileSize = (
+  file: Express.Multer.File,
+  maxSize: number
+): FileValidationError | null => {
+  if (file.size > maxSize) {
+    return {
+      field: "file.size",
+      value: file.size,
+      message: `File size ${(file.size / 1024 / 1024).toFixed(2)}MB exceeds maximum ${(maxSize / 1024 / 1024).toFixed(2)}MB`,
+    };
+  }
+  return null;
+};
+
+/**
+ * Validate file MIME type against allowed types
+ */
+const validateFileType = (
+  file: Express.Multer.File,
+  allowedTypes: string[]
+): FileValidationError | null => {
+  if (!allowedTypes.includes(file.mimetype)) {
+    return {
+      field: "file.type",
+      value: file.mimetype,
+      message: `File type ${file.mimetype} is not allowed. Allowed types: ${allowedTypes.join(", ")}`,
+    };
+  }
+  return null;
+};
+
+/**
+ * Validate file has a valid name
+ */
+const validateFileName = (file: Express.Multer.File): FileValidationError | null => {
+  if (!file.originalname || file.originalname.length === 0) {
+    return {
+      field: "file.name",
+      value: file.originalname,
+      message: "File must have a valid name",
+    };
+  }
+  return null;
+};
+
+/**
+ * Validate file extension is not dangerous
+ */
+const validateFileExtension = (file: Express.Multer.File): FileValidationError | null => {
+  const fileExtension = file.originalname.toLowerCase().split(".").pop();
+  if (fileExtension && DANGEROUS_EXTENSIONS.has(`.${fileExtension}`)) {
+    return {
+      field: "file.extension",
+      value: fileExtension,
+      message: "File type not allowed for security reasons",
+    };
+  }
+  return null;
+};
+
+/**
+ * Collect all file validation errors
+ */
+const collectFileErrors = (
+  file: Express.Multer.File,
+  maxSize: number,
+  allowedTypes: string[]
+): FileValidationError[] => {
+  const validators = [
+    validateFileSize(file, maxSize),
+    validateFileType(file, allowedTypes),
+    validateFileName(file),
+    validateFileExtension(file),
+  ];
+  return validators.filter((error): error is FileValidationError => error !== null);
+};
+
 /**
  * Validate file uploads with business rules
  */
@@ -143,72 +245,25 @@ export const validateFileUpload = (
       const file = req.file;
       const requestId = (req as AuthenticatedRequest).requestId || `req_${Date.now()}`;
 
-      // Check if file is required
+      // Check if file is required but missing
       if (required && !file) {
         const errorResponse = createValidationError(
-          [
-            {
-              field: "file",
-              value: null,
-              message: "File is required",
-            },
-          ],
+          [{ field: "file", value: null, message: "File is required" }],
           requestId
         );
-
         return res.status(400).json(errorResponse);
       }
 
       // If file is not required and not provided, continue
-      if (!required && !file) {
+      if (!file) {
         return next();
       }
 
-      if (file) {
-        const errors: Array<{ field: string; value: unknown; message: string }> = [];
-
-        // Validate file size
-        if (file.size > maxSize) {
-          errors.push({
-            field: "file.size",
-            value: file.size,
-            message: `File size ${(file.size / 1024 / 1024).toFixed(2)}MB exceeds maximum ${(maxSize / 1024 / 1024).toFixed(2)}MB`,
-          });
-        }
-
-        // Validate file type
-        if (!allowedTypes.includes(file.mimetype)) {
-          errors.push({
-            field: "file.type",
-            value: file.mimetype,
-            message: `File type ${file.mimetype} is not allowed. Allowed types: ${allowedTypes.join(", ")}`,
-          });
-        }
-
-        // Validate filename
-        if (!file.originalname || file.originalname.length === 0) {
-          errors.push({
-            field: "file.name",
-            value: file.originalname,
-            message: "File must have a valid name",
-          });
-        }
-
-        // Check for dangerous file extensions
-        const dangerousExtensions = [".exe", ".bat", ".cmd", ".scr", ".com", ".pif", ".js", ".vbs"];
-        const fileExtension = file.originalname.toLowerCase().split(".").pop();
-        if (fileExtension && dangerousExtensions.includes(`.${fileExtension}`)) {
-          errors.push({
-            field: "file.extension",
-            value: fileExtension,
-            message: "File type not allowed for security reasons",
-          });
-        }
-
-        if (errors.length > 0) {
-          const errorResponse = createValidationError(errors, requestId);
-          return res.status(400).json(errorResponse);
-        }
+      // Validate file and collect errors
+      const errors = collectFileErrors(file, maxSize, allowedTypes);
+      if (errors.length > 0) {
+        const errorResponse = createValidationError(errors, requestId);
+        return res.status(400).json(errorResponse);
       }
 
       next();
@@ -318,7 +373,7 @@ export const validateSubscriptionQuota = (
       const user = (req as AuthenticatedRequest).user as unknown as User;
       const requestId = (req as AuthenticatedRequest).requestId || `req_${Date.now()}`;
 
-      if (!user || !user.subscription) {
+      if (!user?.subscription) {
         const errorResponse = createApiError(
           "subscription_required",
           "Active subscription required",
@@ -347,16 +402,12 @@ export const validateSubscriptionQuota = (
       let hasQuota = true;
       let quotaMessage = "";
 
-      switch (quotaType) {
-        case "downloads":
-          if (!user.quota.unlimited) {
-            const remaining = user.quota.downloadsRemaining;
-            hasQuota = remaining >= requiredAmount;
-            quotaMessage = `Download quota exceeded. ${remaining} downloads remaining.`;
-          }
-          break;
-        // Add other quota types as needed
+      if (quotaType === "downloads" && !user.quota.unlimited) {
+        const remaining = user.quota.downloadsRemaining;
+        hasQuota = remaining >= requiredAmount;
+        quotaMessage = `Download quota exceeded. ${remaining} downloads remaining.`;
       }
+      // Add other quota types (uploads, api_calls) as needed with additional if statements
 
       if (!hasQuota) {
         const errorResponse = createApiError("quota_exceeded", "Quota exceeded", {
@@ -394,9 +445,9 @@ export const sanitizeInput = (input: string, maxLength: number = 1000): string =
 
   return input
     .trim()
-    .replace(/[<>]/g, "") // Remove HTML brackets
-    .replace(/javascript:/gi, "") // Remove javascript: protocol
-    .replace(/on\w+=/gi, "") // Remove event handlers
+    .replaceAll(/[<>]/g, "") // Remove HTML brackets
+    .replaceAll(/javascript:/gi, "") // Remove javascript: protocol
+    .replaceAll(/on\w+=/gi, "") // Remove event handlers
     .slice(0, maxLength); // Limit length
 };
 
@@ -411,16 +462,18 @@ export const normalizeEmail = (email: string): string => {
  * Generate request ID for tracking
  */
 export const generateRequestId = (): string => {
-  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 };
 
 // ================================
 // TYPE EXPORTS
 // ================================
 
-export interface ValidationMiddleware {
-  (req: Request, res: Response, next: NextFunction): void | Promise<void>;
-}
+export type ValidationMiddleware = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => void | Promise<void>;
 
 export interface ValidationOptions {
   maxSize?: number;
