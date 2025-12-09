@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAudioStore } from "@/stores/useAudioStore";
-import { ChevronLeft, ChevronRight, Pause, Play, Plus, ShoppingCart } from "lucide-react";
+import { ChevronLeft, ChevronRight, Heart, Pause, Play, ShoppingCart } from "lucide-react";
 import { memo, useCallback, useState } from "react";
 
 /** Audio track for multi-track products */
@@ -40,7 +40,8 @@ interface SonaarGridLayoutProps {
   readonly beats: GridBeat[];
   readonly onBeatSelect?: (beat: GridBeat) => void;
   readonly onAddToCart?: (beat: GridBeat) => void;
-  readonly onAddToPlaylist?: (beat: GridBeat) => void;
+  readonly onToggleFavorite?: (beat: GridBeat) => void;
+  readonly isFavorite?: (beatId: number) => boolean;
   readonly columns?: 2 | 3 | 4 | 5;
   readonly className?: string;
   readonly isLoading?: boolean;
@@ -54,7 +55,8 @@ interface GridItemProps {
   readonly onTrackChange: (trackIndex: number) => void;
   readonly onSelect?: () => void;
   readonly onAddToCart?: () => void;
-  readonly onAddToPlaylist?: () => void;
+  readonly onToggleFavorite?: () => void;
+  readonly isFavorite?: boolean;
 }
 
 function getTracks(beat: GridBeat): AudioTrack[] {
@@ -75,7 +77,8 @@ const GridItem = memo(function GridItem({
   onTrackChange,
   onSelect,
   onAddToCart,
-  onAddToPlaylist,
+  onToggleFavorite,
+  isFavorite,
 }: GridItemProps): JSX.Element {
   const [isHovered, setIsHovered] = useState(false);
   const tracks = getTracks(beat);
@@ -247,17 +250,23 @@ const GridItem = memo(function GridItem({
                 <ShoppingCart className="w-4 h-4" />
               </Button>
             )}
-            {onAddToPlaylist && (
+            {onToggleFavorite && (
               <Button
                 size="icon"
                 variant="secondary"
-                className="w-8 h-8 bg-black/60 hover:bg-[var(--accent-cyan)]"
+                className={cn(
+                  "w-8 h-8 transition-all",
+                  isFavorite
+                    ? "bg-red-500 hover:bg-red-600 text-white"
+                    : "bg-black/60 hover:bg-red-500 hover:text-white"
+                )}
                 onClick={(e: React.MouseEvent) => {
                   e.stopPropagation();
-                  onAddToPlaylist();
+                  onToggleFavorite();
                 }}
+                title={isFavorite ? "Remove from favorites" : "Add to favorites"}
               >
-                <Plus className="w-4 h-4" />
+                <Heart className={cn("w-4 h-4", isFavorite && "fill-current")} />
               </Button>
             )}
           </div>
@@ -320,16 +329,37 @@ function LoadingSkeleton({ columns }: Readonly<{ columns: number }>): JSX.Elemen
   );
 }
 
+// Helper to convert local AudioTrack to store AudioTrack format
+function convertToStoreTrack(
+  beat: GridBeat,
+  track: AudioTrack,
+  index: number
+): import("@/stores/useAudioStore").AudioTrack {
+  return {
+    id: `${beat.id}-${index}`,
+    title: track.title || beat.title,
+    artist: track.artist || beat.artist || "BroLab",
+    url: track.url,
+    audioUrl: track.url,
+    artwork: beat.imageUrl,
+    imageUrl: beat.imageUrl,
+    price: beat.price,
+    isFree: beat.isFree,
+  };
+}
+
 export const SonaarGridLayout = memo(function SonaarGridLayout({
   beats,
   onBeatSelect,
   onAddToCart,
-  onAddToPlaylist,
+  onToggleFavorite,
+  isFavorite,
   columns = 4,
   className,
   isLoading = false,
 }: SonaarGridLayoutProps): JSX.Element {
-  const { currentTrack, isPlaying, setCurrentTrack, setIsPlaying } = useAudioStore();
+  const { currentTrack, isPlaying, setCurrentTrack, setIsPlaying, setQueue, playTrackFromQueue } =
+    useAudioStore();
   const [trackIndices, setTrackIndices] = useState<Record<number, number>>({});
 
   const getTrackIndex = useCallback(
@@ -345,22 +375,18 @@ export const SonaarGridLayout = memo(function SonaarGridLayout({
       const tracks = getTracks(beat);
       const track = tracks[trackIndex];
       if (!track) return;
+
+      // If this beat is currently playing, update the queue and play the new track
       if (currentTrack?.id?.startsWith(`${beatId}-`)) {
-        setCurrentTrack({
-          id: `${beatId}-${trackIndex}`,
-          title: track.title || `${beat.title} - Track ${trackIndex + 1}`,
-          artist: track.artist || beat.artist || "BroLab",
-          url: track.url,
-          audioUrl: track.url,
-          artwork: beat.imageUrl,
-          imageUrl: beat.imageUrl,
-          price: beat.price,
-          isFree: beat.isFree,
-        });
+        // Convert all tracks to store format and set queue
+        const storeTracks = tracks.map((t, i) => convertToStoreTrack(beat, t, i));
+        setQueue(storeTracks);
+        // Play the selected track from queue
+        playTrackFromQueue(trackIndex);
         setIsPlaying(true);
       }
     },
-    [beats, currentTrack, setCurrentTrack, setIsPlaying]
+    [beats, currentTrack, setQueue, playTrackFromQueue, setIsPlaying]
   );
 
   const handlePlay = useCallback(
@@ -368,28 +394,37 @@ export const SonaarGridLayout = memo(function SonaarGridLayout({
       const idx = trackIndex ?? getTrackIndex(beat.id);
       const tracks = getTracks(beat);
       if (tracks.length === 0) return;
-      const track = tracks[idx] || tracks[0];
+
       const trackId = `${beat.id}-${idx}`;
+
+      // If same track, toggle play/pause
       if (currentTrack?.id === trackId && isPlaying) {
         setIsPlaying(false);
-      } else if (currentTrack?.id === trackId && !isPlaying) {
-        setIsPlaying(true);
-      } else {
-        setCurrentTrack({
-          id: trackId,
-          title: track.title || `${beat.title} - Track ${idx + 1}`,
-          artist: track.artist || beat.artist || "BroLab",
-          url: track.url,
-          audioUrl: track.url,
-          artwork: beat.imageUrl,
-          imageUrl: beat.imageUrl,
-          price: beat.price,
-          isFree: beat.isFree,
-        });
-        setIsPlaying(true);
+        return;
       }
+      if (currentTrack?.id === trackId && !isPlaying) {
+        setIsPlaying(true);
+        return;
+      }
+
+      // Convert all tracks to store format and set queue for multi-track navigation
+      const storeTracks = tracks.map((t, i) => convertToStoreTrack(beat, t, i));
+      setQueue(storeTracks);
+
+      // Set current track and play
+      setCurrentTrack(storeTracks[idx] || storeTracks[0]);
+      playTrackFromQueue(idx);
+      setIsPlaying(true);
     },
-    [currentTrack, isPlaying, setCurrentTrack, setIsPlaying, getTrackIndex]
+    [
+      currentTrack,
+      isPlaying,
+      setCurrentTrack,
+      setIsPlaying,
+      setQueue,
+      playTrackFromQueue,
+      getTrackIndex,
+    ]
   );
 
   const isBeatPlaying = useCallback(
@@ -419,7 +454,8 @@ export const SonaarGridLayout = memo(function SonaarGridLayout({
             onTrackChange={(idx: number) => handleTrackChange(beat.id, idx)}
             onSelect={() => onBeatSelect?.(beat)}
             onAddToCart={() => onAddToCart?.(beat)}
-            onAddToPlaylist={() => onAddToPlaylist?.(beat)}
+            onToggleFavorite={() => onToggleFavorite?.(beat)}
+            isFavorite={isFavorite?.(beat.id)}
           />
         ))
       )}

@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAudioStore } from "@/stores/useAudioStore";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  List,
   Loader2,
   Pause,
   Play,
@@ -217,6 +218,8 @@ export function SonaarModernPlayer(): JSX.Element | null {
     volume,
     currentTime,
     duration,
+    queue,
+    currentIndex,
     setIsPlaying,
     setVolume,
     setCurrentTime,
@@ -224,6 +227,7 @@ export function SonaarModernPlayer(): JSX.Element | null {
     setCurrentTrack,
     nextTrack,
     previousTrack,
+    playTrackFromQueue,
   } = useAudioStore();
 
   const { addItem } = useCartContext();
@@ -232,8 +236,12 @@ export function SonaarModernPlayer(): JSX.Element | null {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showTracklist, setShowTracklist] = useState(false);
   const lastTrackRef = useRef<string | null>(null);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Check if there are multiple tracks in the queue
+  const hasMultipleTracks = queue.length > 1;
 
   const stopOtherAudioElements = useCallback((currentAudio: HTMLAudioElement): void => {
     const allAudio = document.querySelectorAll("audio");
@@ -589,6 +597,25 @@ export function SonaarModernPlayer(): JSX.Element | null {
               />
             </div>
 
+            {/* View Tracklist Button - Only show when multiple tracks */}
+            {hasMultipleTracks && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTracklist(true)}
+                className="w-8 h-8 p-0 rounded-full text-gray-400 hover:text-white hover:bg-white/10 relative"
+                title="View Tracklist"
+              >
+                <List className="w-4 h-4" />
+                <span
+                  className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center text-white"
+                  style={{ backgroundColor: SONAAR_COLORS.waveformPlayed }}
+                >
+                  {queue.length}
+                </span>
+              </Button>
+            )}
+
             {getDisplayPrice() && (
               <div className="hidden sm:flex items-center gap-2">
                 <Button
@@ -617,6 +644,162 @@ export function SonaarModernPlayer(): JSX.Element | null {
             </Button>
           </div>
         </div>
+
+        {/* Tracklist Modal */}
+        <AnimatePresence>
+          {showTracklist && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+              onClick={() => setShowTracklist(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="relative w-full max-w-lg mx-4 max-h-[70vh] rounded-xl overflow-hidden"
+                style={{ background: SONAAR_COLORS.backgroundGradient }}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between p-4 border-b border-white/10">
+                  <h3 className="text-xl font-bold" style={{ color: SONAAR_COLORS.waveformPlayed }}>
+                    {currentTrack?.artist || "Tracklist"}
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowTracklist(false)}
+                    className="w-8 h-8 p-0 rounded-full text-gray-400 hover:text-white hover:bg-white/10"
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
+
+                {/* Play All Button */}
+                <div className="flex justify-center py-4">
+                  <Button
+                    onClick={() => {
+                      if (queue.length > 0) {
+                        playTrackFromQueue(0);
+                        setIsPlaying(true);
+                      }
+                    }}
+                    className="px-8 py-2 rounded-full font-semibold transition-all hover:scale-105"
+                    style={{
+                      backgroundColor: SONAAR_COLORS.waveformPlayed,
+                      color: "white",
+                    }}
+                  >
+                    PLAY
+                  </Button>
+                </div>
+
+                {/* Track List */}
+                <div className="overflow-y-auto max-h-[45vh] px-4 pb-4">
+                  {queue.map((track, index) => {
+                    const isCurrentTrack = currentIndex === index;
+                    return (
+                      <motion.div
+                        key={track.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className={`flex items-center gap-4 p-3 rounded-lg cursor-pointer transition-all ${
+                          isCurrentTrack ? "bg-white/10" : "hover:bg-white/5"
+                        }`}
+                        onClick={() => {
+                          playTrackFromQueue(index);
+                          setIsPlaying(true);
+                        }}
+                      >
+                        {/* Play indicator / Track number */}
+                        <div className="w-8 flex items-center justify-center">
+                          {isCurrentTrack && isPlaying ? (
+                            <div className="flex items-end gap-[2px] h-4">
+                              {[0, 1, 2].map(i => (
+                                <motion.div
+                                  key={`playing-bar-${i}`}
+                                  className="w-1 rounded-sm"
+                                  style={{ backgroundColor: SONAAR_COLORS.waveformPlayed }}
+                                  animate={{ height: [4, 12, 4] }}
+                                  transition={{
+                                    duration: 0.5,
+                                    repeat: Infinity,
+                                    delay: i * 0.1,
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <span
+                              className={`text-sm ${isCurrentTrack ? "text-white" : "text-gray-500"}`}
+                            >
+                              {isCurrentTrack ? "▶" : index + 1}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Track Info */}
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={`font-medium truncate ${
+                              isCurrentTrack ? "text-white" : "text-gray-300"
+                            }`}
+                          >
+                            {track.title}
+                          </p>
+                        </div>
+
+                        {/* Artist */}
+                        <div className="hidden sm:block text-sm text-gray-500 truncate max-w-[120px]">
+                          {track.artist}
+                        </div>
+
+                        {/* Duration placeholder */}
+                        <div className="text-sm text-gray-500 w-12 text-right">
+                          {track.duration
+                            ? typeof track.duration === "number"
+                              ? `${Math.floor(track.duration / 60)}:${String(Math.floor(track.duration % 60)).padStart(2, "0")}`
+                              : track.duration
+                            : "--:--"}
+                        </div>
+
+                        {/* Add to cart */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={e => {
+                            e.stopPropagation();
+                            addItem({
+                              beatId: Number.parseInt(track.id, 10),
+                              title: track.title,
+                              genre: "Unknown",
+                              imageUrl: track.imageUrl ?? "",
+                              licenseType: "basic" as const,
+                              quantity: 1,
+                              isFree: track.isFree ?? false,
+                            });
+                            toast({
+                              title: "Added to Cart",
+                              description: `${track.title} has been added to your cart.`,
+                            });
+                          }}
+                          className="w-8 h-8 p-0 text-gray-500 hover:text-white hover:bg-white/10"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                        </Button>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </AnimatePresence>
   );
