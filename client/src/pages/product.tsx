@@ -287,18 +287,100 @@ export default function Product(): JSX.Element {
       // Trigger download success event for dashboard refresh
       globalThis.dispatchEvent(new CustomEvent("download-success"));
 
-      // Then download the file
-      const downloadUrl = product.audio_url || `/api/downloads/file/${product.id}/free`;
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = `${product.name}.mp3`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      // Check if product has multiple audio tracks
+      const audioTracks = product.audio_tracks;
+      const hasMultipleTracks = audioTracks && Array.isArray(audioTracks) && audioTracks.length > 1;
+
+      // Debug: log available URLs and tracks
+      console.log("📥 Download info:", {
+        download_url: product.download_url,
+        audio_url: product.audio_url,
+        trackCount: audioTracks?.length || 0,
+        hasMultipleTracks,
+      });
+
+      if (hasMultipleTracks) {
+        // Multi-track product: download as ZIP
+        console.log("📦 Downloading multi-track product as ZIP...");
+
+        toast({
+          title: "Preparing Download",
+          description: `Creating ZIP archive with ${audioTracks.length} tracks...`,
+        });
+
+        const response = await fetch("/api/downloads/zip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productName: product.name,
+            tracks: audioTracks,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error("❌ ZIP download failed:", response.status, errorData);
+          throw new Error(`ZIP download failed: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        console.log("✅ ZIP downloaded, size:", blob.size);
+
+        const filename = `${product.name.replaceAll(/[^a-zA-Z0-9._-]/g, "_")}.zip`;
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(blobUrl);
+      } else {
+        // Single track: download directly
+        const sourceUrl = product.download_url || product.audio_url;
+
+        if (sourceUrl) {
+          // Use proxy endpoint to force download instead of opening in new tab
+          const filename = `${product.name.replaceAll(/[^a-zA-Z0-9._-]/g, "_")}.mp3`;
+          const proxyUrl = `/api/downloads/proxy?url=${encodeURIComponent(sourceUrl)}&filename=${encodeURIComponent(filename)}`;
+
+          console.log("📥 Proxy URL:", proxyUrl);
+
+          // Use fetch to get the file and create a blob for download
+          const response = await fetch(proxyUrl);
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error("❌ Proxy download failed:", response.status, errorData);
+            throw new Error(`Download failed: ${response.status}`);
+          }
+
+          const blob = await response.blob();
+          console.log("✅ File downloaded, size:", blob.size);
+
+          const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = blobUrl;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(blobUrl);
+        } else {
+          console.warn("⚠️ No download URL available, using fallback");
+          // Fallback to API endpoint if no direct URL available
+          const link = document.createElement("a");
+          link.href = `/api/downloads/file/${product.id}/free`;
+          link.download = `${product.name}.mp3`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        }
+      }
 
       toast({
         title: "Download Started",
-        description: `${product.name} is being downloaded and tracked.`,
+        description: `${product.name} is being downloaded.`,
       });
     } catch (error) {
       console.error("Download error:", error);

@@ -1,3 +1,4 @@
+import archiver from "archiver";
 import express from "express";
 import { Parser } from "json2csv";
 import { insertDownloadSchema } from "../../shared/schema";
@@ -5,6 +6,13 @@ import { getCurrentUser, isAuthenticated } from "../auth";
 import { createValidationMiddleware } from "../lib/validation";
 import { getCurrentClerkUser } from "../middleware/clerkAuth";
 import { handleRouteError } from "../types/routes";
+
+// Audio track interface for ZIP downloads
+interface AudioTrack {
+  url: string;
+  downloadUrl?: string;
+  title?: string;
+}
 
 // Download object interface - matches Convex schema
 interface DownloadRecord {
@@ -282,6 +290,191 @@ router.get("/file/:productId/:type", async (req, res): Promise<void> => {
     });
   } catch (error: unknown) {
     handleRouteError(error, res, "File download failed");
+  }
+});
+
+// GET /api/downloads/proxy - Proxy download to force file download instead of browser playback
+router.get("/proxy", async (req, res): Promise<void> => {
+  try {
+    const { url, filename } = req.query;
+
+    console.log("📥 Proxy download request:", { url, filename });
+
+    if (!url || typeof url !== "string") {
+      console.error("❌ Missing or invalid URL parameter");
+      res.status(400).json({ error: "Missing or invalid URL parameter" });
+      return;
+    }
+
+    // Decode URL if it was encoded
+    const decodedUrl = decodeURIComponent(url);
+    console.log("📥 Decoded URL:", decodedUrl);
+
+    // Validate URL is from allowed domains (WordPress/CDN)
+    const allowedDomains = ["brolabentertainment.com", "wp-content", "uploads"];
+
+    const isAllowed = allowedDomains.some(domain => decodedUrl.includes(domain));
+    if (!isAllowed) {
+      console.error("❌ URL domain not allowed:", decodedUrl);
+      res.status(403).json({ error: "URL domain not allowed", url: decodedUrl });
+      return;
+    }
+
+    // Fetch the file from the external URL with proper headers
+    console.log("📥 Fetching file from:", decodedUrl);
+    const response = await fetch(decodedUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "audio/mpeg, audio/*, */*",
+        "Accept-Language": "en-US,en;q=0.9,fr;q=0.8",
+        Referer: "https://brolabentertainment.com/",
+      },
+    });
+
+    if (!response.ok) {
+      console.error("❌ Failed to fetch file:", response.status, response.statusText);
+      res.status(response.status).json({
+        error: "Failed to fetch file from source",
+        status: response.status,
+        statusText: response.statusText,
+        url: decodedUrl,
+      });
+      return;
+    }
+
+    // Get content type and set appropriate headers
+    const contentType = response.headers.get("content-type") || "audio/mpeg";
+    const contentLength = response.headers.get("content-length");
+
+    console.log("📥 File info:", { contentType, contentLength });
+
+    // Sanitize filename
+    const safeFilename =
+      typeof filename === "string" ? filename.replaceAll(/[^a-zA-Z0-9._-]/g, "_") : "download.mp3";
+
+    // Set headers to force download
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
+    if (contentLength) {
+      res.setHeader("Content-Length", contentLength);
+    }
+
+    // Stream the response body to the client
+    const arrayBuffer = await response.arrayBuffer();
+    console.log("✅ Sending file:", safeFilename, "size:", arrayBuffer.byteLength);
+    res.send(Buffer.from(arrayBuffer));
+  } catch (error: unknown) {
+    console.error("❌ Proxy download error:", error);
+    handleRouteError(error, res, "Proxy download failed");
+  }
+});
+
+// POST /api/downloads/zip - Download multiple audio files as a ZIP archive
+router.post("/zip", async (req, res): Promise<void> => {
+  try {
+    const { productName, tracks } = req.body as {
+      productName: string;
+      tracks: AudioTrack[];
+    };
+
+    console.log("📦 ZIP download request:", { productName, trackCount: tracks?.length });
+
+    if (!productName || !tracks || !Array.isArray(tracks) || tracks.length === 0) {
+      res.status(400).json({ error: "Missing productName or tracks array" });
+      return;
+    }
+
+    // Validate all URLs are from allowed domains
+    const allowedDomains = ["brolabentertainment.com", "wp-content", "uploads"];
+    for (const track of tracks) {
+      const trackUrl = track.downloadUrl || track.url;
+      if (!trackUrl) continue;
+      const isAllowed = allowedDomains.some(domain => trackUrl.includes(domain));
+      if (!isAllowed) {
+        console.error("❌ Track URL domain not allowed:", trackUrl);
+        res.status(403).json({ error: "Track URL domain not allowed", url: trackUrl });
+        return;
+      }
+    }
+
+    // Sanitize product name for filename
+    const safeProductName = productName.replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+    const zipFilename = `${safeProductName}.zip`;
+
+    // Set headers for ZIP download
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
+
+    // Create ZIP archive
+    const archive = archiver("zip", { zlib: { level: 5 } });
+
+    // Handle archive errors
+    archive.on("error", (err: Error) => {
+      console.error("❌ Archive error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to create ZIP archive" });
+      }
+    });
+
+    // Pipe archive to response
+    archive.pipe(res);
+
+    // Fetch and add each track to the archive
+    let trackIndex = 1;
+    for (const track of tracks) {
+      const trackUrl = track.downloadUrl || track.url;
+      if (!trackUrl) {
+        console.warn(`⚠️ Skipping track ${trackIndex}: no URL`);
+        trackIndex++;
+        continue;
+      }
+
+      try {
+        console.log(
+          `📥 Fetching track ${trackIndex}/${tracks.length}: ${trackUrl.substring(0, 60)}...`
+        );
+
+        const response = await fetch(trackUrl, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            Accept: "audio/mpeg, audio/*, */*",
+            Referer: "https://brolabentertainment.com/",
+          },
+        });
+
+        if (!response.ok) {
+          console.error(`❌ Failed to fetch track ${trackIndex}:`, response.status);
+          trackIndex++;
+          continue;
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Generate filename for this track
+        const trackTitle = track.title || `Track_${trackIndex}`;
+        const safeTrackTitle = trackTitle.replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+        const trackFilename = `${String(trackIndex).padStart(2, "0")}_${safeTrackTitle}.mp3`;
+
+        console.log(`✅ Adding to ZIP: ${trackFilename} (${buffer.length} bytes)`);
+        archive.append(buffer, { name: trackFilename });
+      } catch (fetchError) {
+        console.error(`❌ Error fetching track ${trackIndex}:`, fetchError);
+      }
+
+      trackIndex++;
+    }
+
+    // Finalize the archive
+    await archive.finalize();
+    console.log(`✅ ZIP archive created: ${zipFilename}`);
+  } catch (error: unknown) {
+    console.error("❌ ZIP download error:", error);
+    if (!res.headersSent) {
+      handleRouteError(error, res, "ZIP download failed");
+    }
   }
 });
 

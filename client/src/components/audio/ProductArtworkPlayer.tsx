@@ -116,13 +116,33 @@ export function ProductArtworkPlayer({
   const currentAudioUrl = currentTrackData?.url;
 
   // Use global audio store to stop other players when this one plays
-  const { currentTrack, setCurrentTrack, setIsPlaying: setGlobalIsPlaying, stop } = useAudioStore();
+  const {
+    currentTrack,
+    setCurrentTrack,
+    setIsPlaying: setGlobalIsPlaying,
+    stop,
+    setQueue,
+    playTrackFromQueue,
+  } = useAudioStore();
 
   // Generate a unique track ID for this product and track
   const trackId = useMemo(
     () => `product-${productId ?? productName}-${currentTrackIndex}`,
     [productId, productName, currentTrackIndex]
   );
+
+  // Convert local tracks to store format for queue
+  const storeTracks = useMemo(() => {
+    return tracks.map((track, index) => ({
+      id: `product-${productId ?? productName}-${index}`,
+      title: track.title || productName,
+      artist: track.artist || "BroLab Entertainment",
+      url: track.url,
+      audioUrl: track.url,
+      artwork: imageSrc,
+      imageUrl: imageSrc,
+    }));
+  }, [tracks, productId, productName, imageSrc]);
 
   // Handle play/pause toggle - manages local audio with global store sync
   const handleTogglePlay = useCallback(async (): Promise<void> => {
@@ -144,9 +164,14 @@ export function ProductArtworkPlayer({
           stop();
         }
 
-        // Update global store to mark this track as current (for other components to know)
-        const trackTitle =
-          currentTrackData?.title || `${productName} - Track ${currentTrackIndex + 1}`;
+        // Set queue with all tracks for global player navigation
+        if (storeTracks.length > 0) {
+          setQueue(storeTracks);
+          playTrackFromQueue(currentTrackIndex);
+        }
+
+        // Update global store to mark this track as current
+        const trackTitle = currentTrackData?.title || productName;
         setCurrentTrack({
           id: trackId,
           title: trackTitle,
@@ -179,8 +204,11 @@ export function ProductArtworkPlayer({
     currentTrackIndex,
     currentTrackData,
     imageSrc,
+    storeTracks,
     setCurrentTrack,
     setGlobalIsPlaying,
+    setQueue,
+    playTrackFromQueue,
     stop,
   ]);
 
@@ -190,13 +218,23 @@ export function ProductArtworkPlayer({
       e.stopPropagation();
       const newIndex = currentTrackIndex > 0 ? currentTrackIndex - 1 : tracks.length - 1;
       setCurrentTrackIndex(newIndex);
-      // Auto-play the new track if currently playing
-      if (isPlaying) {
-        setIsPlayingLocal(false);
-        // Will trigger play on next render via effect
+
+      // Update queue and play the new track if currently playing
+      if (isPlaying && storeTracks.length > 0) {
+        setQueue(storeTracks);
+        playTrackFromQueue(newIndex);
+        setCurrentTrack(storeTracks[newIndex]);
       }
     },
-    [currentTrackIndex, tracks.length, isPlaying]
+    [
+      currentTrackIndex,
+      tracks.length,
+      isPlaying,
+      storeTracks,
+      setQueue,
+      playTrackFromQueue,
+      setCurrentTrack,
+    ]
   );
 
   const handleNextTrack = useCallback(
@@ -204,25 +242,70 @@ export function ProductArtworkPlayer({
       e.stopPropagation();
       const newIndex = currentTrackIndex < tracks.length - 1 ? currentTrackIndex + 1 : 0;
       setCurrentTrackIndex(newIndex);
-      // Auto-play the new track if currently playing
-      if (isPlaying) {
-        setIsPlayingLocal(false);
+
+      // Update queue and play the new track if currently playing
+      if (isPlaying && storeTracks.length > 0) {
+        setQueue(storeTracks);
+        playTrackFromQueue(newIndex);
+        setCurrentTrack(storeTracks[newIndex]);
       }
     },
-    [currentTrackIndex, tracks.length, isPlaying]
+    [
+      currentTrackIndex,
+      tracks.length,
+      isPlaying,
+      storeTracks,
+      setQueue,
+      playTrackFromQueue,
+      setCurrentTrack,
+    ]
   );
 
-  // Auto-play when track changes (if was playing)
+  // Track previous track index to detect changes
+  const previousTrackIndexRef = useRef(currentTrackIndex);
+
+  // Auto-play when track index changes (user clicked prev/next)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentAudioUrl) return;
 
-    // Update audio source when track changes
-    if (audio.src !== currentAudioUrl) {
+    // Only trigger when track index actually changed (not on initial render)
+    if (previousTrackIndexRef.current !== currentTrackIndex) {
+      const wasPlaying = isPlaying;
+      previousTrackIndexRef.current = currentTrackIndex;
+
+      // Update audio source
       audio.src = currentAudioUrl;
       audio.load();
+
+      // Auto-play the new track if we were playing before
+      if (wasPlaying) {
+        // Use canplaythrough event to ensure audio is ready before playing
+        const handleCanPlay = (): void => {
+          audio
+            .play()
+            .then(() => {
+              setIsPlayingLocal(true);
+              setGlobalIsPlaying(true);
+            })
+            .catch(error => {
+              console.error("Auto-play failed:", error);
+              setIsPlayingLocal(false);
+            });
+          audio.removeEventListener("canplaythrough", handleCanPlay);
+        };
+
+        audio.addEventListener("canplaythrough", handleCanPlay);
+
+        // Cleanup listener if component unmounts or track changes again
+        return () => {
+          audio.removeEventListener("canplaythrough", handleCanPlay);
+        };
+      }
     }
-  }, [currentAudioUrl]);
+
+    return undefined;
+  }, [currentTrackIndex, currentAudioUrl, isPlaying, setGlobalIsPlaying]);
 
   // Audio event handlers
   useEffect(() => {
@@ -391,7 +474,7 @@ export function ProductArtworkPlayer({
             {hasMultipleTracks && currentTrackData && (
               <div className="mt-3 text-center">
                 <p className="text-white text-sm font-medium truncate max-w-[200px]">
-                  {currentTrackData.title || `Track ${currentTrackIndex + 1}`}
+                  {currentTrackData.title || productName}
                 </p>
                 <p className="text-white/60 text-xs">
                   {currentTrackIndex + 1} / {tracks.length}

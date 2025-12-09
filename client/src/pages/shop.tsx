@@ -8,6 +8,8 @@ import { TableBeatView } from "@/components/beats/TableBeatView";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { useFavorites } from "@/hooks/useFavorites";
 import { useUnifiedFilters } from "@/hooks/useUnifiedFilters";
 import type { BeatProduct } from "@shared/schema";
 import { LayoutGrid, List, RotateCcw } from "lucide-react";
@@ -102,6 +104,8 @@ function isProductFree(product: BeatProductWithWoo): boolean {
 export default function Shop() {
   const [, setLocation] = useLocation();
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const { toast } = useToast();
+  const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
 
   // Use unified filtering system
   const {
@@ -301,6 +305,34 @@ export default function Shop() {
     [setLocation]
   );
 
+  const handleToggleFavorite = useCallback(
+    async (beat: GridBeat) => {
+      try {
+        if (isFavorite(beat.id)) {
+          await removeFromFavorites(beat.id);
+          toast({
+            title: "Removed from Wishlist",
+            description: `${beat.title} has been removed from your wishlist.`,
+          });
+        } else {
+          await addToFavorites(beat.id);
+          toast({
+            title: "Added to Wishlist",
+            description: `${beat.title} has been added to your wishlist.`,
+          });
+        }
+      } catch (error) {
+        console.error("Wishlist error:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update wishlist. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+    [isFavorite, addToFavorites, removeFromFavorites, toast]
+  );
+
   const handleProductView = useCallback(
     (productId: number) => {
       setLocation(`/product/${productId}`);
@@ -377,6 +409,8 @@ export default function Shop() {
           <SonaarGridLayout
             beats={gridBeats}
             onBeatSelect={handleGridBeatSelect}
+            onToggleFavorite={handleToggleFavorite}
+            isFavorite={isFavorite}
             columns={4}
             isLoading={isLoading}
           />
