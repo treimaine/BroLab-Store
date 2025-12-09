@@ -348,6 +348,14 @@ export interface WooCommerceErrorResponse {
 export interface BroLabProductExtensions {
   // Audio-specific metadata
   audio_url?: string | null;
+  download_url?: string | null;
+  audio_tracks?: Array<{
+    url: string;
+    downloadUrl?: string;
+    title?: string;
+    artist?: string;
+    duration?: string;
+  }>;
   hasVocals?: boolean;
   stems?: boolean;
   bpm?: string;

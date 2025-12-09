@@ -86,12 +86,11 @@ const FilterDropdown = memo(function FilterDropdown({
 
       {isOpen && (
         <>
-          <div
-            className="fixed inset-0 z-40"
+          <button
+            type="button"
+            className="fixed inset-0 z-40 cursor-default bg-transparent border-none"
             onClick={() => setIsOpen(false)}
             onKeyDown={e => e.key === "Escape" && setIsOpen(false)}
-            role="button"
-            tabIndex={-1}
             aria-label="Close dropdown"
           />
           <Card className="absolute top-full left-0 mt-2 z-50 min-w-[200px] bg-[var(--dark-gray)] border-[var(--medium-gray)]">
@@ -180,12 +179,11 @@ const RangeFilter = memo(function RangeFilter({
 
       {isOpen && (
         <>
-          <div
-            className="fixed inset-0 z-40"
+          <button
+            type="button"
+            className="fixed inset-0 z-40 cursor-default bg-transparent border-none"
             onClick={() => setIsOpen(false)}
             onKeyDown={e => e.key === "Escape" && setIsOpen(false)}
-            role="button"
-            tabIndex={-1}
             aria-label="Close dropdown"
           />
           <Card className="absolute top-full left-0 mt-2 z-50 w-64 bg-[var(--dark-gray)] border-[var(--medium-gray)]">

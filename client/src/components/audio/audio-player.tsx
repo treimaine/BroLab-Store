@@ -2,9 +2,9 @@ import { Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface AudioPlayerProps {
-  src: string;
-  title: string;
-  className?: string;
+  readonly src: string;
+  readonly title: string;
+  readonly className?: string;
 }
 
 export function AudioPlayer({ src, title: _title, className = "" }: AudioPlayerProps) {
@@ -72,7 +72,9 @@ export function AudioPlayer({ src, title: _title, className = "" }: AudioPlayerP
             audioRef.current.load();
           }
         }}
-      />
+      >
+        <track kind="captions" />
+      </audio>
 
       <button
         onClick={togglePlay}

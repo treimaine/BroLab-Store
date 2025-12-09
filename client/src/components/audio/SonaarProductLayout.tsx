@@ -53,7 +53,6 @@ interface SonaarProductLayoutProps {
 }
 
 interface WaveformVisualizerProps {
-  readonly audioUrl?: string;
   readonly isPlaying: boolean;
   readonly currentTime: number;
   readonly duration: number;
@@ -148,7 +147,7 @@ export const SonaarProductLayout = memo(function SonaarProductLayout({
   const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
-    if (beat.audioUrl && typeof window !== "undefined") {
+    if (beat.audioUrl && globalThis.window !== undefined) {
       audioRef.current = new Audio(beat.audioUrl);
       audioRef.current.volume = volume;
 
@@ -167,11 +166,12 @@ export const SonaarProductLayout = memo(function SonaarProductLayout({
         setCurrentTime(0);
       });
 
-      return () => {
+      return (): void => {
         audio.pause();
         audio.src = "";
       };
     }
+    return undefined;
   }, [beat.audioUrl, volume]);
 
   const togglePlay = useCallback(() => {
@@ -205,7 +205,7 @@ export const SonaarProductLayout = memo(function SonaarProductLayout({
 
   const formatPrice = (price: number | string): string => {
     if (beat.isFree) return "FREE";
-    const numPrice = typeof price === "string" ? parseFloat(price) : price;
+    const numPrice = typeof price === "string" ? Number.parseFloat(price) : price;
     return `$${numPrice.toFixed(2)}`;
   };
 
@@ -270,7 +270,6 @@ export const SonaarProductLayout = memo(function SonaarProductLayout({
             <Card className="bg-[var(--dark-gray)] border-[var(--medium-gray)]">
               <CardContent className="p-4 space-y-3">
                 <WaveformVisualizer
-                  audioUrl={beat.audioUrl}
                   isPlaying={isPlaying}
                   currentTime={currentTime}
                   duration={duration}
@@ -309,7 +308,7 @@ export const SonaarProductLayout = memo(function SonaarProductLayout({
                       step="0.1"
                       value={isMuted ? 0 : volume}
                       onChange={e => {
-                        const newVolume = parseFloat(e.target.value);
+                        const newVolume = Number.parseFloat(e.target.value);
                         setVolume(newVolume);
                         if (audioRef.current) {
                           audioRef.current.volume = newVolume;

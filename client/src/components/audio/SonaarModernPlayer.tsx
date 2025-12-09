@@ -761,11 +761,13 @@ export function SonaarModernPlayer(): JSX.Element | null {
 
                         {/* Duration placeholder */}
                         <div className="text-sm text-gray-500 w-12 text-right">
-                          {track.duration
-                            ? typeof track.duration === "number"
-                              ? `${Math.floor(track.duration / 60)}:${String(Math.floor(track.duration % 60)).padStart(2, "0")}`
-                              : track.duration
-                            : "--:--"}
+                          {(() => {
+                            if (!track.duration) return "--:--";
+                            if (typeof track.duration === "number") {
+                              return `${Math.floor(track.duration / 60)}:${String(Math.floor(track.duration % 60)).padStart(2, "0")}`;
+                            }
+                            return track.duration;
+                          })()}
                         </div>
 
                         {/* Add to cart */}
