@@ -228,53 +228,53 @@ export default function Home() {
                   )
                 )
               : trendingDisplayBeats.map((beat: BroLabWooCommerceProduct) => (
-                  <Card
-                    key={beat.id}
-                    className="bg-[var(--dark-gray)] border-[var(--medium-gray)] hover:border-[var(--accent-purple)] transition-all duration-300 group"
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-4">
-                        <div className="relative">
-                          <img
-                            src={getImageUrl(beat)}
-                            alt={beat.name}
-                            className="w-16 h-16 rounded-lg object-cover"
+                <Card
+                  key={beat.id}
+                  className="bg-[var(--dark-gray)] border-[var(--medium-gray)] hover:border-[var(--accent-purple)] transition-all duration-300 group"
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="relative">
+                        <img
+                          src={getImageUrl(beat)}
+                          alt={beat.name}
+                          className="w-16 h-16 rounded-lg object-cover"
+                        />
+                        {checkHasRealAudio(beat) && (
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <HoverPlayButton
+                            audioUrl={getAudioUrl(beat)}
+                            productId={beat.id.toString()}
+                            productName={beat.name}
+                            imageUrl={getImageUrl(beat)}
+                            price={beat.price}
+                            isFree={isFreeProduct(beat)}
+                            size="sm"
+                            className="bg-black bg-opacity-60 hover:bg-[var(--accent-purple)]"
                           />
-                          {checkHasRealAudio(beat) && (
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                              <HoverPlayButton
-                                audioUrl={getAudioUrl(beat)}
-                                productId={beat.id.toString()}
-                                productName={beat.name}
-                                imageUrl={getImageUrl(beat)}
-                                price={beat.price}
-                                isFree={isFreeProduct(beat)}
-                                size="sm"
-                                className="bg-black bg-opacity-60 hover:bg-[var(--accent-purple)]"
-                              />
-                            </div>
-                          )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-bold text-white truncate">{beat.name}</h4>
-                          <p className="text-sm text-gray-400">{getGenre(beat)}</p>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="text-[var(--accent-purple)] font-bold">
-                              {isFreeProduct(beat) ? (
-                                <span className="text-[var(--accent-cyan)]">FREE</span>
+                          )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-white truncate">{beat.name}</h4>
+                        <p className="text-sm text-gray-400">{getGenre(beat)}</p>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-[var(--accent-purple)] font-bold">
+                            {isFreeProduct(beat) ? (
+                              <span className="text-[var(--accent-cyan)]">FREE</span>
                               ) : (
                                 `${getFormattedPrice(beat)}`
                               )}
-                            </span>
-                            <div className="flex items-center text-xs text-gray-400">
-                              <Eye className="w-3 h-3 mr-1" />
-                              {Math.floor(Math.random() * 1000) + 100}
-                            </div>
+                          </span>
+                          <div className="flex items-center text-xs text-gray-400">
+                            <Eye className="w-3 h-3 mr-1" />
+                            {Math.floor(Math.random() * 1000) + 100}
                           </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </CardContent>
+                </Card>
                 ))}
           </div>
         </div>
