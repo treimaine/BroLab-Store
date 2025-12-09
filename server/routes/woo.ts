@@ -106,92 +106,156 @@ async function enrichTracksWithMediaTitles(tracks: AudioTrack[]): Promise<AudioT
   return enrichedTracks;
 }
 
+// Title field names used by Sonaar plugin (in priority order)
+const TITLE_FIELDS = [
+  "title",
+  "track_title",
+  "stream_title",
+  "song_title",
+  "name",
+  "icecast_title",
+] as const;
+
+// Artist field names used by Sonaar plugin (in priority order)
+const ARTIST_FIELDS = ["artist", "track_artist", "artist_name"] as const;
+
+// Duration field names used by Sonaar plugin (in priority order)
+// Note: "stream_lenght" is a typo in Sonaar plugin, kept for compatibility
+const DURATION_FIELDS = [
+  "duration",
+  "track_duration",
+  "stream_lenght",
+  "post_audiopreview_duration",
+] as const;
+
+// Helper: Extract first non-empty value from track record using field list
+function extractFieldValue(
+  trackRecord: Record<string, unknown>,
+  fields: readonly string[]
+): string | undefined {
+  for (const field of fields) {
+    const value = safeString(trackRecord[field]);
+    if (value) return value;
+  }
+  return undefined;
+}
+
+// Helper: Extract track title with media ID consideration
+function extractTrackTitle(
+  trackRecord: Record<string, unknown>,
+  mediaId: number | undefined
+): string | undefined {
+  // When mediaId exists, let enrichTracksWithMediaTitles fetch the correct title from WordPress API
+  // This ensures we use the WordPress media library title instead of potentially incorrect values
+  if (mediaId) return undefined;
+  return extractFieldValue(trackRecord, TITLE_FIELDS);
+}
+
+// Helper: Get valid media ID from track record
+function getMediaId(trackRecord: Record<string, unknown>): number | undefined {
+  if (!trackRecord.track_mp3_id) return undefined;
+  const mediaId = Number(trackRecord.track_mp3_id);
+  return Number.isNaN(mediaId) ? undefined : mediaId;
+}
+
+// Helper: Build AudioTrack from track record
+function buildAudioTrack(trackRecord: Record<string, unknown>): AudioTrack | null {
+  const { previewUrl, downloadUrl } = extractAudioUrlsFromTrack(trackRecord);
+  if (!previewUrl) return null;
+
+  const mediaId = getMediaId(trackRecord);
+
+  return {
+    url: previewUrl,
+    downloadUrl: downloadUrl || undefined,
+    title: extractTrackTitle(trackRecord, mediaId),
+    artist: extractFieldValue(trackRecord, ARTIST_FIELDS),
+    duration: extractFieldValue(trackRecord, DURATION_FIELDS),
+    mediaId,
+  };
+}
+
+// Helper: Process array of track data
+function processTrackArray(trackData: unknown[], productId: number): AudioTrack[] {
+  const tracks: AudioTrack[] = [];
+
+  for (const track of trackData) {
+    const trackRecord = track as Record<string, unknown>;
+    const audioTrack = buildAudioTrack(trackRecord);
+
+    if (audioTrack) {
+      tracks.push(audioTrack);
+      console.log(
+        `🎵 Product ${productId} - Track:`,
+        audioTrack.title || "(no title)",
+        `preview: ${audioTrack.url?.substring(0, 50)}...`,
+        `download: ${audioTrack.downloadUrl?.substring(0, 50)}...`
+      );
+    }
+  }
+
+  console.log(`🎵 Product ${productId} - Found ${tracks.length} audio tracks`);
+  return tracks;
+}
+
+// Helper: Process single track object
+function processSingleTrackObject(
+  trackData: Record<string, unknown>,
+  productId: number
+): AudioTrack[] {
+  const url = extractAudioFromTrack(trackData);
+  if (!url) return [];
+
+  const track: AudioTrack = {
+    url,
+    title: safeString(trackData.title) || undefined,
+    artist: safeString(trackData.artist) || undefined,
+    duration: safeString(trackData.duration) || undefined,
+  };
+
+  console.log(`🎵 Product ${productId} - Found audio URL (object):`, url);
+  return [track];
+}
+
+// Helper: Get fallback track from audio_url metadata
+function getFallbackTrack(
+  audioUrlMeta: WooCommerceMetaData | undefined,
+  productId: number
+): AudioTrack[] {
+  if (!audioUrlMeta?.value) return [];
+
+  const audioUrl = safeString(audioUrlMeta.value);
+  if (!audioUrl) return [];
+
+  console.log(`🎵 Product ${productId} - Fallback audio URL:`, audioUrl);
+  return [{ url: audioUrl }];
+}
+
 // Helper function to extract all audio tracks from alb_tracklist metadata
 function extractAudioTracks(
   albTracklistMeta: WooCommerceMetaData | undefined,
   audioUrlMeta: WooCommerceMetaData | undefined,
   productId: number
 ): AudioTrack[] {
-  const tracks: AudioTrack[] = [];
-
-  if (albTracklistMeta?.value) {
-    const trackData = parseTrackData(albTracklistMeta.value);
-
-    if (Array.isArray(trackData) && trackData.length > 0) {
-      for (const track of trackData) {
-        const trackRecord = track as Record<string, unknown>;
-        const { previewUrl, downloadUrl } = extractAudioUrlsFromTrack(trackRecord);
-        if (previewUrl) {
-          // Get media ID for fetching title from WordPress
-          const mediaId = trackRecord.track_mp3_id ? Number(trackRecord.track_mp3_id) : undefined;
-
-          // Extract title from various possible field names used by Sonaar
-          // IMPORTANT: Only use tracklist title if NO mediaId exists
-          // When mediaId exists, let enrichTracksWithMediaTitles fetch the correct title from WordPress API
-          // This ensures we use the WordPress media library title (e.g., "Elevate") instead of
-          // potentially incorrect values from tracklist fields (e.g., filename-based "Timeless")
-          const trackTitle = mediaId
-            ? "" // Will be fetched from WordPress media library
-            : safeString(trackRecord.title) ||
-              safeString(trackRecord.track_title) ||
-              safeString(trackRecord.stream_title) ||
-              safeString(trackRecord.song_title) ||
-              safeString(trackRecord.name) ||
-              safeString(trackRecord.icecast_title) ||
-              "";
-
-          tracks.push({
-            url: previewUrl, // Preview URL for playback
-            downloadUrl: downloadUrl || undefined, // Full audio URL for download
-            title: trackTitle || undefined,
-            artist:
-              safeString(trackRecord.artist) ||
-              safeString(trackRecord.track_artist) ||
-              safeString(trackRecord.artist_name) ||
-              undefined,
-            duration:
-              safeString(trackRecord.duration) ||
-              safeString(trackRecord.track_duration) ||
-              safeString(trackRecord.stream_lenght) ||
-              safeString(trackRecord.post_audiopreview_duration) ||
-              undefined,
-            mediaId: mediaId && !Number.isNaN(mediaId) ? mediaId : undefined,
-          });
-
-          console.log(
-            `🎵 Product ${productId} - Track:`,
-            trackTitle || "(no title)",
-            `preview: ${previewUrl?.substring(0, 50)}...`,
-            `download: ${downloadUrl?.substring(0, 50)}...`
-          );
-        }
-      }
-      console.log(`🎵 Product ${productId} - Found ${tracks.length} audio tracks`);
-    } else if (trackData && typeof trackData === "object") {
-      const url = extractAudioFromTrack(trackData as Record<string, unknown>);
-      if (url) {
-        const trackRecord = trackData as Record<string, unknown>;
-        tracks.push({
-          url,
-          title: safeString(trackRecord.title) || undefined,
-          artist: safeString(trackRecord.artist) || undefined,
-          duration: safeString(trackRecord.duration) || undefined,
-        });
-      }
-      console.log(`🎵 Product ${productId} - Found audio URL (object):`, url);
-    }
+  if (!albTracklistMeta?.value) {
+    return getFallbackTrack(audioUrlMeta, productId);
   }
 
-  // Fallback to audio_url metadata if no tracks found
-  if (tracks.length === 0 && audioUrlMeta?.value) {
-    const audioUrl = safeString(audioUrlMeta.value);
-    if (audioUrl) {
-      tracks.push({ url: audioUrl });
-      console.log(`🎵 Product ${productId} - Fallback audio URL:`, audioUrl);
-    }
+  const trackData = parseTrackData(albTracklistMeta.value);
+
+  // Handle array of tracks
+  if (Array.isArray(trackData) && trackData.length > 0) {
+    return processTrackArray(trackData, productId);
   }
 
-  return tracks;
+  // Handle single track object
+  if (trackData && typeof trackData === "object") {
+    const tracks = processSingleTrackObject(trackData as Record<string, unknown>, productId);
+    if (tracks.length > 0) return tracks;
+  }
+
+  // Fallback to audio_url metadata
+  return getFallbackTrack(audioUrlMeta, productId);
 }
 
 // Helper function to find metadata value
