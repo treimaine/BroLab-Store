@@ -8,8 +8,24 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Pause, Play, ShoppingCart } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Pause,
+  Play,
+  ShoppingCart,
+  SkipBack,
+  SkipForward,
+} from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+
+/** Audio track for multi-track products */
+export interface AudioTrack {
+  readonly url: string;
+  readonly title?: string;
+  readonly artist?: string;
+  readonly duration?: string;
+}
 
 export interface CarouselBeat {
   readonly id: number;
@@ -19,6 +35,7 @@ export interface CarouselBeat {
   readonly price: number | string;
   readonly imageUrl: string;
   readonly audioUrl?: string;
+  readonly audioTracks?: AudioTrack[];
   readonly isFree?: boolean;
 }
 
@@ -36,9 +53,23 @@ interface CarouselItemProps {
   readonly position: number;
   readonly isActive: boolean;
   readonly isPlaying: boolean;
+  readonly currentTrackIndex: number;
   readonly onPlay: () => void;
+  readonly onPrevTrack: () => void;
+  readonly onNextTrack: () => void;
+  readonly onTrackSelect: (index: number) => void;
   readonly onSelect?: () => void;
   readonly onAddToCart?: () => void;
+}
+
+function getTracks(beat: CarouselBeat): AudioTrack[] {
+  if (beat.audioTracks && beat.audioTracks.length > 0) {
+    return beat.audioTracks;
+  }
+  if (beat.audioUrl) {
+    return [{ url: beat.audioUrl, title: beat.title }];
+  }
+  return [];
 }
 
 const CarouselItem = memo(function CarouselItem({
@@ -46,10 +77,18 @@ const CarouselItem = memo(function CarouselItem({
   position,
   isActive,
   isPlaying,
+  currentTrackIndex,
   onPlay,
+  onPrevTrack,
+  onNextTrack,
+  onTrackSelect,
   onSelect,
   onAddToCart,
 }: CarouselItemProps): JSX.Element {
+  const tracks = getTracks(beat);
+  const hasMultipleTracks = tracks.length > 1;
+  const hasAudio = tracks.length > 0;
+
   // Calculate 3D transform based on position
   // Note: Must include -50% translate to maintain centering since style.transform overrides CSS classes
   const getTransform = (): string => {
@@ -89,17 +128,13 @@ const CarouselItem = memo(function CarouselItem({
       className={cn(
         "absolute left-1/2 top-1/2",
         "w-64 sm:w-72 md:w-80 transition-all duration-500 ease-out",
-        "cursor-pointer"
+        isActive ? "cursor-pointer" : "cursor-default"
       )}
       style={{
         transform: getTransform(),
         opacity: getOpacity(),
         zIndex: getZIndex(),
       }}
-      onClick={isActive ? onSelect : undefined}
-      onKeyDown={e => e.key === "Enter" && isActive && onSelect?.()}
-      role="button"
-      tabIndex={isActive ? 0 : -1}
     >
       <div
         className={cn(
@@ -120,28 +155,97 @@ const CarouselItem = memo(function CarouselItem({
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-          {/* Play Button - Only on active items with audio */}
-          {isActive && beat.audioUrl && (
-            <button
-              onClick={e => {
-                e.stopPropagation();
-                onPlay();
-              }}
-              className={cn(
-                "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
-                "w-16 h-16 rounded-full flex items-center justify-center",
-                "bg-[var(--accent-purple)] text-white",
-                "transform transition-all duration-300 hover:scale-110",
-                isPlaying && "bg-[var(--accent-cyan)]"
+          {/* Audio Controls - Only on active items with audio */}
+          {isActive && hasAudio && (
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-3">
+              {/* Previous Track Button */}
+              {hasMultipleTracks && (
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onPrevTrack();
+                  }}
+                  className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    "bg-black/60 text-white backdrop-blur-sm",
+                    "transform transition-all duration-300 hover:scale-110 hover:bg-black/80"
+                  )}
+                  aria-label="Previous track"
+                >
+                  <SkipBack className="w-5 h-5" fill="currentColor" />
+                </button>
               )}
-              aria-label={isPlaying ? "Pause" : "Play"}
-            >
-              {isPlaying ? (
-                <Pause className="w-7 h-7" fill="currentColor" />
-              ) : (
-                <Play className="w-7 h-7 ml-1" fill="currentColor" />
+
+              {/* Play/Pause Button */}
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onPlay();
+                }}
+                className={cn(
+                  "w-16 h-16 rounded-full flex items-center justify-center",
+                  "bg-[var(--accent-purple)] text-white",
+                  "transform transition-all duration-300 hover:scale-110",
+                  isPlaying && "bg-[var(--accent-cyan)]"
+                )}
+                aria-label={isPlaying ? "Pause" : "Play"}
+              >
+                {isPlaying ? (
+                  <Pause className="w-7 h-7" fill="currentColor" />
+                ) : (
+                  <Play className="w-7 h-7 ml-1" fill="currentColor" />
+                )}
+              </button>
+
+              {/* Next Track Button */}
+              {hasMultipleTracks && (
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onNextTrack();
+                  }}
+                  className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    "bg-black/60 text-white backdrop-blur-sm",
+                    "transform transition-all duration-300 hover:scale-110 hover:bg-black/80"
+                  )}
+                  aria-label="Next track"
+                >
+                  <SkipForward className="w-5 h-5" fill="currentColor" />
+                </button>
               )}
-            </button>
+            </div>
+          )}
+
+          {/* Track Indicator Dots */}
+          {isActive && hasMultipleTracks && (
+            <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+              {tracks.map((_, index) => (
+                <button
+                  key={`track-dot-${beat.id}-${index}`}
+                  onClick={e => {
+                    e.stopPropagation();
+                    onTrackSelect(index);
+                  }}
+                  className={cn(
+                    "w-2 h-2 rounded-full transition-all duration-200",
+                    index === currentTrackIndex
+                      ? "w-4 bg-[var(--accent-purple)]"
+                      : "bg-white/50 hover:bg-white/80"
+                  )}
+                  aria-label={`Track ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Current Track Title (for multi-track) */}
+          {isActive && hasMultipleTracks && tracks[currentTrackIndex]?.title && (
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 max-w-[80%]">
+              <span className="text-xs text-white/80 bg-black/60 px-2 py-1 rounded truncate block">
+                {tracks[currentTrackIndex].title}
+              </span>
+            </div>
           )}
 
           {/* Price Badge */}
@@ -170,10 +274,7 @@ const CarouselItem = memo(function CarouselItem({
             <Button
               size="sm"
               variant="ghost"
-              onClick={e => {
-                e.stopPropagation();
-                onSelect?.();
-              }}
+              onClick={onSelect}
               className="text-white hover:text-[var(--accent-purple)]"
             >
               View Details
@@ -227,8 +328,15 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
   const [activeIndex, setActiveIndex] = useState(0);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [trackIndices, setTrackIndices] = useState<Record<number, number>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Get current track index for a beat
+  const getTrackIndex = useCallback(
+    (beatId: number): number => trackIndices[beatId] ?? 0,
+    [trackIndices]
+  );
 
   // Auto-play carousel
   useEffect(() => {
@@ -241,25 +349,81 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
     return () => clearInterval(interval);
   }, [autoPlay, autoPlayInterval, beats.length, isPaused]);
 
-  // Handle audio playback
+  // Play a specific track from a beat
+  const playTrack = useCallback((beat: CarouselBeat, trackIndex: number): void => {
+    const tracks = getTracks(beat);
+    const track = tracks[trackIndex];
+    if (!track) return;
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    audioRef.current = new Audio(track.url);
+    audioRef.current.play().catch(console.error);
+    audioRef.current.onended = () => setPlayingId(null);
+    setPlayingId(beat.id);
+  }, []);
+
+  // Handle play/pause toggle
   const handlePlay = useCallback(
     (beat: CarouselBeat) => {
-      if (!beat.audioUrl) return;
+      const tracks = getTracks(beat);
+      if (tracks.length === 0) return;
+
+      const currentTrackIdx = getTrackIndex(beat.id);
 
       if (playingId === beat.id) {
         audioRef.current?.pause();
         setPlayingId(null);
       } else {
-        if (audioRef.current) {
-          audioRef.current.pause();
-        }
-        audioRef.current = new Audio(beat.audioUrl);
-        audioRef.current.play().catch(console.error);
-        audioRef.current.onended = () => setPlayingId(null);
-        setPlayingId(beat.id);
+        playTrack(beat, currentTrackIdx);
       }
     },
-    [playingId]
+    [playingId, getTrackIndex, playTrack]
+  );
+
+  // Handle track change (prev/next)
+  const handleTrackChange = useCallback(
+    (beat: CarouselBeat, newIndex: number) => {
+      const tracks = getTracks(beat);
+      if (tracks.length === 0) return;
+
+      // Wrap around
+      const wrappedIndex = (newIndex + tracks.length) % tracks.length;
+      setTrackIndices(prev => ({ ...prev, [beat.id]: wrappedIndex }));
+
+      // If currently playing this beat, switch to new track
+      if (playingId === beat.id) {
+        playTrack(beat, wrappedIndex);
+      }
+    },
+    [playingId, playTrack]
+  );
+
+  // Handle previous track
+  const handlePrevTrack = useCallback(
+    (beat: CarouselBeat) => {
+      const currentIdx = getTrackIndex(beat.id);
+      handleTrackChange(beat, currentIdx - 1);
+    },
+    [getTrackIndex, handleTrackChange]
+  );
+
+  // Handle next track
+  const handleNextTrack = useCallback(
+    (beat: CarouselBeat) => {
+      const currentIdx = getTrackIndex(beat.id);
+      handleTrackChange(beat, currentIdx + 1);
+    },
+    [getTrackIndex, handleTrackChange]
+  );
+
+  // Handle direct track selection
+  const handleTrackSelect = useCallback(
+    (beat: CarouselBeat, index: number) => {
+      handleTrackChange(beat, index);
+    },
+    [handleTrackChange]
   );
 
   // Navigation
@@ -315,8 +479,9 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
   }
 
   return (
-    <div
+    <section
       ref={containerRef}
+      aria-label="Beat carousel"
       className={cn("relative w-full overflow-hidden", "py-8 sm:py-12", className)}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
@@ -349,7 +514,11 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
               position={position}
               isActive={position === 0}
               isPlaying={playingId === beat.id}
+              currentTrackIndex={getTrackIndex(beat.id)}
               onPlay={() => handlePlay(beat)}
+              onPrevTrack={() => handlePrevTrack(beat)}
+              onNextTrack={() => handleNextTrack(beat)}
+              onTrackSelect={idx => handleTrackSelect(beat, idx)}
               onSelect={() => onBeatSelect?.(beat)}
               onAddToCart={() => onAddToCart?.(beat)}
             />
@@ -413,7 +582,7 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
           opacity: 0.1,
         }}
       />
-    </div>
+    </section>
   );
 });
 

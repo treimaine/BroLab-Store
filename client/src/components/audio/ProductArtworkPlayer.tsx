@@ -95,7 +95,7 @@ export function ProductArtworkPlayer({
   productId,
 }: ProductArtworkPlayerProps): JSX.Element {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlayingLocal] = useState(false);
+  const [isLocalPlaying, setIsLocalPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -149,10 +149,10 @@ export function ProductArtworkPlayer({
     const audio = audioRef.current;
     if (!audio || !currentAudioUrl) return;
 
-    if (isPlaying) {
+    if (isLocalPlaying) {
       // Pause local audio
       audio.pause();
-      setIsPlayingLocal(false);
+      setIsLocalPlaying(false);
       // Also update global store
       setGlobalIsPlaying(false);
     } else {
@@ -184,20 +184,20 @@ export function ProductArtworkPlayer({
 
         // Play local audio
         await audio.play();
-        setIsPlayingLocal(true);
+        setIsLocalPlaying(true);
         setGlobalIsPlaying(true);
         setHasError(false);
       } catch (error) {
         console.error("Playback error:", error);
         setHasError(true);
-        setIsPlayingLocal(false);
+        setIsLocalPlaying(false);
       } finally {
         setIsLoading(false);
       }
     }
   }, [
     currentAudioUrl,
-    isPlaying,
+    isLocalPlaying,
     currentTrack,
     trackId,
     productName,
@@ -220,7 +220,7 @@ export function ProductArtworkPlayer({
       setCurrentTrackIndex(newIndex);
 
       // Update queue and play the new track if currently playing
-      if (isPlaying && storeTracks.length > 0) {
+      if (isLocalPlaying && storeTracks.length > 0) {
         setQueue(storeTracks);
         playTrackFromQueue(newIndex);
         setCurrentTrack(storeTracks[newIndex]);
@@ -229,7 +229,7 @@ export function ProductArtworkPlayer({
     [
       currentTrackIndex,
       tracks.length,
-      isPlaying,
+      isLocalPlaying,
       storeTracks,
       setQueue,
       playTrackFromQueue,
@@ -244,7 +244,7 @@ export function ProductArtworkPlayer({
       setCurrentTrackIndex(newIndex);
 
       // Update queue and play the new track if currently playing
-      if (isPlaying && storeTracks.length > 0) {
+      if (isLocalPlaying && storeTracks.length > 0) {
         setQueue(storeTracks);
         playTrackFromQueue(newIndex);
         setCurrentTrack(storeTracks[newIndex]);
@@ -253,7 +253,7 @@ export function ProductArtworkPlayer({
     [
       currentTrackIndex,
       tracks.length,
-      isPlaying,
+      isLocalPlaying,
       storeTracks,
       setQueue,
       playTrackFromQueue,
@@ -267,11 +267,11 @@ export function ProductArtworkPlayer({
   // Auto-play when track index changes (user clicked prev/next)
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !currentAudioUrl) return;
+    if (!audio || !currentAudioUrl) return undefined;
 
     // Only trigger when track index actually changed (not on initial render)
     if (previousTrackIndexRef.current !== currentTrackIndex) {
-      const wasPlaying = isPlaying;
+      const wasPlaying = isLocalPlaying;
       previousTrackIndexRef.current = currentTrackIndex;
 
       // Update audio source
@@ -285,12 +285,12 @@ export function ProductArtworkPlayer({
           audio
             .play()
             .then(() => {
-              setIsPlayingLocal(true);
+              setIsLocalPlaying(true);
               setGlobalIsPlaying(true);
             })
             .catch(error => {
               console.error("Auto-play failed:", error);
-              setIsPlayingLocal(false);
+              setIsLocalPlaying(false);
             });
           audio.removeEventListener("canplaythrough", handleCanPlay);
         };
@@ -305,7 +305,7 @@ export function ProductArtworkPlayer({
     }
 
     return undefined;
-  }, [currentTrackIndex, currentAudioUrl, isPlaying, setGlobalIsPlaying]);
+  }, [currentTrackIndex, currentAudioUrl, isLocalPlaying, setGlobalIsPlaying]);
 
   // Audio event handlers
   useEffect(() => {
@@ -313,18 +313,18 @@ export function ProductArtworkPlayer({
     if (!audio) return;
 
     const handleEnded = (): void => {
-      setIsPlayingLocal(false);
+      setIsLocalPlaying(false);
       setGlobalIsPlaying(false);
     };
-    const handlePause = (): void => setIsPlayingLocal(false);
+    const handlePause = (): void => setIsLocalPlaying(false);
     const handlePlaying = (): void => {
       setIsLoading(false);
-      setIsPlayingLocal(true);
+      setIsLocalPlaying(true);
     };
     const handleWaiting = (): void => setIsLoading(true);
     const handleError = (): void => {
       setIsLoading(false);
-      setIsPlayingLocal(false);
+      setIsLocalPlaying(false);
       setHasError(true);
     };
 
@@ -363,7 +363,7 @@ export function ProductArtworkPlayer({
     if (isLoading) {
       return <Loader2 className="w-8 h-8 text-white animate-spin" />;
     }
-    if (isPlaying) {
+    if (isLocalPlaying) {
       return <Pause className="w-8 h-8 text-white" />;
     }
     return <Play className="w-8 h-8 text-white ml-1" />;
@@ -392,7 +392,7 @@ export function ProductArtworkPlayer({
         {showPlayButton && (
           <div
             className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-200 ${
-              isPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              isLocalPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             }`}
             style={{ backgroundColor: PLAYER_COLORS.overlay }}
           >
@@ -419,15 +419,17 @@ export function ProductArtworkPlayer({
                 whileTap={{ scale: 0.95 }}
                 className="w-20 h-20 rounded-full flex items-center justify-center transition-all"
                 style={{
-                  background: isPlaying ? "rgba(0, 200, 200, 0.9)" : PLAYER_COLORS.playButtonBg,
+                  background: isLocalPlaying
+                    ? "rgba(0, 200, 200, 0.9)"
+                    : PLAYER_COLORS.playButtonBg,
                   border: `4px solid ${PLAYER_COLORS.playButtonBorder}`,
-                  boxShadow: isPlaying
+                  boxShadow: isLocalPlaying
                     ? "0 4px 20px rgba(0, 200, 200, 0.5)"
                     : "0 4px 20px rgba(162, 89, 255, 0.5)",
                 }}
                 onClick={() => void handleTogglePlay()}
                 disabled={isLoading}
-                aria-label={isPlaying ? "Pause audio" : "Play audio"}
+                aria-label={isLocalPlaying ? "Pause audio" : "Play audio"}
               >
                 {renderPlayButtonIcon()}
               </motion.button>
@@ -450,9 +452,9 @@ export function ProductArtworkPlayer({
             {/* Track Indicator Dots - only for multi-track */}
             {hasMultipleTracks && (
               <div className="flex items-center gap-1.5 mt-4">
-                {tracks.map((_, index) => (
+                {tracks.map((track, index) => (
                   <button
-                    key={`track-dot-${index}`}
+                    key={`track-dot-${track.url}-${index}`}
                     type="button"
                     onClick={(e: React.MouseEvent) => {
                       e.stopPropagation();
@@ -487,7 +489,7 @@ export function ProductArtworkPlayer({
 
       {/* Spectrum bars animation - visible when playing */}
       <AnimatePresence>
-        {isPlaying && (
+        {isLocalPlaying && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -495,7 +497,7 @@ export function ProductArtworkPlayer({
             transition={{ duration: 0.3 }}
             className="flex justify-center"
           >
-            <SpectrumBars isPlaying={isPlaying} />
+            <SpectrumBars isPlaying={isLocalPlaying} />
           </motion.div>
         )}
       </AnimatePresence>
