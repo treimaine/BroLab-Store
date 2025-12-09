@@ -370,6 +370,88 @@ router.get("/proxy", async (req, res): Promise<void> => {
   }
 });
 
+// Allowed domains for URL validation
+const ALLOWED_DOMAINS = ["brolabentertainment.com", "wp-content", "uploads"];
+
+// Default fetch headers for audio requests
+const AUDIO_FETCH_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  Accept: "audio/mpeg, audio/*, */*",
+  Referer: "https://brolabentertainment.com/",
+};
+
+// Helper: Check if URL is from allowed domain
+function isUrlAllowed(url: string): boolean {
+  return ALLOWED_DOMAINS.some(domain => url.includes(domain));
+}
+
+// Helper: Validate all track URLs
+function validateTrackUrls(tracks: AudioTrack[]): { valid: boolean; invalidUrl?: string } {
+  for (const track of tracks) {
+    const trackUrl = track.downloadUrl || track.url;
+    if (trackUrl && !isUrlAllowed(trackUrl)) {
+      return { valid: false, invalidUrl: trackUrl };
+    }
+  }
+  return { valid: true };
+}
+
+// Helper: Fetch single track and return buffer
+async function fetchTrackBuffer(
+  trackUrl: string,
+  trackIndex: number,
+  totalTracks: number
+): Promise<Buffer | null> {
+  console.log(`📥 Fetching track ${trackIndex}/${totalTracks}: ${trackUrl.substring(0, 60)}...`);
+
+  const response = await fetch(trackUrl, { headers: AUDIO_FETCH_HEADERS });
+
+  if (!response.ok) {
+    console.error(`❌ Failed to fetch track ${trackIndex}:`, response.status);
+    return null;
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+// Helper: Generate safe filename for track
+function generateTrackFilename(track: AudioTrack, index: number): string {
+  const trackTitle = track.title || `Track_${index}`;
+  const safeTrackTitle = trackTitle.replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+  return `${String(index).padStart(2, "0")}_${safeTrackTitle}.mp3`;
+}
+
+// Helper: Add tracks to archive
+async function addTracksToArchive(archive: archiver.Archiver, tracks: AudioTrack[]): Promise<void> {
+  let trackIndex = 1;
+
+  for (const track of tracks) {
+    const trackUrl = track.downloadUrl || track.url;
+
+    if (!trackUrl) {
+      console.warn(`⚠️ Skipping track ${trackIndex}: no URL`);
+      trackIndex++;
+      continue;
+    }
+
+    try {
+      const buffer = await fetchTrackBuffer(trackUrl, trackIndex, tracks.length);
+
+      if (buffer) {
+        const trackFilename = generateTrackFilename(track, trackIndex);
+        console.log(`✅ Adding to ZIP: ${trackFilename} (${buffer.length} bytes)`);
+        archive.append(buffer, { name: trackFilename });
+      }
+    } catch (fetchError) {
+      console.error(`❌ Error fetching track ${trackIndex}:`, fetchError);
+    }
+
+    trackIndex++;
+  }
+}
+
 // POST /api/downloads/zip - Download multiple audio files as a ZIP archive
 router.post("/zip", async (req, res): Promise<void> => {
   try {
@@ -386,16 +468,11 @@ router.post("/zip", async (req, res): Promise<void> => {
     }
 
     // Validate all URLs are from allowed domains
-    const allowedDomains = ["brolabentertainment.com", "wp-content", "uploads"];
-    for (const track of tracks) {
-      const trackUrl = track.downloadUrl || track.url;
-      if (!trackUrl) continue;
-      const isAllowed = allowedDomains.some(domain => trackUrl.includes(domain));
-      if (!isAllowed) {
-        console.error("❌ Track URL domain not allowed:", trackUrl);
-        res.status(403).json({ error: "Track URL domain not allowed", url: trackUrl });
-        return;
-      }
+    const validation = validateTrackUrls(tracks);
+    if (!validation.valid) {
+      console.error("❌ Track URL domain not allowed:", validation.invalidUrl);
+      res.status(403).json({ error: "Track URL domain not allowed", url: validation.invalidUrl });
+      return;
     }
 
     // Sanitize product name for filename
@@ -420,52 +497,8 @@ router.post("/zip", async (req, res): Promise<void> => {
     // Pipe archive to response
     archive.pipe(res);
 
-    // Fetch and add each track to the archive
-    let trackIndex = 1;
-    for (const track of tracks) {
-      const trackUrl = track.downloadUrl || track.url;
-      if (!trackUrl) {
-        console.warn(`⚠️ Skipping track ${trackIndex}: no URL`);
-        trackIndex++;
-        continue;
-      }
-
-      try {
-        console.log(
-          `📥 Fetching track ${trackIndex}/${tracks.length}: ${trackUrl.substring(0, 60)}...`
-        );
-
-        const response = await fetch(trackUrl, {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            Accept: "audio/mpeg, audio/*, */*",
-            Referer: "https://brolabentertainment.com/",
-          },
-        });
-
-        if (!response.ok) {
-          console.error(`❌ Failed to fetch track ${trackIndex}:`, response.status);
-          trackIndex++;
-          continue;
-        }
-
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        // Generate filename for this track
-        const trackTitle = track.title || `Track_${trackIndex}`;
-        const safeTrackTitle = trackTitle.replaceAll(/[^a-zA-Z0-9._-]/g, "_");
-        const trackFilename = `${String(trackIndex).padStart(2, "0")}_${safeTrackTitle}.mp3`;
-
-        console.log(`✅ Adding to ZIP: ${trackFilename} (${buffer.length} bytes)`);
-        archive.append(buffer, { name: trackFilename });
-      } catch (fetchError) {
-        console.error(`❌ Error fetching track ${trackIndex}:`, fetchError);
-      }
-
-      trackIndex++;
-    }
+    // Add all tracks to archive
+    await addTracksToArchive(archive, tracks);
 
     // Finalize the archive
     await archive.finalize();
