@@ -41,7 +41,7 @@ export const enhancedFileUploadSecurity = (
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
     try {
-      const requestId = (req as AuthenticatedRequest).requestId || `req_${Date.now()}`;
+      const requestId = (req as AuthenticatedRequest).requestId || generateSecureRequestId();
       const file = req.file;
 
       if (!file) {
@@ -162,7 +162,7 @@ export const enhancedFileUploadSecurity = (
     } catch (error) {
       console.error("Enhanced file upload security error:", error);
 
-      const requestId = (req as AuthenticatedRequest).requestId || `req_${Date.now()}`;
+      const requestId = (req as AuthenticatedRequest).requestId || generateSecureRequestId();
       const errorResponse = createApiError("security_check_failed", "Security check failed", {
         userMessage: "An error occurred while checking file security",
         requestId,
@@ -335,7 +335,7 @@ export const fileUploadRateLimit = (
     if (userStats.count >= maxUploadsPerHour) {
       const errorResponse = createApiError("upload_rate_limit", "Upload rate limit exceeded", {
         userMessage: `Too many uploads. Maximum ${maxUploadsPerHour} uploads per hour allowed.`,
-        requestId: (req as AuthenticatedRequest).requestId || `req_${Date.now()}`,
+        requestId: (req as AuthenticatedRequest).requestId || generateSecureRequestId(),
       });
 
       return res.status(429).json(errorResponse);
@@ -345,7 +345,7 @@ export const fileUploadRateLimit = (
     if (userStats.totalSize + fileSize > maxTotalSizePerHour) {
       const errorResponse = createApiError("upload_size_limit", "Upload size limit exceeded", {
         userMessage: `Upload size limit exceeded. Maximum ${Math.round(maxTotalSizePerHour / 1024 / 1024)}MB per hour allowed.`,
-        requestId: (req as AuthenticatedRequest).requestId || `req_${Date.now()}`,
+        requestId: (req as AuthenticatedRequest).requestId || generateSecureRequestId(),
       });
 
       return res.status(429).json(errorResponse);
