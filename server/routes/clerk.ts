@@ -2,6 +2,7 @@ import { Response, Router } from "express";
 import Stripe from "stripe";
 import { urls } from "../config/urls";
 import { handleRouteError } from "../types/routes";
+import { generateSecureRequestId } from "../utils/requestId";
 
 // Enhanced logging utility for payment flows
 const logPaymentEvent = (
@@ -337,7 +338,7 @@ const handleStripeError = (stripeError: unknown, requestId: string, res: Respons
 
 // Create checkout session for one-time purchases
 router.post("/create-checkout-session", async (req, res): Promise<void> => {
-  const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  const requestId = generateSecureRequestId();
 
   try {
     logPaymentEvent("info", "checkout_session_request", {

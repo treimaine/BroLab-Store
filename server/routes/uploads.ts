@@ -8,6 +8,7 @@ import { uploadRateLimit } from "../middleware/rateLimiter";
 import { validateFileUpload } from "../middleware/validation";
 import { AuthenticatedRequest } from "../types/express";
 import { handleRouteError } from "../types/routes";
+import { generateSecureRequestId } from "../utils/requestId";
 
 const router = Router();
 
@@ -52,7 +53,7 @@ router.post(
     try {
       // File validation already handled by middleware
       if (!req.file) {
-        const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
+        const requestId = (req as { requestId?: string }).requestId || generateSecureRequestId();
         const errorResponse = createApiError("file_too_large", "No file provided", {
           userMessage: "Please select a file to upload",
           requestId,

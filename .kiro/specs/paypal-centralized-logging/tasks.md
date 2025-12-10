@@ -1,0 +1,77 @@
+# Implementation Plan
+
+- [x] 1. Add secureLogger import and replace create-order logging
+  - [x] 1.1 Add import statement for secureLogger from "../lib/secureLogger"
+    - Add at top of file with other imports
+    - _Requirements: 1.1, 5.1_
+  - [x] 1.2 Replace console.log for order creation start with secureLogger.info
+    - Replace `console.log("🚀 Creating PayPal order for user:", req.user.id)` with structured log
+    - Include userId, serviceType, reservationId in context
+    - _Requirements: 1.2_
+  - [x] 1.3 Replace console.log for order creation success with secureLogger.info
+    - Replace `console.log("✅ PayPal order created:", result.orderId)` with structured log
+    - Include orderId in context
+    - _Requirements: 1.3_
+  - [x] 1.4 Replace console.error for order creation failure with secureLogger.error
+    - Replace `console.error("❌ Failed to create PayPal order:", result.error)` with structured log
+    - Include error details in context
+    - _Requirements: 1.4_
+  - [ ]\* 1.5 Write property test for create-order logging
+    - **Property 4: Operation start logging includes user context**
+    - **Validates: Requirements 1.2**
+
+- [x] 2. Replace capture-payment logging
+  - [x] 2.1 Replace console.log for capture start with secureLogger.info
+    - Replace `console.log("🎯 Capturing PayPal payment for user:", req.user?.id)` with structured log
+    - Include userId and orderId in context
+    - _Requirements: 2.1_
+  - [x] 2.2 Replace console.log for capture success with secureLogger.info
+    - Replace `console.log("✅ Payment captured:", result.transactionId)` with structured log
+    - Include transactionId and orderId in context
+    - _Requirements: 2.2_
+  - [x] 2.3 Replace console.error for capture failure with secureLogger.error
+    - Replace `console.error("❌ Failed to capture payment:", result.error)` with structured log
+    - Include error details and orderId in context
+    - _Requirements: 2.3_
+  - [ ]\* 2.4 Write property test for capture-payment logging
+    - **Property 2: Success operation logging includes result identifiers**
+    - **Validates: Requirements 2.2**
+
+- [x] 3. Replace auto-capture logging
+  - [x] 3.1 Replace console.log for auto-capture start with secureLogger.info
+    - Replace `console.log("🎯 Auto-capturing PayPal payment for user:", req.user?.id)` with structured log
+    - Include userId and token in context
+    - _Requirements: 3.1_
+  - [x] 3.2 Replace console.log for auto-capture success with secureLogger.info
+    - Replace `console.log("✅ Payment auto-captured:", result.transactionId)` with structured log
+    - Include transactionId and token in context
+    - _Requirements: 3.2_
+  - [x] 3.3 Replace console.error for auto-capture failure with secureLogger.error
+    - Replace `console.error("❌ Failed to auto-capture payment:", result.error)` with structured log
+    - Include error details and token in context
+    - _Requirements: 3.3_
+  - [x] 3.4 Replace console.error for auto-capture exception with secureLogger.error
+    - Replace `console.error("❌ Error in auto-capture endpoint:", error)` with structured log
+    - Pass Error object and token in context
+    - _Requirements: 3.4_
+  - [ ]\* 3.5 Write property test for auto-capture error logging
+    - **Property 3: Failed operation logging includes error and context**
+    - **Validates: Requirements 3.3, 3.4**
+
+- [x] 4. Replace order details logging
+  - [x] 4.1 Replace console.log for order details request with secureLogger.info
+    - Replace `console.log("📋 Getting PayPal order for user:", req.user?.id)` with structured log
+    - Include userId and orderId in context
+    - _Requirements: 4.1_
+
+- [x] 5. Verification and cleanup
+  - [x] 5.1 Verify no console.log or console.error calls remain in paypal.ts
+    - Search file for any remaining console calls
+    - Ensure all logging uses secureLogger
+    - _Requirements: 5.2_
+  - [ ]\* 5.2 Write property test for logging method consistency
+    - **Property 1: Logging method consistency**
+    - **Validates: Requirements 5.2**
+
+- [ ] 6. Final Checkpoint
+  - Ensure all tests pass, ask the user if questions arise.

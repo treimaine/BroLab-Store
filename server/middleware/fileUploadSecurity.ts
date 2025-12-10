@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { createApiError } from "../../shared/validation/index";
 import { scanFile, validateFile } from "../lib/upload";
 import { AuthenticatedRequest } from "../types/express";
+import { generateSecureRequestId } from "../utils/requestId";
 
 /**
  * Risk level type alias for file security analysis
