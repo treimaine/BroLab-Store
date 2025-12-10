@@ -193,7 +193,7 @@ Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadlin
 
             return pendingPayment;
           },
-          retryable: true,
+          canRetry: true,
           timeout: 5000,
         },
       ],

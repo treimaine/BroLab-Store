@@ -1,7 +1,8 @@
-import express, { Request } from "express";
+import express from "express";
 import { registerAuthRoutes, setupAuth } from "./auth";
 import { env } from "./lib/env";
 import { logger } from "./lib/logger";
+import { requestIdMiddleware } from "./middleware/requestId";
 import {
   apiRateLimiter,
   authRateLimiter,
@@ -53,11 +54,8 @@ logger.info("Server starting", {
   flags: env.flags,
 });
 
-// Request ID middleware
-app.use((req: Request & { requestId?: string }, _res, next) => {
-  req.requestId = (req.headers["x-request-id"] as string) || `req_${Date.now()}`;
-  next();
-});
+// Request ID middleware - generates cryptographically secure UUIDs
+app.use(requestIdMiddleware);
 
 // Authentication configuration (includes Clerk middleware)
 setupAuth(app);

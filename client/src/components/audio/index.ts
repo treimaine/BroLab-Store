@@ -15,7 +15,7 @@ export { EnhancedGlobalAudioPlayer } from "./EnhancedGlobalAudioPlayer";
 export { GlobalAudioPlayer } from "./GlobalAudioPlayer";
 export { SimpleAudioPlayer } from "./SimpleAudioPlayer";
 export { SonaarAudioPlayer } from "./SonaarAudioPlayer";
-export { default as AudioPlayer } from "./audio-player";
+export { AudioPlayer } from "./audio-player";
 
 // Waveform components
 export { EnhancedWaveformPlayer } from "./EnhancedWaveformPlayer";

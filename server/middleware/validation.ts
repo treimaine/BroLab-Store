@@ -8,6 +8,7 @@ import {
   getUserMessageForErrorType,
 } from "../../shared/validation/ErrorValidation";
 import { AuthenticatedRequest } from "../types/express";
+import { generateSecureRequestId } from "../utils/requestId";
 
 // ================================
 // VALIDATION MIDDLEWARE
@@ -25,7 +26,7 @@ export const createValidationMiddleware = <T extends z.ZodSchema>(
       const requestId =
         (req.headers["x-request-id"] as string) ||
         (req.headers["x-correlation-id"] as string) ||
-        `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+        generateSecureRequestId();
 
       // Get data from the specified source
       let data: unknown;
@@ -243,7 +244,7 @@ export const validateFileUpload = (
   return (req: Request, res: Response, next: NextFunction): void | Response => {
     try {
       const file = req.file;
-      const requestId = (req as AuthenticatedRequest).requestId || `req_${Date.now()}`;
+      const requestId = (req as AuthenticatedRequest).requestId || generateSecureRequestId();
 
       // Check if file is required but missing
       if (required && !file) {
@@ -290,7 +291,7 @@ export const validatePermissions = (
   return async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
     try {
       const user = (req as AuthenticatedRequest).user as unknown as User;
-      const requestId = (req as AuthenticatedRequest).requestId || `req_${Date.now()}`;
+      const requestId = (req as AuthenticatedRequest).requestId || generateSecureRequestId();
 
       if (!user) {
         const errorResponse = createApiError("invalid_credentials", "Authentication required", {
@@ -371,7 +372,7 @@ export const validateSubscriptionQuota = (
   return async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
     try {
       const user = (req as AuthenticatedRequest).user as unknown as User;
-      const requestId = (req as AuthenticatedRequest).requestId || `req_${Date.now()}`;
+      const requestId = (req as AuthenticatedRequest).requestId || generateSecureRequestId();
 
       if (!user?.subscription) {
         const errorResponse = createApiError(
@@ -422,7 +423,7 @@ export const validateSubscriptionQuota = (
     } catch (error) {
       console.error("Quota validation error:", error);
 
-      const requestId = (req as AuthenticatedRequest).requestId || `req_${Date.now()}`;
+      const requestId = (req as AuthenticatedRequest).requestId || generateSecureRequestId();
       const errorResponse = createApiError("internal_server_error", "Quota validation failed", {
         userMessage: "An error occurred while checking your quota",
         requestId,
@@ -460,10 +461,10 @@ export const normalizeEmail = (email: string): string => {
 
 /**
  * Generate request ID for tracking
+ * @deprecated Use generateSecureRequestId from server/utils/requestId instead.
+ * Re-exported for backward compatibility.
  */
-export const generateRequestId = (): string => {
-  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-};
+export { generateRequestId } from "../utils/requestId";
 
 // ================================
 // TYPE EXPORTS
