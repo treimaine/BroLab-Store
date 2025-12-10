@@ -192,7 +192,7 @@ export const validatePhoneNumber = (phone: string): boolean => {
   if (!phone || phone.length < 10 || phone.length > 17) return false;
 
   // Remove common formatting characters
-  const cleaned = phone.replace(/[\s\-()+ ]/g, "");
+  const cleaned = phone.replaceAll(/[\s\-()+]/g, "");
 
   // Check if it's all digits (after removing formatting)
   const digitRegex = /^\d{10,15}$/;
@@ -204,9 +204,9 @@ export const sanitizeUserInput = (input: string, maxLength: number = 1000): stri
 
   return input
     .trim()
-    .replace(/[<>]/g, "") // Remove HTML brackets
-    .replace(/['"]/g, "") // Remove quotes
-    .replace(/[&]/g, "") // Remove ampersands
+    .replaceAll(/[<>]/g, "") // Remove HTML brackets
+    .replaceAll(/['"]/g, "") // Remove quotes
+    .replaceAll("&", "") // Remove ampersands
     .slice(0, maxLength); // Limit length
 };
 
@@ -283,9 +283,9 @@ export const validatePassword = (password: string): { isValid: boolean; errors: 
 export const sanitizeInput = (input: string): string => {
   return input
     .trim()
-    .replace(/[<>]/g, "") // Remove potential HTML tags
-    .replace(/javascript:/gi, "") // Remove javascript: protocol
-    .replace(/on\w+=/gi, ""); // Remove event handlers
+    .replaceAll(/[<>]/g, "") // Remove potential HTML tags
+    .replaceAll(/javascript:/gi, "") // Remove javascript: protocol
+    .replaceAll(/on\w+=/gi, ""); // Remove event handlers
 };
 
 // ================================
@@ -475,7 +475,7 @@ export const mixingMasteringFormSchema = z.object({
   trackCount: z
     .string()
     .optional()
-    .refine(count => !count || (parseInt(count) >= 1 && parseInt(count) <= 100), {
+    .refine(count => !count || (Number.parseInt(count) >= 1 && Number.parseInt(count) <= 100), {
       message: "Track count must be between 1 and 100",
     }),
 
@@ -623,3 +623,43 @@ export type ServiceSelectionInput = z.infer<typeof serviceSelectionSchema>;
 export type MixingMasteringSubmissionInput = z.infer<typeof mixingMasteringSubmissionSchema>;
 export type CustomBeatRequestInput = z.infer<typeof customBeatRequestSchema>;
 export type CustomBeatFileInput = z.infer<typeof customBeatFileValidation>;
+
+// ================================
+// PayPal Order Validation
+// ================================
+
+/**
+ * Supported PayPal currencies
+ * Based on PayPal's supported currency codes for the regions we operate in
+ */
+export const PAYPAL_SUPPORTED_CURRENCIES = ["EUR", "USD", "GBP", "CAD", "AUD"] as const;
+export type PayPalCurrency = (typeof PAYPAL_SUPPORTED_CURRENCIES)[number];
+
+/**
+ * PayPal Create Order Schema
+ * Validates amount, currency, and required fields for PayPal order creation
+ * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create
+ */
+export const paypalCreateOrderSchema = z.object({
+  serviceType: z
+    .string()
+    .min(1, "Service type is required")
+    .max(100, "Service type must be 100 characters or less"),
+  amount: z
+    .number({ invalid_type_error: "Amount must be a number" })
+    .min(0.5, "Minimum amount is $0.50")
+    .max(999999.99, "Amount exceeds maximum allowed ($999,999.99)"),
+  currency: z.enum(PAYPAL_SUPPORTED_CURRENCIES, {
+    errorMap: () => ({
+      message: `Currency must be one of: ${PAYPAL_SUPPORTED_CURRENCIES.join(", ")}`,
+    }),
+  }),
+  description: z
+    .string()
+    .min(1, "Description is required")
+    .max(500, "Description must be 500 characters or less"),
+  reservationId: z.string().min(1, "Reservation ID is required"),
+  customerEmail: z.string().email("Invalid email format"),
+});
+
+export type PayPalCreateOrderInput = z.infer<typeof paypalCreateOrderSchema>;

@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import express, { NextFunction, Response, type Request } from "express";
 import { app } from "./app";
 import { choosePort } from "./lib/cliPort";
-import { env } from "./lib/env";
+import { enforcePaymentSecrets, env } from "./lib/env";
 import { parsePortFlags } from "./lib/findFreePort";
 import { logger } from "./lib/logger";
 // RLS Security removed - using Convex for security
@@ -10,6 +10,14 @@ import { log, serveStatic, setupVite } from "./vite";
 
 // Load environment variables from .env file
 config();
+
+// Validate payment configuration early (fail fast in production)
+try {
+  enforcePaymentSecrets();
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+}
 
 // Use the configured app from app.ts
 

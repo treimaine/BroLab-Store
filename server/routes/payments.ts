@@ -10,6 +10,7 @@ import { createPaymentSessionRequestSchema, validateBody } from "../../shared/va
 import PayPalService from "../services/paypal";
 import type { CreatePaymentSessionHandler } from "../types/ApiTypes";
 import { handleRouteError } from "../types/routes";
+import { generateSecureRequestId } from "../utils/requestId";
 
 const router = Router();
 
@@ -298,7 +299,7 @@ const createPaymentSession: CreatePaymentSessionHandler = async (req, res) => {
 
     // Verify user authentication
     if (!req.user?.id) {
-      const requestId = (req as { requestId?: string }).requestId || `req_${Date.now()}`;
+      const requestId = (req as { requestId?: string }).requestId || generateSecureRequestId();
       res.status(401).json({
         error: "Authentication required",
         message: "Please log in to continue",
