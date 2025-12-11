@@ -12,16 +12,16 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Suspense, useEffect, useState } from "react";
 import { HelmetProvider } from "react-helmet-async";
 import { Route, Switch, useLocation } from "wouter";
-import { queryClient, warmCache } from "./lib/queryClient";
+import { clearUserCache, queryClient, warmCache } from "./lib/queryClient";
 
 // Critical components - loaded immediately for core UX
 import { Navbar } from "@/components/layout/navbar";
 
 import { ComponentPreloader } from "@/components/loading/ComponentPreloader";
-import { isFeatureEnabled } from "@/config/featureFlags";
 import { AdminRoutes, LegalRoutes, ServiceRoutes } from "@/config/routeChunks";
 import { useDeferredMountStaggered } from "@/hooks/useDeferredMount";
 import { useInteractionPreloader } from "@/hooks/useInteractionPreloader";
+import { useIsFeatureEnabled } from "@/stores/useFeatureFlagsStore";
 import {
   bundleOptimization,
   createLazyComponent,
@@ -47,22 +47,18 @@ const NewsletterModal = createLazyComponent(async () => {
 });
 
 // Audio player - lazy loaded as it's heavy and not immediately needed
-const EnhancedGlobalAudioPlayer = createLazyComponent(
-  async () => {
-    const module = await import("@/components/audio/EnhancedGlobalAudioPlayer");
-    return { default: module.EnhancedGlobalAudioPlayer };
-  },
-  { preloadDelay: 2000 } // Preload after 2 seconds
-);
+// Preload is handled conditionally in App component based on enableGlobalAudioPlayer flag
+const EnhancedGlobalAudioPlayer = createLazyComponent(async () => {
+  const module = await import("@/components/audio/EnhancedGlobalAudioPlayer");
+  return { default: module.EnhancedGlobalAudioPlayer };
+});
 
 // Sonaar Modern Player (Example 097 style) - lazy loaded
-const SonaarModernPlayer = createLazyComponent(
-  async () => {
-    const module = await import("@/components/audio/SonaarModernPlayer");
-    return { default: module.SonaarModernPlayer };
-  },
-  { preloadDelay: 2000 }
-);
+// Preload is handled conditionally in App component based on enableGlobalAudioPlayer flag
+const SonaarModernPlayer = createLazyComponent(async () => {
+  const module = await import("@/components/audio/SonaarModernPlayer");
+  return { default: module.SonaarModernPlayer };
+});
 
 // Core pages - only Home loaded immediately, others lazy loaded for better initial load
 import Home from "@/pages/home";
@@ -132,15 +128,15 @@ import {
   OptimizedLoadingFallback,
   RouteLoadingFallback,
 } from "@/components/loading/OptimizedLoadingFallback";
-import { BundleSizeAnalyzer, PerformanceMonitor } from "@/components/monitoring/PerformanceMonitor";
+import { DevOnlyMonitors } from "@/components/monitoring/DevOnlyMonitors";
 import NotFound from "@/pages/not-found";
 import { CacheProvider } from "./providers/CacheProvider";
 
 function Router() {
-  // Feature flags for route groups
-  const isLegalEnabled = isFeatureEnabled("enableLegalRoutes");
-  const isAdminEnabled = isFeatureEnabled("enableAdminRoutes");
-  const isServiceEnabled = isFeatureEnabled("enableServiceRoutes");
+  // Feature flags for route groups (using reactive hooks)
+  const isLegalEnabled = useIsFeatureEnabled("enableLegalRoutes");
+  const isAdminEnabled = useIsFeatureEnabled("enableAdminRoutes");
+  const isServiceEnabled = useIsFeatureEnabled("enableServiceRoutes");
 
   return (
     <Switch>
@@ -218,6 +214,7 @@ function useNewsletterModalLazy() {
 // Wrapper component for global audio player that checks current route
 function GlobalAudioPlayerWrapper(): JSX.Element | null {
   const [location] = useLocation();
+  const isSonaarModernPlayerEnabled = useIsFeatureEnabled("enableSonaarModernPlayer");
 
   // Hide global audio player on product pages (product page has its own player)
   const isProductPage = location.startsWith("/product/");
@@ -228,11 +225,7 @@ function GlobalAudioPlayerWrapper(): JSX.Element | null {
 
   return (
     <Suspense fallback={<OptimizedLoadingFallback type="audio" />}>
-      {isFeatureEnabled("enableSonaarModernPlayer") ? (
-        <SonaarModernPlayer />
-      ) : (
-        <EnhancedGlobalAudioPlayer />
-      )}
+      {isSonaarModernPlayerEnabled ? <SonaarModernPlayer /> : <EnhancedGlobalAudioPlayer />}
     </Suspense>
   );
 }
@@ -240,10 +233,17 @@ function GlobalAudioPlayerWrapper(): JSX.Element | null {
 function App() {
   const { isOpen, closeModal } = useNewsletterModalLazy();
   const { isSignedIn, isLoaded } = useAuth();
+  const isGlobalAudioEnabled = useIsFeatureEnabled("enableGlobalAudioPlayer");
 
   // Defer non-critical component mounting after main content renders
   // Staggered mounting: OfflineIndicator (0ms), MobileBottomNav (150ms), AudioPlayer (300ms)
-  const [mountOffline, mountMobileNav, mountAudioPlayer] = useDeferredMountStaggered(3, 150);
+  // Skip audio player index (2) if global audio is disabled to save bandwidth
+  const audioSkipIndices = isGlobalAudioEnabled ? [] : [2];
+  const [mountOffline, mountMobileNav, mountAudioPlayer] = useDeferredMountStaggered(
+    3,
+    150,
+    audioSkipIndices
+  );
 
   // Use interaction-based preloading
   useInteractionPreloader();
@@ -257,18 +257,51 @@ function App() {
     bundleOptimization.preloadOnUserInteraction();
   }, []);
 
-  // Warm cache only when authenticated
+  // Conditionally preload audio player components only when feature is enabled
+  // This saves bandwidth on non-audio pages by not loading heavy audio modules
   useEffect(() => {
-    // Wait for auth to be loaded and user to be signed in
-    if (!isLoaded || !isSignedIn) {
+    if (!isGlobalAudioEnabled) return;
+
+    const preloadTimer = setTimeout(() => {
+      import("@/components/audio/EnhancedGlobalAudioPlayer").catch(() => {});
+      import("@/components/audio/SonaarModernPlayer").catch(() => {});
+    }, 2000);
+
+    return () => clearTimeout(preloadTimer);
+  }, [isGlobalAudioEnabled]);
+
+  // Cache warming with proper cleanup on auth state changes
+  useEffect(() => {
+    // Wait for auth to be loaded before doing anything
+    if (!isLoaded) {
       return;
     }
 
-    warmCache().catch(error => {
-      if (import.meta.env.DEV) {
-        console.error("Cache warming failed:", error);
-      }
-    });
+    // Create abort controller for cleanup
+    const abortController = new AbortController();
+    let isActive = true;
+
+    if (isSignedIn) {
+      // User signed in - warm the cache
+      warmCache(abortController.signal).catch(error => {
+        // Ignore abort errors or if effect was cleaned up
+        if (error?.name === "AbortError" || !isActive) {
+          return;
+        }
+        if (import.meta.env.DEV) {
+          console.error("Cache warming failed:", error);
+        }
+      });
+    } else {
+      // User signed out - clear user-specific cache to prevent stale data
+      clearUserCache();
+    }
+
+    // Cleanup on sign-out, auth state flip, or unmount
+    return () => {
+      isActive = false;
+      abortController.abort();
+    };
   }, [isLoaded, isSignedIn]);
 
   return (
@@ -311,13 +344,8 @@ function App() {
                       {/* Component preloader for route-based optimization */}
                       <ComponentPreloader />
 
-                      {/* Performance monitoring (development only) */}
-                      {process.env.NODE_ENV === "development" && (
-                        <>
-                          <PerformanceMonitor />
-                          <BundleSizeAnalyzer />
-                        </>
-                      )}
+                      {/* Performance monitoring (development only, lazy loaded) */}
+                      <DevOnlyMonitors />
                     </ErrorBoundary>
                   </main>
 
@@ -335,7 +363,8 @@ function App() {
 
                   {/* Global audio player - lazy loaded, deferred as it's heavy */}
                   {/* Hidden on product pages where ProductArtworkPlayer handles playback */}
-                  {mountAudioPlayer && <GlobalAudioPlayerWrapper />}
+                  {/* Gated by enableGlobalAudioPlayer feature flag to save bandwidth on non-audio pages */}
+                  {isGlobalAudioEnabled && mountAudioPlayer && <GlobalAudioPlayerWrapper />}
 
                   {/* Newsletter modal - lazy loaded */}
                   {isOpen && (

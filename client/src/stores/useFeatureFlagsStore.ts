@@ -28,6 +28,7 @@ export interface FeatureFlags {
   enableBundleAnalyzer: boolean;
 
   // Audio player flags
+  enableGlobalAudioPlayer: boolean;
   enableSonaarModernPlayer: boolean;
 
   // Service flags
@@ -64,7 +65,8 @@ export const defaultFeatureFlags: FeatureFlags = {
   enablePerformanceMonitoring: globalThis.window !== undefined && import.meta.env.DEV,
   enableBundleAnalyzer: globalThis.window !== undefined && import.meta.env.DEV,
 
-  // Audio player - new Sonaar Modern Player enabled by default
+  // Audio player - global player and Sonaar Modern Player enabled by default
+  enableGlobalAudioPlayer: true,
   enableSonaarModernPlayer: true,
 
   // Services - enabled by default

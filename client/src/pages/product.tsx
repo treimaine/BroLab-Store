@@ -12,10 +12,12 @@ import { useWooCommerce } from "@/hooks/use-woocommerce";
 import { useClerkSync } from "@/hooks/useClerkSync";
 import { useDownloads } from "@/hooks/useDownloads";
 import { useWishlist } from "@/hooks/useWishlist";
+import { api } from "@/lib/convex-api";
 import { LicensePricing, LicenseTypeEnum } from "@shared/schema";
 import { LicenseType } from "@shared/types/Beat";
+import { useMutation } from "convex/react";
 import { ArrowLeft, Download, FileText, Heart, ShoppingCart } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRoute } from "wouter";
 
 interface Tag {
@@ -105,6 +107,103 @@ const LICENSE_OPTIONS: Array<{
     price: LicensePricing.unlimited,
   },
 ];
+
+// Helper to sanitize filename for download
+function sanitizeFilename(name: string): string {
+  return name.replaceAll(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+// Helper to trigger file download from blob
+function triggerBlobDownload(blob: Blob, filename: string): void {
+  const blobUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(blobUrl);
+}
+
+// Helper to download multi-track product as ZIP
+async function downloadMultiTrackZip(productName: string, audioTracks: unknown[]): Promise<void> {
+  const response = await fetch("/api/downloads/zip", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      productName,
+      tracks: audioTracks,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error("❌ ZIP download failed:", response.status, errorData);
+    throw new Error(`ZIP download failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  console.log("✅ ZIP downloaded, size:", blob.size);
+
+  const filename = `${sanitizeFilename(productName)}.zip`;
+  triggerBlobDownload(blob, filename);
+}
+
+// Helper to download single track via proxy
+async function downloadSingleTrack(productName: string, sourceUrl: string): Promise<void> {
+  const filename = `${sanitizeFilename(productName)}.mp3`;
+  const proxyUrl = `/api/downloads/proxy?url=${encodeURIComponent(sourceUrl)}&filename=${encodeURIComponent(filename)}`;
+
+  console.log("📥 Proxy URL:", proxyUrl);
+
+  const response = await fetch(proxyUrl);
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error("❌ Proxy download failed:", response.status, errorData);
+    throw new Error(`Download failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  console.log("✅ File downloaded, size:", blob.size);
+
+  triggerBlobDownload(blob, filename);
+}
+
+// Helper to download via fallback API endpoint
+function downloadViaFallback(productId: number, productName: string): void {
+  console.warn("⚠️ No download URL available, using fallback");
+  const link = document.createElement("a");
+  link.href = `/api/downloads/file/${productId}/free`;
+  link.download = `${productName}.mp3`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+// Helper to handle download errors
+function handleDownloadError(
+  error: unknown,
+  toast: (options: { title: string; description: string; variant?: "destructive" }) => void
+): void {
+  if (error instanceof Error && error.message === "AUTHENTICATION_REQUIRED") {
+    toast({
+      title: "Authentication Required",
+      description: "Please log in to download this beat.",
+      variant: "destructive",
+    });
+    setTimeout(() => {
+      globalThis.location.href = "/login";
+    }, 2000);
+    return;
+  }
+
+  toast({
+    title: "Download Error",
+    description: "There was an error processing your download.",
+    variant: "destructive",
+  });
+}
 
 // Loading skeleton component
 function ProductLoadingSkeleton({ productId }: Readonly<{ productId: number }>): JSX.Element {
@@ -273,10 +372,7 @@ export default function Product(): JSX.Element {
     if (!product) return;
 
     try {
-      // Sync user if necessary
       await syncUser();
-
-      // Log download via Convex
       await logDownload({
         productId: product.id,
         productName: product.name,
@@ -284,14 +380,11 @@ export default function Product(): JSX.Element {
         price: 0,
       });
 
-      // Trigger download success event for dashboard refresh
       globalThis.dispatchEvent(new CustomEvent("download-success"));
 
-      // Check if product has multiple audio tracks
       const audioTracks = product.audio_tracks;
       const hasMultipleTracks = audioTracks && Array.isArray(audioTracks) && audioTracks.length > 1;
 
-      // Debug: log available URLs and tracks
       console.log("📥 Download info:", {
         download_url: product.download_url,
         audio_url: product.audio_url,
@@ -300,81 +393,18 @@ export default function Product(): JSX.Element {
       });
 
       if (hasMultipleTracks) {
-        // Multi-track product: download as ZIP
         console.log("📦 Downloading multi-track product as ZIP...");
-
         toast({
           title: "Preparing Download",
           description: `Creating ZIP archive with ${audioTracks.length} tracks...`,
         });
-
-        const response = await fetch("/api/downloads/zip", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            productName: product.name,
-            tracks: audioTracks,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error("❌ ZIP download failed:", response.status, errorData);
-          throw new Error(`ZIP download failed: ${response.status}`);
-        }
-
-        const blob = await response.blob();
-        console.log("✅ ZIP downloaded, size:", blob.size);
-
-        const filename = `${product.name.replaceAll(/[^a-zA-Z0-9._-]/g, "_")}.zip`;
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(blobUrl);
+        await downloadMultiTrackZip(product.name, audioTracks);
       } else {
-        // Single track: download directly
         const sourceUrl = product.download_url || product.audio_url;
-
         if (sourceUrl) {
-          // Use proxy endpoint to force download instead of opening in new tab
-          const filename = `${product.name.replaceAll(/[^a-zA-Z0-9._-]/g, "_")}.mp3`;
-          const proxyUrl = `/api/downloads/proxy?url=${encodeURIComponent(sourceUrl)}&filename=${encodeURIComponent(filename)}`;
-
-          console.log("📥 Proxy URL:", proxyUrl);
-
-          // Use fetch to get the file and create a blob for download
-          const response = await fetch(proxyUrl);
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error("❌ Proxy download failed:", response.status, errorData);
-            throw new Error(`Download failed: ${response.status}`);
-          }
-
-          const blob = await response.blob();
-          console.log("✅ File downloaded, size:", blob.size);
-
-          const blobUrl = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = blobUrl;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          URL.revokeObjectURL(blobUrl);
+          await downloadSingleTrack(product.name, sourceUrl);
         } else {
-          console.warn("⚠️ No download URL available, using fallback");
-          // Fallback to API endpoint if no direct URL available
-          const link = document.createElement("a");
-          link.href = `/api/downloads/file/${product.id}/free`;
-          link.download = `${product.name}.mp3`;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
+          downloadViaFallback(product.id, product.name);
         }
       }
 
@@ -384,29 +414,34 @@ export default function Product(): JSX.Element {
       });
     } catch (error) {
       console.error("Download error:", error);
-
-      // Check if it's an authentication error
-      if (error instanceof Error && error.message === "AUTHENTICATION_REQUIRED") {
-        toast({
-          title: "Authentication Required",
-          description: "Please log in to download this beat.",
-          variant: "destructive",
-        });
-        // Optionally redirect to login page
-        setTimeout(() => {
-          globalThis.location.href = "/login";
-        }, 2000);
-      } else {
-        toast({
-          title: "Download Error",
-          description: "There was an error processing your download.",
-          variant: "destructive",
-        });
-      }
+      handleDownloadError(error, toast);
     }
   };
 
   const { addFavorite, removeFavorite, isFavorite } = useWishlist();
+
+  // Track product view
+  const incrementView = useMutation(api.beats.trackView.incrementView as never);
+  const hasTrackedView = useRef(false);
+
+  useEffect(() => {
+    // Track view only once per page load and when product is loaded
+    if (product && productId && !hasTrackedView.current) {
+      hasTrackedView.current = true;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (incrementView as any)({
+        wordpressId: productId,
+        title: product.name,
+        genre: product.categories?.[0]?.name,
+        price: typeof product.price === "number" ? product.price : 0,
+        imageUrl: product.images?.[0]?.src,
+        audioUrl: product.audio_url,
+      }).catch((error: unknown) => {
+        console.warn("Failed to track view:", error);
+      });
+    }
+  }, [product, productId, incrementView]);
 
   const handleAddToWishlist = async (): Promise<void> => {
     if (!product) return;

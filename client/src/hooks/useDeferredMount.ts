@@ -88,25 +88,33 @@ export function useDeferredMount(options: DeferredMountOptions = {}): boolean {
  *
  * @param count - Number of deferred mount states to create
  * @param staggerDelay - Delay between each mount in ms (default: 100)
+ * @param skipIndices - Array of indices to skip (will remain false), useful for feature-flagged components
  * @returns Array of booleans indicating mount state for each component
  *
  * @example
  * ```tsx
  * function App() {
- *   const [mountOffline, mountNav, mountNewsletter] = useDeferredMountStaggered(3, 200);
+ *   const isAudioEnabled = useIsFeatureEnabled("enableGlobalAudioPlayer");
+ *   // Skip index 2 (audio player) if audio is disabled
+ *   const skipIndices = isAudioEnabled ? [] : [2];
+ *   const [mountOffline, mountNav, mountAudio] = useDeferredMountStaggered(3, 200, skipIndices);
  *
  *   return (
  *     <div>
  *       <MainContent />
  *       {mountOffline && <OfflineIndicator />}
  *       {mountNav && <MobileBottomNav />}
- *       {mountNewsletter && <NewsletterModal />}
+ *       {mountAudio && <GlobalAudioPlayer />}
  *     </div>
  *   );
  * }
  * ```
  */
-export function useDeferredMountStaggered(count: number, staggerDelay = 100): boolean[] {
+export function useDeferredMountStaggered(
+  count: number,
+  staggerDelay = 100,
+  skipIndices: number[] = []
+): boolean[] {
   const [mountStates, setMountStates] = useState<boolean[]>(() => new Array(count).fill(false));
 
   useEffect(() => {
@@ -122,6 +130,10 @@ export function useDeferredMountStaggered(count: number, staggerDelay = 100): bo
 
     const startMounting = (): void => {
       for (let i = 0; i < count; i++) {
+        // Skip indices that are feature-flagged off (saves bandwidth)
+        if (skipIndices.includes(i)) {
+          continue;
+        }
         const timeout = setTimeout(() => updateMountState(i), i * staggerDelay);
         timeouts.push(timeout);
       }
@@ -148,6 +160,8 @@ export function useDeferredMountStaggered(count: number, staggerDelay = 100): bo
     return () => {
       timeouts.forEach(clearTimeout);
     };
+    // Note: skipIndices is intentionally excluded from deps to avoid re-triggering on flag changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [count, staggerDelay]);
 
   return mountStates;
