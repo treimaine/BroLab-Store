@@ -276,8 +276,8 @@ function getEnvNumber(key: string, defaultValue: number, min?: number, max?: num
   const value = import.meta.env[key];
   if (!value) return defaultValue;
 
-  const parsed = parseInt(value, 10);
-  if (isNaN(parsed)) {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) {
     console.warn(`Invalid number format for ${key}: "${value}". Using default: ${defaultValue}`);
     return defaultValue;
   }
@@ -396,128 +396,181 @@ interface ValidationResult {
   warnings: string[];
 }
 
+// Helper: Validate required environment variables
+function validateRequiredEnvVars(): string[] {
+  const errors: string[] = [];
+  const requiredEnvVars = [
+    { key: "VITE_CONVEX_URL", description: "Convex database URL for real-time functionality" },
+  ];
+
+  for (const { key, description } of requiredEnvVars) {
+    const value = import.meta.env[key];
+    if (!value) {
+      errors.push(`Missing required environment variable: ${key} - ${description}`);
+    } else if (key === "VITE_CONVEX_URL" && !value.startsWith("https://")) {
+      errors.push(`Invalid ${key}: Must be a valid HTTPS URL, got: ${value}`);
+    }
+  }
+
+  return errors;
+}
+
+// Helper: Validate optional environment variables
+function validateOptionalEnvVars(): string[] {
+  const warnings: string[] = [];
+  const optionalEnvVars = [
+    { key: "VITE_API_BASE_URL", description: "API base URL for backend communication" },
+    { key: "VITE_LOG_LEVEL", description: "Logging level for development" },
+  ];
+
+  for (const { key, description } of optionalEnvVars) {
+    const value = import.meta.env[key];
+    if (!value && import.meta.env.NODE_ENV === "development") {
+      warnings.push(`Optional environment variable not set: ${key} - ${description}`);
+    }
+  }
+
+  return warnings;
+}
+
+// Helper: Validate UI configuration with detailed errors and warnings
+function validateUIConfigDetailed(config: DashboardConfig["ui"]): {
+  errors: string[];
+  warnings: string[];
+} {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (config.animationDuration < 0 || config.animationDuration > 2000) {
+    errors.push(
+      `Invalid animation duration: ${config.animationDuration}ms. Must be between 0-2000ms for optimal user experience.`
+    );
+  } else if (config.animationDuration > 1000) {
+    warnings.push(
+      `Animation duration is quite long: ${config.animationDuration}ms. Consider values under 500ms for better perceived performance.`
+    );
+  }
+
+  if (config.skeletonItems < 1 || config.skeletonItems > 20) {
+    errors.push(
+      `Invalid skeleton items count: ${config.skeletonItems}. Must be between 1-20 items.`
+    );
+  }
+
+  if (config.maxActivityItems < 5 || config.maxActivityItems > 100) {
+    errors.push(
+      `Invalid max activity items: ${config.maxActivityItems}. Must be between 5-100 items for performance reasons.`
+    );
+  }
+
+  return { errors, warnings };
+}
+
+// Helper: Validate pagination configuration with detailed errors and warnings
+function validatePaginationConfigDetailed(config: DashboardConfig["pagination"]): {
+  errors: string[];
+  warnings: string[];
+} {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (config.ordersPerPage < 1 || config.ordersPerPage > 100) {
+    errors.push(
+      `Invalid orders per page: ${config.ordersPerPage}. Must be between 1-100 for optimal loading performance.`
+    );
+  } else if (config.ordersPerPage > 50) {
+    warnings.push(
+      `Large orders per page setting (${config.ordersPerPage}) may impact loading performance. Consider values under 25.`
+    );
+  }
+
+  if (config.downloadsPerPage < 1 || config.downloadsPerPage > 100) {
+    errors.push(
+      `Invalid downloads per page: ${config.downloadsPerPage}. Must be between 1-100 for optimal loading performance.`
+    );
+  }
+
+  if (config.activityPerPage < 1 || config.activityPerPage > 50) {
+    errors.push(
+      `Invalid activity per page: ${config.activityPerPage}. Must be between 1-50 for real-time performance.`
+    );
+  }
+
+  return { errors, warnings };
+}
+
+// Helper: Validate realtime configuration with detailed errors and warnings
+function validateRealtimeConfigDetailed(config: DashboardConfig["realtime"]): {
+  errors: string[];
+  warnings: string[];
+} {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (config.reconnectInterval < 1000 || config.reconnectInterval > 60000) {
+    errors.push(
+      `Invalid reconnect interval: ${config.reconnectInterval}ms. Must be between 1000-60000ms (1-60 seconds).`
+    );
+  } else if (config.reconnectInterval < 3000) {
+    warnings.push(
+      `Short reconnect interval (${config.reconnectInterval}ms) may cause excessive server load. Consider 5000ms or higher.`
+    );
+  }
+
+  if (config.maxRetries < 1 || config.maxRetries > 50) {
+    errors.push(`Invalid max retries: ${config.maxRetries}. Must be between 1-50 attempts.`);
+  }
+
+  if (config.heartbeatInterval < 5000 || config.heartbeatInterval > 300000) {
+    errors.push(
+      `Invalid heartbeat interval: ${config.heartbeatInterval}ms. Must be between 5000-300000ms (5 seconds - 5 minutes).`
+    );
+  }
+
+  return { errors, warnings };
+}
+
+// Helper: Log validation results
+function logValidationResults(errors: string[], warnings: string[]): void {
+  if (errors.length > 0) {
+    console.error("Configuration validation errors:", errors);
+  }
+
+  if (warnings.length > 0) {
+    console.warn("Configuration validation warnings:", warnings);
+  }
+
+  if (errors.length === 0 && warnings.length === 0) {
+    console.info("Configuration validation passed successfully");
+  }
+}
+
 // Configuration validator with detailed error reporting
 export function validateConfig(): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
   try {
-    // Validate required environment variables
-    const requiredEnvVars = [
-      { key: "VITE_CONVEX_URL", description: "Convex database URL for real-time functionality" },
-    ];
+    // Validate environment variables
+    errors.push(...validateRequiredEnvVars());
+    warnings.push(...validateOptionalEnvVars());
 
-    for (const { key, description } of requiredEnvVars) {
-      const value = import.meta.env[key];
-      if (!value) {
-        errors.push(`Missing required environment variable: ${key} - ${description}`);
-      } else if (key === "VITE_CONVEX_URL" && !value.startsWith("https://")) {
-        errors.push(`Invalid ${key}: Must be a valid HTTPS URL, got: ${value}`);
-      }
-    }
-
-    // Validate optional environment variables with warnings
-    const optionalEnvVars = [
-      { key: "VITE_API_BASE_URL", description: "API base URL for backend communication" },
-      { key: "VITE_LOG_LEVEL", description: "Logging level for development" },
-    ];
-
-    for (const { key, description } of optionalEnvVars) {
-      const value = import.meta.env[key];
-      if (!value && import.meta.env.NODE_ENV === "development") {
-        warnings.push(`Optional environment variable not set: ${key} - ${description}`);
-      }
-    }
-
-    // Validate configuration values with detailed range checking
+    // Validate configuration sections
     const config = getDashboardConfig();
 
-    // UI Configuration Validation
-    if (config.ui.animationDuration < 0 || config.ui.animationDuration > 2000) {
-      errors.push(
-        `Invalid animation duration: ${config.ui.animationDuration}ms. Must be between 0-2000ms for optimal user experience.`
-      );
-    } else if (config.ui.animationDuration > 1000) {
-      warnings.push(
-        `Animation duration is quite long: ${config.ui.animationDuration}ms. Consider values under 500ms for better perceived performance.`
-      );
-    }
+    const uiValidation = validateUIConfigDetailed(config.ui);
+    errors.push(...uiValidation.errors);
+    warnings.push(...uiValidation.warnings);
 
-    if (config.ui.skeletonItems < 1 || config.ui.skeletonItems > 20) {
-      errors.push(
-        `Invalid skeleton items count: ${config.ui.skeletonItems}. Must be between 1-20 items.`
-      );
-    }
+    const paginationValidation = validatePaginationConfigDetailed(config.pagination);
+    errors.push(...paginationValidation.errors);
+    warnings.push(...paginationValidation.warnings);
 
-    if (config.ui.maxActivityItems < 5 || config.ui.maxActivityItems > 100) {
-      errors.push(
-        `Invalid max activity items: ${config.ui.maxActivityItems}. Must be between 5-100 items for performance reasons.`
-      );
-    }
+    const realtimeValidation = validateRealtimeConfigDetailed(config.realtime);
+    errors.push(...realtimeValidation.errors);
+    warnings.push(...realtimeValidation.warnings);
 
-    // Pagination Configuration Validation
-    if (config.pagination.ordersPerPage < 1 || config.pagination.ordersPerPage > 100) {
-      errors.push(
-        `Invalid orders per page: ${config.pagination.ordersPerPage}. Must be between 1-100 for optimal loading performance.`
-      );
-    }
-
-    if (config.pagination.downloadsPerPage < 1 || config.pagination.downloadsPerPage > 100) {
-      errors.push(
-        `Invalid downloads per page: ${config.pagination.downloadsPerPage}. Must be between 1-100 for optimal loading performance.`
-      );
-    }
-
-    if (config.pagination.activityPerPage < 1 || config.pagination.activityPerPage > 50) {
-      errors.push(
-        `Invalid activity per page: ${config.pagination.activityPerPage}. Must be between 1-50 for real-time performance.`
-      );
-    }
-
-    // Real-time Configuration Validation
-    if (config.realtime.reconnectInterval < 1000 || config.realtime.reconnectInterval > 60000) {
-      errors.push(
-        `Invalid reconnect interval: ${config.realtime.reconnectInterval}ms. Must be between 1000-60000ms (1-60 seconds).`
-      );
-    }
-
-    if (config.realtime.maxRetries < 1 || config.realtime.maxRetries > 50) {
-      errors.push(
-        `Invalid max retries: ${config.realtime.maxRetries}. Must be between 1-50 attempts.`
-      );
-    }
-
-    if (config.realtime.heartbeatInterval < 5000 || config.realtime.heartbeatInterval > 300000) {
-      errors.push(
-        `Invalid heartbeat interval: ${config.realtime.heartbeatInterval}ms. Must be between 5000-300000ms (5 seconds - 5 minutes).`
-      );
-    }
-
-    // Performance warnings for suboptimal configurations
-    if (config.pagination.ordersPerPage > 50) {
-      warnings.push(
-        `Large orders per page setting (${config.pagination.ordersPerPage}) may impact loading performance. Consider values under 25.`
-      );
-    }
-
-    if (config.realtime.reconnectInterval < 3000) {
-      warnings.push(
-        `Short reconnect interval (${config.realtime.reconnectInterval}ms) may cause excessive server load. Consider 5000ms or higher.`
-      );
-    }
-
-    // Log validation results
-    if (errors.length > 0) {
-      console.error("Configuration validation errors:", errors);
-    }
-
-    if (warnings.length > 0) {
-      console.warn("Configuration validation warnings:", warnings);
-    }
-
-    if (errors.length === 0 && warnings.length === 0) {
-      console.info("Configuration validation passed successfully");
-    }
+    logValidationResults(errors, warnings);
 
     return {
       isValid: errors.length === 0,

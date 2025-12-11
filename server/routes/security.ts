@@ -1,66 +1,34 @@
 // BroLab Entertainment - Security Routes
-// Generated: January 23, 2025
-// Purpose: Security management and RLS administration routes
+// Purpose: Security status and user info endpoints
+// Note: Admin security operations are handled via Convex functions
+// Use: npx convex run audit:getSecurityEvents, admin/verifySubscriptions:verifyAllSubscriptions
 
 import { Router } from "express";
 import { isAuthenticated as requireAuth } from "../auth";
-import { requireAdmin } from "../middleware/requireAdmin";
-import { AuthenticatedRequest, handleRouteError } from "../types/routes";
-// RLS Security removed - using Convex for security
+import { AuthenticatedRequest } from "../types/routes";
 
 const router = Router();
 
-// Security handled by Convex (admin only)
-// 🔒 SECURITY: Admin authentication required
-router.post("/admin/rls/initialize", requireAuth, requireAdmin, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      message: "Security handled by Convex",
-    });
-  } catch (error: unknown) {
-    handleRouteError(error, res, "Security initialization failed");
-  }
-});
-
-// Security handled by Convex (admin only)
-// 🔒 SECURITY: Admin authentication required
-router.post("/admin/rls/apply-policies", requireAuth, requireAdmin, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      message: "Security handled by Convex",
-    });
-  } catch (error: unknown) {
-    handleRouteError(error, res, "Security policy application failed");
-  }
-});
-
-// Security handled by Convex (admin only)
-// 🔒 SECURITY: Admin authentication required
-router.get("/admin/rls/verify", requireAuth, requireAdmin, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      message: "Security handled by Convex",
-    });
-  } catch (error: unknown) {
-    handleRouteError(error, res, "Security verification failed");
-  }
-});
-
 // Security status check (public)
 router.get("/security/status", (req, res) => {
+  const convexConfigured = !!(process.env.CONVEX_URL || process.env.VITE_CONVEX_URL);
+  const clerkConfigured = !!process.env.CLERK_SECRET_KEY;
+
   const status = {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || "development",
-    rlsEnabled: !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    rateLimitActive: true,
-    securityHeaders: true,
+    database: {
+      provider: "convex",
+      configured: convexConfigured,
+      userIsolation: true, // All Convex queries filter by userId/clerkId
+    },
     authentication: {
-      enabled: true,
+      provider: "clerk",
+      enabled: clerkConfigured,
       sessionBased: true,
     },
+    rateLimitActive: true,
+    securityHeaders: true,
   };
 
   res.json(status);
