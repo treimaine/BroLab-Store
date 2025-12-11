@@ -23,6 +23,9 @@ interface AudioState {
   queue: AudioTrack[];
   currentIndex: number;
   progress: number;
+  // Handoff state for seamless transition between players
+  isHandingOff: boolean;
+  handoffTime: number;
 }
 
 interface AudioActions {
@@ -54,6 +57,10 @@ interface AudioActions {
 
   // Utility
   reset: () => void;
+
+  // Handoff management for seamless player transitions
+  initiateHandoff: (currentTime: number) => void;
+  completeHandoff: () => void;
 }
 
 const initialState: AudioState = {
@@ -66,6 +73,8 @@ const initialState: AudioState = {
   queue: [],
   currentIndex: -1,
   progress: 0,
+  isHandingOff: false,
+  handoffTime: 0,
 };
 
 export const useAudioStore = create<AudioState & AudioActions>((set, get) => ({
@@ -73,16 +82,16 @@ export const useAudioStore = create<AudioState & AudioActions>((set, get) => ({
 
   setCurrentTrack: track => {
     const state = get();
-    // If changing to a different track, keep playing state but reset time
-    if (state.currentTrack?.id !== track?.id) {
+    // If same track, just update the reference
+    if (state.currentTrack?.id === track?.id) {
+      set({ currentTrack: track });
+    } else {
+      // Different track - reset time but keep playing state
       set({
         currentTrack: track,
         currentTime: 0,
         duration: 0,
-        // Keep isPlaying as is - don't force it to false
       });
-    } else {
-      set({ currentTrack: track });
     }
   },
   setIsPlaying: playing => set({ isPlaying: playing }),
@@ -154,6 +163,21 @@ export const useAudioStore = create<AudioState & AudioActions>((set, get) => ({
   playPrevious: () => get().previousTrack(),
 
   reset: () => set(initialState),
+
+  // Handoff: prepare for seamless transition between players
+  initiateHandoff: (currentTime: number) =>
+    set({
+      isHandingOff: true,
+      handoffTime: currentTime,
+      // Keep isPlaying true so the receiving player knows to continue
+    }),
+
+  // Handoff: complete the transition
+  completeHandoff: () =>
+    set({
+      isHandingOff: false,
+      handoffTime: 0,
+    }),
 }));
 
 // Hook for easier access to audio controls

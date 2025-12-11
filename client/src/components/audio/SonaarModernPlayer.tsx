@@ -220,6 +220,8 @@ export function SonaarModernPlayer(): JSX.Element | null {
     duration,
     queue,
     currentIndex,
+    isHandingOff,
+    handoffTime,
     setIsPlaying,
     setVolume,
     setCurrentTime,
@@ -228,6 +230,7 @@ export function SonaarModernPlayer(): JSX.Element | null {
     nextTrack,
     previousTrack,
     playTrackFromQueue,
+    completeHandoff,
   } = useAudioStore();
 
   const { addItem } = useCartContext();
@@ -266,7 +269,10 @@ export function SonaarModernPlayer(): JSX.Element | null {
     setIsLoading(true);
     stopOtherAudioElements(audio);
     setDuration(0);
-    setCurrentTime(0);
+    // Don't reset currentTime if this is a handoff - we'll set it from handoffTime
+    if (!isHandingOff) {
+      setCurrentTime(0);
+    }
 
     audio.src = currentTrack.audioUrl;
     audio.load();
@@ -287,25 +293,71 @@ export function SonaarModernPlayer(): JSX.Element | null {
         clearTimeout(loadingTimeoutRef.current);
       }
     };
-  }, [currentTrack, setDuration, setCurrentTime, setIsPlaying, toast, stopOtherAudioElements]);
+  }, [
+    currentTrack,
+    isHandingOff,
+    setDuration,
+    setCurrentTime,
+    setIsPlaying,
+    toast,
+    stopOtherAudioElements,
+  ]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
 
+    // Track if this effect is still active (for cleanup)
+    let isCancelled = false;
+
     const handlePlayPause = async (): Promise<void> => {
       if (isPlaying) {
         try {
           stopOtherAudioElements(audio);
+
+          // Handle handoff from ProductArtworkPlayer - resume at saved time
+          if (isHandingOff && handoffTime > 0) {
+            audio.currentTime = handoffTime;
+            completeHandoff();
+          }
+
+          // Wait for audio to be ready before playing
+          if (audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+            await new Promise<void>((resolve, reject) => {
+              const onCanPlay = (): void => {
+                audio.removeEventListener("canplay", onCanPlay);
+                audio.removeEventListener("error", onError);
+                resolve();
+              };
+              const onError = (): void => {
+                audio.removeEventListener("canplay", onCanPlay);
+                audio.removeEventListener("error", onError);
+                reject(new Error("Audio load failed"));
+              };
+              audio.addEventListener("canplay", onCanPlay);
+              audio.addEventListener("error", onError);
+            });
+          }
+
+          // Check if operation was cancelled during wait
+          if (isCancelled) return;
+
           await audio.play();
         } catch (error) {
+          // Ignore AbortError - it's expected when pause() interrupts play()
+          if (error instanceof Error && error.name === "AbortError") {
+            console.debug("Play interrupted - likely intentional navigation");
+            return;
+          }
           console.error("Playback error:", error);
-          setIsPlaying(false);
-          toast({
-            title: "Playback Error",
-            description: "Failed to play audio.",
-            variant: "destructive",
-          });
+          if (!isCancelled) {
+            setIsPlaying(false);
+            toast({
+              title: "Playback Error",
+              description: "Failed to play audio.",
+              variant: "destructive",
+            });
+          }
         }
       } else {
         audio.pause();
@@ -313,7 +365,21 @@ export function SonaarModernPlayer(): JSX.Element | null {
     };
 
     void handlePlayPause();
-  }, [isPlaying, currentTrack, setIsPlaying, toast, stopOtherAudioElements]);
+
+    // Cleanup to cancel pending operations
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    isPlaying,
+    currentTrack,
+    isHandingOff,
+    handoffTime,
+    completeHandoff,
+    setIsPlaying,
+    toast,
+    stopOtherAudioElements,
+  ]);
 
   useEffect(() => {
     const audio = audioRef.current;
