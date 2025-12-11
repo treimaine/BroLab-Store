@@ -67,6 +67,263 @@ const SPECTRUM_BAR_CONFIGS = [
   { id: "bar-4", heightVariant: 15, durationOffset: 0.4, delay: 0.32 },
 ];
 
+// Playing indicator bar configs
+const PLAYING_INDICATOR_BARS = [
+  { id: "playing-bar-0", delay: 0 },
+  { id: "playing-bar-1", delay: 0.1 },
+  { id: "playing-bar-2", delay: 0.2 },
+];
+
+/**
+ * Format duration from number or string to display format
+ */
+function formatDuration(duration: number | string | undefined): string {
+  if (!duration) return "--:--";
+  if (typeof duration === "number") {
+    const minutes = Math.floor(duration / 60);
+    const seconds = String(Math.floor(duration % 60)).padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  }
+  return duration;
+}
+
+/**
+ * Wait for audio element to be ready for playback
+ * Extracted to reduce nesting depth in useEffect
+ */
+function waitForAudioReady(audio: HTMLAudioElement): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const onCanPlay = (): void => {
+      audio.removeEventListener("canplay", onCanPlay);
+      audio.removeEventListener("error", onError);
+      resolve();
+    };
+    const onError = (): void => {
+      audio.removeEventListener("canplay", onCanPlay);
+      audio.removeEventListener("error", onError);
+      reject(new Error("Audio load failed"));
+    };
+    audio.addEventListener("canplay", onCanPlay);
+    audio.addEventListener("error", onError);
+  });
+}
+
+/**
+ * Check if error is an AbortError (expected when pause interrupts play)
+ */
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+/**
+ * PlayingIndicator - Animated bars showing current track is playing
+ */
+function PlayingIndicator(): JSX.Element {
+  return (
+    <div className="flex items-end gap-[2px] h-4">
+      {PLAYING_INDICATOR_BARS.map(bar => (
+        <motion.div
+          key={bar.id}
+          className="w-1 rounded-sm"
+          style={{ backgroundColor: SONAAR_COLORS.waveformPlayed }}
+          animate={{ height: [4, 12, 4] }}
+          transition={{
+            duration: 0.5,
+            repeat: Infinity,
+            delay: bar.delay,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * TrackItem - Individual track row in the tracklist modal
+ */
+interface TrackItemProps {
+  readonly track: {
+    id: string;
+    title: string;
+    artist: string;
+    imageUrl?: string;
+    duration?: number | string;
+    isFree?: boolean;
+  };
+  readonly index: number;
+  readonly isCurrentTrack: boolean;
+  readonly isPlaying: boolean;
+  readonly onPlay: () => void;
+  readonly onAddToCart: () => void;
+}
+
+function TrackItem({
+  track,
+  index,
+  isCurrentTrack,
+  isPlaying,
+  onPlay,
+  onAddToCart,
+}: TrackItemProps): JSX.Element {
+  const handleAddToCartClick = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    onAddToCart();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className={`flex items-center gap-4 p-3 rounded-lg cursor-pointer transition-all ${
+        isCurrentTrack ? "bg-white/10" : "hover:bg-white/5"
+      }`}
+      onClick={onPlay}
+    >
+      {/* Play indicator / Track number */}
+      <div className="w-8 flex items-center justify-center">
+        {isCurrentTrack && isPlaying ? (
+          <PlayingIndicator />
+        ) : (
+          <span className={`text-sm ${isCurrentTrack ? "text-white" : "text-gray-500"}`}>
+            {isCurrentTrack ? "▶" : index + 1}
+          </span>
+        )}
+      </div>
+
+      {/* Track Info */}
+      <div className="flex-1 min-w-0">
+        <p className={`font-medium truncate ${isCurrentTrack ? "text-white" : "text-gray-300"}`}>
+          {track.title}
+        </p>
+      </div>
+
+      {/* Artist */}
+      <div className="hidden sm:block text-sm text-gray-500 truncate max-w-[120px]">
+        {track.artist}
+      </div>
+
+      {/* Duration */}
+      <div className="text-sm text-gray-500 w-12 text-right">{formatDuration(track.duration)}</div>
+
+      {/* Add to cart */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleAddToCartClick}
+        className="w-8 h-8 p-0 text-gray-500 hover:text-white hover:bg-white/10"
+      >
+        <ShoppingCart className="w-4 h-4" />
+      </Button>
+    </motion.div>
+  );
+}
+
+/**
+ * TracklistModal - Modal displaying the queue of tracks
+ */
+interface TracklistModalProps {
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly queue: TrackItemProps["track"][];
+  readonly currentIndex: number;
+  readonly isPlaying: boolean;
+  readonly currentTrackArtist?: string;
+  readonly onPlayTrack: (index: number) => void;
+  readonly onAddTrackToCart: (track: TrackItemProps["track"]) => void;
+}
+
+function TracklistModal({
+  isOpen,
+  onClose,
+  queue,
+  currentIndex,
+  isPlaying,
+  currentTrackArtist,
+  onPlayTrack,
+  onAddTrackToCart,
+}: TracklistModalProps): JSX.Element | null {
+  if (!isOpen) return null;
+
+  const handlePlayAll = (): void => {
+    if (queue.length > 0) {
+      onPlayTrack(0);
+    }
+  };
+
+  const handleBackdropClick = (): void => {
+    onClose();
+  };
+
+  const handleModalClick = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={handleBackdropClick}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        className="relative w-full max-w-lg mx-4 max-h-[70vh] rounded-xl overflow-hidden"
+        style={{ background: SONAAR_COLORS.backgroundGradient }}
+        onClick={handleModalClick}
+      >
+        {/* Modal Header */}
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <h3 className="text-xl font-bold" style={{ color: SONAAR_COLORS.waveformPlayed }}>
+            {currentTrackArtist || "Tracklist"}
+          </h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="w-8 h-8 p-0 rounded-full text-gray-400 hover:text-white hover:bg-white/10"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Play All Button */}
+        <div className="flex justify-center py-4">
+          <Button
+            onClick={handlePlayAll}
+            className="px-8 py-2 rounded-full font-semibold transition-all hover:scale-105"
+            style={{
+              backgroundColor: SONAAR_COLORS.waveformPlayed,
+              color: "white",
+            }}
+          >
+            PLAY
+          </Button>
+        </div>
+
+        {/* Track List */}
+        <div className="overflow-y-auto max-h-[45vh] px-4 pb-4">
+          {queue.map((track, index) => (
+            <TrackItem
+              key={track.id}
+              track={track}
+              index={index}
+              isCurrentTrack={currentIndex === index}
+              isPlaying={isPlaying}
+              onPlay={() => onPlayTrack(index)}
+              onAddToCart={() => onAddTrackToCart(track)}
+            />
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function SpectrumBars({ isPlaying, barCount = 5 }: SpectrumBarsProps): JSX.Element {
   const bars = SPECTRUM_BAR_CONFIGS.slice(0, barCount);
 
@@ -307,66 +564,49 @@ export function SonaarModernPlayer(): JSX.Element | null {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
 
-    // Track if this effect is still active (for cleanup)
     let isCancelled = false;
 
-    const handlePlayPause = async (): Promise<void> => {
-      if (isPlaying) {
-        try {
-          stopOtherAudioElements(audio);
+    const startPlayback = async (): Promise<void> => {
+      stopOtherAudioElements(audio);
 
-          // Handle handoff from ProductArtworkPlayer - resume at saved time
-          if (isHandingOff && handoffTime > 0) {
-            audio.currentTime = handoffTime;
-            completeHandoff();
-          }
+      // Handle handoff from ProductArtworkPlayer - resume at saved time
+      if (isHandingOff && handoffTime > 0) {
+        audio.currentTime = handoffTime;
+        completeHandoff();
+      }
 
-          // Wait for audio to be ready before playing
-          if (audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
-            await new Promise<void>((resolve, reject) => {
-              const onCanPlay = (): void => {
-                audio.removeEventListener("canplay", onCanPlay);
-                audio.removeEventListener("error", onError);
-                resolve();
-              };
-              const onError = (): void => {
-                audio.removeEventListener("canplay", onCanPlay);
-                audio.removeEventListener("error", onError);
-                reject(new Error("Audio load failed"));
-              };
-              audio.addEventListener("canplay", onCanPlay);
-              audio.addEventListener("error", onError);
-            });
-          }
+      // Wait for audio to be ready before playing
+      if (audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+        await waitForAudioReady(audio);
+      }
 
-          // Check if operation was cancelled during wait
-          if (isCancelled) return;
-
-          await audio.play();
-        } catch (error) {
-          // Ignore AbortError - it's expected when pause() interrupts play()
-          if (error instanceof Error && error.name === "AbortError") {
-            console.debug("Play interrupted - likely intentional navigation");
-            return;
-          }
-          console.error("Playback error:", error);
-          if (!isCancelled) {
-            setIsPlaying(false);
-            toast({
-              title: "Playback Error",
-              description: "Failed to play audio.",
-              variant: "destructive",
-            });
-          }
-        }
-      } else {
-        audio.pause();
+      if (!isCancelled) {
+        await audio.play();
       }
     };
 
-    void handlePlayPause();
+    const handlePlaybackError = (error: unknown): void => {
+      if (isAbortError(error)) {
+        console.debug("Play interrupted - likely intentional navigation");
+        return;
+      }
+      console.error("Playback error:", error);
+      if (!isCancelled) {
+        setIsPlaying(false);
+        toast({
+          title: "Playback Error",
+          description: "Failed to play audio.",
+          variant: "destructive",
+        });
+      }
+    };
 
-    // Cleanup to cancel pending operations
+    if (isPlaying) {
+      startPlayback().catch(handlePlaybackError);
+    } else {
+      audio.pause();
+    }
+
     return () => {
       isCancelled = true;
     };
@@ -509,6 +749,33 @@ export function SonaarModernPlayer(): JSX.Element | null {
   const togglePlay = (): void => {
     setIsPlaying(!isPlaying);
   };
+
+  const handlePlayTrackFromQueue = useCallback(
+    (index: number): void => {
+      playTrackFromQueue(index);
+      setIsPlaying(true);
+    },
+    [playTrackFromQueue, setIsPlaying]
+  );
+
+  const handleAddTrackToCart = useCallback(
+    (track: { id: string; title: string; imageUrl?: string; isFree?: boolean }): void => {
+      addItem({
+        beatId: Number.parseInt(track.id, 10),
+        title: track.title,
+        genre: "Unknown",
+        imageUrl: track.imageUrl ?? "",
+        licenseType: "basic" as const,
+        quantity: 1,
+        isFree: track.isFree ?? false,
+      });
+      toast({
+        title: "Added to Cart",
+        description: `${track.title} has been added to your cart.`,
+      });
+    },
+    [addItem, toast]
+  );
 
   const renderPlayButtonIcon = (): JSX.Element => {
     if (isLoading) {
@@ -713,160 +980,16 @@ export function SonaarModernPlayer(): JSX.Element | null {
 
         {/* Tracklist Modal */}
         <AnimatePresence>
-          {showTracklist && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm"
-              onClick={() => setShowTracklist(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="relative w-full max-w-lg mx-4 max-h-[70vh] rounded-xl overflow-hidden"
-                style={{ background: SONAAR_COLORS.backgroundGradient }}
-                onClick={e => e.stopPropagation()}
-              >
-                {/* Modal Header */}
-                <div className="flex items-center justify-between p-4 border-b border-white/10">
-                  <h3 className="text-xl font-bold" style={{ color: SONAAR_COLORS.waveformPlayed }}>
-                    {currentTrack?.artist || "Tracklist"}
-                  </h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowTracklist(false)}
-                    className="w-8 h-8 p-0 rounded-full text-gray-400 hover:text-white hover:bg-white/10"
-                  >
-                    <X className="w-5 h-5" />
-                  </Button>
-                </div>
-
-                {/* Play All Button */}
-                <div className="flex justify-center py-4">
-                  <Button
-                    onClick={() => {
-                      if (queue.length > 0) {
-                        playTrackFromQueue(0);
-                        setIsPlaying(true);
-                      }
-                    }}
-                    className="px-8 py-2 rounded-full font-semibold transition-all hover:scale-105"
-                    style={{
-                      backgroundColor: SONAAR_COLORS.waveformPlayed,
-                      color: "white",
-                    }}
-                  >
-                    PLAY
-                  </Button>
-                </div>
-
-                {/* Track List */}
-                <div className="overflow-y-auto max-h-[45vh] px-4 pb-4">
-                  {queue.map((track, index) => {
-                    const isCurrentTrack = currentIndex === index;
-                    return (
-                      <motion.div
-                        key={track.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className={`flex items-center gap-4 p-3 rounded-lg cursor-pointer transition-all ${
-                          isCurrentTrack ? "bg-white/10" : "hover:bg-white/5"
-                        }`}
-                        onClick={() => {
-                          playTrackFromQueue(index);
-                          setIsPlaying(true);
-                        }}
-                      >
-                        {/* Play indicator / Track number */}
-                        <div className="w-8 flex items-center justify-center">
-                          {isCurrentTrack && isPlaying ? (
-                            <div className="flex items-end gap-[2px] h-4">
-                              {[0, 1, 2].map(i => (
-                                <motion.div
-                                  key={`playing-bar-${i}`}
-                                  className="w-1 rounded-sm"
-                                  style={{ backgroundColor: SONAAR_COLORS.waveformPlayed }}
-                                  animate={{ height: [4, 12, 4] }}
-                                  transition={{
-                                    duration: 0.5,
-                                    repeat: Infinity,
-                                    delay: i * 0.1,
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          ) : (
-                            <span
-                              className={`text-sm ${isCurrentTrack ? "text-white" : "text-gray-500"}`}
-                            >
-                              {isCurrentTrack ? "▶" : index + 1}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Track Info */}
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className={`font-medium truncate ${
-                              isCurrentTrack ? "text-white" : "text-gray-300"
-                            }`}
-                          >
-                            {track.title}
-                          </p>
-                        </div>
-
-                        {/* Artist */}
-                        <div className="hidden sm:block text-sm text-gray-500 truncate max-w-[120px]">
-                          {track.artist}
-                        </div>
-
-                        {/* Duration placeholder */}
-                        <div className="text-sm text-gray-500 w-12 text-right">
-                          {(() => {
-                            if (!track.duration) return "--:--";
-                            if (typeof track.duration === "number") {
-                              return `${Math.floor(track.duration / 60)}:${String(Math.floor(track.duration % 60)).padStart(2, "0")}`;
-                            }
-                            return track.duration;
-                          })()}
-                        </div>
-
-                        {/* Add to cart */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={e => {
-                            e.stopPropagation();
-                            addItem({
-                              beatId: Number.parseInt(track.id, 10),
-                              title: track.title,
-                              genre: "Unknown",
-                              imageUrl: track.imageUrl ?? "",
-                              licenseType: "basic" as const,
-                              quantity: 1,
-                              isFree: track.isFree ?? false,
-                            });
-                            toast({
-                              title: "Added to Cart",
-                              description: `${track.title} has been added to your cart.`,
-                            });
-                          }}
-                          className="w-8 h-8 p-0 text-gray-500 hover:text-white hover:bg-white/10"
-                        >
-                          <ShoppingCart className="w-4 h-4" />
-                        </Button>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
+          <TracklistModal
+            isOpen={showTracklist}
+            onClose={() => setShowTracklist(false)}
+            queue={queue}
+            currentIndex={currentIndex}
+            isPlaying={isPlaying}
+            currentTrackArtist={currentTrack?.artist}
+            onPlayTrack={handlePlayTrackFromQueue}
+            onAddTrackToCart={handleAddTrackToCart}
+          />
         </AnimatePresence>
       </motion.div>
     </AnimatePresence>
