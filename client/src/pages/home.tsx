@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
+import { api } from "@/lib/convex-api";
 import {
   hasRealAudio as checkHasRealAudio,
   getAudioUrl,
@@ -21,6 +22,7 @@ import {
   isFreeProduct,
 } from "@/utils/woocommerce-helpers";
 import type { BroLabWooCommerceProduct } from "@shared/types";
+import { useQuery } from "convex/react";
 import { Eye, Info, Music, TrendingUp } from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -59,6 +61,10 @@ export default function Home() {
 
   const { data: beats, isLoading, error } = useProducts();
 
+  // Get trending beats data from Convex (real view counts)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const trendingData = useQuery(api.beats.trending.getTrendingBeats as any, { limit: 12 });
+
   useEffect(() => {
     if (error) {
       console.warn("Error loading products:", error);
@@ -74,11 +80,35 @@ export default function Home() {
     });
   }, [beats, isLoading, error]);
 
+  // Create a map of WordPress ID to view count from Convex data
+  const viewCountMap = useMemo(() => {
+    const map = new Map<number, number>();
+    if (trendingData && Array.isArray(trendingData)) {
+      for (const item of trendingData as Array<{ wordpressId: number; views: number }>) {
+        map.set(item.wordpressId, item.views);
+      }
+    }
+    return map;
+  }, [trendingData]);
+
   const { featuredCarouselBeats, trendingDisplayBeats } = useMemo(() => {
+    // Featured: first 6 beats
     const featured = localBeats?.slice(0, 6) || [];
-    const trending = localBeats?.slice(6, 12) || [];
-    const remaining = localBeats?.slice(12, 18) || [];
-    const trendingDisplay = remaining.length > 0 ? remaining : trending;
+    const featuredIds = new Set(featured.map(b => b.id));
+
+    // Trending: sort by real view count, exclude featured, take top 6
+    const nonFeaturedBeats = localBeats?.filter(b => !featuredIds.has(b.id)) || [];
+
+    // Sort by views (from Convex) descending, fallback to date_created
+    const sortedByViews = [...nonFeaturedBeats].sort((a, b) => {
+      const viewsA = viewCountMap.get(a.id) || 0;
+      const viewsB = viewCountMap.get(b.id) || 0;
+      if (viewsB !== viewsA) return viewsB - viewsA;
+      // Fallback: most recent first (by date_created string comparison)
+      return (b.date_created || "").localeCompare(a.date_created || "");
+    });
+
+    const trendingDisplay = sortedByViews.slice(0, 6);
 
     // Transform to CarouselBeat format
     const carouselBeats: CarouselBeat[] = featured.map(beat => ({
@@ -101,7 +131,7 @@ export default function Home() {
       featuredCarouselBeats: carouselBeats,
       trendingDisplayBeats: trendingDisplay,
     };
-  }, [localBeats]);
+  }, [localBeats, viewCountMap]);
 
   const handleBeatSelect = useCallback(
     (beat: CarouselBeat) => {
@@ -268,7 +298,7 @@ export default function Home() {
                           </span>
                           <div className="flex items-center text-xs text-gray-400">
                             <Eye className="w-3 h-3 mr-1" />
-                            {Math.floor(Math.random() * 1000) + 100}
+                            {viewCountMap.get(beat.id) || 0}
                           </div>
                         </div>
                       </div>

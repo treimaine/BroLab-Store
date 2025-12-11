@@ -21,6 +21,8 @@ import type * as admin_verifySubscriptions from "../admin/verifySubscriptions.js
 import type * as audit from "../audit.js";
 import type * as auth_roles from "../auth/roles.js";
 import type * as beats_fetchFromWooCommerce from "../beats/fetchFromWooCommerce.js";
+import type * as beats_trackView from "../beats/trackView.js";
+import type * as beats_trending from "../beats/trending.js";
 import type * as cartItems from "../cartItems.js";
 import type * as clerk_billing from "../clerk/billing.js";
 import type * as clerk_simpleWebhook from "../clerk/simpleWebhook.js";
@@ -119,6 +121,8 @@ declare const fullApi: ApiFromModules<{
   audit: typeof audit;
   "auth/roles": typeof auth_roles;
   "beats/fetchFromWooCommerce": typeof beats_fetchFromWooCommerce;
+  "beats/trackView": typeof beats_trackView;
+  "beats/trending": typeof beats_trending;
   cartItems: typeof cartItems;
   "clerk/billing": typeof clerk_billing;
   "clerk/simpleWebhook": typeof clerk_simpleWebhook;

@@ -7,14 +7,18 @@ import { ClerkErrorBoundary } from "./components/auth/ClerkErrorBoundary";
 import { EnvConfigError } from "./components/errors/EnvConfigError";
 import { validateClerkKeyFormat, validateEnvConfig } from "./components/errors/envConfigUtils";
 import "./index.css";
-import { initializePerformanceMonitoring } from "./lib/performanceMonitoring";
 import "./styles/z-index.css";
 import { optimizeScrolling, preloadCriticalResources } from "./utils/performance";
 
 // Initialize performance optimizations
 preloadCriticalResources();
 optimizeScrolling();
-initializePerformanceMonitoring(); // PHASE 4 advanced monitoring
+
+// Lazy load performance monitoring only in development (top-level await)
+if (import.meta.env.DEV) {
+  const { initializePerformanceMonitoring } = await import("./lib/performanceMonitoring");
+  initializePerformanceMonitoring();
+}
 
 // Register service worker for offline functionality
 if ("serviceWorker" in navigator && import.meta.env.PROD) {

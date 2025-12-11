@@ -692,21 +692,60 @@ export const prefetchUtils = {
   },
 };
 
-// Cache warming for critical data
-export const warmCache = async () => {
+// Cache warming for critical data with abort support
+export const warmCache = async (signal?: AbortSignal): Promise<void> => {
+  // Check if already aborted before starting
+  if (signal?.aborted) {
+    return;
+  }
+
   try {
     // Warm cache with static data that's commonly accessed
     await Promise.all([
       queryClient.prefetchQuery({
         queryKey: ["/api/subscription/plans"],
         staleTime: CACHE_CONFIG.STATIC.staleTime,
+        queryFn: async () => {
+          const response = await fetch("/api/subscription/plans", { signal });
+          if (!response.ok) throw new Error("Failed to fetch subscription plans");
+          return response.json();
+        },
       }),
       queryClient.prefetchQuery({
         queryKey: ["/api/beats/featured"],
         staleTime: CACHE_CONFIG.DYNAMIC.staleTime,
+        queryFn: async () => {
+          const response = await fetch("/api/beats/featured", { signal });
+          if (!response.ok) throw new Error("Failed to fetch featured beats");
+          return response.json();
+        },
       }),
     ]);
   } catch (error) {
+    // Silently ignore abort errors
+    if (error instanceof Error && error.name === "AbortError") {
+      return;
+    }
     console.warn("Cache warming failed:", error);
   }
+};
+
+// Clear user-specific cache entries (for sign-out cleanup)
+export const clearUserCache = (): void => {
+  queryClient.removeQueries({
+    predicate: query => {
+      const key = query.queryKey;
+      // Remove user-specific and dashboard queries
+      return key.some(
+        k =>
+          typeof k === "string" &&
+          (k.includes("user") ||
+            k.includes("dashboard") ||
+            k.includes("favorites") ||
+            k.includes("downloads") ||
+            k.includes("orders") ||
+            k.includes("subscription"))
+      );
+    },
+  });
 };

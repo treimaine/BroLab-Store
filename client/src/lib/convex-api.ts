@@ -38,4 +38,13 @@ export const api = {
   orders: {
     regenerateDownloadsFromOrders: "orders:regenerateDownloadsFromOrders" as string,
   },
+  beats: {
+    trackView: {
+      incrementView: "beats/trackView:incrementView" as string,
+    },
+    trending: {
+      getTrendingBeats: "beats/trending:getTrendingBeats" as string,
+      getViewCount: "beats/trending:getViewCount" as string,
+    },
+  },
 } as const;
