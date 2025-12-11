@@ -119,10 +119,12 @@ export function ProductArtworkPlayer({
   const {
     currentTrack,
     setCurrentTrack,
+    setCurrentTime: setGlobalCurrentTime,
     setIsPlaying: setGlobalIsPlaying,
     stop,
     setQueue,
     playTrackFromQueue,
+    initiateHandoff,
   } = useAudioStore();
 
   // Generate a unique track ID for this product and track
@@ -327,12 +329,19 @@ export function ProductArtworkPlayer({
       setIsLocalPlaying(false);
       setHasError(true);
     };
+    // Sync current time to global store for handoff
+    const handleTimeUpdate = (): void => {
+      if (isLocalPlaying) {
+        setGlobalCurrentTime(audio.currentTime);
+      }
+    };
 
     audio.addEventListener("ended", handleEnded);
     audio.addEventListener("pause", handlePause);
     audio.addEventListener("playing", handlePlaying);
     audio.addEventListener("waiting", handleWaiting);
     audio.addEventListener("error", handleError);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
 
     return () => {
       audio.removeEventListener("ended", handleEnded);
@@ -340,24 +349,29 @@ export function ProductArtworkPlayer({
       audio.removeEventListener("playing", handlePlaying);
       audio.removeEventListener("waiting", handleWaiting);
       audio.removeEventListener("error", handleError);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
     };
-  }, [setGlobalIsPlaying]);
+  }, [setGlobalIsPlaying, isLocalPlaying, setGlobalCurrentTime]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount - initiate handoff instead of stopping
   useEffect(() => {
     const audio = audioRef.current;
     return () => {
-      if (audio) {
+      const store = useAudioStore.getState();
+
+      // If this audio was playing, initiate handoff to global player
+      if (audio && store.currentTrack?.id === trackId && store.isPlaying) {
+        // Save current time for the global player to resume from
+        initiateHandoff(audio.currentTime);
+        // Pause local audio without modifying global isPlaying state
+        audio.pause();
+      } else if (audio) {
+        // Not playing, just cleanup normally
         audio.pause();
         audio.currentTime = 0;
       }
-      // Clear global store if this track was playing
-      const store = useAudioStore.getState();
-      if (store.currentTrack?.id === trackId) {
-        stop();
-      }
     };
-  }, [trackId, stop]);
+  }, [trackId, initiateHandoff]);
 
   const renderPlayButtonIcon = (): JSX.Element => {
     if (isLoading) {
