@@ -30,69 +30,56 @@ export function generateSitemapXML(
     includeStaticPages = true,
   } = config;
 
-  const urls: SitemapUrl[] = [];
+  const today = new Date().toISOString().split("T")[0];
 
-  // Page d'accueil
-  urls.push({
-    loc: `${baseUrl}/`,
-    changefreq: "daily",
-    priority: 1.0,
-    lastmod: new Date().toISOString().split("T")[0],
-  });
-
-  // Page shop
-  urls.push({
-    loc: `${baseUrl}/shop`,
-    changefreq: "daily",
-    priority: 0.9,
-    lastmod: new Date().toISOString().split("T")[0],
-  });
-
-  // Pages statiques
-  if (includeStaticPages) {
-    const staticPages = [
-      { path: "/about", priority: 0.7, changefreq: "monthly" as const },
-      { path: "/contact", priority: 0.6, changefreq: "monthly" as const },
-      { path: "/terms", priority: 0.3, changefreq: "yearly" as const },
-      { path: "/privacy", priority: 0.3, changefreq: "yearly" as const },
-      { path: "/license", priority: 0.5, changefreq: "monthly" as const },
-    ];
-
-    staticPages.forEach(page => {
-      urls.push({
-        loc: `${baseUrl}${page.path}`,
-        changefreq: page.changefreq,
-        priority: page.priority,
-        lastmod: new Date().toISOString().split("T")[0],
-      });
-    });
-  }
-
-  // Catégories de beats
-  if (includeCategories && categories.length > 0) {
-    categories.forEach(category => {
-      urls.push({
-        loc: `${baseUrl}/shop?category=${encodeURIComponent(category.name)}`,
-        changefreq: "weekly",
-        priority: 0.8,
-        lastmod: new Date().toISOString().split("T")[0],
-      });
-    });
-  }
-
-  // Beats individuels
-  beats.forEach(beat => {
-    const beatUrl: SitemapUrl = {
+  // Build all URLs in a single array initialization
+  const urls: SitemapUrl[] = [
+    // Page d'accueil
+    {
+      loc: `${baseUrl}/`,
+      changefreq: "daily",
+      priority: 1,
+      lastmod: today,
+    },
+    // Page shop
+    {
+      loc: `${baseUrl}/shop`,
+      changefreq: "daily",
+      priority: 0.9,
+      lastmod: today,
+    },
+    // Pages statiques
+    ...(includeStaticPages
+      ? [
+          { path: "/about", priority: 0.7, changefreq: "monthly" as const },
+          { path: "/contact", priority: 0.6, changefreq: "monthly" as const },
+          { path: "/terms", priority: 0.3, changefreq: "yearly" as const },
+          { path: "/privacy", priority: 0.3, changefreq: "yearly" as const },
+          { path: "/license", priority: 0.5, changefreq: "monthly" as const },
+        ].map(page => ({
+          loc: `${baseUrl}${page.path}`,
+          changefreq: page.changefreq,
+          priority: page.priority,
+          lastmod: today,
+        }))
+      : []),
+    // Catégories de beats
+    ...(includeCategories && categories.length > 0
+      ? categories.map(category => ({
+          loc: `${baseUrl}/shop?category=${encodeURIComponent(category.name)}`,
+          changefreq: "weekly" as const,
+          priority: 0.8,
+          lastmod: today,
+        }))
+      : []),
+    // Beats individuels
+    ...beats.map(beat => ({
       loc: `${baseUrl}/product/${beat.id}`,
-      changefreq: "weekly",
+      changefreq: "weekly" as const,
       priority: 0.8,
-      lastmod: beat.created_at
-        ? new Date(beat.created_at).toISOString().split("T")[0]
-        : new Date().toISOString().split("T")[0],
-    };
-
-    urls.push(beatUrl);
-  });
+      lastmod: beat.created_at ? new Date(beat.created_at).toISOString().split("T")[0] : today,
+    })),
+  ];
 
   // Générer le XML
   const xml = `<?xml version="1.0" encoding="UTF-8"?>

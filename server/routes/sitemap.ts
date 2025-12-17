@@ -4,67 +4,144 @@ import {
   generateSitemapIndex,
   generateSitemapXML,
 } from "../lib/sitemapGenerator";
-import { ProcessedBeatData, WooCommerceApiProduct, handleRouteError } from "../types/routes";
+import {
+  ProcessedBeatData,
+  WooCommerceApiProduct,
+  WooCommerceCategory,
+  handleRouteError,
+} from "../types/routes";
 
 const router = Router();
 
-// WooCommerce API helpers
-async function wcApiRequest(endpoint: string, options: RequestInit = {}) {
-  const WOOCOMMERCE_API_URL =
-    process.env.WOOCOMMERCE_API_URL || "https://brolabentertainment.com/wp-json/wc/v3";
-  const WC_CONSUMER_KEY = process.env.WOOCOMMERCE_CONSUMER_KEY;
-  const WC_CONSUMER_SECRET = process.env.WOOCOMMERCE_CONSUMER_SECRET;
+// WooCommerce API configuration
+const WOOCOMMERCE_API_URL =
+  process.env.WOOCOMMERCE_API_URL || "https://brolabentertainment.com/wp-json/wc/v3";
+const WC_CONSUMER_KEY = process.env.WOOCOMMERCE_CONSUMER_KEY;
+const WC_CONSUMER_SECRET = process.env.WOOCOMMERCE_CONSUMER_SECRET;
 
-  if (!WC_CONSUMER_KEY || !WC_CONSUMER_SECRET) {
-    // In tests/dev, return sample data to keep endpoints working
-    if (process.env.NODE_ENV === "test") {
-      return [] as WooCommerceApiProduct[];
+/**
+ * Check if WooCommerce API is enabled (credentials configured)
+ */
+function isWooCommerceEnabled(): boolean {
+  return !!(WC_CONSUMER_KEY && WC_CONSUMER_SECRET);
+}
+
+/**
+ * WooCommerce API request with graceful degradation
+ * Returns empty array when credentials are missing instead of throwing
+ */
+async function wcApiRequest<T = WooCommerceApiProduct[]>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  // Graceful degradation: return empty data when WooCommerce is disabled
+  if (!isWooCommerceEnabled()) {
+    if (process.env.NODE_ENV !== "test") {
+      console.warn(
+        "[Sitemap] WooCommerce API disabled - credentials missing, returning empty data"
+      );
     }
-    throw new Error("WooCommerce API credentials not configured");
+    return [] as T;
   }
 
-  const url = new URL(`${WOOCOMMERCE_API_URL}${endpoint}`);
-  url.searchParams.append("consumer_key", WC_CONSUMER_KEY);
-  url.searchParams.append("consumer_secret", WC_CONSUMER_SECRET);
+  // Test environment mock
+  if (process.env.NODE_ENV === "test") {
+    return [] as T;
+  }
 
-  const response =
-    process.env.NODE_ENV === "test"
-      ? ({
-          ok: true,
-          status: 200,
-          statusText: "OK",
-          json: async () => [] as WooCommerceApiProduct[],
-        } as Response)
-      : await fetch(url.toString(), {
-          ...options,
-          headers: {
-            "Content-Type": "application/json",
-            "User-Agent": "BroLab-Frontend/1.0",
-            Accept: "application/json",
-            ...options.headers,
-          },
-        });
+  // At this point, credentials are guaranteed to exist (checked by isWooCommerceEnabled)
+  const url = new URL(`${WOOCOMMERCE_API_URL}${endpoint}`);
+  url.searchParams.append("consumer_key", WC_CONSUMER_KEY as string);
+  url.searchParams.append("consumer_secret", WC_CONSUMER_SECRET as string);
+
+  const response = await fetch(url.toString(), {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": "BroLab-Frontend/1.0",
+      Accept: "application/json",
+      ...options.headers,
+    },
+  });
 
   if (!response.ok) {
-    throw new Error(`WooCommerce API error: ${response.status} ${response.statusText}`);
+    // Graceful degradation on API errors - log and return empty
+    console.error(`[Sitemap] WooCommerce API error: ${response.status} ${response.statusText}`);
+    return [] as T;
   }
 
   return response.json();
 }
 
-// Base URL pour les liens
-const BASE_URL = process.env.FRONTEND_URL || "https://brolabentertainment.com";
+/**
+ * Récupère tous les produits WooCommerce en itérant sur toutes les pages
+ * @param baseEndpoint - Endpoint de base (ex: "/products")
+ * @returns Tous les produits du catalogue
+ */
+async function wcApiRequestAllPages(baseEndpoint: string): Promise<WooCommerceApiProduct[]> {
+  const allProducts: WooCommerceApiProduct[] = [];
+  const perPage = 100; // Maximum autorisé par WooCommerce
+  let page = 1;
+
+  while (true) {
+    const separator = baseEndpoint.includes("?") ? "&" : "?";
+    const endpoint = `${baseEndpoint}${separator}per_page=${perPage}&page=${page}`;
+    const products = await wcApiRequest<WooCommerceApiProduct[]>(endpoint);
+
+    if (!products || products.length === 0) {
+      break; // Plus de produits
+    }
+
+    allProducts.push(...products);
+
+    if (products.length < perPage) {
+      break; // Dernière page
+    }
+
+    page++;
+  }
+
+  return allProducts;
+}
+
+/**
+ * Détermine l'URL de base selon l'environnement
+ * Évite les fuites d'URLs staging en production et vice-versa
+ */
+function getBaseUrl(): string {
+  // Variable d'environnement explicite (priorité maximale)
+  if (process.env.FRONTEND_URL) {
+    return process.env.FRONTEND_URL;
+  }
+
+  // Environnement de production uniquement
+  if (process.env.NODE_ENV === "production") {
+    return "https://brolabentertainment.com";
+  }
+
+  // Développement/test: utiliser localhost
+  const port = process.env.PORT || 5000;
+  return `http://localhost:${port}`;
+}
+
+// Base URL pour les liens (dérivée de l'environnement)
+const BASE_URL = getBaseUrl();
 
 /**
  * GET /sitemap.xml
  * Génère le sitemap XML principal avec tous les beats et pages
+ * Graceful degradation: returns static pages only when WooCommerce is disabled
  */
 router.get("/sitemap.xml", async (_req, res) => {
   try {
+    // Check WooCommerce availability and set debug header
+    const wooEnabled = isWooCommerceEnabled();
+    res.setHeader("X-WooCommerce-Status", wooEnabled ? "enabled" : "disabled");
+
     // Récupérer tous les produits et catégories depuis WooCommerce
     const [products, categories] = await Promise.all([
-      wcApiRequest("/products?per_page=100"),
-      wcApiRequest("/products/categories"),
+      wcApiRequestAllPages("/products"),
+      wcApiRequest<WooCommerceCategory[]>("/products/categories"),
     ]);
 
     // Transformer les données WooCommerce
@@ -72,11 +149,11 @@ router.get("/sitemap.xml", async (_req, res) => {
       // Extract BPM from product or meta_data
       let bpm: number | undefined;
       if (product.bpm) {
-        bpm = parseInt(product.bpm.toString());
+        bpm = Number.parseInt(product.bpm.toString(), 10);
       } else {
         const bpmMeta = product.meta_data?.find(meta => meta.key === "bpm");
         if (bpmMeta?.value) {
-          bpm = parseInt(bpmMeta.value.toString());
+          bpm = Number.parseInt(bpmMeta.value.toString(), 10);
         }
       }
 
@@ -95,7 +172,7 @@ router.get("/sitemap.xml", async (_req, res) => {
           product.mood ||
           product.meta_data?.find(meta => meta.key === "mood")?.value?.toString() ||
           null,
-        price: parseFloat(product.price) || 0,
+        price: Number.parseFloat(product.price) || 0,
         image_url: product.images?.[0]?.src,
         image: product.images?.[0]?.src, // Alias for compatibility
         images: product.images,
@@ -103,16 +180,16 @@ router.get("/sitemap.xml", async (_req, res) => {
         tags: product.tags?.map(tag => tag.name) || [],
         categories: product.categories,
         meta_data: product.meta_data,
-        duration: product.duration ? parseFloat(product.duration.toString()) : undefined,
+        duration: product.duration ? Number.parseFloat(product.duration.toString()) : undefined,
         downloads: product.downloads || 0,
       };
     });
 
-    // Générer le sitemap XML
+    // Générer le sitemap XML (static pages always included, beats/categories only if available)
     const sitemapXML = generateSitemapXML(beats, categories, {
       baseUrl: BASE_URL,
       includeImages: true,
-      includeCategories: true,
+      includeCategories: categories.length > 0,
       includeStaticPages: true,
     });
 
@@ -121,7 +198,8 @@ router.get("/sitemap.xml", async (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=3600"); // Cache 1 heure
     res.send(sitemapXML);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to generate sitemap");
+    const errorMessage = error instanceof Error ? error : new Error("Failed to generate sitemap");
+    handleRouteError(errorMessage, res, "Failed to generate sitemap");
   }
 });
 
@@ -139,7 +217,9 @@ router.get("/sitemap-index.xml", async (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(sitemapIndexXML);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to generate sitemap index");
+    const errorMessage =
+      error instanceof Error ? error : new Error("Failed to generate sitemap index");
+    handleRouteError(errorMessage, res, "Failed to generate sitemap index");
   }
 });
 
@@ -155,27 +235,34 @@ router.get("/robots.txt", async (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache 24 heures
     res.send(robotsTxt);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to generate robots.txt");
+    const errorMessage =
+      error instanceof Error ? error : new Error("Failed to generate robots.txt");
+    handleRouteError(errorMessage, res, "Failed to generate robots.txt");
   }
 });
 
 /**
  * GET /sitemap-beats.xml
  * Sitemap spécifique pour les beats uniquement
+ * Graceful degradation: returns empty but valid XML when WooCommerce is disabled
  */
 router.get("/sitemap-beats.xml", async (_req, res) => {
   try {
-    const products = await wcApiRequest("/products?per_page=100");
+    // Check WooCommerce availability and set debug header
+    const wooEnabled = isWooCommerceEnabled();
+    res.setHeader("X-WooCommerce-Status", wooEnabled ? "enabled" : "disabled");
+
+    const products = await wcApiRequestAllPages("/products");
 
     const beats: ProcessedBeatData[] = products.map((product: WooCommerceApiProduct) => {
       // Extract BPM from product or meta_data
       let bpm: number | undefined;
       if (product.bpm) {
-        bpm = parseInt(product.bpm.toString());
+        bpm = Number.parseInt(product.bpm.toString(), 10);
       } else {
         const bpmMeta = product.meta_data?.find(meta => meta.key === "bpm");
         if (bpmMeta?.value) {
-          bpm = parseInt(bpmMeta.value.toString());
+          bpm = Number.parseInt(bpmMeta.value.toString(), 10);
         }
       }
 
@@ -194,7 +281,7 @@ router.get("/sitemap-beats.xml", async (_req, res) => {
           product.mood ||
           product.meta_data?.find(meta => meta.key === "mood")?.value?.toString() ||
           null,
-        price: parseFloat(product.price) || 0,
+        price: Number.parseFloat(product.price) || 0,
         image_url: product.images?.[0]?.src,
         image: product.images?.[0]?.src, // Alias for compatibility
         images: product.images,
@@ -202,11 +289,12 @@ router.get("/sitemap-beats.xml", async (_req, res) => {
         tags: product.tags?.map(tag => tag.name) || [],
         categories: product.categories,
         meta_data: product.meta_data,
-        duration: product.duration ? parseFloat(product.duration.toString()) : undefined,
+        duration: product.duration ? Number.parseFloat(product.duration.toString()) : undefined,
         downloads: product.downloads || 0,
       };
     });
 
+    // Generate sitemap (will be empty but valid XML if no products)
     const sitemapXML = generateSitemapXML(beats, [], {
       baseUrl: BASE_URL,
       includeImages: true,
@@ -218,7 +306,9 @@ router.get("/sitemap-beats.xml", async (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=1800"); // Cache 30 minutes
     res.send(sitemapXML);
   } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to generate beats sitemap");
+    const errorMessage =
+      error instanceof Error ? error : new Error("Failed to generate beats sitemap");
+    handleRouteError(errorMessage, res, "Failed to generate beats sitemap");
   }
 });
 
