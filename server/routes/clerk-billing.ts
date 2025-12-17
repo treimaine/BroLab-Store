@@ -1,6 +1,12 @@
 import { Request, Response, Router } from "express";
 import { randomUUID } from "node:crypto";
 import {
+  getWebhookAuditLogger,
+  type WebhookAuditEntry,
+  type WebhookOutcome,
+} from "../services/WebhookAuditLogger";
+import { getWebhookSecurityService } from "../services/WebhookSecurityService";
+import {
   PaymentError,
   PaymentErrorCode,
   createErrorResponse,
@@ -8,6 +14,10 @@ import {
 } from "../utils/errorHandling";
 
 const router = Router();
+
+// Initialize security services
+const securityService = getWebhookSecurityService();
+const auditLogger = getWebhookAuditLogger();
 
 // Types for webhook events
 interface WebhookPayload {
@@ -47,9 +57,32 @@ const INVOICE_EVENT_MUTATIONS: Record<string, string> = {
 /**
  * Clerk Billing webhook endpoint
  * Handles subscription and invoice events from Clerk with signature verification
+ *
+ * Security features:
+ * - Timestamp validation for replay attack protection (Requirements 2.1, 2.2, 2.3)
+ * - Idempotency checking to prevent duplicate processing (Requirements 3.1, 3.2)
+ * - IP failure tracking for suspicious activity detection (Requirement 4.4)
+ * - Structured audit logging (Requirements 4.1, 4.2, 4.3)
  */
 router.post("/", async (req: Request, res: Response): Promise<void> => {
   const requestId = randomUUID();
+  const startTime = Date.now();
+
+  // Extract source IP for tracking and logging
+  const sourceIp = extractSourceIP(req);
+
+  // Extract Svix headers early for logging
+  const svixHeaders = extractSvixHeaders(req);
+  const svixId = svixHeaders?.["svix-id"] || "unknown";
+  const svixTimestamp = svixHeaders?.["svix-timestamp"] || "";
+
+  // Initialize audit entry builder
+  let eventType = "unknown";
+  let signatureValid = false;
+  let outcome: WebhookOutcome = "error";
+  let rejectionReason: string | undefined;
+  let mutationCalled: string | undefined;
+  let syncStatus: boolean | undefined;
 
   try {
     console.log(`📨 [${requestId}] Processing Clerk Billing webhook...`);
@@ -57,7 +90,97 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
     // Verify environment configuration
     const config = validateEnvironmentConfig(requestId);
     if (!config.isValid) {
+      outcome = "rejected";
+      rejectionReason = "Environment configuration invalid";
+      logAuditEntry({
+        requestId,
+        startTime,
+        eventType,
+        sourceIp,
+        svixId,
+        signatureValid,
+        outcome,
+        rejectionReason,
+      });
       res.status(config.statusCode!).json(config.errorResponse!);
+      return;
+    }
+
+    // Check for required Svix headers
+    if (!svixHeaders) {
+      outcome = "rejected";
+      rejectionReason = "Missing required Svix headers";
+      console.warn(`⚠️ [${requestId}] ${rejectionReason}`);
+      logAuditEntry({
+        requestId,
+        startTime,
+        eventType,
+        sourceIp,
+        svixId,
+        signatureValid,
+        outcome,
+        rejectionReason,
+      });
+      const errorResponse = createErrorResponse(
+        "Missing headers",
+        PaymentErrorCode.WEBHOOK_MISSING_HEADERS,
+        rejectionReason,
+        requestId
+      );
+      res.status(400).json(errorResponse);
+      return;
+    }
+
+    // Requirement 2.1, 2.2, 2.3: Validate timestamp for replay attack protection
+    const timestampValidation = securityService.validateTimestamp(svixTimestamp);
+    if (!timestampValidation.valid) {
+      outcome = "rejected";
+      rejectionReason = timestampValidation.reason;
+      console.warn(`⚠️ [${requestId}] Timestamp validation failed: ${rejectionReason}`);
+      logAuditEntry({
+        requestId,
+        startTime,
+        eventType,
+        sourceIp,
+        svixId,
+        signatureValid,
+        outcome,
+        rejectionReason,
+      });
+      const errorResponse = createErrorResponse(
+        "Invalid timestamp",
+        timestampValidation.code,
+        rejectionReason,
+        requestId
+      );
+      res.status(400).json(errorResponse);
+      return;
+    }
+
+    // Requirement 3.1, 3.2: Check idempotency before processing
+    const idempotencyResult = securityService.checkIdempotency(svixId);
+    if (idempotencyResult.isDuplicate) {
+      outcome = "duplicate";
+      console.log(
+        `ℹ️ [${requestId}] Duplicate webhook detected: ${svixId} (originally processed at ${new Date(idempotencyResult.originalProcessedAt).toISOString()})`
+      );
+      logAuditEntry({
+        requestId,
+        startTime,
+        eventType,
+        sourceIp,
+        svixId,
+        signatureValid: true, // Signature was valid when originally processed
+        outcome,
+      });
+      // Return 200 for duplicates without re-processing (idempotent behavior)
+      res.status(200).json({
+        received: true,
+        synced: false,
+        message: "Duplicate webhook - already processed",
+        requestId,
+        duplicate: true,
+      });
       return;
     }
 
@@ -69,23 +192,156 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       requestId
     );
     if (!payload) {
+      outcome = "rejected";
+      rejectionReason = "Webhook signature verification failed";
+
+      // Requirement 4.4: Track signature failures by IP
+      securityService.trackSignatureFailure(sourceIp);
+
+      // Check if IP should trigger security warning
+      if (securityService.shouldWarnAboutIP(sourceIp)) {
+        const failureCount = securityService.getFailureCount(sourceIp);
+        auditLogger.logSecurityWarning(sourceIp, failureCount);
+        console.warn(
+          `🚨 [${requestId}] Security warning: ${failureCount} signature failures from IP ${sourceIp}`
+        );
+      }
+
+      logAuditEntry({
+        requestId,
+        startTime,
+        eventType,
+        sourceIp,
+        svixId,
+        signatureValid,
+        outcome,
+        rejectionReason,
+      });
       const errorResponse = createErrorResponse(
         "Invalid signature",
         PaymentErrorCode.STRIPE_INVALID_SIGNATURE,
-        "Webhook signature verification failed",
+        rejectionReason,
         requestId
       );
       res.status(400).json(errorResponse);
       return;
     }
 
+    // Signature verified successfully
+    signatureValid = true;
+    eventType = payload.type || "unknown";
+
     // Process webhook event
     const response = await processWebhookEvent(payload, config.convexUrl, requestId);
+
+    // Requirement 3.2: Record processed webhook for idempotency
+    securityService.recordProcessed(svixId, eventType);
+
+    // Set audit fields from response
+    outcome = "success";
+    syncStatus = response.synced;
+    mutationCalled = response.handled ? `${response.handled}:${eventType}` : undefined;
+
+    logAuditEntry({
+      requestId,
+      startTime,
+      eventType,
+      sourceIp,
+      svixId,
+      signatureValid,
+      outcome,
+      mutationCalled,
+      syncStatus,
+    });
+
     res.status(200).json(response);
   } catch (error) {
+    outcome = "error";
+    rejectionReason = error instanceof Error ? error.message : String(error);
+    logAuditEntry({
+      requestId,
+      startTime,
+      eventType,
+      sourceIp,
+      svixId,
+      signatureValid,
+      outcome,
+      rejectionReason,
+    });
     handleWebhookError(error, requestId, res);
   }
 });
+
+/**
+ * Extract source IP from request
+ * Handles proxied requests (X-Forwarded-For) and direct connections
+ */
+function extractSourceIP(req: Request): string {
+  // Check for forwarded IP (when behind proxy/load balancer)
+  const forwardedFor = req.headers["x-forwarded-for"];
+  if (forwardedFor) {
+    // X-Forwarded-For can contain multiple IPs, take the first (client IP)
+    const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+    return ips.split(",")[0].trim();
+  }
+
+  // Check for real IP header (nginx)
+  const realIp = req.headers["x-real-ip"];
+  if (realIp) {
+    return Array.isArray(realIp) ? realIp[0] : realIp;
+  }
+
+  // Fall back to socket remote address
+  return req.socket.remoteAddress || "unknown";
+}
+
+/**
+ * Options for logging audit entries
+ */
+interface AuditLogOptions {
+  requestId: string;
+  startTime: number;
+  eventType: string;
+  sourceIp: string;
+  svixId: string;
+  signatureValid: boolean;
+  outcome: WebhookOutcome;
+  rejectionReason?: string;
+  mutationCalled?: string;
+  syncStatus?: boolean;
+}
+
+/**
+ * Log audit entry with all required fields
+ * Requirements: 4.1, 4.2, 4.3
+ */
+function logAuditEntry(options: AuditLogOptions): void {
+  const processingTimeMs = Date.now() - options.startTime;
+
+  const auditEntry: WebhookAuditEntry = {
+    requestId: options.requestId,
+    timestamp: new Date().toISOString(),
+    eventType: options.eventType,
+    sourceIp: options.sourceIp,
+    svixId: options.svixId,
+    signatureValid: options.signatureValid,
+    processingTimeMs,
+    outcome: options.outcome,
+  };
+
+  // Include optional fields only when present
+  if (options.rejectionReason !== undefined) {
+    auditEntry.rejectionReason = options.rejectionReason;
+  }
+  if (options.mutationCalled !== undefined) {
+    auditEntry.mutationCalled = options.mutationCalled;
+  }
+  if (options.syncStatus !== undefined) {
+    auditEntry.syncStatus = options.syncStatus;
+  }
+
+  auditLogger.log(auditEntry);
+}
 
 /**
  * Validate environment configuration
