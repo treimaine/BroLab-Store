@@ -93,7 +93,7 @@
   - Include rejection reasons for failed requests
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [-] 4.5 Write property test for response format compatibility
+- [x] 4.5 Write property test for response format compatibility
   - **Property 5: Response format backward compatibility**
   - **Validates: Requirements 5.1, 5.2, 5.3**
 
