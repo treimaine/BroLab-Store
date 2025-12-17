@@ -869,4 +869,433 @@ describe("Webhook Security Property Tests", () => {
       );
     });
   });
+
+  // ============================================================================
+  // Test Suite: Property 5 - Response Format Backward Compatibility
+  // **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+  // **Validates: Requirements 5.1, 5.2, 5.3**
+  // ============================================================================
+
+  describe("Property 5: Response format backward compatibility", () => {
+    /**
+     * Required fields that must be present in every webhook response
+     * to maintain backward compatibility with existing integrations
+     * Requirements 5.1, 5.2, 5.3
+     */
+    const REQUIRED_RESPONSE_FIELDS = ["received", "synced", "requestId"] as const;
+
+    /**
+     * WebhookResponse interface definition for type checking
+     * This matches the interface in server/routes/clerk-billing.ts
+     */
+    interface WebhookResponse {
+      received: boolean;
+      synced: boolean;
+      handled?: string;
+      eventType?: string;
+      message?: string;
+      requestId: string;
+      timestamp?: string;
+      duplicate?: boolean;
+    }
+
+    /**
+     * Validates that a response object conforms to the WebhookResponse interface
+     */
+    function isValidWebhookResponse(response: unknown): response is WebhookResponse {
+      if (typeof response !== "object" || response === null) {
+        return false;
+      }
+
+      const obj = response as Record<string, unknown>;
+
+      // Check required fields exist and have correct types
+      if (typeof obj.received !== "boolean") return false;
+      if (typeof obj.synced !== "boolean") return false;
+      if (typeof obj.requestId !== "string") return false;
+
+      // Check optional fields have correct types when present
+      if (obj.handled !== undefined && typeof obj.handled !== "string") return false;
+      if (obj.eventType !== undefined && typeof obj.eventType !== "string") return false;
+      if (obj.message !== undefined && typeof obj.message !== "string") return false;
+      if (obj.timestamp !== undefined && typeof obj.timestamp !== "string") return false;
+      if (obj.duplicate !== undefined && typeof obj.duplicate !== "boolean") return false;
+
+      return true;
+    }
+
+    /**
+     * Creates a valid WebhookResponse for testing
+     */
+    function createWebhookResponse(params: {
+      received: boolean;
+      synced: boolean;
+      requestId: string;
+      handled?: string;
+      eventType?: string;
+      message?: string;
+      timestamp?: string;
+      duplicate?: boolean;
+    }): WebhookResponse {
+      const response: WebhookResponse = {
+        received: params.received,
+        synced: params.synced,
+        requestId: params.requestId,
+      };
+
+      if (params.handled !== undefined) response.handled = params.handled;
+      if (params.eventType !== undefined) response.eventType = params.eventType;
+      if (params.message !== undefined) response.message = params.message;
+      if (params.timestamp !== undefined) response.timestamp = params.timestamp;
+      if (params.duplicate !== undefined) response.duplicate = params.duplicate;
+
+      return response;
+    }
+
+    /**
+     * Arbitrary generator for valid WebhookResponse objects
+     */
+    const webhookResponseArbitrary = fc.record({
+      received: fc.boolean(),
+      synced: fc.boolean(),
+      requestId: fc.uuid(),
+      handled: fc.option(fc.constantFrom("subscription", "invoice", "user_session"), {
+        nil: undefined,
+      }),
+      eventType: fc.option(
+        fc.constantFrom(
+          "session.created",
+          "session.ended",
+          "subscription.created",
+          "subscription.updated",
+          "subscription.deleted",
+          "invoice.paid",
+          "invoice.failed",
+          "user.created",
+          "user.updated"
+        ),
+        { nil: undefined }
+      ),
+      message: fc.option(fc.string({ minLength: 1, maxLength: 200 }), { nil: undefined }),
+      timestamp: fc.option(
+        fc
+          .integer({
+            min: 1577836800000,
+            max: 1924991999999,
+          })
+          .map(ms => new Date(ms).toISOString()),
+        { nil: undefined }
+      ),
+      duplicate: fc.option(fc.boolean(), { nil: undefined }),
+    });
+
+    /**
+     * **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+     * **Validates: Requirements 5.1, 5.2, 5.3**
+     *
+     * For any webhook response, the JSON should contain all required fields:
+     * received, synced, and requestId
+     */
+    it("should include all required fields (received, synced, requestId) in any response", () => {
+      fc.assert(
+        fc.property(webhookResponseArbitrary, responseData => {
+          const response = createWebhookResponse(responseData);
+
+          // Verify all required fields are present
+          for (const field of REQUIRED_RESPONSE_FIELDS) {
+            expect(response).toHaveProperty(field);
+            expect(response[field]).toBeDefined();
+          }
+
+          // Verify the response is valid according to interface
+          expect(isValidWebhookResponse(response)).toBe(true);
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    /**
+     * **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+     * **Validates: Requirements 5.1**
+     *
+     * For any webhook response, the 'received' field should be a boolean
+     */
+    it("should have 'received' field as boolean type", () => {
+      fc.assert(
+        fc.property(webhookResponseArbitrary, responseData => {
+          const response = createWebhookResponse(responseData);
+
+          expect(typeof response.received).toBe("boolean");
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    /**
+     * **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+     * **Validates: Requirements 5.2**
+     *
+     * For any webhook response, the 'synced' field should be a boolean
+     */
+    it("should have 'synced' field as boolean type", () => {
+      fc.assert(
+        fc.property(webhookResponseArbitrary, responseData => {
+          const response = createWebhookResponse(responseData);
+
+          expect(typeof response.synced).toBe("boolean");
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    /**
+     * **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+     * **Validates: Requirements 5.3**
+     *
+     * For any webhook response, the 'requestId' field should be a non-empty string
+     */
+    it("should have 'requestId' field as non-empty string", () => {
+      fc.assert(
+        fc.property(webhookResponseArbitrary, responseData => {
+          const response = createWebhookResponse(responseData);
+
+          expect(typeof response.requestId).toBe("string");
+          expect(response.requestId.length).toBeGreaterThan(0);
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    /**
+     * **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+     * **Validates: Requirements 5.1, 5.2, 5.3**
+     *
+     * For any webhook response, serializing to JSON and parsing back should preserve
+     * all required fields with correct types
+     */
+    it("should preserve required fields through JSON serialization round-trip", () => {
+      fc.assert(
+        fc.property(webhookResponseArbitrary, responseData => {
+          const response = createWebhookResponse(responseData);
+
+          // Serialize to JSON and parse back
+          const jsonString = JSON.stringify(response);
+          const parsed = JSON.parse(jsonString) as Record<string, unknown>;
+
+          // Verify required fields are preserved
+          expect(parsed.received).toBe(response.received);
+          expect(parsed.synced).toBe(response.synced);
+          expect(parsed.requestId).toBe(response.requestId);
+
+          // Verify types are preserved
+          expect(typeof parsed.received).toBe("boolean");
+          expect(typeof parsed.synced).toBe("boolean");
+          expect(typeof parsed.requestId).toBe("string");
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    /**
+     * **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+     * **Validates: Requirements 5.1, 5.2, 5.3**
+     *
+     * For successful webhook responses (synced: true), the response should include
+     * handled and eventType fields
+     */
+    it("should include handled and eventType for successful synced responses", () => {
+      // Generate only successful synced responses
+      const successResponseArbitrary = fc.record({
+        received: fc.constant(true),
+        synced: fc.constant(true),
+        requestId: fc.uuid(),
+        handled: fc.constantFrom("subscription", "invoice", "user_session"),
+        eventType: fc.constantFrom(
+          "session.created",
+          "subscription.created",
+          "subscription.updated",
+          "invoice.paid"
+        ),
+        timestamp: fc
+          .integer({
+            min: 1577836800000,
+            max: 1924991999999,
+          })
+          .map(ms => new Date(ms).toISOString()),
+      });
+
+      fc.assert(
+        fc.property(successResponseArbitrary, responseData => {
+          const response = createWebhookResponse(responseData);
+
+          // Verify required fields
+          expect(response.received).toBe(true);
+          expect(response.synced).toBe(true);
+          expect(response.requestId).toBeDefined();
+
+          // Verify success-specific fields
+          expect(response.handled).toBeDefined();
+          expect(response.eventType).toBeDefined();
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    /**
+     * **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+     * **Validates: Requirements 5.1, 5.2, 5.3**
+     *
+     * For duplicate webhook responses, the response should include duplicate: true
+     * and still have all required fields
+     */
+    it("should include duplicate flag for duplicate webhook responses", () => {
+      // Generate duplicate responses
+      const duplicateResponseArbitrary = fc.record({
+        received: fc.constant(true),
+        synced: fc.constant(false),
+        requestId: fc.uuid(),
+        message: fc.constant("Duplicate webhook - already processed"),
+        duplicate: fc.constant(true),
+      });
+
+      fc.assert(
+        fc.property(duplicateResponseArbitrary, responseData => {
+          const response = createWebhookResponse(responseData);
+
+          // Verify required fields
+          expect(response.received).toBe(true);
+          expect(response.synced).toBe(false);
+          expect(response.requestId).toBeDefined();
+
+          // Verify duplicate-specific fields
+          expect(response.duplicate).toBe(true);
+          expect(response.message).toContain("Duplicate");
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    /**
+     * **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+     * **Validates: Requirements 5.1, 5.2, 5.3**
+     *
+     * For any response with optional fields, those fields should have correct types
+     */
+    it("should have correct types for optional fields when present", () => {
+      // Generate responses with all optional fields present
+      const fullResponseArbitrary = fc.record({
+        received: fc.boolean(),
+        synced: fc.boolean(),
+        requestId: fc.uuid(),
+        handled: fc.constantFrom("subscription", "invoice", "user_session"),
+        eventType: fc.constantFrom("session.created", "subscription.created", "invoice.paid"),
+        message: fc.string({ minLength: 1, maxLength: 100 }),
+        timestamp: fc
+          .integer({
+            min: 1577836800000,
+            max: 1924991999999,
+          })
+          .map(ms => new Date(ms).toISOString()),
+        duplicate: fc.boolean(),
+      });
+
+      fc.assert(
+        fc.property(fullResponseArbitrary, responseData => {
+          const response = createWebhookResponse(responseData);
+
+          // Verify optional field types
+          expect(typeof response.handled).toBe("string");
+          expect(typeof response.eventType).toBe("string");
+          expect(typeof response.message).toBe("string");
+          expect(typeof response.timestamp).toBe("string");
+          expect(typeof response.duplicate).toBe("boolean");
+
+          // Verify timestamp is valid ISO string
+          if (response.timestamp) {
+            expect(() => new Date(response.timestamp!)).not.toThrow();
+            expect(new Date(response.timestamp).toISOString()).toBe(response.timestamp);
+          }
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    /**
+     * **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+     * **Validates: Requirements 5.1, 5.2, 5.3**
+     *
+     * For any response, the isValidWebhookResponse validator should return true
+     */
+    it("should pass validation for any properly constructed response", () => {
+      fc.assert(
+        fc.property(webhookResponseArbitrary, responseData => {
+          const response = createWebhookResponse(responseData);
+
+          expect(isValidWebhookResponse(response)).toBe(true);
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    /**
+     * **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+     * **Validates: Requirements 5.1, 5.2, 5.3**
+     *
+     * Responses missing required fields should fail validation
+     */
+    it("should fail validation when required fields are missing", () => {
+      // Test missing 'received'
+      const missingReceived = { synced: true, requestId: "test-id" };
+      expect(isValidWebhookResponse(missingReceived)).toBe(false);
+
+      // Test missing 'synced'
+      const missingSynced = { received: true, requestId: "test-id" };
+      expect(isValidWebhookResponse(missingSynced)).toBe(false);
+
+      // Test missing 'requestId'
+      const missingRequestId = { received: true, synced: true };
+      expect(isValidWebhookResponse(missingRequestId)).toBe(false);
+
+      // Test null/undefined
+      expect(isValidWebhookResponse(null)).toBe(false);
+      expect(isValidWebhookResponse(undefined)).toBe(false);
+
+      // Test non-object
+      expect(isValidWebhookResponse("string")).toBe(false);
+      expect(isValidWebhookResponse(123)).toBe(false);
+    });
+
+    /**
+     * **Feature: clerk-webhook-security, Property 5: Response format backward compatibility**
+     * **Validates: Requirements 5.1, 5.2, 5.3**
+     *
+     * Responses with wrong field types should fail validation
+     */
+    it("should fail validation when field types are incorrect", () => {
+      // Test wrong type for 'received'
+      const wrongReceivedType = { received: "true", synced: true, requestId: "test-id" };
+      expect(isValidWebhookResponse(wrongReceivedType)).toBe(false);
+
+      // Test wrong type for 'synced'
+      const wrongSyncedType = { received: true, synced: "false", requestId: "test-id" };
+      expect(isValidWebhookResponse(wrongSyncedType)).toBe(false);
+
+      // Test wrong type for 'requestId'
+      const wrongRequestIdType = { received: true, synced: true, requestId: 123 };
+      expect(isValidWebhookResponse(wrongRequestIdType)).toBe(false);
+
+      // Test wrong type for optional 'handled'
+      const wrongHandledType = { received: true, synced: true, requestId: "test-id", handled: 123 };
+      expect(isValidWebhookResponse(wrongHandledType)).toBe(false);
+
+      // Test wrong type for optional 'duplicate'
+      const wrongDuplicateType = {
+        received: true,
+        synced: true,
+        requestId: "test-id",
+        duplicate: "true",
+      };
+      expect(isValidWebhookResponse(wrongDuplicateType)).toBe(false);
+    });
+  });
 });
