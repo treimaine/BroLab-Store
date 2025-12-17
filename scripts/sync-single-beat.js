@@ -4,31 +4,13 @@
  * Script simple pour synchroniser un beat spécifique
  */
 
-<<<<<<< HEAD
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-import fetch from 'node-fetch';
-=======
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
 
 // Charger les variables d'environnement
 dotenv.config();
 
-<<<<<<< HEAD
-// Configuration
-const WORDPRESS_URL = 'https://brolabentertainment.com/wp-json/wc/v3';
-const CONSUMER_KEY = process.env.WOOCOMMERCE_CONSUMER_KEY;
-const CONSUMER_SECRET = process.env.WOOCOMMERCE_CONSUMER_SECRET;
-const SUPABASE_URL = 'https://lqijgqevowmvikxqpgaz.supabase.co';
-const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxaWpncWV2b3dtdmlreHFwZ2F6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjM1MDY1MCwiZXhwIjoyMDUxOTI2NjUwfQ.Y50LY8Rp3zFBRt4yS-kZeWlKrQvhM1kQJ8xr4jhkfrE';
-
-console.log('✅ Configuration chargée');
-console.log('CONSUMER_KEY:', !!CONSUMER_KEY);
-console.log('CONSUMER_SECRET:', !!CONSUMER_SECRET);
-=======
 // Configuration - All sensitive credentials loaded from environment variables
 const WORDPRESS_URL =
   process.env.WORDPRESS_API_URL || "https://brolabentertainment.com/wp-json/wc/v3";
@@ -57,26 +39,12 @@ if (!CONSUMER_KEY || !CONSUMER_SECRET) {
 console.log("✅ Configuration chargée");
 console.log("CONSUMER_KEY:", !!CONSUMER_KEY);
 console.log("CONSUMER_SECRET:", !!CONSUMER_SECRET);
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
 
 // Initialiser Supabase
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 async function syncBeat920() {
   try {
-<<<<<<< HEAD
-    console.log('🔄 Synchronisation du beat 920...');
-    
-    // 1. Récupérer le produit depuis WordPress
-    const auth = Buffer.from(`${CONSUMER_KEY}:${CONSUMER_SECRET}`).toString('base64');
-    console.log('🔗 Connexion à WordPress...');
-    
-    const response = await fetch(`${WORDPRESS_URL}/products/920`, {
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json'
-      }
-=======
     console.log("🔄 Synchronisation du beat 920...");
 
     // 1. Récupérer le produit depuis WordPress
@@ -88,18 +56,13 @@ async function syncBeat920() {
         Authorization: `Basic ${auth}`,
         "Content-Type": "application/json",
       },
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
     });
 
     console.log(`📡 Réponse: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       const errorText = await response.text();
-<<<<<<< HEAD
-      console.error('❌ Erreur WordPress:', errorText);
-=======
       console.error("❌ Erreur WordPress:", errorText);
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
       return;
     }
 
@@ -111,16 +74,6 @@ async function syncBeat920() {
       id: 920, // Force l'ID
       wordpress_id: 920,
       title: product.name,
-<<<<<<< HEAD
-      description: product.description || product.short_description || '',
-      genre: 'Hip-Hop', // Valeur par défaut
-      bpm: 120, // Valeur par défaut
-      key: 'C', // Valeur par défaut
-      mood: 'Energetic', // Valeur par défaut
-      price: Math.round(parseFloat(product.price || '0') * 100),
-      audio_url: '',
-      image_url: product.images?.[0]?.src || '',
-=======
       description: product.description || product.short_description || "",
       genre: "Hip-Hop", // Valeur par défaut
       bpm: 120, // Valeur par défaut
@@ -129,24 +82,12 @@ async function syncBeat920() {
       price: Math.round(Number.parseFloat(product.price || "0") * 100),
       audio_url: "",
       image_url: product.images?.[0]?.src || "",
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
       is_active: true,
       created_at: product.date_created,
       tags: [],
       featured: false,
       downloads: 0,
       views: 0,
-<<<<<<< HEAD
-      duration: 180
-    };
-
-    console.log('💾 Insertion dans Supabase...');
-    const { data, error } = await supabase
-      .from('beats')
-      .upsert(supabaseProduct, {
-        onConflict: 'id',
-        ignoreDuplicates: false
-=======
       duration: 180,
     };
 
@@ -156,28 +97,11 @@ async function syncBeat920() {
       .upsert(supabaseProduct, {
         onConflict: "id",
         ignoreDuplicates: false,
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
       })
       .select()
       .single();
 
     if (error) {
-<<<<<<< HEAD
-      console.error('❌ Erreur Supabase:', error);
-      return;
-    }
-
-    console.log('✅ Beat 920 synchronisé avec succès !');
-    console.log('📊 Données:', data);
-
-  } catch (error) {
-    console.error('💥 Erreur fatale:', error);
-  }
-}
-
-// Exécuter la synchronisation
-syncBeat920();
-=======
       console.error("❌ Erreur Supabase:", error);
       return;
     }
@@ -191,4 +115,3 @@ syncBeat920();
 
 // Exécuter la synchronisation avec top-level await
 await syncBeat920();
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc

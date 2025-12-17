@@ -1,9 +1,6 @@
 import { StandardHero } from "@/components/ui/StandardHero";
 import { useWordPress } from "@/hooks/use-wordpress";
-<<<<<<< HEAD
-=======
 import { sanitizeHtml } from "@shared/utils/sanitize";
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
 
 export default function Copyright() {
   const { page, isLoading, error } = useWordPress("copyright");
@@ -126,11 +123,7 @@ export default function Copyright() {
       {page ? (
         <>
           <StandardHero
-<<<<<<< HEAD
-            title={(page.title?.rendered || "Copyright").replace(/<[^>]+>/g, "")}
-=======
             title={(page.title?.rendered || "Copyright").replaceAll(/<[^>]+>/g, "")}
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
             subtitle="Important copyright information about our music compositions and licensing rights."
           />
           <div className="max-w-4xl mx-auto px-4 py-20">

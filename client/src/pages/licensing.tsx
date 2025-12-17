@@ -1,9 +1,6 @@
 import { StandardHero } from "@/components/ui/StandardHero";
 import { useWordPress } from "@/hooks/use-wordpress";
-<<<<<<< HEAD
-=======
 import { sanitizeHtml } from "@shared/utils/sanitize";
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
 
 export default function Licensing() {
   const { page, isLoading, error } = useWordPress("licensing");
@@ -107,11 +104,7 @@ export default function Licensing() {
       {page ? (
         <>
           <StandardHero
-<<<<<<< HEAD
-            title={(page.title?.rendered || "Licensing").replace(/<[^>]+>/g, "")}
-=======
             title={(page.title?.rendered || "Licensing").replaceAll(/<[^>]+>/g, "")}
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
             subtitle="Understand our beat licensing options and choose the right license for your music projects."
           />
           <div className="max-w-4xl mx-auto px-4 py-20">

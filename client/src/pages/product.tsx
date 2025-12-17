@@ -15,10 +15,7 @@ import { useWishlist } from "@/hooks/useWishlist";
 import { api } from "@/lib/convex-api";
 import { LicensePricing, LicenseTypeEnum } from "@shared/schema";
 import { LicenseType } from "@shared/types/Beat";
-<<<<<<< HEAD
-=======
 import { sanitizeHtml } from "@shared/utils/sanitize";
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
 import { useMutation } from "convex/react";
 import { ArrowLeft, Download, FileText, Heart, ShoppingCart } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

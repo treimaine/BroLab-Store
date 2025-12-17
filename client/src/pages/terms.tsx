@@ -1,9 +1,6 @@
 import { StandardHero } from "@/components/ui/StandardHero";
 import { useWordPress } from "@/hooks/use-wordpress";
-<<<<<<< HEAD
-=======
-import { sanitizeHtml } from "../../../shared/utils";
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
+import { sanitizeHtml } from "@shared/utils/sanitize";
 
 export default function Terms() {
   const { page, isLoading, error } = useWordPress("terms-of-service");

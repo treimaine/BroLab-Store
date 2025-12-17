@@ -1,9 +1,6 @@
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import { useWordPress } from "@/hooks/use-wordpress";
-<<<<<<< HEAD
-=======
 import { sanitizeHtml } from "@shared/utils/sanitize";
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 

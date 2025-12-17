@@ -1,9 +1,6 @@
 import { StandardHero } from "@/components/ui/StandardHero";
 import { useWordPress } from "@/hooks/use-wordpress";
-<<<<<<< HEAD
-=======
 import { sanitizeHtml } from "@shared/utils/sanitize";
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
 
 export default function Privacy() {
   const { page, isLoading, error } = useWordPress("privacy-policy");
@@ -116,11 +113,7 @@ export default function Privacy() {
       {page ? (
         <>
           <StandardHero
-<<<<<<< HEAD
-            title={(page.title?.rendered || "Privacy Policy").replace(/<[^>]+>/g, "")}
-=======
             title={(page.title?.rendered || "Privacy Policy").replaceAll(/<[^>]+>/g, "")}
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
             subtitle="Learn how we collect, use, and protect your personal information at BroLab Entertainment."
           />
           <div className="max-w-4xl mx-auto px-4 py-20">
