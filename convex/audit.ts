@@ -5,7 +5,7 @@ export const log = mutation({
   args: {
     action: v.string(),
     resource: v.string(),
-    details: v.optional(v.object({})),
+    details: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("auditLogs", {
@@ -56,7 +56,7 @@ export const logAuditEvent = mutation({
     userId: v.optional(v.string()),
     action: v.string(),
     resource: v.string(),
-    details: v.optional(v.object({})),
+    details: v.optional(v.any()),
     ipAddress: v.optional(v.string()),
     userAgent: v.optional(v.string()),
   },
