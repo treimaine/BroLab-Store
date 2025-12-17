@@ -46,12 +46,10 @@ app.use(bodySizeLimits);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
-// Debug structured env log (without secrets)
+// Server startup log (no sensitive data)
 logger.info("Server starting", {
   nodeEnv: env.NODE_ENV,
-  convexUrl: env.VITE_CONVEX_URL,
   clerkConfigured: Boolean(env.VITE_CLERK_PUBLISHABLE_KEY) && Boolean(env.CLERK_SECRET_KEY),
-  flags: env.flags,
 });
 
 // Request ID middleware - generates cryptographically secure UUIDs

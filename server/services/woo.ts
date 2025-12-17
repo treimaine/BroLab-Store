@@ -128,8 +128,7 @@ export async function fetchWooProducts(
       return [];
     }
 
-    console.log("🔧 WooCommerce API URL:", config.apiUrl);
-    console.log("🔧 WooCommerce Key:", `${config.apiKey.substring(0, 10)}...`);
+    // WooCommerce configuration validated (no sensitive data logged)
 
     const params = buildSearchParams(validatedFilters as Record<string, unknown>);
     const url = `${config.apiUrl}/products?${params}`;

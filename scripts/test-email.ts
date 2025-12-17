@@ -19,13 +19,15 @@ import { sendMail } from "../server/services/mail";
 async function testEmailConfiguration(): Promise<void> {
   console.log("🧪 Testing email configuration...\n");
 
-  // Check configuration
+  // Check configuration (without exposing sensitive values)
   console.log("📋 Configuration:");
-  console.log(`  RESEND_API_KEY: ${process.env.RESEND_API_KEY ? "✅ Set" : "❌ Not set"}`);
-  console.log(`  SMTP_HOST: ${process.env.SMTP_HOST || "Not set"}`);
-  console.log(`  SMTP_PORT: ${process.env.SMTP_PORT || "Not set"}`);
-  console.log(`  SMTP_USER: ${process.env.SMTP_USER || "Not set"}`);
-  console.log(`  SMTP_PASS: ${process.env.SMTP_PASS ? "✅ Set" : "❌ Not set"}`);
+  console.log(
+    `  RESEND_API_KEY: ${process.env.RESEND_API_KEY ? "✅ Configured" : "❌ Not configured"}`
+  );
+  console.log(`  SMTP_HOST: ${process.env.SMTP_HOST ? "✅ Configured" : "❌ Not configured"}`);
+  console.log(`  SMTP_PORT: ${process.env.SMTP_PORT ? "✅ Configured" : "❌ Not configured"}`);
+  console.log(`  SMTP_USER: ${process.env.SMTP_USER ? "✅ Configured" : "❌ Not configured"}`);
+  console.log(`  SMTP_PASS: ${process.env.SMTP_PASS ? "✅ Configured" : "❌ Not configured"}`);
   console.log();
 
   // Validate configuration
@@ -45,7 +47,7 @@ async function testEmailConfiguration(): Promise<void> {
     process.exit(1);
   }
 
-  console.log(`✅ Using ${hasResend ? "Resend" : "Gmail SMTP"}\n`);
+  console.log(`✅ Email service configured\n`);
 
   // Get test email address
   const testEmail =
@@ -73,8 +75,7 @@ async function testEmailConfiguration(): Promise<void> {
     });
 
     console.log("✅ Test email sent successfully!");
-    console.log(`   Message ID: ${messageId}`);
-    console.log(`\n📬 Check your inbox at: ${testEmail}`);
+    console.log(`\n📬 Check your inbox for the test email.`);
   } catch (error) {
     console.error("❌ Failed to send test email:");
     console.error(error);
