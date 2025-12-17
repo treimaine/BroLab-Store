@@ -1,5 +1,9 @@
 import { StandardHero } from "@/components/ui/StandardHero";
 import { useWordPress } from "@/hooks/use-wordpress";
+<<<<<<< HEAD
+=======
+import { sanitizeHtml } from "../../../shared/utils";
+>>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
 
 export default function Terms() {
   const { page, isLoading, error } = useWordPress("terms-of-service");
@@ -126,7 +130,7 @@ export default function Terms() {
           <div className="max-w-4xl mx-auto px-4 py-20">
             <div
               className="prose prose-invert prose-lg max-w-none"
-              dangerouslySetInnerHTML={{ __html: page.content.rendered }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content.rendered) }}
             />
           </div>
         </>
