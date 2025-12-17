@@ -1,13 +1,18 @@
-import { useWordPress } from '@/hooks/use-wordpress';
-import { Helmet } from 'react-helmet-async';
+import { useWordPress } from "@/hooks/use-wordpress";
+import { sanitizeHtml } from "@shared/utils/sanitize";
+import { Helmet } from "react-helmet-async";
 
 interface PageRendererProps {
-  slug: string;
-  fallbackTitle?: string;
-  fallbackContent?: React.ReactNode;
+  readonly slug: string;
+  readonly fallbackTitle?: string;
+  readonly fallbackContent?: React.ReactNode;
 }
 
-export function PageRenderer({ slug, fallbackTitle, fallbackContent }: PageRendererProps) {
+export function PageRenderer({
+  slug,
+  fallbackTitle,
+  fallbackContent,
+}: Readonly<PageRendererProps>) {
   const { page, isLoading, error } = useWordPress(slug);
 
   if (isLoading) {
@@ -38,7 +43,7 @@ export function PageRenderer({ slug, fallbackTitle, fallbackContent }: PageRende
     );
   }
 
-  const title = page?.title?.rendered || fallbackTitle || 'BroLab Entertainment';
+  const title = page?.title?.rendered || fallbackTitle || "BroLab Entertainment";
   const content = page?.content?.rendered;
 
   return (
@@ -46,20 +51,20 @@ export function PageRenderer({ slug, fallbackTitle, fallbackContent }: PageRende
       <Helmet>
         <title>{title} | BroLab Entertainment</title>
         {page?.excerpt?.rendered && (
-          <meta name="description" content={page.excerpt.rendered.replace(/<[^>]*>/g, '')} />
+          <meta name="description" content={page.excerpt.rendered.replaceAll(/<[^>]*>/g, "")} />
         )}
       </Helmet>
-      
+
       <div className="max-w-4xl mx-auto px-4 py-20">
         {page && content ? (
           <>
-            <h1 
+            <h1
               className="text-4xl md:text-5xl font-bold mb-12 text-center"
-              dangerouslySetInnerHTML={{ __html: title }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(title) }}
             />
-            <div 
+            <div
               className="prose prose-invert prose-lg max-w-none prose-headings:text-white prose-p:text-gray-300 prose-a:text-[var(--accent-purple)] prose-strong:text-white prose-ul:text-gray-300 prose-ol:text-gray-300"
-              dangerouslySetInnerHTML={{ __html: content }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
             />
           </>
         ) : (

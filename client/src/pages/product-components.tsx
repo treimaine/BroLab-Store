@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { LicenseTypeEnum } from "@shared/schema";
+import { sanitizeHtml } from "@shared/utils/sanitize";
 import { Download, FileText, Heart, Music, ShoppingCart } from "lucide-react";
 import type { LicenseOption } from "./product-helpers";
 
@@ -70,7 +71,7 @@ export function ProductDescription({
       <div
         className="text-gray-300 leading-relaxed prose prose-invert max-w-none"
         dangerouslySetInnerHTML={{
-          __html: description || "No description available.",
+          __html: sanitizeHtml(description) || "No description available.",
         }}
       />
     </div>

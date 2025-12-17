@@ -1,5 +1,6 @@
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import { useWordPress } from "@/hooks/use-wordpress";
+import { sanitizeHtml } from "@shared/utils/sanitize";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 
@@ -70,7 +71,7 @@ export default function FAQ() {
         {page?.content?.rendered ? (
           <div
             className="prose prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: page.content.rendered }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content.rendered) }}
           />
         ) : (
           <div className="space-y-4">

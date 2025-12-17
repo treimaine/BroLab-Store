@@ -5,6 +5,7 @@ export * from "./analytics-manager";
 export * from "./business-logic";
 export * from "./cache-manager";
 export * from "./errorUtils";
+export * from "./sanitize";
 
 // Re-export singleton instances
 export { analyticsManager } from "./analytics-manager";

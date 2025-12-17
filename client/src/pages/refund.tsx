@@ -1,5 +1,6 @@
 import { StandardHero } from "@/components/ui/StandardHero";
 import { useWordPress } from "@/hooks/use-wordpress";
+import { sanitizeHtml } from "@shared/utils/sanitize";
 
 export default function Refund() {
   const { page, isLoading, error } = useWordPress("refund-policy");
@@ -106,13 +107,13 @@ export default function Refund() {
       {page ? (
         <>
           <StandardHero
-            title={(page.title?.rendered || "Refund Policy").replace(/<[^>]+>/g, "")}
+            title={(page.title?.rendered || "Refund Policy").replaceAll(/<[^>]+>/g, "")}
             subtitle="Learn about our refund policy for digital products and the circumstances under which refunds may be considered."
           />
           <div className="max-w-4xl mx-auto px-4 py-20">
             <div
               className="prose prose-invert prose-lg max-w-none"
-              dangerouslySetInnerHTML={{ __html: page.content.rendered }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.content.rendered) }}
             />
           </div>
         </>
