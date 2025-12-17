@@ -118,8 +118,8 @@ describe("Reservation Flow Integration Tests", () => {
 
     it("should format session storage correctly", () => {
       const paymentData = {
-        clientSecret: "pi_123_secret_456",
-        paymentIntentId: "pi_123",
+        clientSecret: "pi_test_mock_client_secret",
+        paymentIntentId: "pi_test_mock_id",
       };
 
       const reservationResult = {
@@ -138,7 +138,7 @@ describe("Reservation Flow Integration Tests", () => {
         reservationId: reservationResult.id,
       };
 
-      expect(pendingPayment.clientSecret).toBe("pi_123_secret_456");
+      expect(pendingPayment.clientSecret).toBe("pi_test_mock_client_secret");
       expect(pendingPayment.reservationId).toBe("res_123");
       expect(pendingPayment.price).toBe(20000);
     });
