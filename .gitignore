@@ -55,6 +55,14 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+# Temporary lint/build output files
+lint-output.txt
+lint-temp.txt
+current-lint.txt
+tsc-output.txt
+secrets-to-remove.txt
+nul
+
 # Cache
 .npm
 .yarn/cache
