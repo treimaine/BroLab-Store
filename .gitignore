@@ -102,6 +102,9 @@ tmp/
 temp/
 attached_assets/
 
+# TestSprite (contains sensitive config)
+testsprite_tests/
+
 # Backup files
 *.bak
 *.backup
