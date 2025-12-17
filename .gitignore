@@ -55,8 +55,6 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-<<<<<<< HEAD
-=======
 # Temporary lint/build output files
 lint-output.txt
 lint-temp.txt
@@ -64,8 +62,6 @@ current-lint.txt
 tsc-output.txt
 secrets-to-remove.txt
 nul
-
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
 # Cache
 .npm
 .yarn/cache
@@ -113,12 +109,8 @@ tmp/
 temp/
 attached_assets/
 
-<<<<<<< HEAD
-=======
-# TestSprite (contains sensitive config)
+# TestSprite (contains sensitive config - NEVER commit)
 testsprite_tests/
-
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
 # Backup files
 *.bak
 *.backup

@@ -4,11 +4,7 @@
       "command": "npx",
       "args": ["@testsprite/testsprite-mcp@latest"],
       "env": {
-<<<<<<< HEAD
-        "API_KEY": "sk-user-6mETGwkJI10L8ozJ-1Es6vFpAPUXe5d7StLxwZJgHVa4GsCRFNynmyagV6-2mHPa7SS9RN0E-sxK3bBQHZJ6RZCT6MfSPjEoJjDJ0JEJCvh0tTKdAG7QBmnOPy48fxRu7Lw"
-=======
         "API_KEY": "${TESTSPRITE_API_KEY}"
->>>>>>> 36d5f1783a85309cded75560c94663152dc37dcc
       }
     }
   }
