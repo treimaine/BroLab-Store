@@ -15,6 +15,7 @@ import {
 } from "./middleware/security";
 import activityRouter from "./routes/activity";
 import avatarRouter from "./routes/avatar";
+import beatsRouter from "./routes/beats";
 import categoriesRouter from "./routes/categories";
 import clerkRouter from "./routes/clerk";
 import clerkBillingRouter from "./routes/clerk-billing";
@@ -32,6 +33,7 @@ import serviceOrdersRouter from "./routes/serviceOrders";
 import sitemapRouter from "./routes/sitemap";
 import storageRouter from "./routes/storage";
 import stripeRouter from "./routes/stripe";
+import subscriptionRouter from "./routes/subscription";
 import syncRouter from "./routes/sync";
 import uploadsRouter from "./routes/uploads";
 import wishlistRouter from "./routes/wishlist";
