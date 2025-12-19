@@ -5,6 +5,7 @@ node_modules/
 
 # Production builds
 dist/
+!api/dist/
 build/
 .next/
 out/

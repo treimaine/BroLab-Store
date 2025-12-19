@@ -36,7 +36,7 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false, // Disable sourcemaps in production for smaller bundle
     // Performance optimizations
-    target: "es2020", // Better compatibility and smaller output
+    target: "esnext", // Support top-level await
     minify: "esbuild",
     cssMinify: true,
     // Increase chunk size warning limit
