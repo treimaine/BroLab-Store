@@ -1,7 +1,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { LicenseTypeEnum } from "../../shared/schema";
-import { BrandConfig, buildInvoicePdfStream } from "../lib/pdf";
+import { BrandConfig, buildInvoicePdfStreamAsync } from "../lib/pdf";
 import { sendMail } from "./mail";
 
 /**
@@ -122,7 +122,7 @@ export class InvoiceService {
       });
 
       // Generate PDF stream
-      const pdfStream = buildInvoicePdfStream(orderForPdf, pdfItems, this.brandConfig);
+      const pdfStream = await buildInvoicePdfStreamAsync(orderForPdf, pdfItems, this.brandConfig);
 
       // Collect PDF chunks
       const chunks: Buffer[] = [];

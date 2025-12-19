@@ -125,7 +125,7 @@ export function Navbar() {
                 <div className="flex flex-col h-full">
                   <div className="flex items-center justify-between mb-6 sm:mb-8">
                     <img
-                      src="/attached_assets/Brolab logo trans_1752780961016.png"
+                      src="/logo.png"
                       alt="BroLab Entertainment"
                       className="h-10 w-auto sm:h-12"
                     />
@@ -237,7 +237,7 @@ export function Navbar() {
           <div className="absolute left-1/2 transform -translate-x-1/2 md:relative md:left-0 md:transform-none flex items-center">
             <Link href="/" className="flex items-center" aria-label="Brolab Home">
               <img
-                src="/attached_assets/Brolab logo trans_1752780961016.png"
+                src="/logo.png"
                 alt="BroLab Entertainment"
                 className="h-8 w-auto sm:h-10 md:h-14 lg:h-16"
               />

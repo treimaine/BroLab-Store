@@ -95,7 +95,7 @@ export function Footer(): JSX.Element {
           <div className="col-span-1 md:col-span-2">
             <Link href="/" className="mb-4 block" aria-label="BroLab Home">
               <img
-                src="/attached_assets/Brolab logo trans_1752780961016.png"
+                src="/logo.png"
                 alt="BroLab Entertainment"
                 className="h-12 w-auto md:h-16 lg:h-20"
               />

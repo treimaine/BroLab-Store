@@ -4,7 +4,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { sendMail } from "../services/mail";
 import { getConvex } from "./convex";
 import { getOrderInvoiceData, saveInvoiceUrl } from "./db";
-import { BrandConfig, buildInvoicePdfStream } from "./pdf";
+import { BrandConfig } from "./pdf";
 
 export function makeInvoiceNumber(orderId: number, year?: number): string {
   const y = year || new Date().getFullYear();
@@ -66,7 +66,7 @@ export async function ensureInvoicePdf(orderId: string): Promise<string> {
     logoPath: process.env.BRAND_LOGO_PATH || "",
   };
 
-  const pdfStream = buildInvoicePdfStream(
+  const pdfStream = await buildInvoicePdfStreamAsync(
     { ...order, invoice_number: invoiceNumber },
     items,
     brand
