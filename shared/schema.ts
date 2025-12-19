@@ -188,6 +188,23 @@ export const insertBeatSchema = z.object({
 });
 export type InsertBeat = z.infer<typeof insertBeatSchema>;
 
+// Beat type for storage layer (snake_case for database compatibility)
+export type Beat = {
+  id: number;
+  wordpress_id: number;
+  title: string;
+  description?: string | null;
+  genre: string;
+  bpm: number;
+  key?: string | null;
+  mood?: string | null;
+  price: number;
+  audio_url?: string | null;
+  image_url?: string | null;
+  is_active?: boolean;
+  created_at: string;
+};
+
 //
 // ==========================
 // WISHLIST
