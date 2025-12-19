@@ -6,6 +6,7 @@ import helmet from "helmet";
 /**
  * Custom key generator for rate limiting behind proxies (Vercel, etc.)
  * Uses X-Forwarded-For header when available, falls back to req.ip
+ * Handles IPv6 addresses properly by normalizing them
  */
 function getClientIp(req: Request): string {
   // X-Forwarded-For can contain multiple IPs: client, proxy1, proxy2
@@ -13,10 +14,23 @@ function getClientIp(req: Request): string {
   const forwardedFor = req.headers["x-forwarded-for"];
   if (forwardedFor) {
     const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor.split(",")[0];
-    return ips.trim();
+    return normalizeIp(ips.trim());
   }
   // Fallback to req.ip (works when trust proxy is set)
-  return req.ip || req.socket.remoteAddress || "unknown";
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  return normalizeIp(ip);
+}
+
+/**
+ * Normalize IP address to handle IPv6 mapped IPv4 addresses
+ * e.g., ::ffff:127.0.0.1 -> 127.0.0.1
+ */
+function normalizeIp(ip: string): string {
+  // Handle IPv6 mapped IPv4 addresses
+  if (ip.startsWith("::ffff:")) {
+    return ip.substring(7);
+  }
+  return ip;
 }
 
 /**
@@ -135,7 +149,7 @@ export const apiRateLimiter = rateLimit({
     // Skip rate limiting for health checks and monitoring
     return req.path === "/api/monitoring/health" || req.path === "/api/monitoring/status";
   },
-  validate: { trustProxy: false }, // Disable validation warning for Forwarded header
+  validate: false, // Disable all validation warnings (we handle IP extraction ourselves)
 });
 
 // Stricter rate limiting for authentication endpoints
@@ -149,7 +163,7 @@ export const authRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getClientIp,
-  validate: { trustProxy: false },
+  validate: false,
 });
 
 // Stricter rate limiting for payment endpoints
@@ -163,7 +177,7 @@ export const paymentRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getClientIp,
-  validate: { trustProxy: false },
+  validate: false,
 });
 
 // Stricter rate limiting for download endpoints
@@ -177,5 +191,5 @@ export const downloadRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getClientIp,
-  validate: { trustProxy: false },
+  validate: false,
 });

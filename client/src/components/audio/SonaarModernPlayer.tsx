@@ -531,6 +531,7 @@ export function SonaarModernPlayer(): JSX.Element | null {
       setCurrentTime(0);
     }
 
+    console.log(`🎵 Loading audio for track "${currentTrack.title}": ${currentTrack.audioUrl}`);
     audio.src = currentTrack.audioUrl;
     audio.load();
     lastTrackRef.current = currentTrack.id;

@@ -3,11 +3,13 @@
  *
  * 3D coverflow carousel for featured beats on homepage
  * Features: 3D transforms, smooth animations, touch support
+ * Uses global audio store for synchronized playback across components
  */
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAudioStore } from "@/stores/useAudioStore";
 import {
   ChevronLeft,
   ChevronRight,
@@ -317,6 +319,25 @@ const CarouselItem = memo(function CarouselItem({
   );
 });
 
+// Helper to convert CarouselBeat track to store AudioTrack format
+function convertToStoreTrack(
+  beat: CarouselBeat,
+  track: AudioTrack,
+  index: number
+): import("@/stores/useAudioStore").AudioTrack {
+  return {
+    id: `carousel-${beat.id}-${index}`,
+    title: track.title || beat.title,
+    artist: track.artist || beat.artist || "BroLab",
+    url: track.url,
+    audioUrl: track.url,
+    artwork: beat.imageUrl,
+    imageUrl: beat.imageUrl,
+    price: beat.price,
+    isFree: beat.isFree,
+  };
+}
+
 export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
   beats,
   onBeatSelect,
@@ -326,11 +347,13 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
   className,
 }: SonaarCarouselCoverflowProps): JSX.Element {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [playingId, setPlayingId] = useState<number | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [trackIndices, setTrackIndices] = useState<Record<number, number>>({});
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Use global audio store for synchronized playback
+  const { currentTrack, isPlaying, setCurrentTrack, setIsPlaying, setQueue, playTrackFromQueue } =
+    useAudioStore();
 
   // Get current track index for a beat
   const getTrackIndex = useCallback(
@@ -338,7 +361,15 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
     [trackIndices]
   );
 
-  // Auto-play carousel
+  // Check if a specific beat is currently playing
+  const isBeatPlaying = useCallback(
+    (beatId: number): boolean => {
+      return Boolean(currentTrack?.id?.startsWith(`carousel-${beatId}-`) && isPlaying);
+    },
+    [currentTrack, isPlaying]
+  );
+
+  // Auto-play carousel (visual rotation, not audio)
   useEffect(() => {
     if (!autoPlay || isPaused || beats.length <= 1) return;
 
@@ -349,37 +380,43 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
     return () => clearInterval(interval);
   }, [autoPlay, autoPlayInterval, beats.length, isPaused]);
 
-  // Play a specific track from a beat
-  const playTrack = useCallback((beat: CarouselBeat, trackIndex: number): void => {
-    const tracks = getTracks(beat);
-    const track = tracks[trackIndex];
-    if (!track) return;
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    audioRef.current = new Audio(track.url);
-    audioRef.current.play().catch(console.error);
-    audioRef.current.onended = () => setPlayingId(null);
-    setPlayingId(beat.id);
-  }, []);
-
-  // Handle play/pause toggle
+  // Handle play/pause toggle using global store
   const handlePlay = useCallback(
     (beat: CarouselBeat) => {
       const tracks = getTracks(beat);
       if (tracks.length === 0) return;
 
       const currentTrackIdx = getTrackIndex(beat.id);
+      const trackId = `carousel-${beat.id}-${currentTrackIdx}`;
 
-      if (playingId === beat.id) {
-        audioRef.current?.pause();
-        setPlayingId(null);
-      } else {
-        playTrack(beat, currentTrackIdx);
+      // If same track, toggle play/pause
+      if (currentTrack?.id === trackId && isPlaying) {
+        setIsPlaying(false);
+        return;
       }
+      if (currentTrack?.id === trackId && !isPlaying) {
+        setIsPlaying(true);
+        return;
+      }
+
+      // Convert all tracks to store format and set queue
+      const storeTracks = tracks.map((t, i) => convertToStoreTrack(beat, t, i));
+      setQueue(storeTracks);
+
+      // Set current track and play
+      setCurrentTrack(storeTracks[currentTrackIdx] || storeTracks[0]);
+      playTrackFromQueue(currentTrackIdx);
+      setIsPlaying(true);
     },
-    [playingId, getTrackIndex, playTrack]
+    [
+      currentTrack,
+      isPlaying,
+      getTrackIndex,
+      setCurrentTrack,
+      setIsPlaying,
+      setQueue,
+      playTrackFromQueue,
+    ]
   );
 
   // Handle track change (prev/next)
@@ -392,12 +429,16 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
       const wrappedIndex = (newIndex + tracks.length) % tracks.length;
       setTrackIndices(prev => ({ ...prev, [beat.id]: wrappedIndex }));
 
-      // If currently playing this beat, switch to new track
-      if (playingId === beat.id) {
-        playTrack(beat, wrappedIndex);
+      // If currently playing this beat, switch to new track in global store
+      if (isBeatPlaying(beat.id)) {
+        const storeTracks = tracks.map((t, i) => convertToStoreTrack(beat, t, i));
+        setQueue(storeTracks);
+        setCurrentTrack(storeTracks[wrappedIndex]);
+        playTrackFromQueue(wrappedIndex);
+        setIsPlaying(true);
       }
     },
-    [playingId, playTrack]
+    [isBeatPlaying, setQueue, setCurrentTrack, playTrackFromQueue, setIsPlaying]
   );
 
   // Handle previous track
@@ -513,7 +554,7 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
               beat={beat}
               position={position}
               isActive={position === 0}
-              isPlaying={playingId === beat.id}
+              isPlaying={isBeatPlaying(beat.id)}
               currentTrackIndex={getTrackIndex(beat.id)}
               onPlay={() => handlePlay(beat)}
               onPrevTrack={() => handlePrevTrack(beat)}
