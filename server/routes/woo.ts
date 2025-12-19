@@ -335,11 +335,21 @@ async function mapProductToBeat(product: WooCommerceProduct) {
 
 // Check if WooCommerce is configured
 function isWooCommerceConfigured(): boolean {
-  return !!(
-    process.env.WOOCOMMERCE_API_URL &&
-    process.env.VITE_WC_KEY &&
-    process.env.WOOCOMMERCE_CONSUMER_SECRET
-  );
+  const apiUrl = process.env.WOOCOMMERCE_API_URL;
+  const apiKey = process.env.WOOCOMMERCE_CONSUMER_KEY || process.env.VITE_WC_KEY;
+  const apiSecret = process.env.WOOCOMMERCE_CONSUMER_SECRET;
+
+  const isConfigured = !!(apiUrl && apiKey && apiSecret);
+
+  if (!isConfigured) {
+    console.log("⚠️ WooCommerce config check:", {
+      hasApiUrl: !!apiUrl,
+      hasApiKey: !!apiKey,
+      hasApiSecret: !!apiSecret,
+    });
+  }
+
+  return isConfigured;
 }
 
 router.get("/products", async (req: Request, res: Response) => {
