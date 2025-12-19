@@ -3,8 +3,9 @@ node_modules/
 
 # Build outputs
 build/
-dist/
 coverage/
+# Note: dist/ is needed for Vercel serverless functions
+# Only ignore specific dist subdirectories if needed
 
 # Development files
 .git/
