@@ -395,6 +395,7 @@ function validateEnvironmentConfig(requestId: string): {
 
 /**
  * Verify webhook signature using Svix
+ * Uses raw body buffer for accurate signature verification
  */
 async function verifyWebhookSignature(
   req: Request,
@@ -417,8 +418,17 @@ async function verifyWebhookSignature(
       throw new Error("Missing required Svix headers");
     }
 
+    // Use raw body if available (set by express.json verify option)
+    // This is critical for signature verification - JSON.stringify may alter the payload
+    const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
+    const bodyToVerify = rawBody ? rawBody.toString("utf8") : JSON.stringify(req.body);
+
+    if (!rawBody) {
+      console.warn(`⚠️ [${requestId}] Raw body not available, using JSON.stringify fallback`);
+    }
+
     // Verify signature
-    const payload = svix.verify(JSON.stringify(req.body), svixHeaders) as WebhookPayload;
+    const payload = svix.verify(bodyToVerify, svixHeaders) as WebhookPayload;
     console.log(`✅ [${requestId}] Webhook signature verified`);
     return payload;
   } catch (err: unknown) {

@@ -53,7 +53,19 @@ app.use(corsMiddleware);
 app.use(helmetMiddleware);
 app.use(compressionMiddleware);
 app.use(bodySizeLimits);
-app.use(express.json({ limit: "10mb" }));
+
+// Capture raw body for webhook signature verification (Svix/Clerk, Stripe)
+// Must be before express.json() middleware
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req, _res, buf) => {
+      // Store raw body for webhook signature verification
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (req as any).rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
 // Server startup log (no sensitive data)
