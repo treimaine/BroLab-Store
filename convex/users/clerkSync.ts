@@ -33,23 +33,19 @@ export const syncClerkUser = mutation({
       const now = Date.now();
 
       // Determine the best username to use
-      // Priority: existing valid username > Clerk username > auto-generated
+      // Priority: Clerk username (if valid) > existing username > auto-generated
       const clerkUsername = args.username || `user_${args.clerkId.slice(-8)}`;
       const hasValidClerkUsername = args.username && !args.username.startsWith("user_");
-      const hasValidExistingUsername =
-        existingUser?.username && !existingUser.username.startsWith("user_");
 
       let finalUsername: string;
-      if (existingUser) {
-        // Preserve existing username unless Clerk has a better one
-        if (hasValidExistingUsername && existingUser.username) {
-          finalUsername = existingUser.username;
-        } else if (hasValidClerkUsername) {
-          finalUsername = clerkUsername;
-        } else {
-          finalUsername = existingUser.username || clerkUsername;
-        }
+      if (hasValidClerkUsername) {
+        // Always use Clerk username when it's a real username (not auto-generated)
+        finalUsername = clerkUsername;
+      } else if (existingUser?.username) {
+        // Fall back to existing username if Clerk doesn't have a valid one
+        finalUsername = existingUser.username;
       } else {
+        // Last resort: use auto-generated username
         finalUsername = clerkUsername;
       }
 
@@ -345,23 +341,20 @@ export const forceSyncCurrentUser = mutation({
 
       const now = Date.now();
 
-      // Prepare update data - preserve existing username if it exists and is not auto-generated
+      // Prepare update data - always use Clerk username if it's valid (not auto-generated)
       const hasValidClerkUsername = userData.username && !userData.username.startsWith("user_");
-      const hasValidExistingUsername =
-        existingUser?.username && !existingUser.username.startsWith("user_");
 
       // Determine the best username to use
+      // Priority: Clerk username (if valid) > existing username > auto-generated
       let finalUsername: string;
-      if (existingUser) {
-        // Preserve existing username unless Clerk has a better one
-        if (hasValidExistingUsername && existingUser.username) {
-          finalUsername = existingUser.username;
-        } else if (hasValidClerkUsername) {
-          finalUsername = userData.username;
-        } else {
-          finalUsername = existingUser.username || userData.username;
-        }
+      if (hasValidClerkUsername) {
+        // Always use Clerk username when it's a real username (not auto-generated)
+        finalUsername = userData.username;
+      } else if (existingUser?.username) {
+        // Fall back to existing username if Clerk doesn't have a valid one
+        finalUsername = existingUser.username;
       } else {
+        // Last resort: use auto-generated username
         finalUsername = userData.username;
       }
 

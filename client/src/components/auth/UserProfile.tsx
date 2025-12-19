@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useDashboardSection } from "@/stores/useDashboardStore";
-import { useUser } from "@clerk/clerk-react";
+import { useClerk, useUser } from "@clerk/clerk-react";
+import { useMutation } from "convex/react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Calendar,
@@ -38,6 +39,7 @@ interface UserStats {
 
 const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
   const { user, isLoaded } = useUser();
+  const { openUserProfile } = useClerk();
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [formData, setFormData] = useState({
@@ -45,6 +47,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
     lastName: "",
     username: "",
   });
+
+  // Convex mutation for forcing user sync after Clerk update
+  const forceSyncUser = useMutation("users/clerkSync:forceSyncCurrentUser" as never);
 
   // Get real stats from unified dashboard store
   const stats = useDashboardSection("stats");
@@ -103,20 +108,45 @@ const UserProfile: React.FC<UserProfileProps> = ({ className }) => {
 
     setIsUpdating(true);
     try {
+      // Update user profile in Clerk
       await user.update({
         firstName: formData.firstName,
         lastName: formData.lastName,
         username: formData.username,
       });
+
+      // Force sync to Convex after successful Clerk update
+      try {
+        await forceSyncUser();
+        console.log("✅ User data synced to Convex");
+      } catch (syncError) {
+        console.warn("⚠️ Convex sync will happen via webhook:", syncError);
+        // Don't fail the whole operation if sync fails - webhook will handle it
+      }
+
       setIsEditing(false);
       toast.success("Profile updated successfully");
     } catch (error) {
       console.error("Error updating profile:", error);
-      toast.error("Error updating profile");
+
+      // Check if it's a verification error from Clerk
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (errorMessage.includes("verification") || errorMessage.includes("additional")) {
+        // Clerk requires additional verification - open the Clerk profile modal
+        toast.error("Additional verification required. Opening profile settings...");
+        setTimeout(() => {
+          openUserProfile();
+        }, 1500);
+      } else if (errorMessage.includes("username")) {
+        toast.error("Username is already taken or invalid. Please choose another one.");
+      } else {
+        toast.error("Error updating profile. Please try again.");
+      }
     } finally {
       setIsUpdating(false);
     }
-  }, [user, formData]);
+  }, [user, formData, forceSyncUser, openUserProfile]);
 
   const handleInputChange = useCallback((field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));

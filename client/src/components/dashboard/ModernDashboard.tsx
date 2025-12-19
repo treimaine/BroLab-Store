@@ -392,26 +392,26 @@ export const ModernDashboard = memo(() => {
               {/* Dashboard Header with Enhanced Connection Status */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-4 md:mb-6">
                 {(() => {
-                  // Prioritize Convex user data, but fallback to Clerk for name if needed
+                  // Prioritize Clerk data for real-time updates, with Convex as fallback
                   let userToPass = user || null;
 
-                  // If Convex user doesn't have firstName/lastName, try to get from Clerk
-                  if (userToPass && !userToPass.firstName && !userToPass.lastName && clerkUser) {
-                    userToPass = {
-                      ...userToPass,
-                      firstName: clerkUser.firstName || undefined,
-                      lastName: clerkUser.lastName || undefined,
-                    };
-                  } else if (!userToPass && clerkUser) {
-                    // If no Convex user at all, create a minimal user object from Clerk
-                    userToPass = {
+                  // Always use Clerk data when available (it's the source of truth for user profile)
+                  if (clerkUser) {
+                    const baseUser = userToPass || {
                       id: clerkUser.id,
                       clerkId: clerkUser.id,
-                      email: clerkUser.primaryEmailAddress?.emailAddress || "",
-                      firstName: clerkUser.firstName || undefined,
-                      lastName: clerkUser.lastName || undefined,
-                      imageUrl: clerkUser.imageUrl || undefined,
-                      username: clerkUser.username || undefined,
+                      email: "",
+                    };
+                    userToPass = {
+                      ...baseUser,
+                      id: userToPass?.id || clerkUser.id,
+                      clerkId: userToPass?.clerkId || clerkUser.id,
+                      email: clerkUser.primaryEmailAddress?.emailAddress || userToPass?.email || "",
+                      firstName: clerkUser.firstName || userToPass?.firstName || undefined,
+                      lastName: clerkUser.lastName || userToPass?.lastName || undefined,
+                      imageUrl: clerkUser.imageUrl || userToPass?.imageUrl || undefined,
+                      // Always use Clerk username for real-time updates
+                      username: clerkUser.username || userToPass?.username || undefined,
                     };
                   }
 
@@ -661,7 +661,7 @@ export const ModernDashboard = memo(() => {
                           <div>
                             <p className="text-xs sm:text-sm font-medium text-white">Username</p>
                             <p className="text-muted-foreground text-xs sm:text-sm">
-                              {user?.username || "Not set"}
+                              {clerkUser?.username || user?.username || "Not set"}
                             </p>
                           </div>
                           {user?.subscription && (
