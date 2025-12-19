@@ -39,6 +39,9 @@ import wpRouter from "./routes/wp";
 
 const app = express();
 
+// CORS middleware - must be before other middleware
+app.use(corsMiddleware);
+
 // Security middleware - helmet, compression, body-size limits
 app.use(helmetMiddleware);
 app.use(compressionMiddleware);
