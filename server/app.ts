@@ -40,6 +40,10 @@ import wpRouter from "./routes/wp";
 
 const app = express();
 
+// Trust proxy for Vercel/reverse proxy deployments
+// This is required for rate limiting to work correctly with X-Forwarded-For headers
+app.set("trust proxy", 1);
+
 // CORS middleware - must be before other middleware
 app.use(corsMiddleware);
 
