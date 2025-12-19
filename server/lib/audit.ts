@@ -34,7 +34,7 @@ export class AuditLogger {
   async log(entry: AuditLogEntry): Promise<void> {
     try {
       const convex = getConvex();
-      // @ts-expect-error - Convex API type depth issue (known limitation)
+      // @ts-expect-error - Convex API type instantiation depth issue
       await convex.mutation(api.audit.logAuditEvent, {
         userId: entry.userId,
         action: entry.action,

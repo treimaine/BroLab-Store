@@ -1,6 +1,8 @@
+import { getAuth } from "@clerk/express";
 import { Router } from "express";
 import { api } from "../../convex/_generated/api";
-import { getCurrentUser, isAuthenticated } from "../auth";
+import { ActivityItem } from "../../convex/activity/getUserActivity";
+import { isAuthenticated } from "../auth";
 import { getConvex } from "../lib/convex";
 import { handleRouteError } from "../types/routes";
 
@@ -9,29 +11,32 @@ const router = Router();
 // GET /api/activity - Get user's recent activity
 router.get("/", isAuthenticated, async (req, res): Promise<void> => {
   try {
-    const user = await getCurrentUser(req);
-    if (!user) {
+    const { userId: clerkId } = getAuth(req);
+    if (!clerkId) {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
 
     // Fetch activity from Convex
     const convex = getConvex();
-    const activityData = await convex.query(api.activity.getUserActivity, {
-      clerkId: user.clerkId || "",
-      limit: 20,
-    });
+    const activityData: ActivityItem[] = await convex.query(
+      api.activity.getUserActivity.getUserActivity,
+      {
+        clerkId,
+        limit: 20,
+      }
+    );
 
-    const recentActivity = activityData.map(activity => ({
+    const recentActivity = activityData.map((activity: ActivityItem) => ({
       id: activity._id,
       type: activity.action,
-      description: activity.details?.description || activity.action,
+      description: (activity.details as Record<string, unknown>)?.description || activity.action,
       timestamp: new Date(activity.timestamp).toISOString(),
       metadata: activity.details,
     }));
 
     console.log("🔧 Activity API Debug:", {
-      userId: user.id,
+      clerkId,
       activitiesCount: recentActivity.length,
     });
 

@@ -6,11 +6,11 @@ import type {
   InsertFile,
   InsertOrder,
   InsertReservation,
+  InsertServiceOrder,
   Order,
   Reservation,
   ReservationStatusEnum,
   ServiceOrder,
-  ServiceOrderInput,
   User,
 } from "../../shared/schema";
 import {
@@ -110,7 +110,7 @@ export async function listDownloads(userId: number): Promise<Download[]> {
 }
 
 // Create a service order
-export async function createServiceOrder(order: ServiceOrderInput): Promise<ServiceOrder> {
+export async function createServiceOrder(order: InsertServiceOrder): Promise<ServiceOrder> {
   // TODO: Implement with Convex
   console.log("Creating service order:", order);
   return {} as ServiceOrder;
@@ -134,14 +134,12 @@ export async function upsertSubscription({
   stripeSubId,
   userId,
   plan,
-  _status,
-  _current_period_end,
 }: {
   stripeSubId: string;
   userId: number;
   plan: string;
-  _status: string;
-  _current_period_end: string;
+  _status?: string;
+  _current_period_end?: string;
 }): Promise<string | null> {
   // Convert the user ID to proper Convex ID format using type-safe conversion
   const convexUserId = createConvexUserId(userId);
@@ -211,7 +209,7 @@ export async function logActivity(activity: Omit<ActivityLog, "id">): Promise<Ac
 
   // Convert Convex result to ActivityLog format
   return {
-    id: parseInt(result.toString().slice(-8)) || 0,
+    id: Number.parseInt(result.toString().slice(-8), 10) || 0,
     user_id: activity.user_id,
     action: activity.action,
     details: activity.details,
@@ -219,20 +217,20 @@ export async function logActivity(activity: Omit<ActivityLog, "id">): Promise<Ac
   } as ActivityLog;
 }
 
-// Sauvegarde l'URL de la facture PDF dans la commande
+// Save the invoice PDF URL in the order
 export async function saveInvoiceUrl(orderId: number, url: string): Promise<void> {
   // TODO: Implement with Convex
   console.log("Saving invoice URL:", orderId, url);
 }
 
-// Génère ou récupère le numéro de facture (BRLB-YYYY-000123)
+// Generate or retrieve the invoice number (BRLB-YYYY-000123)
 export async function ensureInvoiceNumber(orderId: number): Promise<string> {
   // TODO: Implement with Convex
   console.log("Ensuring invoice number for order:", orderId);
   return `BRLB-${new Date().getFullYear()}-${String(orderId).padStart(6, "0")}`;
 }
 
-// Récupère la commande et ses items pour la facture
+// Retrieve the order and its items for the invoice
 export async function getOrderInvoiceData(
   orderId: number
 ): Promise<{ order: Order; items: CartItem[] }> {
@@ -241,7 +239,7 @@ export async function getOrderInvoiceData(
   return { order: {} as Order, items: [] };
 }
 
-// Crée une nouvelle commande
+// Create a new order
 export async function createOrder(order: InsertOrder): Promise<Order> {
   // Transform InsertOrder to match Convex OrderData interface
   const convexOrderData = {
@@ -266,7 +264,7 @@ export async function createOrder(order: InsertOrder): Promise<Order> {
 
   // Convert Convex result to Order format
   return {
-    id: parseInt(result.orderId?.toString().slice(-8)) || 0,
+    id: Number.parseInt(result.orderId?.toString().slice(-8) ?? "0", 10) || 0,
     user_id: order.user_id,
     session_id: order.session_id,
     email: order.email,
@@ -287,14 +285,14 @@ export async function createOrder(order: InsertOrder): Promise<Order> {
   } as Order;
 }
 
-// Liste les commandes d'un utilisateur
+// List orders for a user
 export async function listUserOrders(userId: number): Promise<Order[]> {
   // TODO: Implement with Convex
   console.log("Listing user orders:", userId);
   return [];
 }
 
-// Liste les items d'une commande
+// List items for an order
 export async function listOrderItems(orderId: number): Promise<CartItem[]> {
   // TODO: Implement with Convex
   console.log("Listing order items:", orderId);

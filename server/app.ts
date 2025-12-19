@@ -2,6 +2,7 @@ import express from "express";
 import { registerAuthRoutes, setupAuth } from "./auth";
 import { env } from "./lib/env";
 import { logger } from "./lib/logger";
+import { corsMiddleware } from "./middleware/cors";
 import { requestIdMiddleware } from "./middleware/requestId";
 import {
   apiRateLimiter,

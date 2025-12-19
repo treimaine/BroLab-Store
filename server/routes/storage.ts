@@ -122,11 +122,7 @@ router.post(
         orderId: order_id ? (order_id as Id<"orders">) : undefined,
         clerkId,
       };
-      const fileId = await convex.mutation(
-        // @ts-expect-error - Convex API type depth issue (known TypeScript limitation)
-        api.files.createFile.createFile,
-        createFileArgs
-      );
+      const fileId = await convex.mutation(api.files.createFile.createFile, createFileArgs);
 
       // Build response with file record
       const fileRecord: InsertFile = {

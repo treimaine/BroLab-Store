@@ -1,4 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
+import { api } from "../../convex/_generated/api";
+import { getConvex } from "./convex";
 
 // System health monitoring
 export interface HealthCheck {

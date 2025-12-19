@@ -1,5 +1,5 @@
 // server/lib/mappers/woo.ts
-import { Beat } from "../../../shared/schema";
+import { BeatProduct } from "../../../shared/schema";
 import { WooCommerceCategory, WooCommerceMetaData } from "../../../shared/types/WooCommerceApi";
 
 export interface WooProduct {
@@ -30,7 +30,7 @@ const extractIsFree = (p: WooProduct) => {
   return price === 0 || hasFreeTag || isFreeInMeta;
 };
 
-export function mapWooProductToBeat(p: WooProduct): Beat {
+export function mapWooProductToBeat(p: WooProduct): BeatProduct {
   return {
     id: p.id,
     title: p.name,

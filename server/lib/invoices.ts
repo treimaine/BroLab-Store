@@ -26,7 +26,6 @@ export async function ensureInvoiceNumber(orderId: string): Promise<string> {
   try {
     const convex = getConvex();
     const invoiceNumber = await convex.mutation(
-      // @ts-expect-error - Convex API type depth issue (known limitation)
       api.invoices.generateInvoiceNumber.generateInvoiceNumber,
       {
         orderId: orderId as Id<"orders">,

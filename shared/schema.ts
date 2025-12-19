@@ -159,9 +159,6 @@ export type BeatProduct = {
   created_at?: string;
 };
 
-// Type legacy Beat (maintenu pour compatibilité)
-export type Beat = BeatProduct;
-
 // Type ProductLike unifié (pour compatibilité avec accessControl)
 export type ProductLike = {
   id: number;
@@ -501,7 +498,6 @@ export const insertServiceOrderSchema = z.object({
   status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
 });
 export type InsertServiceOrder = z.infer<typeof insertServiceOrderSchema>;
-export type ServiceOrderInput = InsertServiceOrder;
 
 //
 // ==========================
