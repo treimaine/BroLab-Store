@@ -39,6 +39,17 @@ function getWooCommerceConfig(): WooCommerceConfig | null {
   const apiKey = process.env.WOOCOMMERCE_CONSUMER_KEY || process.env.VITE_WC_KEY;
   const apiSecret = process.env.WOOCOMMERCE_CONSUMER_SECRET;
 
+  // Debug logging for Vercel
+  console.log("🔧 WooCommerce Config Check:", {
+    hasApiUrl: !!apiUrl,
+    apiUrlValue: apiUrl ? apiUrl.substring(0, 30) + "..." : "MISSING",
+    hasApiKey: !!apiKey,
+    apiKeyPrefix: apiKey ? apiKey.substring(0, 10) + "..." : "MISSING",
+    hasApiSecret: !!apiSecret,
+    apiSecretPrefix: apiSecret ? apiSecret.substring(0, 10) + "..." : "MISSING",
+    nodeEnv: process.env.NODE_ENV,
+  });
+
   if (!apiUrl || !apiKey || !apiSecret) {
     console.error(
       "❌ Missing WooCommerce configuration. Set WOOCOMMERCE_API_URL, WOOCOMMERCE_CONSUMER_KEY, and WOOCOMMERCE_CONSUMER_SECRET in .env"
