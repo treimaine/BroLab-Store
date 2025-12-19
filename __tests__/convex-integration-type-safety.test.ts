@@ -296,7 +296,7 @@ describe("Convex Integration Type Safety", () => {
   describe("Function Name Constants", () => {
     it("should have all required function names defined", () => {
       expect(CONVEX_FUNCTIONS.GET_USER_BY_CLERK_ID).toBe("users/clerkSync:getUserByClerkId");
-      expect(CONVEX_FUNCTIONS.UPSERT_USER).toBe("users/clerkSync:upsertUser");
+      expect(CONVEX_FUNCTIONS.UPSERT_USER).toBe("users/clerkSync:syncClerkUser");
       expect(CONVEX_FUNCTIONS.LOG_DOWNLOAD).toBe("downloads/record:logDownload");
       expect(CONVEX_FUNCTIONS.CREATE_ORDER).toBe("orders/createOrder:createOrder");
       expect(CONVEX_FUNCTIONS.CREATE_RESERVATION).toBe(

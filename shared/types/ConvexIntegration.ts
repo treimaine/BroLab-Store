@@ -13,7 +13,7 @@ export type ConvexId<T extends string> = `${T}:${string}`;
 export const CONVEX_FUNCTIONS = {
   // User management
   GET_USER_BY_CLERK_ID: "users/clerkSync:getUserByClerkId",
-  UPSERT_USER: "users/clerkSync:upsertUser",
+  UPSERT_USER: "users/clerkSync:syncClerkUser",
   UPDATE_USER_AVATAR: "users/clerkSync:updateUserAvatar",
 
   // Downloads
