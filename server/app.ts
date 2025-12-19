@@ -79,6 +79,7 @@ app.use((_req, res, next) => {
 // API Routes with rate limiting
 app.use("/api/activity", apiRateLimiter, activityRouter);
 app.use("/api/avatar", apiRateLimiter, avatarRouter);
+app.use("/api/beats", apiRateLimiter, beatsRouter);
 app.use("/api/downloads", downloadRateLimiter, downloadsRouter);
 app.use("/api/email", authRateLimiter, emailRouter);
 app.use("/api/monitoring", monitoringRouter); // No rate limit for monitoring
@@ -96,6 +97,7 @@ app.use("/api/schema", apiRateLimiter, schemaRouter);
 app.use("/api/security", apiRateLimiter, securityRouter);
 app.use("/api/service-orders", apiRateLimiter, serviceOrdersRouter);
 app.use("/api/storage", apiRateLimiter, storageRouter);
+app.use("/api/subscription", apiRateLimiter, subscriptionRouter);
 app.use("/api/uploads", apiRateLimiter, uploadsRouter);
 app.use("/api/wishlist", apiRateLimiter, wishlistRouter);
 app.use("/api/wp", apiRateLimiter, wpRouter);
