@@ -65,9 +65,9 @@ export function useApiWithRetry(options: UseApiWithRetryOptions = {}) {
         // Get auth token if available
         const authToken = getAuthToken ? await getAuthToken() : null;
         const headers: Record<string, string> = {};
-        
+
         if (authToken) {
-          headers['Authorization'] = `Bearer ${authToken}`;
+          headers["Authorization"] = `Bearer ${authToken}`;
         }
 
         const response = await enhancedApiRequest(method, url, data, {
@@ -75,6 +75,8 @@ export function useApiWithRetry(options: UseApiWithRetryOptions = {}) {
           retryDelay,
           timeout,
           headers,
+          // Use "include" to ensure cookies (__session) are sent for Clerk auth
+          credentials: "include",
           onRetry: (attempt, error) => {
             setState(prev => ({ ...prev, retryCount: attempt }));
 

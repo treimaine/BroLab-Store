@@ -97,10 +97,11 @@ export class SyncManager extends BrowserEventEmitter {
     super();
 
     // Determine WebSocket URL based on environment
-    const isProduction = typeof window !== "undefined" && window.location.hostname !== "localhost";
+    const isProduction =
+      globalThis.window !== undefined && globalThis.window.location.hostname !== "localhost";
     const wsProtocol = isProduction ? "wss:" : "ws:";
     const defaultWsUrl = isProduction
-      ? `${wsProtocol}//${window.location.host}/ws`
+      ? `${wsProtocol}//${globalThis.window.location.host}/ws`
       : "ws://localhost:3001/ws";
 
     this.config = {
@@ -272,7 +273,7 @@ export class SyncManager extends BrowserEventEmitter {
       const response = await fetch(`${this.config.pollingUrl}/validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
+        credentials: "include", // Required for Clerk __session cookie
       });
 
       if (!response.ok) {
@@ -498,7 +499,7 @@ export class SyncManager extends BrowserEventEmitter {
       const response = await fetch(this.config.pollingUrl, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
+        credentials: "include", // Required for Clerk __session cookie
       });
 
       if (!response.ok) {

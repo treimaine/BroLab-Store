@@ -601,6 +601,7 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
                 Authorization: `Bearer ${token}`,
               },
               body: JSON.stringify(formData),
+              credentials: "include", // Required for Clerk __session cookie
             });
 
             if (!response.ok) {
@@ -654,6 +655,7 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
                   service: serviceName,
                 },
               }),
+              credentials: "include", // Required for Clerk __session cookie
             });
 
             if (!response.ok) {

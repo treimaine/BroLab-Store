@@ -390,6 +390,7 @@ class PollingConnection implements Connection {
         method: "POST",
         headers,
         body: JSON.stringify(message),
+        credentials: "include", // Required for Clerk __session cookie
       });
     } catch (error) {
       // Network error or request abortion
@@ -516,6 +517,7 @@ class PollingConnection implements Connection {
     const response = await fetch(`${this.url}/poll?since=${this.lastPollTime}`, {
       method: "GET",
       headers,
+      credentials: "include", // Required for Clerk __session cookie
     });
 
     this.validateResponse(response);
@@ -585,13 +587,14 @@ export class ConnectionManager extends BrowserEventEmitter {
     super();
 
     // Determine base URL based on environment
-    const isProduction = typeof window !== "undefined" && window.location.hostname !== "localhost";
+    const isProduction =
+      globalThis.window !== undefined && globalThis.window.location.hostname !== "localhost";
     const baseUrl = isProduction
-      ? `${window.location.protocol}//${window.location.host}`
+      ? `${globalThis.window.location.protocol}//${globalThis.window.location.host}`
       : "http://localhost:5000";
     const wsProtocol = isProduction ? "wss:" : "ws:";
     const wsBaseUrl = isProduction
-      ? `${wsProtocol}//${window.location.host}`
+      ? `${wsProtocol}//${globalThis.window.location.host}`
       : "ws://localhost:5000";
 
     this.config = {

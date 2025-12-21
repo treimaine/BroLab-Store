@@ -26,32 +26,32 @@ interface FileError {
 }
 
 interface FileUploadProps {
-  onUploadSuccess?: (file: File) => void;
-  onUploadError?: (error: FileError) => void;
-  onUploadStart?: (file: File) => void;
-  onUploadProgress?: (progress: number) => void;
-  acceptedFileTypes?: string[];
-  maxFileSize?: number;
-  currentFile?: File | null;
-  onFileRemove?: () => void;
+  readonly onUploadSuccess?: (file: File) => void;
+  readonly onUploadError?: (error: FileError) => void;
+  readonly onUploadStart?: (file: File) => void;
+  readonly onUploadProgress?: (progress: number) => void;
+  readonly acceptedFileTypes?: string[];
+  readonly maxFileSize?: number;
+  readonly currentFile?: File | null;
+  readonly onFileRemove?: () => void;
   /** Duration in milliseconds for the upload simulation. Defaults to 2000ms (2s), 0 for no simulation */
-  uploadDelay?: number;
-  validateFile?: (file: File) => FileError | null;
-  className?: string;
+  readonly uploadDelay?: number;
+  readonly validateFile?: (file: File) => FileError | null;
+  readonly className?: string;
   /** Whether to allow form submission even if file upload fails */
-  allowFormSubmissionOnError?: boolean;
+  readonly allowFormSubmissionOnError?: boolean;
   /** Maximum number of retry attempts for failed uploads */
-  maxRetries?: number;
+  readonly maxRetries?: number;
   /** Enable antivirus scanning */
-  enableAntivirusScanning?: boolean;
+  readonly enableAntivirusScanning?: boolean;
   /** Enable secure upload to server */
-  enableSecureUpload?: boolean;
+  readonly enableSecureUpload?: boolean;
   /** Upload endpoint URL */
-  uploadEndpoint?: string;
+  readonly uploadEndpoint?: string;
   /** Authentication token for secure uploads */
-  authToken?: string;
+  readonly authToken?: string;
   /** Additional metadata to include with upload */
-  uploadMetadata?: Record<string, string>;
+  readonly uploadMetadata?: Record<string, string>;
 }
 
 const DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -440,6 +440,7 @@ export default function FileUpload({
           method: "POST",
           body: formData,
           headers,
+          credentials: "include", // Required for Clerk __session cookie
         });
 
         if (!response.ok) {

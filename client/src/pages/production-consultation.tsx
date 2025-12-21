@@ -138,6 +138,7 @@ Additional Message: ${formData.message}`,
           Authorization: `Bearer ${await getToken()}`,
         },
         body: JSON.stringify(reservationData),
+        credentials: "include", // Required for Clerk __session cookie
       });
 
       console.log("📡 Consultation response status:", response.status);

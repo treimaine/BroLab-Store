@@ -130,6 +130,7 @@ export default function RecordingSessions() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(reservationData),
+        credentials: "include", // Required for Clerk __session cookie
       });
 
       console.log("📡 Reservation response status:", response.status);
