@@ -87,6 +87,11 @@ export interface ConvexUserInput extends Record<string, unknown> {
  * Type-safe conversion from ConvexUser to shared schema User
  */
 export function convexUserToUser(convexUser: ConvexUser): User {
+  // Defensive check for invalid convexUser
+  if (!convexUser?._id) {
+    throw new Error("convexUserToUser received invalid user object: missing _id");
+  }
+
   // Extract numeric ID from Convex ID for compatibility
   const numericId = extractNumericId(convexUser._id);
 
@@ -126,7 +131,13 @@ export function userToConvexUserInput(user: Partial<User> & { clerkId: string })
 /**
  * Extract numeric ID from Convex ID for compatibility with legacy systems
  */
-export function extractNumericId(convexId: Id<"users">): number {
+export function extractNumericId(convexId: Id<"users"> | undefined | null): number {
+  // Defensive check for undefined/null convexId
+  if (!convexId) {
+    console.warn("extractNumericId received undefined/null convexId, returning fallback");
+    return Math.floor(Math.random() * 1000000);
+  }
+
   // Extract the last 8 characters and convert to number
   const idString = convexId.toString();
   const numericPart = idString.slice(-8);

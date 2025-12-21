@@ -197,10 +197,24 @@ export async function getUserByClerkId(clerkId: string): Promise<ConvexUser | nu
   }
 }
 
+/**
+ * Response type from syncClerkUser mutation
+ */
+interface SyncClerkUserResponse {
+  success: boolean;
+  action: "created" | "updated";
+  userId: Id<"users">;
+  user: ConvexUser | null;
+}
+
 export async function upsertUser(userData: ConvexUserInput): Promise<ConvexUser | null> {
   try {
-    const result = await convexWrapper.mutation<ConvexUser>(CONVEX_FUNCTIONS.UPSERT_USER, userData);
-    return result.data || null;
+    const result = await convexWrapper.mutation<SyncClerkUserResponse>(
+      CONVEX_FUNCTIONS.UPSERT_USER,
+      userData
+    );
+    // syncClerkUser returns { success, action, userId, user } - extract the user object
+    return result.data?.user || null;
   } catch (error) {
     console.error("upsertUser failed:", error);
     return null;
