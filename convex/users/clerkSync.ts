@@ -251,59 +251,6 @@ export const deleteClerkUser = mutation({
 });
 
 /**
- * Get user statistics
- */
-export const getUserStats = query({
-  args: { clerkId: v.string() },
-  handler: async (ctx, { clerkId }) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
-      .first();
-
-    if (!user) {
-      return null;
-    }
-
-    // Count favorites
-    const favoritesCount = await ctx.db
-      .query("favorites")
-      .withIndex("by_user", q => q.eq("userId", user._id))
-      .collect()
-      .then(favorites => favorites.length);
-
-    // Count downloads
-    const downloadsCount = await ctx.db
-      .query("downloads")
-      .withIndex("by_user", q => q.eq("userId", user._id))
-      .collect()
-      .then(downloads => downloads.length);
-
-    // Count orders
-    const ordersCount = await ctx.db
-      .query("orders")
-      .withIndex("by_user", q => q.eq("userId", user._id))
-      .collect()
-      .then(orders => orders.length);
-
-    return {
-      userId: user._id,
-      email: user.email,
-      username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      imageUrl: user.imageUrl,
-      createdAt: user.createdAt,
-      stats: {
-        favoritesCount,
-        downloadsCount,
-        ordersCount,
-      },
-    };
-  },
-});
-
-/**
  * Force sync current authenticated user from Clerk identity
  */
 export const forceSyncCurrentUser = mutation({

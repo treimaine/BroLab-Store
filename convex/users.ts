@@ -119,8 +119,8 @@ export const updateUserAvatar = mutation({
   },
 });
 
-// Re-export getUserStats functions
-export { getUserStats, getUserStatsByClerkId } from "./users/getUserStats";
+// Note: getUserStats functions are available at users/getUserStats
+// Import directly from there: import { getUserStats } from "./users/getUserStats"
 
 // Restore user data
 export const restore = mutation({
