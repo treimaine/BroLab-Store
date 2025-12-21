@@ -1,3 +1,4 @@
+import { verifyToken } from "@clerk/backend";
 import { clerkMiddleware, getAuth } from "@clerk/express";
 import cookieParser from "cookie-parser";
 import type { Express, NextFunction, Request, Response } from "express";
@@ -132,6 +133,57 @@ function extractBearerToken(req: Request): string | undefined {
 }
 
 /**
+ * Verify Bearer token manually using Clerk's verifyToken from @clerk/backend
+ * This is used when getAuth() doesn't find the user (e.g., cross-origin requests)
+ */
+async function verifyBearerToken(
+  token: string
+): Promise<{ userId: string; sessionId?: string } | null> {
+  try {
+    // Use verifyToken from @clerk/backend to verify the JWT token
+    const verifiedToken = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY,
+    });
+
+    if (verifiedToken?.sub) {
+      return {
+        userId: verifiedToken.sub,
+        sessionId: verifiedToken.sid as string | undefined,
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Bearer token verification failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Get or create a Convex user by Clerk ID
+ * Centralizes user retrieval/creation logic to avoid duplication
+ * @returns Object with user and isNewUser flag
+ */
+async function getOrCreateConvexUser(
+  userId: string
+): Promise<{ user: ConvexUser | null; isNewUser: boolean }> {
+  const existingUser = await getUserByClerkId(userId);
+
+  if (existingUser) {
+    return { user: existingUser, isNewUser: false };
+  }
+
+  const newUserInput = userToConvexUserInput({
+    clerkId: userId,
+    email: "", // Will be updated client-side
+    username: `user_${userId.slice(-8)}`,
+  });
+  const newUser = await upsertUser(newUserInput);
+
+  return { user: newUser, isNewUser: true };
+}
+
+/**
  * Handle test token authentication
  */
 async function handleTestTokenAuth(
@@ -189,26 +241,16 @@ async function handleClerkAuth(
   // Clear failed attempts on successful authentication
   securityEnhancer.clearFailedAttempts(ipAddress);
 
-  // Retrieve user from Convex
-  let convexUser: ConvexUser | null = await getUserByClerkId(userId);
-
-  if (!convexUser) {
-    // Create user in Convex if doesn't exist
-    const newUserInput = userToConvexUserInput({
-      clerkId: userId,
-      email: "", // Will be updated client-side
-      username: `user_${userId.slice(-8)}`,
-    });
-    convexUser = await upsertUser(newUserInput);
-
-    // Log new user creation
-    if (convexUser) {
-      await auditLogger.logRegistration(userId, ipAddress, userAgent);
-    }
-  }
+  // Retrieve or create user from Convex
+  const { user: convexUser, isNewUser } = await getOrCreateConvexUser(userId);
 
   if (!convexUser) {
     return false;
+  }
+
+  // Log new user creation
+  if (isNewUser) {
+    await auditLogger.logRegistration(userId, ipAddress, userAgent);
   }
 
   // Convert ConvexUser to shared User type
@@ -289,6 +331,125 @@ async function handleSessionAuth(
 }
 
 /**
+ * Authentication context for request processing
+ */
+interface AuthContext {
+  ipAddress: string;
+  userAgent: string;
+}
+
+/**
+ * Result of user ID resolution from various auth methods
+ */
+interface UserIdResolution {
+  userId?: string;
+  sessionId?: string;
+}
+
+/**
+ * Extract authentication context from request
+ */
+function getAuthContext(req: Request): AuthContext {
+  return {
+    ipAddress: getClientIP(req),
+    userAgent: req.headers["user-agent"] || "unknown",
+  };
+}
+
+/**
+ * Attempt to resolve user ID from Clerk auth result or Bearer token fallback
+ */
+async function resolveUserId(authResult: {
+  success: boolean;
+  user?: { userId?: string; sessionId?: string };
+}): Promise<UserIdResolution> {
+  if (authResult.success && authResult.user?.userId) {
+    return {
+      userId: authResult.user.userId,
+      sessionId: authResult.user.sessionId,
+    };
+  }
+  return {};
+}
+
+/**
+ * Attempt Bearer token verification as fallback
+ */
+async function tryBearerTokenFallback(req: Request): Promise<UserIdResolution> {
+  const bearerToken = extractBearerToken(req);
+  if (!bearerToken) {
+    return {};
+  }
+
+  console.log("🔐 Attempting manual Bearer token verification...");
+  const tokenResult = await verifyBearerToken(bearerToken);
+
+  if (tokenResult) {
+    console.log("✅ Bearer token verified successfully for user:", tokenResult.userId);
+    return { userId: tokenResult.userId, sessionId: tokenResult.sessionId };
+  }
+
+  console.log("❌ Bearer token verification failed");
+  return {};
+}
+
+/**
+ * Log authentication failure and send error response
+ */
+async function handleAuthFailure(
+  res: Response,
+  authResult: { error?: string; riskLevel?: string; securityEvents?: string[] },
+  context: AuthContext,
+  securityEnhancer: { recordFailedAttempt: (ip: string) => void },
+  SecurityEventType: { AUTHENTICATION_FAILURE: string },
+  hasBearerToken: boolean
+): Promise<void> {
+  securityEnhancer.recordFailedAttempt(context.ipAddress);
+
+  await auditLogger.logSecurityEvent(
+    "anonymous",
+    SecurityEventType.AUTHENTICATION_FAILURE,
+    {
+      error: authResult.error || "No valid authentication found",
+      riskLevel: authResult.riskLevel,
+      securityEvents: authResult.securityEvents,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+      hasBearerToken,
+    },
+    context.ipAddress,
+    context.userAgent
+  );
+
+  res.status(401).json({
+    error: "Authentication failed",
+    details: process.env.NODE_ENV === "development" ? authResult.error : undefined,
+  });
+}
+
+/**
+ * Log authentication error and send error response
+ */
+async function handleAuthError(res: Response, error: unknown, context: AuthContext): Promise<void> {
+  console.error("Authentication error:", error);
+
+  await auditLogger.logSecurityEvent(
+    "anonymous",
+    "authentication_error",
+    {
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    },
+    context.ipAddress,
+    context.userAgent
+  );
+
+  res.status(500).json({ error: "Authentication error" });
+}
+
+/**
  * Authentication middleware with security logging and validation
  * Supports Clerk authentication, test tokens, and session-based auth
  */
@@ -297,102 +458,60 @@ export const isAuthenticated = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  const context = getAuthContext(req);
+
   try {
     const { securityEnhancer, SecurityEventType } = await import("./lib/securityEnhancer");
-    const ipAddress = getClientIP(req);
-    const userAgent = req.headers["user-agent"] || "unknown";
 
     // Check test token authentication
-    if (await handleTestTokenAuth(req, ipAddress, userAgent)) {
+    if (await handleTestTokenAuth(req, context.ipAddress, context.userAgent)) {
       return next();
     }
 
-    // Enhanced Clerk authentication with security validation
+    // Try standard Clerk authentication first (via cookies/middleware)
     const authResult = await securityEnhancer.validateClerkToken(req);
 
-    if (!authResult.success) {
-      // Record failed attempt for brute force protection
-      securityEnhancer.recordFailedAttempt(ipAddress);
-
-      // Log authentication failure
-      await auditLogger.logSecurityEvent(
-        "anonymous",
-        SecurityEventType.AUTHENTICATION_FAILURE,
-        {
-          error: authResult.error,
-          riskLevel: authResult.riskLevel,
-          securityEvents: authResult.securityEvents,
-          ipAddress,
-          userAgent,
-        },
-        ipAddress,
-        userAgent
-      );
-
-      res.status(401).json({
-        error: "Authentication failed",
-        details: process.env.NODE_ENV === "development" ? authResult.error : undefined,
-      });
-      return;
+    // Resolve user ID from Clerk or Bearer token fallback
+    let resolution = await resolveUserId(authResult);
+    if (!resolution.userId) {
+      resolution = await tryBearerTokenFallback(req);
     }
 
-    const { userId, sessionId } = authResult.user || {};
-
-    // Handle Clerk authentication
-    if (userId) {
+    // If we have a userId, proceed with Clerk authentication
+    if (resolution.userId) {
       const success = await handleClerkAuth(
         req,
-        userId,
-        sessionId,
-        authResult,
-        ipAddress,
-        userAgent
+        resolution.userId,
+        resolution.sessionId,
+        {
+          success: true,
+          riskLevel: authResult.riskLevel || "low",
+          securityEvents: authResult.securityEvents || [],
+        },
+        context.ipAddress,
+        context.userAgent
       );
       if (success) {
         return next();
       }
     }
 
-    // Fallback to session-based authentication
-    if (await handleSessionAuth(req, ipAddress, userAgent)) {
+    // Try session-based authentication as last resort
+    if (await handleSessionAuth(req, context.ipAddress, context.userAgent)) {
       return next();
     }
 
-    // Log unauthorized access attempt
-    await auditLogger.logSecurityEvent(
-      "anonymous",
-      SecurityEventType.UNAUTHORIZED_ACCESS_ATTEMPT,
-      {
-        path: req.path,
-        method: req.method,
-        ipAddress,
-        userAgent,
-      },
-      ipAddress,
-      userAgent
+    // All authentication methods failed
+    await handleAuthFailure(
+      res,
+      authResult,
+      context,
+      securityEnhancer,
+      SecurityEventType,
+      !!extractBearerToken(req)
     );
-
-    res.status(401).json({ error: "Unauthorized" });
   } catch (error) {
-    console.error("Authentication error:", error);
-
-    const ipAddress = getClientIP(req);
-    const userAgent = req.headers["user-agent"] || "unknown";
-
-    await auditLogger.logSecurityEvent(
-      "anonymous",
-      "authentication_error",
-      {
-        error: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined,
-        ipAddress,
-        userAgent,
-      },
-      ipAddress,
-      userAgent
-    );
-
-    res.status(500).json({ error: "Authentication error" });
+    await handleAuthError(res, error, context);
   }
 };
 
@@ -409,18 +528,8 @@ export const getCurrentUser = async (req: RequestWithUser): Promise<User | null>
       return null;
     }
 
-    // Retrieve user from Convex
-    let convexUser: ConvexUser | null = await getUserByClerkId(userId);
-
-    if (!convexUser) {
-      // Create user in Convex if doesn't exist
-      const newUserInput = userToConvexUserInput({
-        clerkId: userId,
-        email: "", // Will be updated client-side
-        username: `user_${userId.slice(-8)}`,
-      });
-      convexUser = await upsertUser(newUserInput);
-    }
+    // Retrieve or create user from Convex
+    const { user: convexUser } = await getOrCreateConvexUser(userId);
 
     if (convexUser) {
       // Convert ConvexUser to shared User type using type-safe conversion

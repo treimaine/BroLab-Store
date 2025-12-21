@@ -32,6 +32,7 @@
     "test:webhook": "node scripts/test-webhook-local.js"
   },
   "dependencies": {
+    "@clerk/backend": "^2.29.0",
     "@clerk/clerk-react": "^5.39.0",
     "@clerk/clerk-sdk-node": "^5.1.6",
     "@clerk/express": "^1.7.18",
