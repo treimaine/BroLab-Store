@@ -1,3 +1,4 @@
+import { getAuth } from "@clerk/express";
 import { Router } from "express";
 import { ErrorMessages } from "../../shared/constants/ErrorMessages";
 import monitoring from "../lib/monitoring";
@@ -19,6 +20,52 @@ router.get("/health", apiRateLimit, async (req, res): Promise<void> => {
     });
   } catch (error: unknown) {
     handleRouteError(error, res, "Health check failed");
+  }
+});
+
+// Auth diagnostic endpoint - helps debug Clerk authentication issues
+router.get("/auth-check", async (req, res): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    const hasAuthHeader = !!authHeader;
+    const hasBearerToken = authHeader?.startsWith("Bearer ") ?? false;
+
+    // Check Clerk auth
+    let clerkAuth = null;
+    try {
+      clerkAuth = getAuth(req);
+    } catch (e) {
+      clerkAuth = { error: e instanceof Error ? e.message : "Unknown error" };
+    }
+
+    // Environment check (no secrets exposed)
+    const envCheck = {
+      NODE_ENV: process.env.NODE_ENV,
+      hasClerkSecretKey: !!process.env.CLERK_SECRET_KEY,
+      clerkSecretKeyPrefix: process.env.CLERK_SECRET_KEY?.substring(0, 8) || "not set",
+      hasClerkPublishableKey: !!process.env.VITE_CLERK_PUBLISHABLE_KEY,
+      clerkPublishableKeyPrefix:
+        process.env.VITE_CLERK_PUBLISHABLE_KEY?.substring(0, 8) || "not set",
+      hasConvexUrl: !!process.env.VITE_CONVEX_URL,
+    };
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      request: {
+        hasAuthHeader,
+        hasBearerToken,
+        tokenLength: hasBearerToken ? authHeader!.length - 7 : 0,
+      },
+      clerkAuth: {
+        userId: clerkAuth?.userId || null,
+        sessionId: clerkAuth?.sessionId || null,
+        hasSessionClaims: !!clerkAuth?.sessionClaims,
+        error: (clerkAuth as { error?: string })?.error || null,
+      },
+      environment: envCheck,
+    });
+  } catch (error: unknown) {
+    handleRouteError(error, res, "Auth check failed");
   }
 });
 

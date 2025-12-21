@@ -96,8 +96,15 @@ export class SyncManager extends BrowserEventEmitter {
   constructor(config: Partial<ConnectionConfig> = {}) {
     super();
 
+    // Determine WebSocket URL based on environment
+    const isProduction = typeof window !== "undefined" && window.location.hostname !== "localhost";
+    const wsProtocol = isProduction ? "wss:" : "ws:";
+    const defaultWsUrl = isProduction
+      ? `${wsProtocol}//${window.location.host}/ws`
+      : "ws://localhost:3001/ws";
+
     this.config = {
-      websocketUrl: config.websocketUrl || "ws://localhost:3001/ws",
+      websocketUrl: config.websocketUrl || defaultWsUrl,
       pollingUrl: config.pollingUrl || "/api/sync",
       pollingInterval: config.pollingInterval || 5000,
       maxReconnectAttempts: config.maxReconnectAttempts || 10,

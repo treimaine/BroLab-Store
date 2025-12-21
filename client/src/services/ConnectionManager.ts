@@ -584,9 +584,19 @@ export class ConnectionManager extends BrowserEventEmitter {
   constructor(config: Partial<ConnectionConfig> = {}) {
     super();
 
+    // Determine base URL based on environment
+    const isProduction = typeof window !== "undefined" && window.location.hostname !== "localhost";
+    const baseUrl = isProduction
+      ? `${window.location.protocol}//${window.location.host}`
+      : "http://localhost:5000";
+    const wsProtocol = isProduction ? "wss:" : "ws:";
+    const wsBaseUrl = isProduction
+      ? `${wsProtocol}//${window.location.host}`
+      : "ws://localhost:5000";
+
     this.config = {
-      websocketUrl: config.websocketUrl || "ws://localhost:5000/ws",
-      pollingUrl: config.pollingUrl || "http://localhost:5000/api/sync",
+      websocketUrl: config.websocketUrl || `${wsBaseUrl}/ws`,
+      pollingUrl: config.pollingUrl || `${baseUrl}/api/sync`,
       connectionTimeout: config.connectionTimeout || 10000,
       heartbeatInterval: config.heartbeatInterval || 30000,
       pollingInterval: config.pollingInterval || 5000,
