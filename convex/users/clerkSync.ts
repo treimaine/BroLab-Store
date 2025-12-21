@@ -17,11 +17,12 @@ export const syncClerkUser = mutation({
   },
   handler: async (ctx, args) => {
     try {
-      console.log(`🔄 Syncing Clerk user: ${args.clerkId} (${args.email})`);
+      console.log(`🔄 Syncing Clerk user: ${args.clerkId} (${args.email || "no email yet"})`);
 
-      // Validate input data
-      if (!args.clerkId || !args.email) {
-        throw new Error("ClerkId and email are required");
+      // Validate input data - clerkId is required, email can be empty for initial sync
+      // Email will be updated later when user data is available from Clerk
+      if (!args.clerkId) {
+        throw new Error("ClerkId is required");
       }
 
       // Check if user already exists

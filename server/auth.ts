@@ -4,7 +4,7 @@ import cookieParser from "cookie-parser";
 import type { Express, NextFunction, Request, Response } from "express";
 import session from "express-session";
 import type { User } from "../shared/schema";
-import { ConvexUser, convexUserToUser, userToConvexUserInput } from "../shared/types/ConvexUser";
+import { ConvexUser, ConvexUserInput, convexUserToUser } from "../shared/types/ConvexUser";
 import { auditLogger } from "./lib/audit";
 import { getUserByClerkId, upsertUser } from "./lib/convex";
 
@@ -162,10 +162,13 @@ async function verifyBearerToken(
 /**
  * Get or create a Convex user by Clerk ID
  * Centralizes user retrieval/creation logic to avoid duplication
+ * @param userId - Clerk user ID
+ * @param userInfo - Optional user info from Clerk session (email, username, etc.)
  * @returns Object with user and isNewUser flag
  */
 async function getOrCreateConvexUser(
-  userId: string
+  userId: string,
+  userInfo?: { email?: string; username?: string; firstName?: string; lastName?: string }
 ): Promise<{ user: ConvexUser | null; isNewUser: boolean }> {
   const existingUser = await getUserByClerkId(userId);
 
@@ -173,11 +176,15 @@ async function getOrCreateConvexUser(
     return { user: existingUser, isNewUser: false };
   }
 
-  const newUserInput = userToConvexUserInput({
+  // Use provided user info or defaults
+  // Create ConvexUserInput directly to include firstName/lastName
+  const newUserInput: ConvexUserInput = {
     clerkId: userId,
-    email: "", // Will be updated client-side
-    username: `user_${userId.slice(-8)}`,
-  });
+    email: userInfo?.email || "",
+    username: userInfo?.username || `user_${userId.slice(-8)}`,
+    firstName: userInfo?.firstName,
+    lastName: userInfo?.lastName,
+  };
   const newUser = await upsertUser(newUserInput);
 
   return { user: newUser, isNewUser: true };
@@ -234,15 +241,16 @@ async function handleClerkAuth(
     securityEvents: string[];
   },
   ipAddress: string,
-  userAgent: string
+  userAgent: string,
+  userInfo?: { email?: string; username?: string; firstName?: string; lastName?: string }
 ): Promise<boolean> {
   const { securityEnhancer } = await import("./lib/securityEnhancer");
 
   // Clear failed attempts on successful authentication
   securityEnhancer.clearFailedAttempts(ipAddress);
 
-  // Retrieve or create user from Convex
-  const { user: convexUser, isNewUser } = await getOrCreateConvexUser(userId);
+  // Retrieve or create user from Convex with user info from Clerk
+  const { user: convexUser, isNewUser } = await getOrCreateConvexUser(userId, userInfo);
 
   if (!convexUser) {
     return false;
@@ -344,6 +352,12 @@ interface AuthContext {
 interface UserIdResolution {
   userId?: string;
   sessionId?: string;
+  userInfo?: {
+    email?: string;
+    username?: string;
+    firstName?: string;
+    lastName?: string;
+  };
 }
 
 /**
@@ -361,12 +375,24 @@ function getAuthContext(req: Request): AuthContext {
  */
 async function resolveUserId(authResult: {
   success: boolean;
-  user?: { userId?: string; sessionId?: string };
+  user?: { userId?: string; sessionId?: string; sessionClaims?: Record<string, unknown> };
 }): Promise<UserIdResolution> {
   if (authResult.success && authResult.user?.userId) {
+    // Extract user info from session claims if available
+    const claims = authResult.user.sessionClaims;
+    const userInfo = claims
+      ? {
+          email: typeof claims.email === "string" ? claims.email : undefined,
+          username: typeof claims.username === "string" ? claims.username : undefined,
+          firstName: typeof claims.given_name === "string" ? claims.given_name : undefined,
+          lastName: typeof claims.family_name === "string" ? claims.family_name : undefined,
+        }
+      : undefined;
+
     return {
       userId: authResult.user.userId,
       sessionId: authResult.user.sessionId,
+      userInfo,
     };
   }
   return {};
@@ -489,7 +515,8 @@ export const isAuthenticated = async (
           securityEvents: authResult.securityEvents || [],
         },
         context.ipAddress,
-        context.userAgent
+        context.userAgent,
+        resolution.userInfo
       );
       if (success) {
         return next();

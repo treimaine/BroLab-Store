@@ -4,7 +4,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { sendMail } from "../services/mail";
 import { getConvex } from "./convex";
 import { getOrderInvoiceData, saveInvoiceUrl } from "./db";
-import { BrandConfig } from "./pdf";
+import { BrandConfig, buildInvoicePdfStreamAsync } from "./pdf";
 
 export function makeInvoiceNumber(orderId: number, year?: number): string {
   const y = year || new Date().getFullYear();
