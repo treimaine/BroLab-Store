@@ -37,17 +37,28 @@ interface ClerkUserData {
 
 /**
  * Clerk webhook event data structure
+ * Note: session.created includes nested user object, while user.created has flat structure
  */
 interface ClerkWebhookEvent {
   type: string;
   data: {
     id?: string;
     user_id?: string;
+    // Flat structure for user.created/user.updated events
     email_addresses?: Array<{ email_address: string }>;
     username?: string;
     first_name?: string;
     last_name?: string;
     image_url?: string;
+    // Nested user object for session.created events
+    user?: {
+      id?: string;
+      email_addresses?: Array<{ email_address: string }>;
+      username?: string | null;
+      first_name?: string;
+      last_name?: string;
+      image_url?: string;
+    };
   };
 }
 
@@ -96,7 +107,7 @@ function extractUserData(evt: ClerkWebhookEvent): ClerkUserData | null {
 }
 
 /**
- * Process user sync for different event types
+ * Process user sync for different event types (user.created, user.updated)
  */
 async function processUserSync(
   ctx: ActionCtx,
@@ -121,6 +132,61 @@ async function processUserSync(
   }
 }
 
+/**
+ * Process session.created event - logs user login activity
+ * session.created payload structure from Clerk:
+ * - data.id = session ID (sess_xxx)
+ * - data.user_id = user ID (user_xxx)
+ * - data.user = nested user object with email_addresses, first_name, etc.
+ */
+async function processSessionCreated(ctx: ActionCtx, evt: ClerkWebhookEvent): Promise<void> {
+  // Log the full payload for debugging
+  console.log("session.created payload:", JSON.stringify(evt.data, null, 2));
+
+  // For session.created, user_id is the Clerk user ID
+  const userId = evt.data.user_id || evt.data.user?.id;
+
+  if (!userId) {
+    console.warn("Missing user_id in session.created event");
+    return;
+  }
+
+  console.log(`Session created for user: ${userId}`);
+
+  // Extract user data from nested user object (session.created structure)
+  const user = evt.data.user;
+  const email = user?.email_addresses?.[0]?.email_address;
+
+  if (email) {
+    // If we have email, we can do a full sync
+    console.log(`Email found in session.created: ${email}, doing full sync`);
+    const userData: ClerkUserData = {
+      clerkId: userId,
+      email,
+      username: user?.username ?? undefined,
+      firstName: user?.first_name,
+      lastName: user?.last_name,
+      imageUrl: user?.image_url,
+    };
+    await syncClerkUserMutation(ctx, userData);
+  } else {
+    // No email in payload (user.email_addresses is empty), just log the login activity
+    console.log(`No email in session.created for user ${userId}, logging activity only`);
+    try {
+      await ctx.scheduler.runAfter(
+        0,
+        "users/clerkSync:logUserLogin" as never,
+        {
+          clerkId: userId,
+        } as never
+      );
+      console.log(`Login activity scheduled for user: ${userId}`);
+    } catch (error) {
+      console.error("Error scheduling login activity:", error);
+    }
+  }
+}
+
 // Clerk webhook handler for user session management
 const clerkWebhook = httpAction(async (ctx, request) => {
   console.log("Clerk webhook received");
@@ -134,7 +200,8 @@ const clerkWebhook = httpAction(async (ctx, request) => {
     // Handle different event types
     switch (evt.type) {
       case "session.created":
-        await processUserSync(ctx, evt, "Session created");
+        // session.created has different payload structure - no email_addresses
+        await processSessionCreated(ctx, evt);
         break;
       case "user.created":
         await processUserSync(ctx, evt, "User created");

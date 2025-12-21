@@ -131,6 +131,83 @@ export const syncClerkUser = mutation({
 });
 
 /**
+ * Log user login activity from session.created webhook
+ * This is called when Clerk sends a session.created event (user logs in)
+ */
+export const logUserLogin = mutation({
+  args: {
+    clerkId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      console.log(`🔐 Logging login for user: ${args.clerkId}`);
+
+      // Find the user by their Clerk ID
+      const existingUser = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", q => q.eq("clerkId", args.clerkId))
+        .first();
+
+      if (!existingUser) {
+        console.warn(`⚠️ User not found for login: ${args.clerkId}`);
+        // Log to audit that we received a login for unknown user
+        await ctx.db.insert("auditLogs", {
+          clerkId: args.clerkId,
+          action: "login_unknown_user",
+          resource: "users",
+          details: {
+            event: "session_created",
+            error: "User not found in database",
+          },
+          timestamp: Date.now(),
+        });
+        return { success: false, error: "User not found" };
+      }
+
+      const now = Date.now();
+
+      // Update lastLoginAt
+      await ctx.db.patch(existingUser._id, {
+        lastLoginAt: now,
+        updatedAt: now,
+      });
+
+      // Log user login activity
+      await ctx.db.insert("activityLog", {
+        userId: existingUser._id,
+        action: "user_login",
+        details: { source: "clerk_session_created" },
+        timestamp: now,
+      });
+
+      console.log(`✅ Login logged for user: ${args.clerkId}`);
+      return {
+        success: true,
+        userId: existingUser._id,
+      };
+    } catch (error) {
+      console.error(`❌ Error logging user login:`, error);
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Log error to audit logs
+      await ctx.db.insert("auditLogs", {
+        clerkId: args.clerkId,
+        action: "login_log_error",
+        resource: "users",
+        details: {
+          event: "session_created",
+          error: errorMessage,
+        },
+        timestamp: Date.now(),
+      });
+
+      return { success: false, error: errorMessage };
+    }
+  },
+});
+
+/**
  * Get a user by their Clerk ID
  */
 export const getUserByClerkId = query({
