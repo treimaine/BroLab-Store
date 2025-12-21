@@ -1,5 +1,47 @@
 import { v } from "convex/values";
 
+// ================================
+// RE-EXPORTS FROM SHARED VALIDATION
+// ================================
+// These re-exports maintain backward compatibility for existing imports
+// The single source of truth is in shared/validation/validators.ts
+
+// Import and re-export validateEmail from shared module for backward compatibility
+import { validateEmail as validateEmailImpl } from "../../shared/validation/validators";
+export const validateEmail = validateEmailImpl;
+
+// Re-export other validation functions from shared module
+export {
+  validateBpmForGenre,
+  validateDuration as validateDurationShared,
+  validateFilePath,
+  validateMimeType,
+  validateOrderTotal,
+  validatePassword,
+  validatePhoneNumber,
+  validatePrice as validatePriceShared,
+  validateReservationSlot,
+  validateUUID,
+  type FileUploadInput,
+  type FileUploadValidationResult,
+  type OrderStatus,
+  // Types
+  type PasswordValidationResult,
+  type ReservationStatus,
+  type ServiceType,
+  type UserRole,
+} from "../../shared/validation/validators";
+
+// Re-export sanitization functions
+export {
+  sanitizeEmail as sanitizeEmailShared,
+  sanitizeFilename,
+  sanitizeInput,
+  sanitizeString as sanitizeStringShared,
+  sanitizeUserInput,
+  sanitizeUsername as sanitizeUsernameShared,
+} from "../../shared/validation/sanitizers";
+
 // Validation schemas for different data types
 export const userValidation = {
   clerkId: v.string(),
@@ -57,11 +99,8 @@ export const reservationValidation = {
   }),
 };
 
-// Validation functions
-export function validateEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
+// Local validation functions (Convex-specific)
+// Note: validateEmail is imported from shared module above
 
 export function validateClerkId(clerkId: string): boolean {
   return typeof clerkId === "string" && clerkId.startsWith("user_") && clerkId.length > 10;

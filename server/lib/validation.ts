@@ -3,12 +3,59 @@
  *
  * This module provides type-safe request validation middleware using Zod schemas
  * to ensure all API endpoints have proper request/response validation.
+ *
+ * For validation functions (validateEmail, validateUUID, etc.), import from:
+ * ```typescript
+ * import { validateEmail, sanitizeInput } from '@shared/validation';
+ * ```
  */
 
 import { NextFunction, Request, Response } from "express";
 import { ZodError, ZodSchema, z } from "zod";
 import { BroLabErrorType } from "../../shared/types/Error";
 import { getRequestId, sendInternalError, sendValidationError } from "./errorResponses";
+
+// ================================
+// RE-EXPORTS FROM SHARED VALIDATION
+// ================================
+// These re-exports maintain backward compatibility for existing imports
+// The single source of truth is in shared/validation/
+
+export {
+  sanitizeEmail,
+  sanitizeFilename,
+  sanitizeInput,
+  sanitizeString,
+  // Sanitization functions
+  sanitizeUserInput,
+  sanitizeUsername,
+  validateBpmForGenre,
+  validateClerkId,
+  validateClerkIdSafe,
+  validateDuration,
+  // Validation functions
+  validateEmail,
+  validateFilePath,
+  validateMimeType,
+  validateOrderStatus,
+  validateOrderTotal,
+  validatePassword,
+  validatePhoneNumber,
+  validatePrice,
+  validateReservationSlot,
+  validateReservationStatus,
+  validateServiceType,
+  validateUUID,
+  validateUserRole,
+  type FileUploadInput,
+  type FileUploadValidationResult,
+  type OrderStatus,
+  // Types
+  type PasswordValidationResult,
+  type ReservationStatus,
+  type ServiceType,
+  type UserRole,
+} from "../../shared/validation/index";
 
 // Import business object validation schemas
 

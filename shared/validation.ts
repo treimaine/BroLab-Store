@@ -141,10 +141,11 @@ export const auditLogSchema = z.object({
 // VALIDATION UTILITIES
 // ================================
 
-export const validateEmail = (email: string): boolean => {
-  if (!email || email.length > 254) return false;
-  return z.string().email().safeParse(email).success;
-};
+// Import validateEmail from centralized validators module
+// This is the SINGLE source of truth for email validation
+import { validateEmail as validateEmailImpl } from "./validation/validators";
+
+export const validateEmail = validateEmailImpl;
 
 export const validateFilePath = (path: string): boolean => {
   if (!path) return false;

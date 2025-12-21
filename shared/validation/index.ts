@@ -1,44 +1,155 @@
+/**
+ * Centralized Validation Module
+ *
+ * This is the SINGLE SOURCE OF TRUTH for all validation schemas, functions,
+ * and utilities used across the application (client, server, and Convex layers).
+ *
+ * Import from this module for all validation needs:
+ * ```typescript
+ * import { validateEmail, sanitizeInput, registerSchema } from '@shared/validation';
+ * ```
+ *
+ * @module shared/validation
+ */
+
 // ================================
-// VALIDATION SCHEMAS INDEX
+// VALIDATION FUNCTIONS (Single Source of Truth)
 // ================================
 
-// Re-export all validation schemas and utilities
+export {
+  BPM_RANGES,
+  DEFAULT_ALLOWED_MIME_TYPES,
+  VALID_ORDER_STATUSES,
+  VALID_RESERVATION_STATUSES,
+  VALID_SERVICE_TYPES,
+  VALID_USER_ROLES,
+  // Business logic validation
+  validateBpmForGenre,
+  // Clerk ID validation
+  validateClerkId,
+  validateClerkIdSafe,
+  validateDuration,
+  // Email validation
+  validateEmail,
+  // File validation
+  validateFilePath,
+  validateFileUpload,
+  validateMimeType,
+  // Status validation
+  validateOrderStatus,
+  validateOrderTotal,
+  validatePassword,
+  // Phone validation
+  validatePhoneNumber,
+  // Numeric validation
+  validatePrice,
+  validateReservationSlot,
+  validateReservationStatus,
+  validateServiceType,
+  // UUID validation
+  validateUUID,
+  validateUserRole,
+  type FileUploadInput,
+  type FileUploadValidationResult,
+  type OrderStatus,
+  // Types
+  type PasswordValidationResult,
+  type ReservationStatus,
+  type ServiceType,
+  type UserRole,
+} from "./validators";
+
+// ================================
+// SANITIZATION FUNCTIONS
+// ================================
+
+export {
+  escapeHtml,
+  sanitizeEmail,
+  sanitizeFilename,
+  sanitizeInput,
+  sanitizeString,
+  sanitizeUrl,
+  sanitizeUserInput,
+  sanitizeUsername,
+  stripHtml,
+} from "./sanitizers";
+
+// ================================
+// DOMAIN-SPECIFIC VALIDATION SCHEMAS
+// ================================
+
 export * from "./BeatValidation";
 export * from "./ErrorValidation";
 export * from "./OrderValidation";
 export * from "./ReservationValidation";
 export * from "./UserValidation";
+export * from "./sync";
 
-// Re-export existing validation utilities from main validation file (excluding duplicates)
+// ================================
+// ZOD SCHEMAS (from main validation file)
+// ================================
+
 export {
+  PAYPAL_SUPPORTED_CURRENCIES,
+  // Audit
   auditLogSchema,
+  // Subscription schemas
   createSubscriptionSchema,
+  customBeatFileValidation,
+  customBeatRequestSchema,
   enhancedPaymentIntentSchema,
   enhancedRegisterSchema,
   fileFilterValidation,
+  // File schemas
   fileUploadValidation,
   loginSchema,
+  mixingMasteringFormSchema,
+  mixingMasteringSubmissionSchema,
+  // Payment schemas
   paymentIntentSchema,
+  // PayPal schemas
+  paypalCreateOrderSchema,
+  // Rate limiting
   rateLimitSchema,
+  // User schemas
   registerSchema,
-  sanitizeInput,
-  sanitizeUserInput,
   serverCreateSubscriptionSchema,
   serverRegisterSchema,
+  // Service schemas
   serviceOrderValidation,
+  serviceSelectionSchema,
+  // Webhook schemas
   stripeWebhookSchema,
   updateProfileSchema,
-  validateEmail,
-  validateFilePath,
-  validateFileUpload as validateFileUploadUtil,
-  validateMimeType,
-  validatePassword,
-  validatePhoneNumber,
-  validateReservationSlot,
-  validateUUID,
+  type AuditLogInput,
+  type CreateSubscriptionInput,
+  type CustomBeatFileInput,
+  type CustomBeatRequestInput,
+  type EnhancedPaymentIntentInput,
+  type EnhancedRegisterInput,
+  type FileFilterInput,
+  type LoginInput,
+  type MixingMasteringFormInput,
+  type MixingMasteringSubmissionInput,
+  type PayPalCreateOrderInput,
+  type PayPalCurrency,
+  type PaymentIntentInput,
+  type RateLimitInput,
+  // Types
+  type RegisterInput,
+  type ServerCreateSubscriptionInput,
+  type ServiceOrderInput,
+  type ServiceSelectionInput,
+  type StripeWebhookInput,
+  type UpdateProfileInput,
+  type FileUploadInput as ZodFileUploadInput,
 } from "../validation";
 
-// Re-export error utilities
+// ================================
+// ERROR UTILITIES
+// ================================
+
 export {
   createApiError,
   createBusinessLogicError,
@@ -46,13 +157,6 @@ export {
   getHttpStatusForErrorType,
   getUserMessageForErrorType,
 } from "./ErrorValidation";
-
-// Re-export specific schemas that are commonly used
-export { CreateOrderSchema, CreatePaymentIntentSchema } from "./OrderValidation";
-export { CreateReservationSchema, ServiceDetailsSchema } from "./ReservationValidation";
-
-// Re-export payment session schema from apiEndpoints
-export { createPaymentSessionRequestSchema } from "../types/apiEndpoints";
 
 // ================================
 // COMMON VALIDATION SCHEMAS
@@ -120,7 +224,7 @@ export const CommonQueries = {
 // ================================
 
 import { NextFunction, Request, Response } from "express";
-import { createValidationError } from "./ErrorValidation";
+import { createValidationError as createValidationErrorFn } from "./ErrorValidation";
 
 /**
  * Create validation middleware for request body
@@ -138,7 +242,7 @@ export const validateBody = <T extends z.ZodSchema>(schema: T) => {
           code: err.code,
         }));
 
-        const errorResponse = createValidationError(
+        const errorResponse = createValidationErrorFn(
           validationErrors,
           req.headers["x-request-id"] as string
         );
@@ -178,7 +282,7 @@ export const validateQuery = <T extends z.ZodSchema>(schema: T) => {
           code: err.code,
         }));
 
-        const errorResponse = createValidationError(
+        const errorResponse = createValidationErrorFn(
           validationErrors,
           req.headers["x-request-id"] as string
         );
@@ -218,7 +322,7 @@ export const validateParams = <T extends z.ZodSchema>(schema: T) => {
           code: err.code,
         }));
 
-        const errorResponse = createValidationError(
+        const errorResponse = createValidationErrorFn(
           validationErrors,
           req.headers["x-request-id"] as string
         );
@@ -271,9 +375,9 @@ export const makePartial = <T extends z.ZodRawShape>(schema: z.ZodObject<T>) => 
 };
 
 /**
- * Validate and transform file upload
+ * Validate and transform file upload (Express.Multer.File)
  */
-export const validateFileUpload = (file: Express.Multer.File) => {
+export const validateMulterFileUpload = (file: Express.Multer.File) => {
   const FileUploadSchema = z.object({
     fieldname: z.string(),
     originalname: z.string().min(1, "Filename is required"),
@@ -304,3 +408,10 @@ export const extractValidationErrors = (error: z.ZodError) => {
     value: undefined, // Simplified to avoid type issues
   }));
 };
+
+// Re-export specific schemas that are commonly used
+export { CreateOrderSchema, CreatePaymentIntentSchema } from "./OrderValidation";
+export { CreateReservationSchema, ServiceDetailsSchema } from "./ReservationValidation";
+
+// Re-export payment session schema from apiEndpoints
+export { createPaymentSessionRequestSchema } from "../types/apiEndpoints";

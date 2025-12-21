@@ -30,13 +30,13 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
 
 ## Tasks
 
-- [ ] 1. Set up shared validation module structure
-  - [ ] 1.1 Create `shared/validation/index.ts` as the central export point
+- [x] 1. Set up shared validation module structure
+  - [x] 1.1 Create `shared/validation/index.ts` as the central export point
     - Consolidate exports from existing validation files
     - Create barrel exports for all schemas
     - _Requirements: 1.1, 1.2, 9.1_
 
-  - [ ] 1.2 Migrate `validateEmail` to single implementation
+  - [x] 1.2 Migrate `validateEmail` to single implementation
     - Create `shared/validation/validators.ts` with unified validateEmail
     - Remove duplicate implementations from convex/lib and server/lib
     - Update all imports to use shared/validation
@@ -46,7 +46,7 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
     - **Property 2: Email Validation Round-Trip**
     - **Validates: Requirements 1.5, 9.5**
 
-  - [ ] 1.4 Create re-exports in `convex/lib/validation.ts` and `server/lib/validation.ts`
+  - [x] 1.4 Create re-exports in `convex/lib/validation.ts` and `server/lib/validation.ts`
     - Replace duplicate code with re-exports from shared/validation
     - Maintain backward compatibility for existing imports
     - _Requirements: 1.3, 9.2, 9.3_

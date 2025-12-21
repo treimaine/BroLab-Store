@@ -615,30 +615,37 @@ async function handleUserEvent(
     const emailAddresses = data.email_addresses as Array<{ email_address: string }> | undefined;
     const email = emailAddresses?.[0]?.email_address || "unknown@temp.com";
 
-    // Call syncClerkUser mutation
-    const response = await fetch(`${convexUrl}/api/mutation`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        path: "users/clerkSync:syncClerkUser",
-        args: {
-          clerkId: userId,
-          email: email,
-          username: data.username as string | undefined,
-          firstName: data.first_name as string | undefined,
-          lastName: data.last_name as string | undefined,
-          imageUrl: data.image_url as string | undefined,
-        },
-        format: "json",
-      }),
+    // Log extracted data for debugging
+    console.log(`📊 [${requestId}] User data extracted:`, {
+      clerkId: userId,
+      email,
+      username: data.username,
+      firstName: data.first_name,
+      lastName: data.last_name,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Convex mutation failed: ${errorText}`);
-    }
+    // Use ConvexHttpClient for proper mutation calls
+    const { ConvexHttpClient } = await import("convex/browser");
+    const convex = new ConvexHttpClient(convexUrl);
 
-    console.log(`✅ [${requestId}] User synced successfully: ${userId}`);
+    // Import the API reference dynamically to avoid circular dependencies
+    const { api } = await import("../../convex/_generated/api");
+
+    // Call syncClerkUser mutation using the proper Convex client
+    const result = await convex.mutation(api.users.clerkSync.syncClerkUser, {
+      clerkId: userId,
+      email: email,
+      username: (data.username as string) || undefined,
+      firstName: (data.first_name as string) || undefined,
+      lastName: (data.last_name as string) || undefined,
+      imageUrl: (data.image_url as string) || undefined,
+    });
+
+    console.log(`✅ [${requestId}] User synced successfully:`, {
+      userId,
+      action: result?.action,
+      success: result?.success,
+    });
   } catch (error) {
     console.error(`❌ [${requestId}] Error syncing user:`, error);
     throw error;
