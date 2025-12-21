@@ -106,13 +106,19 @@ async function sendConfirmationEmail(
   user: ReservationUser
 ): Promise<void> {
   try {
+    // Validate email before attempting to send
+    if (!userEmail || userEmail.trim() === "") {
+      console.warn("⚠️ Cannot send confirmation email: No recipient email provided");
+      return;
+    }
+
     const emailContent = buildConfirmationEmailContent(user, reservation);
     await sendMail({
       to: userEmail,
       subject: "BroLab Reservation Confirmation",
       html: emailContent,
     });
-    console.log("📧 Confirmation email sent successfully");
+    console.log("📧 Confirmation email sent successfully to:", userEmail);
   } catch (emailError) {
     console.error("⚠️ Failed to send confirmation email:", emailError);
   }
@@ -376,8 +382,17 @@ router.post(
         status: reservation.status,
       });
 
+      // Determine the best email to use for confirmation
+      // Priority: user.email from auth > clientInfo.email from form
+      const confirmationEmail =
+        user.email && user.email.trim() !== "" ? user.email : body.clientInfo?.email;
+
       // Send emails asynchronously (non-blocking)
-      void sendConfirmationEmail(user.email, reservation, user);
+      if (confirmationEmail) {
+        void sendConfirmationEmail(confirmationEmail, reservation, user);
+      } else {
+        console.warn("⚠️ No email available for confirmation - skipping user email");
+      }
       void sendAdminNotification(user, reservation, body.clientInfo?.phone, body.notes);
 
       res.status(201).json(reservation);

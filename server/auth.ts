@@ -173,6 +173,18 @@ async function getOrCreateConvexUser(
   const existingUser = await getUserByClerkId(userId);
 
   if (existingUser) {
+    // If existing user has no email but we have one from Clerk, update it
+    if ((!existingUser.email || existingUser.email === "") && userInfo?.email) {
+      console.log("📧 Updating user email from Clerk session:", userInfo.email);
+      const updatedUser = await upsertUser({
+        clerkId: userId,
+        email: userInfo.email,
+        username: existingUser.username || userInfo.username,
+        firstName: userInfo.firstName || existingUser.firstName,
+        lastName: userInfo.lastName || existingUser.lastName,
+      });
+      return { user: updatedUser, isNewUser: false };
+    }
     return { user: existingUser, isNewUser: false };
   }
 
