@@ -116,14 +116,12 @@ export const getUserDownloadQuota = query({
 
     // Determine license type and quota
     const licenseType = subscription?.planId || "basic";
-    const quota =
-      licenseType === "basic"
-        ? 10
-        : licenseType === "premium"
-          ? 25
-          : licenseType === "unlimited"
-            ? 999999
-            : 10;
+    const quotaByLicense: Record<string, number> = {
+      basic: 10,
+      premium: 25,
+      unlimited: 999999,
+    };
+    const quota = quotaByLicense[licenseType] ?? 10;
 
     // Count downloads for this user
     const downloads = await ctx.db

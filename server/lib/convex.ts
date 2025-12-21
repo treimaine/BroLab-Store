@@ -293,6 +293,412 @@ export async function logActivity(activityData: ActivityData): Promise<Id<"activ
   }
 }
 
+// ============================================================================
+// EXTENDED CONVEX QUERY AND MUTATION FUNCTIONS
+// ============================================================================
+
+/**
+ * Get user by email
+ */
+export async function getUserByEmail(email: string): Promise<ConvexUser | null> {
+  try {
+    // Uses convex/users.ts:getUserByEmail
+    const result = await convexWrapper.query<ConvexUser>("users:getUserByEmail", { email });
+    return result.data || null;
+  } catch (error) {
+    console.error("getUserByEmail failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Get user by username
+ */
+export async function getUserByUsername(username: string): Promise<ConvexUser | null> {
+  try {
+    // Uses convex/users.ts:getUserByUsername
+    const result = await convexWrapper.query<ConvexUser>("users:getUserByUsername", { username });
+    return result.data || null;
+  } catch (error) {
+    console.error("getUserByUsername failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Get user by ID
+ */
+export async function getUserById(userId: Id<"users">): Promise<ConvexUser | null> {
+  try {
+    // Uses convex/users.ts:getUserById
+    const result = await convexWrapper.query<ConvexUser>("users:getUserById", { id: userId });
+    return result.data || null;
+  } catch (error) {
+    console.error("getUserById failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Update user avatar
+ */
+export async function updateUserAvatar(
+  clerkId: string,
+  avatarUrl: string
+): Promise<ConvexUser | null> {
+  try {
+    // Uses convex/users.ts:updateUserAvatar
+    const result = await convexWrapper.mutation<ConvexUser>("users:updateUserAvatar", {
+      clerkId,
+      avatarUrl,
+    });
+    return result.data || null;
+  } catch (error) {
+    console.error("updateUserAvatar failed:", error);
+    return null;
+  }
+}
+
+/**
+ * List downloads for a user
+ */
+export interface ConvexDownload {
+  _id: Id<"downloads">;
+  userId: Id<"users">;
+  beatId: number;
+  licenseType: string;
+  downloadUrl?: string;
+  downloadCount?: number;
+  timestamp: number;
+}
+
+export async function listDownloads(userId: Id<"users">): Promise<ConvexDownload[]> {
+  try {
+    // Uses convex/downloads/listDownloads.ts:listDownloadsServer (new file we created)
+    const result = await convexWrapper.query<ConvexDownload[]>(
+      "downloads/listDownloads:listDownloadsServer",
+      { userId }
+    );
+    return result.data || [];
+  } catch (error) {
+    console.error("listDownloads failed:", error);
+    return [];
+  }
+}
+
+/**
+ * Get subscription for a user
+ */
+export interface ConvexSubscription {
+  plan: string;
+  status: string;
+  currentPeriodEnd: number | null;
+  cancelAtPeriodEnd: boolean;
+  userId: Id<"users">;
+}
+
+export async function getSubscription(userId: Id<"users">): Promise<ConvexSubscription | null> {
+  try {
+    // Uses convex/subscriptions/getSubscription.ts:getSubscription
+    const result = await convexWrapper.query<ConvexSubscription>(
+      "subscriptions/getSubscription:getSubscription",
+      { userId }
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("getSubscription failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Get subscription status helper
+ */
+export async function getSubscriptionStatus(userId: Id<"users">): Promise<string> {
+  try {
+    const subscription = await getSubscription(userId);
+    return subscription?.status || "none";
+  } catch (error) {
+    console.error("getSubscriptionStatus failed:", error);
+    return "none";
+  }
+}
+
+/**
+ * File management types and functions
+ */
+/**
+ * File role type alias for consistent usage across file operations
+ */
+export type FileRole = "upload" | "deliverable" | "invoice";
+
+export interface ConvexFile {
+  _id: Id<"files">;
+  userId: Id<"users">;
+  filename: string;
+  originalName: string;
+  storagePath: string;
+  mimeType: string;
+  size: number;
+  role: FileRole;
+  reservationId?: Id<"reservations">;
+  orderId?: Id<"orders">;
+  ownerId: Id<"users">;
+  createdAt: number;
+}
+
+export async function createFileRecord(fileData: {
+  filename: string;
+  originalName: string;
+  storagePath: string;
+  mimeType: string;
+  size: number;
+  role: FileRole;
+  reservationId?: Id<"reservations">;
+  orderId?: Id<"orders">;
+  clerkId: string;
+}): Promise<string | null> {
+  try {
+    const result = await convexWrapper.mutation<string>("files/createFile:createFile", fileData);
+    return result.data || null;
+  } catch (error) {
+    console.error("createFileRecord failed:", error);
+    return null;
+  }
+}
+
+export async function getFileById(
+  fileId: Id<"files">,
+  clerkId: string
+): Promise<ConvexFile | null> {
+  try {
+    const result = await convexWrapper.query<ConvexFile>("files/getFile:getFile", {
+      fileId,
+      clerkId,
+    });
+    return result.data || null;
+  } catch (error) {
+    console.error("getFileById failed:", error);
+    return null;
+  }
+}
+
+export async function listUserFiles(
+  clerkId: string,
+  filters?: {
+    role?: FileRole;
+    reservationId?: Id<"reservations">;
+    orderId?: Id<"orders">;
+  }
+): Promise<ConvexFile[]> {
+  try {
+    const result = await convexWrapper.query<ConvexFile[]>("files/listFiles:listFiles", {
+      clerkId,
+      ...filters,
+    });
+    return result.data || [];
+  } catch (error) {
+    console.error("listUserFiles failed:", error);
+    return [];
+  }
+}
+
+export async function deleteFileRecord(fileId: Id<"files">, clerkId: string): Promise<boolean> {
+  try {
+    await convexWrapper.mutation("files/deleteFile:deleteFile", { fileId, clerkId });
+    return true;
+  } catch (error) {
+    console.error("deleteFileRecord failed:", error);
+    return false;
+  }
+}
+
+/**
+ * Invoice functions
+ */
+export async function saveInvoiceUrl(orderId: Id<"orders">, invoiceUrl: string): Promise<boolean> {
+  try {
+    await convexWrapper.mutation("invoices/updateInvoiceUrl:saveInvoiceUrl", {
+      orderId,
+      invoiceUrl,
+    });
+    return true;
+  } catch (error) {
+    console.error("saveInvoiceUrl failed:", error);
+    return false;
+  }
+}
+
+export async function generateInvoiceNumber(orderId: Id<"orders">): Promise<string | null> {
+  try {
+    const result = await convexWrapper.mutation<string>(
+      "invoices/generateInvoiceNumber:generateInvoiceNumber",
+      { orderId }
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("generateInvoiceNumber failed:", error);
+    return null;
+  }
+}
+
+export interface OrderInvoiceData {
+  order: Record<string, unknown>;
+  items: Array<Record<string, unknown>>;
+  user: Record<string, unknown> | null;
+  invoice: Record<string, unknown> | null;
+}
+
+export async function getOrderInvoiceData(orderId: Id<"orders">): Promise<OrderInvoiceData | null> {
+  try {
+    const result = await convexWrapper.mutation<OrderInvoiceData>(
+      "invoices/updateInvoiceUrl:getOrderInvoiceData",
+      { orderId }
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("getOrderInvoiceData failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Order functions
+ */
+export interface ConvexOrder {
+  _id: Id<"orders">;
+  userId?: Id<"users">;
+  email: string;
+  status: string;
+  total: number;
+  items: Array<Record<string, unknown>>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export async function listUserOrders(userId: Id<"users">): Promise<ConvexOrder[]> {
+  try {
+    const result = await convexWrapper.query<ConvexOrder[]>(
+      "orders/listUserOrders:listUserOrders",
+      { userId }
+    );
+    return result.data || [];
+  } catch (error) {
+    console.error("listUserOrders failed:", error);
+    return [];
+  }
+}
+
+export interface ConvexOrderItem {
+  _id: Id<"orderItems">;
+  orderId: Id<"orders">;
+  productId: number;
+  type: string;
+  title: string;
+  qty: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export async function listOrderItems(orderId: Id<"orders">): Promise<ConvexOrderItem[]> {
+  try {
+    const result = await convexWrapper.query<ConvexOrderItem[]>(
+      "orders/listOrderItems:listOrderItems",
+      { orderId }
+    );
+    return result.data || [];
+  } catch (error) {
+    console.error("listOrderItems failed:", error);
+    return [];
+  }
+}
+
+/**
+ * Reservation functions
+ */
+export interface ConvexReservation {
+  _id: Id<"reservations">;
+  userId?: Id<"users">;
+  serviceType: string;
+  status: string;
+  details: Record<string, unknown>;
+  preferredDate: string;
+  durationMinutes: number;
+  totalPrice: number;
+  notes?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export async function getReservationById(
+  reservationId: Id<"reservations">,
+  skipAuth = true
+): Promise<ConvexReservation | null> {
+  try {
+    const result = await convexWrapper.query<ConvexReservation>(
+      "reservations/getReservationById:getReservationById",
+      { reservationId, skipAuth }
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("getReservationById failed:", error);
+    return null;
+  }
+}
+
+export async function getUserReservations(_clerkId: string): Promise<ConvexReservation[]> {
+  try {
+    // Use the authenticated query which gets user from clerkId
+    const result = await convexWrapper.query<ConvexReservation[]>(
+      "reservations/listReservations:getUserReservations",
+      {}
+    );
+    return result.data || [];
+  } catch (error) {
+    console.error("getUserReservations failed:", error);
+    return [];
+  }
+}
+
+export async function updateReservationStatus(
+  reservationId: Id<"reservations">,
+  status: string,
+  notes?: string
+): Promise<{ success: boolean; oldStatus: string; newStatus: string } | null> {
+  try {
+    const result = await convexWrapper.mutation<{
+      success: boolean;
+      oldStatus: string;
+      newStatus: string;
+    }>("reservations/updateReservationStatus:updateReservationStatus", {
+      reservationId,
+      status,
+      notes,
+    });
+    return result.data || null;
+  } catch (error) {
+    console.error("updateReservationStatus failed:", error);
+    return null;
+  }
+}
+
+export async function getReservationsByDateRange(
+  startDate: string,
+  endDate: string,
+  status?: string
+): Promise<ConvexReservation[]> {
+  try {
+    const result = await convexWrapper.query<ConvexReservation[]>(
+      "reservations/getByDateRange:getByDateRange",
+      { startDate, endDate, status }
+    );
+    return result.data || [];
+  } catch (error) {
+    console.error("getReservationsByDateRange failed:", error);
+    return [];
+  }
+}
+
 /**
  * INTERFACE DEFINITIONS CORRECTED FOR CONVEX INTEGRATION
  *

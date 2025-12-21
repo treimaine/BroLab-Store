@@ -63,7 +63,7 @@ function extractBpm(p: WooProduct): number | null {
   const bpmMeta = p.meta_data?.find(m => m.key === "bpm");
   if (bpmMeta && (typeof bpmMeta.value === "string" || typeof bpmMeta.value === "number")) {
     const bpmValue = Number(bpmMeta.value);
-    return isNaN(bpmValue) ? null : bpmValue;
+    return Number.isNaN(bpmValue) ? null : bpmValue;
   }
   return null;
 }
