@@ -383,31 +383,51 @@ function getAuthContext(req: Request): AuthContext {
 }
 
 /**
+ * Extract string value from claims if it exists and is a string
+ */
+function extractClaimString(claims: Record<string, unknown>, key: string): string | undefined {
+  const value = claims[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * Extract user info from session claims
+ */
+function extractUserInfoFromClaims(
+  claims: Record<string, unknown> | undefined
+): UserIdResolution["userInfo"] {
+  if (!claims) {
+    return undefined;
+  }
+
+  return {
+    email: extractClaimString(claims, "email"),
+    username: extractClaimString(claims, "username"),
+    firstName: extractClaimString(claims, "given_name"),
+    lastName: extractClaimString(claims, "family_name"),
+  };
+}
+
+/**
  * Attempt to resolve user ID from Clerk auth result or Bearer token fallback
  */
 async function resolveUserId(authResult: {
   success: boolean;
   user?: { userId?: string; sessionId?: string; sessionClaims?: Record<string, unknown> };
 }): Promise<UserIdResolution> {
-  if (authResult.success && authResult.user?.userId) {
-    // Extract user info from session claims if available
-    const claims = authResult.user.sessionClaims;
-    const userInfo = claims
-      ? {
-          email: typeof claims.email === "string" ? claims.email : undefined,
-          username: typeof claims.username === "string" ? claims.username : undefined,
-          firstName: typeof claims.given_name === "string" ? claims.given_name : undefined,
-          lastName: typeof claims.family_name === "string" ? claims.family_name : undefined,
-        }
-      : undefined;
+  const hasValidUser = authResult.success && authResult.user?.userId;
 
-    return {
-      userId: authResult.user.userId,
-      sessionId: authResult.user.sessionId,
-      userInfo,
-    };
+  if (!hasValidUser) {
+    return {};
   }
-  return {};
+
+  const userInfo = extractUserInfoFromClaims(authResult.user?.sessionClaims);
+
+  return {
+    userId: authResult.user?.userId,
+    sessionId: authResult.user?.sessionId,
+    userInfo,
+  };
 }
 
 /**

@@ -9,6 +9,14 @@
       "includeFiles": "api/dist/**"
     }
   },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "brolabentertainment.com" }],
+      "destination": "https://www.brolabentertainment.com/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/dist/index.js" },
     { "source": "/(.*)", "destination": "/index.html" }
