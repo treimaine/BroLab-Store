@@ -624,15 +624,11 @@ async function handleUserEvent(
       lastName: data.last_name,
     });
 
-    // Use ConvexHttpClient for proper mutation calls
-    const { ConvexHttpClient } = await import("convex/browser");
-    const convex = new ConvexHttpClient(convexUrl);
+    // Use the existing upsertUser function from server/lib/convex.ts
+    // which properly uses ConvexHttpClient
+    const { upsertUser } = await import("../lib/convex");
 
-    // Import the API reference dynamically to avoid circular dependencies
-    const { api } = await import("../../convex/_generated/api");
-
-    // Call syncClerkUser mutation using the proper Convex client
-    const result = await convex.mutation(api.users.clerkSync.syncClerkUser, {
+    const result = await upsertUser({
       clerkId: userId,
       email: email,
       username: (data.username as string) || undefined,
@@ -643,9 +639,12 @@ async function handleUserEvent(
 
     console.log(`✅ [${requestId}] User synced successfully:`, {
       userId,
-      action: result?.action,
-      success: result?.success,
+      result: result ? "success" : "failed",
     });
+
+    if (!result) {
+      throw new Error("User sync returned null");
+    }
   } catch (error) {
     console.error(`❌ [${requestId}] Error syncing user:`, error);
     throw error;
@@ -653,7 +652,8 @@ async function handleUserEvent(
 }
 
 /**
- * Call Convex mutation via HTTP API
+ * Call Convex mutation via ConvexHttpClient
+ * Uses the official Convex client instead of raw HTTP fetch
  */
 async function callConvexMutation(
   mutationName: string,
@@ -662,20 +662,17 @@ async function callConvexMutation(
   requestId: string
 ): Promise<void> {
   try {
-    const response = await fetch(`${convexUrl}/api/mutation`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        path: mutationName,
-        args: { data },
-        format: "json",
-      }),
-    });
+    // Use ConvexHttpClient for proper mutation calls
+    const { ConvexHttpClient } = await import("convex/browser");
+    const convex = new ConvexHttpClient(convexUrl);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Convex mutation failed: ${errorText}`);
-    }
+    // For billing mutations, we need to call them dynamically
+    // The mutation name format is "clerk/billing:handleSubscriptionCreated"
+    console.log(`🔔 [${requestId}] Calling Convex mutation: ${mutationName}`);
+
+    // Use the string-based mutation call to avoid type instantiation issues
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (convex as any).mutation(mutationName as any, { data });
 
     console.log(`✅ [${requestId}] Convex mutation completed: ${mutationName}`);
   } catch (error) {

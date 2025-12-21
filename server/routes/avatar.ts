@@ -1,6 +1,8 @@
+import { ConvexHttpClient } from "convex/browser";
 import { Router } from "express";
 import multer from "multer";
 import { isAuthenticated } from "../auth";
+import { updateUserAvatar } from "../lib/convex";
 import { scanFile, validateFile } from "../lib/upload";
 import { uploadRateLimit } from "../middleware/rateLimiter";
 
@@ -53,28 +55,17 @@ router.post(
       // Get Clerk user ID
       const clerkId = req.user!.id;
 
-      // Get Convex URL
+      // Get Convex URL and initialize client
       const convexUrl = process.env.VITE_CONVEX_URL || process.env.CONVEX_URL;
       if (!convexUrl) {
         throw new Error("CONVEX_URL environment variable is required");
       }
 
-      // Step 1: Generate upload URL from Convex
-      const generateUrlResponse = await fetch(`${convexUrl}/api/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: "files:generateUploadUrl",
-          args: {},
-          format: "json",
-        }),
-      });
+      const convex = new ConvexHttpClient(convexUrl);
 
-      if (!generateUrlResponse.ok) {
-        throw new Error("Failed to generate upload URL");
-      }
-
-      const { value: uploadUrlData } = await generateUrlResponse.json();
+      // Step 1: Generate upload URL from Convex using action
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const uploadUrlData = await (convex as any).action("files:generateUploadUrl", {});
       const uploadUrl = uploadUrlData.url;
 
       // Step 2: Upload file to Convex storage
@@ -90,40 +81,19 @@ router.post(
 
       const { storageId } = await uploadResponse.json();
 
-      // Step 3: Get the storage URL
-      const getUrlResponse = await fetch(`${convexUrl}/api/mutation`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: "files:getStorageUrl",
-          args: { storageId },
-          format: "json",
-        }),
-      });
-
-      if (!getUrlResponse.ok) {
-        throw new Error("Failed to get storage URL");
-      }
-
-      const { value: avatarUrl } = await getUrlResponse.json();
+      // Step 3: Get the storage URL using mutation
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const avatarUrl = await (convex as any).mutation("files:getStorageUrl", { storageId });
 
       if (!avatarUrl) {
         throw new Error("Storage URL is null");
       }
 
-      // Step 4: Update user avatar in database
-      const updateResponse = await fetch(`${convexUrl}/api/mutation`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: "users:updateUserAvatar",
-          args: { clerkId, avatarUrl },
-          format: "json",
-        }),
-      });
+      // Step 4: Update user avatar in database using the existing helper function
+      const result = await updateUserAvatar(clerkId, avatarUrl);
 
-      if (!updateResponse.ok) {
-        throw new Error("Failed to update user avatar");
+      if (!result) {
+        throw new Error("Failed to update user avatar in database");
       }
 
       res.json({
