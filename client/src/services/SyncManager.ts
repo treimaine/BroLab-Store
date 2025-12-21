@@ -93,6 +93,9 @@ export class SyncManager extends BrowserEventEmitter {
   private readonly latencyHistory: number[] = [];
   private readonly maxLatencyHistory = 100;
 
+  // Flag to disable WebSocket on serverless platforms (Vercel)
+  private readonly useWebSocket: boolean;
+
   constructor(config: Partial<ConnectionConfig> = {}) {
     super();
 
@@ -103,6 +106,10 @@ export class SyncManager extends BrowserEventEmitter {
     const defaultWsUrl = isProduction
       ? `${wsProtocol}//${globalThis.window.location.host}/ws`
       : "ws://localhost:3001/ws";
+
+    // Disable WebSocket on Vercel (serverless doesn't support persistent connections)
+    // Vercel deployments use *.vercel.app or custom domains without WebSocket support
+    this.useWebSocket = !isProduction || config.websocketUrl !== undefined;
 
     this.config = {
       websocketUrl: config.websocketUrl || defaultWsUrl,
@@ -192,7 +199,8 @@ export class SyncManager extends BrowserEventEmitter {
   }
 
   /**
-   * Start the sync manager - attempts WebSocket first, falls back to polling
+   * Start the sync manager - attempts WebSocket first (dev only), falls back to polling
+   * Note: WebSocket is disabled in production on Vercel (serverless doesn't support it)
    */
   public async startSync(): Promise<void> {
     if (this.isDestroyed) {
@@ -200,6 +208,13 @@ export class SyncManager extends BrowserEventEmitter {
     }
 
     this.log("Starting sync manager...");
+
+    // Skip WebSocket in production (Vercel serverless doesn't support WebSockets)
+    if (!this.useWebSocket) {
+      this.log("WebSocket disabled in production, using polling mode");
+      this.startPolling();
+      return;
+    }
 
     try {
       await this.connectWebSocket();

@@ -112,7 +112,12 @@ async function handleApiRequest(request) {
     const networkResponse = await fetch(request);
 
     // Cache successful responses for cacheable APIs
-    if (networkResponse.ok && CACHEABLE_APIS.some(api => url.pathname.startsWith(api))) {
+    // Only cache same-origin responses (avoid opaque response errors)
+    if (
+      networkResponse.ok &&
+      networkResponse.type !== "opaque" &&
+      CACHEABLE_APIS.some(api => url.pathname.startsWith(api))
+    ) {
       const cache = await caches.open(RUNTIME_CACHE);
       cache.put(request, networkResponse.clone());
     }
@@ -164,7 +169,9 @@ async function handleStaticAsset(request) {
 
     // Fetch from network and cache
     const networkResponse = await fetch(request);
-    if (networkResponse.ok) {
+
+    // Only cache successful same-origin responses (avoid opaque response errors)
+    if (networkResponse.ok && networkResponse.type !== "opaque") {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone());
     }
