@@ -85,7 +85,7 @@ describe("DataValidationService - Cache Improvements", () => {
   describe("Cache Key Generation", () => {
     it("should generate cache key that includes source validation metadata", async () => {
       // First validation creates cache entry
-      const report1 = await service.validateDataIntegrity(mockData, {
+      const _report1 = await service.validateDataIntegrity(mockData, {
         cacheResults: true,
       });
 
@@ -98,7 +98,7 @@ describe("DataValidationService - Cache Improvements", () => {
 
     it("should generate different cache keys for different data sources", async () => {
       // Validate with database source
-      const report1 = await service.validateDataIntegrity(mockData, {
+      const _report1 = await service.validateDataIntegrity(mockData, {
         cacheResults: true,
       });
 
@@ -111,7 +111,7 @@ describe("DataValidationService - Cache Improvements", () => {
         },
       };
 
-      const report2 = await service.validateDataIntegrity(modifiedData, {
+      const _report2 = await service.validateDataIntegrity(modifiedData, {
         cacheResults: true,
       });
 

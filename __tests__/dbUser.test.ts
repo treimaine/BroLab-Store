@@ -1,7 +1,7 @@
 // __tests__/dbUser.test.ts
 
 // Legacy supabaseAdmin stub to satisfy the test
-const supabaseAdmin = {
+const _supabaseAdmin = {
   from: jest.fn(),
 } as any;
 

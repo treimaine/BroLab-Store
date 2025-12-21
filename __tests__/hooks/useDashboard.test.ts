@@ -1,6 +1,7 @@
 import { DashboardErrorType, useDashboard, useDashboardStats } from "@/hooks/useDashboard";
 import { useUser } from "@clerk/clerk-react";
 import { renderHook } from "@testing-library/react";
+import { createMockClerkUser } from "../types/test-types";
 /**
  * Tests for the unified dashboard hook
  *
@@ -25,7 +26,7 @@ describe("useDashboard", () => {
         user: null,
         isLoaded: true,
         isSignedIn: false,
-      } as any);
+      } as ReturnType<typeof useUser>);
 
       const { result } = renderHook(() => useDashboard());
 
@@ -45,7 +46,7 @@ describe("useDashboard", () => {
         user: null,
         isLoaded: false,
         isSignedIn: false,
-      } as any);
+      } as ReturnType<typeof useUser>);
 
       const { result } = renderHook(() => useDashboard());
 
@@ -54,20 +55,13 @@ describe("useDashboard", () => {
     });
 
     it("should be authenticated when user is present", () => {
-      const mockUser = {
-        id: "user_123",
-        emailAddresses: [{ emailAddress: "test@example.com" }],
-        firstName: "John",
-        lastName: "Doe",
-        imageUrl: "https://example.com/avatar.jpg",
-        username: "johndoe",
-      };
+      const mockUser = createMockClerkUser();
 
       mockUseUser.mockReturnValue({
         user: mockUser,
         isLoaded: true,
         isSignedIn: true,
-      } as any);
+      } as unknown as ReturnType<typeof useUser>);
 
       const { result } = renderHook(() => useDashboard());
 
@@ -79,18 +73,13 @@ describe("useDashboard", () => {
 
   describe("Data structure", () => {
     beforeEach(() => {
-      const mockUser = {
-        id: "user_123",
-        emailAddresses: [{ emailAddress: "test@example.com" }],
-        firstName: "John",
-        lastName: "Doe",
-      };
+      const mockUser = createMockClerkUser();
 
       mockUseUser.mockReturnValue({
         user: mockUser,
         isLoaded: true,
         isSignedIn: true,
-      } as any);
+      } as unknown as ReturnType<typeof useUser>);
     });
 
     it("should return properly typed dashboard data structure", () => {
@@ -136,16 +125,13 @@ describe("useDashboard", () => {
 
   describe("Configuration options", () => {
     beforeEach(() => {
-      const mockUser = {
-        id: "user_123",
-        emailAddresses: [{ emailAddress: "test@example.com" }],
-      };
+      const mockUser = createMockClerkUser();
 
       mockUseUser.mockReturnValue({
         user: mockUser,
         isLoaded: true,
         isSignedIn: true,
-      } as any);
+      } as unknown as ReturnType<typeof useUser>);
     });
 
     it("should accept configuration options", () => {
@@ -179,16 +165,13 @@ describe("useDashboardStats", () => {
   });
 
   it("should return stats-only interface", () => {
-    const mockUser = {
-      id: "user_123",
-      emailAddresses: [{ emailAddress: "test@example.com" }],
-    };
+    const mockUser = createMockClerkUser();
 
     mockUseUser.mockReturnValue({
       user: mockUser,
       isLoaded: true,
       isSignedIn: true,
-    } as any);
+    } as unknown as ReturnType<typeof useUser>);
 
     const { result } = renderHook(() => useDashboardStats());
 
@@ -203,7 +186,7 @@ describe("useDashboardStats", () => {
       user: null,
       isLoaded: true,
       isSignedIn: false,
-    } as unknown);
+    } as ReturnType<typeof useUser>);
 
     const { result } = renderHook(() => useDashboardStats());
 

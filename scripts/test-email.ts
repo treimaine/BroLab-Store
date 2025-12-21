@@ -56,7 +56,7 @@ async function testEmailConfiguration(): Promise<void> {
   console.log(`📧 Sending test email to: ${testEmail}\n`);
 
   try {
-    const messageId = await sendMail({
+    const _messageId = await sendMail({
       to: testEmail,
       subject: "BroLab Email Test",
       html: `

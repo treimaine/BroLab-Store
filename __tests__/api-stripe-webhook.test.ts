@@ -72,8 +72,8 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
   it("prevents duplicate processing via idempotency guard", async () => {
     // First call: not processed
     mockConvex.mutation.mockImplementationOnce(
-      async (fn: string, args?: Record<string, unknown>) => {
-        if (fn === "orders:markProcessedEvent" && args && args.provider === "stripe") {
+      async (fn: string, _args?: Record<string, unknown>) => {
+        if (fn === "orders:markProcessedEvent" && _args && _args.provider === "stripe") {
           return { alreadyProcessed: false };
         }
         return {};
@@ -81,8 +81,8 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
     );
     // Second call: already processed
     mockConvex.mutation.mockImplementationOnce(
-      async (fn: string, args?: Record<string, unknown>) => {
-        if (fn === "orders:markProcessedEvent" && args && args.provider === "stripe") {
+      async (fn: string, _args?: Record<string, unknown>) => {
+        if (fn === "orders:markProcessedEvent" && _args && _args.provider === "stripe") {
           return { alreadyProcessed: true };
         }
         return {};
@@ -118,8 +118,8 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
   it("generates invoice and sends email on checkout.session.completed", async () => {
     // Idempotency first call
     mockConvex.mutation.mockImplementationOnce(
-      async (fn: string, args?: Record<string, unknown>) => {
-        if (fn === "orders:markProcessedEvent" && args && args.provider === "stripe") {
+      async (fn: string, _args?: Record<string, unknown>) => {
+        if (fn === "orders:markProcessedEvent" && _args && _args.provider === "stripe") {
           return { alreadyProcessed: false };
         }
         return {};
@@ -128,7 +128,7 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
 
     // recordPayment mutation
     mockConvex.mutation.mockImplementationOnce(
-      async (fn: string, args?: Record<string, unknown>) => {
+      async (fn: string, _args?: Record<string, unknown>) => {
         if (fn === "orders:recordPayment") {
           return { success: true };
         }
@@ -137,7 +137,7 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
     );
 
     // getOrderWithRelations query
-    mockConvex.query.mockImplementationOnce(async (fn: string, args?: Record<string, unknown>) => {
+    mockConvex.query.mockImplementationOnce(async (fn: string, _args?: Record<string, unknown>) => {
       if (fn === "orders:getOrderWithRelations") {
         return {
           order: {
@@ -166,16 +166,18 @@ describe("Stripe webhook idempotency and invoice pipeline", () => {
     });
 
     // generateUploadUrl action
-    mockConvex.action.mockImplementationOnce(async (fn: string, args?: Record<string, unknown>) => {
-      if (fn === "files:generateUploadUrl") {
-        return { url: "http://upload.local" };
+    mockConvex.action.mockImplementationOnce(
+      async (fn: string, _args?: Record<string, unknown>) => {
+        if (fn === "files:generateUploadUrl") {
+          return { url: "http://upload.local" };
+        }
+        return {};
       }
-      return {};
-    });
+    );
 
     // setInvoiceForOrder mutation
     mockConvex.mutation.mockImplementationOnce(
-      async (fn: string, args?: Record<string, unknown>) => {
+      async (fn: string, _args?: Record<string, unknown>) => {
         if (fn === "orders:setInvoiceForOrder") {
           return {
             invoiceId: "inv:1",

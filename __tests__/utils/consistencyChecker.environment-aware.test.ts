@@ -213,7 +213,7 @@ describe("ConsistencyChecker - Environment-Aware Validation", () => {
   describe("Test Hash Acceptance", () => {
     it("should accept test-hash when allowTestHashes is true", () => {
       const data = createTestDashboardData();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (data.stats as any).dataHash = "test-hash";
 
       const options: ConsistencyCheckOptions = {
@@ -235,7 +235,7 @@ describe("ConsistencyChecker - Environment-Aware Validation", () => {
 
     it("should accept test- prefixed hashes when allowTestHashes is true", () => {
       const data = createTestDashboardData();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (data.stats as any).dataHash = "test-12345";
 
       const options: ConsistencyCheckOptions = {
@@ -256,7 +256,7 @@ describe("ConsistencyChecker - Environment-Aware Validation", () => {
 
     it("should accept mock-hash when allowTestHashes is true", () => {
       const data = createTestDashboardData();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (data.stats as any).dataHash = "mock-hash";
 
       const options: ConsistencyCheckOptions = {
@@ -277,7 +277,7 @@ describe("ConsistencyChecker - Environment-Aware Validation", () => {
 
     it("should allow test hashes in test environment by default", () => {
       const data = createTestDashboardData();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (data.stats as any).dataHash = "test-hash";
 
       const options: ConsistencyCheckOptions = {
@@ -299,7 +299,7 @@ describe("ConsistencyChecker - Environment-Aware Validation", () => {
   describe("Hash Validation Skipping", () => {
     it("should skip hash validation when skipHashValidation is true", () => {
       const data = createTestDashboardData();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (data.stats as any).dataHash = "invalid-hash";
 
       const options: ConsistencyCheckOptions = {
@@ -346,7 +346,7 @@ describe("ConsistencyChecker - Environment-Aware Validation", () => {
       const data = createTestDashboardData();
       data.stats.monthlyOrders = 999;
       data.stats.monthlyDownloads = 999;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (data.stats as any).dataHash = "test-hash";
 
       const options = ConsistencyChecker.createTestChecker();

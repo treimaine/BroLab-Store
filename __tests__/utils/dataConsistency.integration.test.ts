@@ -6,15 +6,15 @@ import { ConsistencyChecker } from "../../client/src/utils/dataConsistency";
 
 // Mock the validation function since we can't import from shared in tests
 jest.mock("../../shared/validation/sync", () => ({
-  validateDashboardData: jest.fn(data => ({
+  validateDashboardData: jest.fn(_data => ({
     valid: true,
     errors: [],
     warnings: [],
     dataHash: "mock-hash",
     validatedAt: Date.now(),
   })),
-  generateDataHash: jest.fn(data => {
-    return JSON.stringify(data)
+  generateDataHash: jest.fn(_data => {
+    return JSON.stringify(_data)
       .split("")
       .reduce((a, b) => {
         a = (a << 5) - a + b.charCodeAt(0);

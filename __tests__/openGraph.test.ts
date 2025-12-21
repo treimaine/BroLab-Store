@@ -105,8 +105,8 @@ jest.mock("../server/routes/schema", () => {
   const express = require("express");
   const router = express.Router();
 
-  router.get("/beat/:id", (req: express.Request, _res: express.Response) => {
-    const beatId = req.params.id;
+  router.get("/beat/:id", (_req: express.Request, _res: express.Response) => {
+    const beatId = _req.params.id;
     if (beatId === "999999") {
       return res.status(404).json({ error: "Beat not found" });
     }
@@ -139,7 +139,7 @@ jest.mock("../server/routes/schema", () => {
     });
   });
 
-  router.get("/beats-list", (req: express.Request, _res: express.Response) => {
+  router.get("/beats-list", (_req: express.Request, _res: express.Response) => {
     res.setHeader("Content-Type", "application/ld+json");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.json({
@@ -167,7 +167,7 @@ jest.mock("../server/routes/schema", () => {
     });
   });
 
-  router.get("/organization", (req: express.Request, _res: express.Response) => {
+  router.get("/organization", (_req: express.Request, _res: express.Response) => {
     res.setHeader("Content-Type", "application/ld+json");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.json({

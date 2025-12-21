@@ -11,51 +11,21 @@ import {
   destroyConnectionManager,
   getConnectionManager,
 } from "@/services/ConnectionManager";
+import { createMockPerformance, createMockWebSocketClass } from "./types/test-types";
 
-// Mock WebSocket
-class MockWebSocket {
-  public readyState = WebSocket.CONNECTING;
-  public onopen: ((event: Event) => void) | null = null;
-  public onclose: ((event: CloseEvent) => void) | null = null;
-  public onmessage: ((event: MessageEvent) => void) | null = null;
-  public onerror: ((event: Event) => void) | null = null;
-
-  constructor(public url: string) {
-    // Simulate async connection
-    setTimeout(() => {
-      this.readyState = WebSocket.OPEN;
-      if (this.onopen) {
-        this.onopen(new Event("open"));
-      }
-    }, 10);
-  }
-
-  send(data: string) {
-    if (this.readyState !== WebSocket.OPEN) {
-      throw new Error("WebSocket is not open");
-    }
-  }
-
-  close() {
-    this.readyState = WebSocket.CLOSED;
-    if (this.onclose) {
-      this.onclose(new CloseEvent("close"));
-    }
-  }
-}
+// Create mock WebSocket class
+const MockWebSocket = createMockWebSocketClass();
 
 // Mock fetch for polling
-const mockFetch = jest.fn();
+const mockFetch = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>();
 
 // Setup mocks
 beforeAll(() => {
-  global.WebSocket = MockWebSocket as any;
-  global.fetch = mockFetch;
+  global.WebSocket = MockWebSocket as unknown as typeof WebSocket;
+  global.fetch = mockFetch as typeof fetch;
 
   // Mock performance.now
-  global.performance = {
-    now: jest.fn(() => Date.now()),
-  } as any;
+  global.performance = createMockPerformance() as unknown as Performance;
 });
 
 beforeEach(() => {
@@ -102,9 +72,9 @@ describe("ConnectionManager Basic Tests", () => {
   describe("WebSocket Connection", () => {
     it("should connect via WebSocket successfully", async () => {
       const manager = new ConnectionManager(defaultConfig);
-      const statusChanges: any[] = [];
+      const statusChanges: ConnectionStatus[] = [];
 
-      manager.onStatusChange(status => {
+      manager.onStatusChange((status: ConnectionStatus) => {
         statusChanges.push(status);
       });
 
@@ -132,26 +102,14 @@ describe("ConnectionManager Basic Tests", () => {
   describe("HTTP Polling Fallback", () => {
     it("should fallback to polling when WebSocket fails", async () => {
       // Mock WebSocket to fail
-      global.WebSocket = class {
-        constructor() {
-          setTimeout(() => {
-            if (this.onerror) {
-              this.onerror(new Event("error"));
-            }
-          }, 5);
-        }
-        onerror: any = null;
-        onopen: any = null;
-        onclose: any = null;
-        onmessage: any = null;
-        close() {}
-      } as any;
+      const FailingWebSocket = createMockWebSocketClass({ shouldFail: true });
+      global.WebSocket = FailingWebSocket as unknown as typeof WebSocket;
 
       // Mock successful polling
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ messages: [] }),
-      });
+      } as Response);
 
       const manager = new ConnectionManager(defaultConfig);
       await manager.connect();
@@ -161,16 +119,17 @@ describe("ConnectionManager Basic Tests", () => {
 
     it("should send messages via polling", async () => {
       // Force polling mode
-      global.WebSocket = class {
+      const ThrowingWebSocket = class {
         constructor() {
           throw new Error("WebSocket not available");
         }
-      } as any;
+      } as unknown as typeof WebSocket;
+      global.WebSocket = ThrowingWebSocket;
 
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({}),
-      });
+      } as Response);
 
       const manager = new ConnectionManager(defaultConfig);
       await manager.connect();
@@ -197,9 +156,9 @@ describe("ConnectionManager Basic Tests", () => {
   describe("Connection Status Management", () => {
     it("should track connection status changes", async () => {
       const manager = new ConnectionManager(defaultConfig);
-      const statusChanges: any[] = [];
+      const statusChanges: ConnectionStatus[] = [];
 
-      manager.onStatusChange(status => {
+      manager.onStatusChange((status: ConnectionStatus) => {
         statusChanges.push({ ...status });
       });
 

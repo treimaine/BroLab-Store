@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, RenderHookResult } from "@testing-library/react";
 import { useOfflineManager } from "../../client/src/hooks/useOfflineManager";
 /**
  * Tests for useOfflineManager hook
@@ -36,11 +36,16 @@ Object.defineProperty(navigator, "onLine", {
   value: true,
 });
 
+// Type for navigator with writable onLine
+interface WritableNavigator extends Navigator {
+  onLine: boolean;
+}
+
 describe("useOfflineManager", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
-    (navigator as any).onLine = true;
+    (navigator as WritableNavigator).onLine = true;
 
     // Clear all timers to prevent interference between tests
     jest.clearAllTimers();
@@ -53,72 +58,70 @@ describe("useOfflineManager", () => {
   });
 
   it("should initialize with online status", async () => {
-    let result: ReturnType<
-      typeof renderHook<ReturnType<typeof useOfflineManager>, unknown>
-    >["result"];
+    let result: RenderHookResult<ReturnType<typeof useOfflineManager>, unknown>["result"];
 
     await act(async () => {
       const hookResult = renderHook(() => useOfflineManager());
       result = hookResult.result;
     });
 
-    expect(result.current.isOnline).toBe(true);
-    expect(result.current.isOfflineMode).toBe(false);
+    expect(result!.current.isOnline).toBe(true);
+    expect(result!.current.isOfflineMode).toBe(false);
   });
 
   it("should provide queue operation function", async () => {
-    let result: any;
+    let result: RenderHookResult<ReturnType<typeof useOfflineManager>, unknown>["result"];
 
     await act(async () => {
       const hookResult = renderHook(() => useOfflineManager());
       result = hookResult.result;
     });
 
-    expect(typeof result.current.queueOperation).toBe("function");
+    expect(typeof result!.current.queueOperation).toBe("function");
   });
 
   it("should provide optimistic update functions", async () => {
-    let result: any;
+    let result: RenderHookResult<ReturnType<typeof useOfflineManager>, unknown>["result"];
 
     await act(async () => {
       const hookResult = renderHook(() => useOfflineManager());
       result = hookResult.result;
     });
 
-    expect(typeof result.current.applyOptimisticUpdate).toBe("function");
-    expect(typeof result.current.confirmUpdate).toBe("function");
-    expect(typeof result.current.rollbackUpdate).toBe("function");
+    expect(typeof result!.current.applyOptimisticUpdate).toBe("function");
+    expect(typeof result!.current.confirmUpdate).toBe("function");
+    expect(typeof result!.current.rollbackUpdate).toBe("function");
   });
 
   it("should provide convenience methods", async () => {
-    let result: any;
+    let result: RenderHookResult<ReturnType<typeof useOfflineManager>, unknown>["result"];
 
     await act(async () => {
       const hookResult = renderHook(() => useOfflineManager());
       result = hookResult.result;
     });
 
-    expect(typeof result.current.addToCartOffline).toBe("function");
-    expect(typeof result.current.removeFromCartOffline).toBe("function");
-    expect(typeof result.current.toggleFavoriteOffline).toBe("function");
-    expect(typeof result.current.startDownloadOffline).toBe("function");
+    expect(typeof result!.current.addToCartOffline).toBe("function");
+    expect(typeof result!.current.removeFromCartOffline).toBe("function");
+    expect(typeof result!.current.toggleFavoriteOffline).toBe("function");
+    expect(typeof result!.current.startDownloadOffline).toBe("function");
   });
 
   it("should provide sync control functions", async () => {
-    let result: any;
+    let result: RenderHookResult<ReturnType<typeof useOfflineManager>, unknown>["result"];
 
     await act(async () => {
       const hookResult = renderHook(() => useOfflineManager());
       result = hookResult.result;
     });
 
-    expect(typeof result.current.syncNow).toBe("function");
-    expect(typeof result.current.clearCompleted).toBe("function");
+    expect(typeof result!.current.syncNow).toBe("function");
+    expect(typeof result!.current.clearCompleted).toBe("function");
   });
 
   it("should handle offline mode changes", async () => {
-    let result: any;
-    let rerender: any;
+    let result: RenderHookResult<ReturnType<typeof useOfflineManager>, unknown>["result"];
+    let rerender: () => void;
 
     await act(async () => {
       const hookResult = renderHook(() => useOfflineManager());
@@ -126,13 +129,13 @@ describe("useOfflineManager", () => {
       rerender = hookResult.rerender;
     });
 
-    expect(result.current.isOfflineMode).toBe(false);
+    expect(result!.current.isOfflineMode).toBe(false);
 
     // Simulate going offline
     await act(async () => {
-      (navigator as any).onLine = false;
+      (navigator as WritableNavigator).onLine = false;
       // Re-render to trigger useEffect
-      rerender();
+      rerender!();
     });
 
     // Note: The actual offline mode change would be triggered by the
@@ -141,7 +144,7 @@ describe("useOfflineManager", () => {
   });
 
   it("should cleanup on unmount", async () => {
-    let unmount: any;
+    let unmount: () => void;
 
     await act(async () => {
       const hookResult = renderHook(() => useOfflineManager());
@@ -150,12 +153,12 @@ describe("useOfflineManager", () => {
 
     // Should not throw on unmount
     await act(async () => {
-      expect(() => unmount()).not.toThrow();
+      expect(() => unmount!()).not.toThrow();
     });
   });
 
   it("should handle async state updates without warnings", async () => {
-    let result: any;
+    let result: RenderHookResult<ReturnType<typeof useOfflineManager>, unknown>["result"];
 
     await act(async () => {
       const hookResult = renderHook(() => useOfflineManager());
@@ -169,12 +172,12 @@ describe("useOfflineManager", () => {
     });
 
     // Verify the hook is still functional after async updates
-    expect(result.current.isOnline).toBe(true);
-    expect(typeof result.current.queueOperation).toBe("function");
+    expect(result!.current.isOnline).toBe(true);
+    expect(typeof result!.current.queueOperation).toBe("function");
   });
 
   it("should handle multiple async operations without interference", async () => {
-    let result: unknown;
+    let result: RenderHookResult<ReturnType<typeof useOfflineManager>, unknown>["result"];
 
     await act(async () => {
       const hookResult = renderHook(() => useOfflineManager());
@@ -188,7 +191,7 @@ describe("useOfflineManager", () => {
     });
 
     // Verify state remains consistent
-    expect(result.current.isOnline).toBe(true);
-    expect(result.current.isOfflineMode).toBe(false);
+    expect(result!.current.isOnline).toBe(true);
+    expect(result!.current.isOfflineMode).toBe(false);
   });
 });

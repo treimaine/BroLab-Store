@@ -44,10 +44,10 @@ describe("OptimisticUpdateManager", () => {
     });
 
     it("should generate unique update IDs", () => {
-      const update1 = manager.applyOptimisticUpdate("favorites", "add", { id: "1" });
-      const update2 = manager.applyOptimisticUpdate("favorites", "add", { id: "2" });
+      const mockUpdate1 = manager.applyOptimisticUpdate("favorites", "add", { id: "1" });
+      const mockUpdate2 = manager.applyOptimisticUpdate("favorites", "add", { id: "2" });
 
-      expect(update1.id).not.toBe(update2.id);
+      expect(mockUpdate1.id).not.toBe(mockUpdate2.id);
     });
 
     it("should include rollback data when provided", () => {
@@ -205,8 +205,8 @@ describe("OptimisticUpdateManager", () => {
 
   describe("Queue Management", () => {
     it("should provide accurate queue status", () => {
-      const update1 = manager.applyOptimisticUpdate("favorites", "add", { id: "1" });
-      const update2 = manager.applyOptimisticUpdate("downloads", "add", { id: "2" });
+      manager.applyOptimisticUpdate("favorites", "add", { id: "1" });
+      manager.applyOptimisticUpdate("downloads", "add", { id: "2" });
 
       const status = manager.getQueueStatus();
 

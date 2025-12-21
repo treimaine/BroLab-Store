@@ -11,6 +11,37 @@ interface UseReservationErrorHandlingOptions {
 }
 
 /**
+ * Safely extracts an error message from an unknown error type
+ */
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message;
+  }
+  if (typeof err === "string") {
+    return err;
+  }
+  if (typeof err === "object" && err !== null) {
+    const errorObj = err as Record<string, unknown>;
+    if (typeof errorObj.message === "string") {
+      return errorObj.message;
+    }
+    try {
+      return JSON.stringify(errorObj);
+    } catch {
+      return "An unknown error occurred";
+    }
+  }
+  if (err === null || err === undefined) {
+    return "An unknown error occurred";
+  }
+  // For primitives like number, boolean, bigint, symbol
+  if (typeof err === "number" || typeof err === "boolean" || typeof err === "bigint") {
+    return String(err);
+  }
+  return "An unknown error occurred";
+}
+
+/**
  * Simple error handling hook for reservations
  */
 export function useReservationErrorHandling(options: UseReservationErrorHandlingOptions) {
@@ -18,31 +49,30 @@ export function useReservationErrorHandling(options: UseReservationErrorHandling
   const { toast } = useToast();
 
   const [hasError, setHasError] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isRecovering, setIsRecovering] = useState(false);
 
   const handleError = useCallback(
     (err: unknown, _context?: string) => {
       setHasError(true);
-      setError(err);
-
-      const errorMessage = err instanceof Error ? err.message : String(err);
+      const message = getErrorMessage(err);
+      setErrorMessage(message);
 
       if (showToastOnError) {
         toast({
           title: "Error",
-          description: errorMessage,
+          description: message,
           variant: "destructive",
         });
       }
 
       if (onError) {
-        const errorForCallback = err instanceof Error ? err : new Error(errorMessage);
+        const errorForCallback = err instanceof Error ? err : new Error(message);
         onError(errorForCallback);
       }
 
-      return { retryable: true, message: errorMessage };
+      return { retryable: true, message };
     },
     [showToastOnError, toast, onError]
   );
@@ -55,7 +85,7 @@ export function useReservationErrorHandling(options: UseReservationErrorHandling
     setIsRecovering(true);
     setRetryCount(prev => prev + 1);
     setHasError(false);
-    setError(null);
+    setErrorMessage(null);
 
     if (onRecovery) {
       onRecovery();
@@ -66,13 +96,13 @@ export function useReservationErrorHandling(options: UseReservationErrorHandling
 
   const clearError = useCallback(() => {
     setHasError(false);
-    setError(null);
+    setErrorMessage(null);
     setRetryCount(0);
   }, []);
 
   const getErrorDisplay = useCallback(() => {
-    if (!error) return null;
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (!errorMessage) return null;
+
     return {
       message: errorMessage,
       canRetry: retryCount < maxRetries,
@@ -81,11 +111,11 @@ export function useReservationErrorHandling(options: UseReservationErrorHandling
       suggestions: [],
       maxRetries,
     };
-  }, [error, retryCount, maxRetries]);
+  }, [errorMessage, retryCount, maxRetries]);
 
   return {
     hasError,
-    error,
+    error: errorMessage,
     retryCount,
     isRecovering,
     handleError,

@@ -1,9 +1,7 @@
 import { Express } from "express";
 import request from "supertest";
-import { app } from "../server/app";
 import { registerRoutes } from "../server/routes";
 import { MockProduct, MockTag } from "./types/mocks";
-
 
 describe("All Filters Server-Side", () => {
   let app: Express;

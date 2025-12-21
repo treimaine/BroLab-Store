@@ -6,7 +6,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  { ignores: ["dist", "sonaar_music/**/*", "convex/_generated/**/*"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -60,6 +60,48 @@ export default tseslint.config(
         { closingSlash: "never", beforeSelfClosing: "always", afterOpening: "never" },
       ],
       "react/jsx-wrap-multilines": "warn",
+    },
+  },
+  // Relaxed rules for test files - allow any types in mocks
+  {
+    files: ["**/__tests__/**/*.{ts,tsx}", "**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_|^mock|Mock|^unused",
+        },
+      ],
+    },
+  },
+  // Relaxed rules for migration scripts (archive)
+  {
+    files: ["**/migrations/archive/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+  // Relaxed rules for example/documentation files
+  {
+    files: ["**/docs/**/*.{ts,tsx}", "**/*.example.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
+  // Relaxed rules for scripts
+  {
+    files: ["**/scripts/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
     },
   }
 );

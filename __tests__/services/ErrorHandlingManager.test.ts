@@ -384,7 +384,7 @@ describe("ErrorHandlingManager", () => {
     });
 
     it("should clean up resources on destruction", () => {
-      const listenerCount = errorManager.listenerCount("error");
+      const _listenerCount = errorManager.listenerCount("error");
 
       errorManager.destroy();
 

@@ -1,18 +1,19 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
-// Mock the fetch function
-global.fetch = jest.fn();
+// Mock the fetch function with proper typing
+globalThis.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 
-// Mock sessionStorage
+// Mock sessionStorage with proper return types
 const mockSessionStorage = {
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
+  getItem: jest.fn<(key: string) => string | null>(),
+  setItem: jest.fn<(key: string, value: string) => void>(),
+  removeItem: jest.fn<(key: string) => void>(),
+  clear: jest.fn<() => void>(),
 };
 
-Object.defineProperty(window, "sessionStorage", {
+Object.defineProperty(globalThis, "sessionStorage", {
   value: mockSessionStorage,
+  writable: true,
 });
 
 describe("Enhanced Checkout Redirect Flow", () => {
@@ -138,11 +139,9 @@ describe("Enhanced Checkout Redirect Flow", () => {
 
       mockSessionStorage.getItem.mockReturnValue(JSON.stringify(existingServices));
 
-      // Simulate storing the new service
-      const updatedServices = [...existingServices, pendingPayment];
-
       // Simulate the session storage operations that would happen in the app
-      const storedServices = JSON.parse(mockSessionStorage.getItem("pendingServices") || "[]");
+      const storedServicesRaw = mockSessionStorage.getItem("pendingServices");
+      const storedServices = JSON.parse(storedServicesRaw ?? "[]") as typeof existingServices;
       const finalUpdatedServices = [...storedServices, pendingPayment];
 
       mockSessionStorage.setItem("pendingServices", JSON.stringify(finalUpdatedServices));
@@ -195,11 +194,11 @@ describe("Enhanced Checkout Redirect Flow", () => {
       const filteredServices = existingServices.filter(
         service => service.reservationId !== reservationId
       );
-      const updatedServices = [...filteredServices, newService];
+      const mockUpdatedServices = [...filteredServices, newService];
 
       expect(filteredServices).toHaveLength(1); // Should remove the duplicate
-      expect(updatedServices).toHaveLength(2); // Should have 2 services total
-      expect(updatedServices.find(s => s.reservationId === reservationId)).toEqual(newService);
+      expect(mockUpdatedServices).toHaveLength(2); // Should have 2 services total
+      expect(mockUpdatedServices.find(s => s.reservationId === reservationId)).toEqual(newService);
     });
 
     it("should handle session storage errors gracefully", () => {
@@ -219,9 +218,9 @@ describe("Enhanced Checkout Redirect Flow", () => {
       let errorThrown = false;
       try {
         mockSessionStorage.getItem("pendingServices");
-      } catch (error) {
+      } catch (mockError) {
         errorThrown = true;
-        expect(error).toBeInstanceOf(Error);
+        expect(mockError).toBeInstanceOf(Error);
       }
 
       expect(errorThrown).toBe(true);
@@ -229,7 +228,7 @@ describe("Enhanced Checkout Redirect Flow", () => {
       // The application should still attempt to store the backup
       try {
         mockSessionStorage.setItem("lastReservationPayment", JSON.stringify(pendingPayment));
-      } catch (error) {
+      } catch {
         // This is expected to fail too, but shouldn't crash the app
       }
     });
@@ -270,7 +269,8 @@ describe("Enhanced Checkout Redirect Flow", () => {
       mockSessionStorage.getItem.mockReturnValue(JSON.stringify(pendingServices));
 
       // Simulate checkout page loading
-      const storedServices = JSON.parse(mockSessionStorage.getItem("pendingServices") || "[]");
+      const storedServicesRaw = mockSessionStorage.getItem("pendingServices");
+      const storedServices = JSON.parse(storedServicesRaw ?? "[]") as typeof pendingServices;
 
       expect(storedServices).toEqual(pendingServices);
       expect(storedServices[0].clientSecret).toBeDefined();
@@ -296,7 +296,12 @@ describe("Enhanced Checkout Redirect Flow", () => {
       expect(paymentMethod).toBe("intent");
 
       // Services without payment intents should use "session" method
-      const servicesWithoutIntents = [
+      const servicesWithoutIntents: Array<{
+        service: string;
+        serviceName: string;
+        price: number;
+        clientSecret?: string;
+      }> = [
         {
           service: "consultation",
           serviceName: "Production Consultation",

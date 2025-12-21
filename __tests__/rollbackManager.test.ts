@@ -1,10 +1,8 @@
 import { RollbackManager } from "../server/lib/rollbackManager";
+import { createMockConvexClient, MockConvexClient } from "./types/test-types";
 
 // Mock ConvexHttpClient
-const mockConvexClient = {
-  query: jest.fn(),
-  mutation: jest.fn(),
-};
+const mockConvexClient: MockConvexClient = createMockConvexClient();
 
 // Mock logger
 jest.mock("../server/lib/logger", () => ({
@@ -19,8 +17,8 @@ jest.mock("../server/lib/logger", () => ({
 jest.useFakeTimers();
 
 // Mock setInterval
-const mockSetInterval = jest.fn();
-global.setInterval = mockSetInterval;
+const mockSetInterval = jest.fn<ReturnType<typeof setInterval>, Parameters<typeof setInterval>>();
+global.setInterval = mockSetInterval as unknown as typeof setInterval;
 
 describe("RollbackManager", () => {
   let manager: RollbackManager;
@@ -28,7 +26,9 @@ describe("RollbackManager", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSetInterval.mockClear();
-    manager = new RollbackManager(mockConvexClient as any);
+    manager = new RollbackManager(
+      mockConvexClient as unknown as Parameters<typeof RollbackManager>[0]
+    );
   });
 
   afterEach(() => {
@@ -253,8 +253,8 @@ describe("RollbackManager", () => {
       // Create multiple rollback points
       mockConvexClient.mutation.mockResolvedValue("success");
 
-      const rollbackId1 = await manager.createRollbackPoint("update_user", "1", {});
-      const rollbackId2 = await manager.createRollbackPoint("update_order", "2", {});
+      const _rollbackId1 = await manager.createRollbackPoint("update_user", "1", {});
+      const _rollbackId2 = await manager.createRollbackPoint("update_order", "2", {});
 
       const history = await manager.getRollbackHistory();
 
@@ -307,7 +307,7 @@ describe("RollbackManager", () => {
       mockConvexClient.mutation.mockResolvedValue("success");
 
       const rollbackId1 = await manager.createRollbackPoint("update_user", "1", {});
-      const rollbackId2 = await manager.createRollbackPoint("update_user", "2", {});
+      const _rollbackId2 = await manager.createRollbackPoint("update_user", "2", {});
 
       // Manually expire one operation
       const rollbackOperations = (manager as any).rollbackOperations;

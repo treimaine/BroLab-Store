@@ -24,7 +24,7 @@ export function useOrders() {
   const { isAuthenticated } = useConvexAuth();
 
   // Lister les commandes avec Convex
-  // @ts-ignore - Type instantiation depth issue with Convex API
+  // @ts-expect-error - Type instantiation depth issue with Convex API
   const ordersResult = useConvexQuery(api.orders.listOrders, isAuthenticated ? {} : "skip");
   const orders = ordersResult?.items || [];
 

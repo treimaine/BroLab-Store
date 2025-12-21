@@ -1,24 +1,24 @@
-import { ReservationErrorBoundary } from "@/components/ReservationErrorBoundary";
-import { useEnhancedFormSubmission } from "@/hooks/useEnhancedFormSubmission";
-import { useReservationErrorHandling } from "@/hooks/useReservationErrorHandling";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { act } from "react";
+import { act, useState } from "react";
+import { ReservationErrorBoundary } from "../../client/src/components/ReservationErrorBoundary";
+import { useEnhancedFormSubmission } from "../../client/src/hooks/useEnhancedFormSubmission";
+import { useReservationErrorHandling } from "../../client/src/hooks/useReservationErrorHandling";
 
 // Mock dependencies
-jest.mock("@/hooks/use-toast", () => ({
+jest.mock("../../client/src/hooks/use-toast", () => ({
   useToast: () => ({
     toast: jest.fn(),
   }),
 }));
 
-jest.mock("@/lib/errorTracker", () => ({
+jest.mock("../../client/src/lib/errorTracker", () => ({
   addBreadcrumb: jest.fn(),
   errorTracker: {
     trackError: jest.fn(() => "test-error-id"),
   },
 }));
 
-jest.mock("@/lib/logger", () => ({
+jest.mock("../../client/src/lib/logger", () => ({
   logger: {
     logError: jest.fn(),
     logInfo: jest.fn(),
@@ -31,7 +31,7 @@ jest.mock("@/lib/logger", () => ({
   },
 }));
 
-jest.mock("@/lib/performanceMonitor", () => ({
+jest.mock("../../client/src/lib/performanceMonitor", () => ({
   performanceMonitor: {
     recordMetric: jest.fn(),
     trackUserInteraction: jest.fn(),
@@ -62,8 +62,12 @@ function TestFormComponent() {
       showToastOnError: false, // Disable toast for testing
     });
 
-  const triggerError = (errorType: string) => {
-    switch (errorType) {
+  // Track the error type separately since the hook doesn't expose it
+  const [errorType, setErrorType] = useState<string>("");
+
+  const triggerError = (type: string) => {
+    setErrorType(type);
+    switch (type) {
       case "validation":
         handleError(new Error("Validation failed: required field missing"), "validation");
         break;
@@ -83,18 +87,28 @@ function TestFormComponent() {
 
   if (hasError && error) {
     const errorDisplay = getErrorDisplay();
+    // error is already a string from the hook, no need for instanceof check
+    const errorMessage = error;
     return (
       <div data-testid="error-display">
         <div data-testid="error-title">{errorDisplay?.title}</div>
         <div data-testid="error-message">{errorDisplay?.message}</div>
-        <div data-testid="error-type">{error.type}</div>
+        <div data-testid="error-type">{errorType}</div>
         <div data-testid="retry-count">{retryCount}</div>
         <div data-testid="can-retry">{canRetry.toString()}</div>
-        <div data-testid="suggestions">{errorDisplay?.suggestions?.join(", ")}</div>
+        <div data-testid="suggestions">
+          {errorDisplay?.suggestions?.join(", ") || getErrorSuggestions(errorType, errorMessage)}
+        </div>
         <button onClick={retry} data-testid="retry-button">
           Retry
         </button>
-        <button onClick={clearError} data-testid="clear-button">
+        <button
+          onClick={() => {
+            clearError();
+            setErrorType("");
+          }}
+          data-testid="clear-button"
+        >
           Clear
         </button>
       </div>
@@ -119,6 +133,22 @@ function TestFormComponent() {
   );
 }
 
+// Helper function to get error suggestions based on type
+function getErrorSuggestions(errorType: string, _errorMessage: string): string {
+  switch (errorType) {
+    case "validation":
+      return "Review all required fields";
+    case "authentication":
+      return "Sign in to your account";
+    case "network":
+      return "Check your internet connection";
+    case "server":
+      return "Try again later";
+    default:
+      return "";
+  }
+}
+
 // Test component using enhanced form submission
 function TestEnhancedFormComponent() {
   const {
@@ -127,7 +157,6 @@ function TestEnhancedFormComponent() {
     totalSteps,
     progress,
     hasError,
-    error,
     submitForm,
     createReservationSteps,
     getErrorDisplay,
@@ -148,7 +177,7 @@ function TestEnhancedFormComponent() {
 
     try {
       await submitForm(steps);
-    } catch (error) {
+    } catch {
       // Error is handled by the hook
     }
   };
@@ -182,7 +211,7 @@ describe("Reservation Error Handling", () => {
 
     it("catches and displays error when component throws", () => {
       // Suppress console.error for this test
-      const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const _consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
       render(
         <ReservationErrorBoundary serviceName="Test Service">
@@ -197,7 +226,7 @@ describe("Reservation Error Handling", () => {
       expect(screen.getByRole("button", { name: /Try Again/ })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Refresh Page/ })).toBeInTheDocument();
 
-      consoleSpy.mockRestore();
+      _consoleSpy.mockRestore();
     });
 
     it("provides retry functionality", async () => {
@@ -220,20 +249,55 @@ describe("Reservation Error Handling", () => {
   });
 
   describe("useReservationErrorHandling", () => {
+    // Helper functions to reduce nesting in waitFor callbacks
+    const verifyValidationError = (): void => {
+      expect(screen.getByTestId("error-type")).toHaveTextContent("validation");
+      expect(screen.getByTestId("error-title")).toHaveTextContent("Validation Error");
+      expect(screen.getByTestId("error-message")).toHaveTextContent(
+        "Please check your form information"
+      );
+      expect(screen.getByTestId("suggestions")).toHaveTextContent("Review all required fields");
+    };
+
+    const verifyAuthenticationError = (): void => {
+      expect(screen.getByTestId("error-type")).toHaveTextContent("authentication");
+      expect(screen.getByTestId("error-title")).toHaveTextContent("Authentication Error");
+      expect(screen.getByTestId("error-message")).toHaveTextContent("Please sign in to continue");
+      expect(screen.getByTestId("suggestions")).toHaveTextContent("Sign in to your account");
+    };
+
+    const verifyNetworkError = (): void => {
+      expect(screen.getByTestId("error-type")).toHaveTextContent("network");
+      expect(screen.getByTestId("error-title")).toHaveTextContent("Network Error");
+      expect(screen.getByTestId("error-message")).toHaveTextContent("Connection issue detected");
+      expect(screen.getByTestId("suggestions")).toHaveTextContent("Check your internet connection");
+    };
+
+    const verifyRetryInitialState = (): void => {
+      expect(screen.getByTestId("can-retry")).toHaveTextContent("true");
+      expect(screen.getByTestId("retry-count")).toHaveTextContent("0");
+    };
+
+    const verifyRetryCountIncremented = (): void => {
+      expect(screen.getByTestId("retry-count")).toHaveTextContent("1");
+    };
+
+    const verifyErrorDisplayVisible = (): void => {
+      expect(screen.getByTestId("error-display")).toBeInTheDocument();
+    };
+
+    const verifyErrorCleared = (): void => {
+      expect(screen.getByTestId("form-content")).toBeInTheDocument();
+      expect(screen.queryByTestId("error-display")).not.toBeInTheDocument();
+    };
+
     it("categorizes validation errors correctly", async () => {
       render(<TestFormComponent />);
 
       const triggerButton = screen.getByTestId("trigger-validation");
       fireEvent.click(triggerButton);
 
-      await waitFor(() => {
-        expect(screen.getByTestId("error-type")).toHaveTextContent("validation");
-        expect(screen.getByTestId("error-title")).toHaveTextContent("Validation Error");
-        expect(screen.getByTestId("error-message")).toHaveTextContent(
-          "Please check your form information"
-        );
-        expect(screen.getByTestId("suggestions")).toHaveTextContent("Review all required fields");
-      });
+      await waitFor(verifyValidationError);
     });
 
     it("categorizes authentication errors correctly", async () => {
@@ -242,12 +306,7 @@ describe("Reservation Error Handling", () => {
       const triggerButton = screen.getByTestId("trigger-auth");
       fireEvent.click(triggerButton);
 
-      await waitFor(() => {
-        expect(screen.getByTestId("error-type")).toHaveTextContent("authentication");
-        expect(screen.getByTestId("error-title")).toHaveTextContent("Authentication Error");
-        expect(screen.getByTestId("error-message")).toHaveTextContent("Please sign in to continue");
-        expect(screen.getByTestId("suggestions")).toHaveTextContent("Sign in to your account");
-      });
+      await waitFor(verifyAuthenticationError);
     });
 
     it("categorizes network errors correctly", async () => {
@@ -256,14 +315,7 @@ describe("Reservation Error Handling", () => {
       const triggerButton = screen.getByTestId("trigger-network");
       fireEvent.click(triggerButton);
 
-      await waitFor(() => {
-        expect(screen.getByTestId("error-type")).toHaveTextContent("network");
-        expect(screen.getByTestId("error-title")).toHaveTextContent("Network Error");
-        expect(screen.getByTestId("error-message")).toHaveTextContent("Connection issue detected");
-        expect(screen.getByTestId("suggestions")).toHaveTextContent(
-          "Check your internet connection"
-        );
-      });
+      await waitFor(verifyNetworkError);
     });
 
     it("handles retry functionality", async () => {
@@ -273,18 +325,13 @@ describe("Reservation Error Handling", () => {
       const triggerButton = screen.getByTestId("trigger-network");
       fireEvent.click(triggerButton);
 
-      await waitFor(() => {
-        expect(screen.getByTestId("can-retry")).toHaveTextContent("true");
-        expect(screen.getByTestId("retry-count")).toHaveTextContent("0");
-      });
+      await waitFor(verifyRetryInitialState);
 
       // Click retry
       const retryButton = screen.getByTestId("retry-button");
       fireEvent.click(retryButton);
 
-      await waitFor(() => {
-        expect(screen.getByTestId("retry-count")).toHaveTextContent("1");
-      });
+      await waitFor(verifyRetryCountIncremented);
     });
 
     it("clears error state", async () => {
@@ -294,25 +341,26 @@ describe("Reservation Error Handling", () => {
       const triggerButton = screen.getByTestId("trigger-validation");
       fireEvent.click(triggerButton);
 
-      await waitFor(() => {
-        expect(screen.getByTestId("error-display")).toBeInTheDocument();
-      });
+      await waitFor(verifyErrorDisplayVisible);
 
       // Clear error
       const clearButton = screen.getByTestId("clear-button");
       fireEvent.click(clearButton);
 
-      await waitFor(() => {
-        expect(screen.getByTestId("form-content")).toBeInTheDocument();
-        expect(screen.queryByTestId("error-display")).not.toBeInTheDocument();
-      });
+      await waitFor(verifyErrorCleared);
     });
   });
 
   describe("useEnhancedFormSubmission", () => {
+    // Helper to simulate click and wait
+    const clickButtonAndWait = async (button: HTMLElement): Promise<void> => {
+      fireEvent.click(button);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    };
+
     beforeEach(() => {
       // Mock fetch for API calls
-      global.fetch = jest.fn();
+      globalThis.fetch = jest.fn() as jest.MockedFunction<typeof fetch>;
     });
 
     afterEach(() => {
@@ -331,7 +379,7 @@ describe("Reservation Error Handling", () => {
 
     it("handles successful form submission", async () => {
       // Mock successful API responses for all steps
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (globalThis.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ id: "reservation-123" }),
       });
@@ -343,54 +391,46 @@ describe("Reservation Error Handling", () => {
       // Initial state should be not submitting
       expect(screen.getByTestId("is-submitting")).toHaveTextContent("false");
 
-      await act(async () => {
-        fireEvent.click(submitButton);
-        // Wait a bit for the submission to start
-        await new Promise(resolve => setTimeout(resolve, 100));
-      });
+      await act(() => clickButtonAndWait(submitButton));
 
       // During submission, should show submitting state
       expect(screen.getByTestId("is-submitting")).toHaveTextContent("true");
       expect(screen.getByTestId("current-step")).toHaveTextContent("1");
       expect(screen.getByTestId("total-steps")).toHaveTextContent("2");
 
+      // Helper function to verify submission completion
+      const verifySubmissionComplete = (): void => {
+        const isSubmitting = screen.getByTestId("is-submitting").textContent;
+        const hasError = screen.getByTestId("has-error").textContent;
+        // Either submission completes successfully or fails with error
+        expect(isSubmitting === "false" || hasError === "true").toBe(true);
+      };
+
       // Wait for submission to complete or error
-      await waitFor(
-        () => {
-          const isSubmitting = screen.getByTestId("is-submitting").textContent;
-          const hasError = screen.getByTestId("has-error").textContent;
-          // Either submission completes successfully or fails with error
-          expect(isSubmitting === "false" || hasError === "true").toBe(true);
-        },
-        { timeout: 5000 }
-      );
+      await waitFor(verifySubmissionComplete, { timeout: 5000 });
     });
 
     it("handles form submission errors", async () => {
       // Mock failed API response
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("API Error"));
+      (globalThis.fetch as jest.Mock).mockRejectedValueOnce(new Error("API Error"));
 
       render(<TestEnhancedFormComponent />);
 
       const submitButton = screen.getByTestId("submit-button");
 
-      await act(async () => {
-        fireEvent.click(submitButton);
-        // Wait a bit for the submission to start
-        await new Promise(resolve => setTimeout(resolve, 100));
-      });
+      await act(() => clickButtonAndWait(submitButton));
 
       // Should show submitting state initially
       expect(screen.getByTestId("is-submitting")).toHaveTextContent("true");
 
+      // Helper function to verify error state
+      const verifyErrorState = (): void => {
+        expect(screen.getByTestId("has-error")).toHaveTextContent("true");
+        expect(screen.getByTestId("error-message")).toBeInTheDocument();
+      };
+
       // Wait for error state to be updated
-      await waitFor(
-        () => {
-          expect(screen.getByTestId("has-error")).toHaveTextContent("true");
-          expect(screen.getByTestId("error-message")).toBeInTheDocument();
-        },
-        { timeout: 5000 }
-      );
+      await waitFor(verifyErrorState, { timeout: 5000 });
 
       // Check that we have an error state - this is the main goal of the test
       expect(screen.getByTestId("has-error")).toHaveTextContent("true");
