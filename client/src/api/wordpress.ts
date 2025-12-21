@@ -82,6 +82,11 @@ export async function getPageBySlug(slug: string): Promise<WordPressPage | null>
     const response = await wordpress.get(`/pages/${slug}`);
     return response.data;
   } catch (error) {
+    // 404 is expected when page doesn't exist in WordPress - return null silently
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return null;
+    }
+    // Log other errors for debugging
     console.error(`Error fetching page ${slug}:`, error);
     return null;
   }
