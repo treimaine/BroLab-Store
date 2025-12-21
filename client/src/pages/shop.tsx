@@ -315,7 +315,15 @@ export default function Shop() {
             description: `${beat.title} has been removed from your wishlist.`,
           });
         } else {
-          await addToFavorites(beat.id);
+          // Pass beat metadata for dashboard display enrichment
+          await addToFavorites(beat.id, {
+            title: beat.title,
+            genre: beat.genre,
+            imageUrl: beat.imageUrl,
+            audioUrl: beat.audioUrl,
+            price: typeof beat.price === "string" ? Number.parseFloat(beat.price) : beat.price,
+            bpm: beat.bpm,
+          });
           toast({
             title: "Added to Wishlist",
             description: `${beat.title} has been added to your wishlist.`,

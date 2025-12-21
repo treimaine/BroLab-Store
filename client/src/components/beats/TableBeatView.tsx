@@ -283,7 +283,22 @@ export function TableBeatView({
                     if (isFavorite(product.id)) {
                       await removeFromFavorites(product.id);
                     } else {
-                      await addToFavorites(product.id);
+                      // Pass beat metadata for dashboard display enrichment
+                      const imageUrl = product.images?.[0]?.src;
+                      const audioUrl = getAudioUrl(product);
+                      const priceNum =
+                        typeof product.price === "string"
+                          ? Number.parseFloat(product.price)
+                          : product.price;
+                      const bpmNum = product.bpm ? Number.parseInt(product.bpm, 10) : undefined;
+                      await addToFavorites(product.id, {
+                        title: product.name,
+                        genre: product.genre,
+                        imageUrl: imageUrl || undefined,
+                        audioUrl: audioUrl || undefined,
+                        price: Number.isNaN(priceNum) ? undefined : priceNum,
+                        bpm: bpmNum && !Number.isNaN(bpmNum) ? bpmNum : undefined,
+                      });
                     }
                   } catch (error) {
                     console.error("Wishlist toggle error:", error);

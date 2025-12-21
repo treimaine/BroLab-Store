@@ -14,6 +14,18 @@ export interface Favorite {
 }
 
 /**
+ * Beat metadata for enrichment when adding to favorites
+ */
+export interface BeatMetadata {
+  title?: string;
+  genre?: string;
+  imageUrl?: string;
+  audioUrl?: string;
+  price?: number;
+  bpm?: number;
+}
+
+/**
  * Hook for managing user favorites using Convex
  * Provides real-time synchronization of favorite beats
  */
@@ -42,14 +54,22 @@ export function useFavorites() {
   };
 
   /**
-   * Add a beat to favorites
+   * Add a beat to favorites with optional metadata for enrichment
    */
-  const addToFavorites = async (beatId: number): Promise<void> => {
+  const addToFavorites = async (beatId: number, metadata?: BeatMetadata): Promise<void> => {
     if (!isAuthenticated) {
       throw new Error("User must be authenticated to add favorites");
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await addToFavoritesMutation({ beatId } as any);
+    await addToFavoritesMutation({
+      beatId,
+      beatTitle: metadata?.title,
+      beatGenre: metadata?.genre,
+      beatImageUrl: metadata?.imageUrl,
+      beatAudioUrl: metadata?.audioUrl,
+      beatPrice: metadata?.price,
+      beatBpm: metadata?.bpm,
+    } as any);
   };
 
   /**

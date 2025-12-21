@@ -2,7 +2,6 @@ import { ResponsiveBeatCard } from "@/components/beats/ResponsiveBeatCard";
 import { BeatCard } from "@/components/beats/beat-card";
 import { BeatCardSkeleton } from "@/components/loading/LoadingSpinner";
 import { useIntersectionObserver } from "@/components/loading/VirtualScrollList";
-import { useIsMobile } from "@/hooks/useBreakpoint";
 import { cn } from "@/lib/utils";
 import type { BeatProduct as Beat } from "@shared/schema";
 import React, { useCallback, useRef, useState } from "react";
@@ -18,73 +17,77 @@ const normalizeTags = (tags?: Array<string | { name: string }> | null): string[]
 };
 
 interface OptimizedBeatGridProps {
-  beats: Beat[];
-  isLoading?: boolean;
-  viewMode?: "grid" | "table";
-  className?: string;
-  onBeatClick?: (beat: Beat) => void;
+  readonly beats: Beat[];
+  readonly isLoading?: boolean;
+  readonly viewMode?: "grid" | "table";
+  readonly className?: string;
+  readonly onBeatClick?: (beat: Beat) => void;
+}
+
+interface LazyBeatCardProps {
+  readonly beat: Beat;
+  readonly viewMode?: "grid" | "table";
+  readonly onBeatClick?: (beat: Beat) => void;
 }
 
 // Lazy loaded beat card with intersection observer
 function LazyBeatCard({
   beat,
-  index: _index,
   viewMode = "grid",
   onBeatClick,
-}: {
-  beat: Beat;
-  index: number;
-  viewMode?: "grid" | "table";
-  onBeatClick?: (beat: Beat) => void;
-}) {
+}: LazyBeatCardProps): React.JSX.Element {
   const cardRef = useRef<HTMLDivElement>(null);
   const isVisible = useIntersectionObserver(cardRef, {
     threshold: 0.1,
     rootMargin: "100px", // Load 100px before entering viewport
   });
 
+  const renderBeatCard = (): React.JSX.Element => {
+    if (viewMode === "grid") {
+      return (
+        <BeatCard
+          id={beat.id}
+          title={beat.title || beat.name || "Untitled"}
+          genre={beat.genre || beat.categories?.[0]?.name || ""}
+          bpm={beat.bpm || 0}
+          price={beat.price}
+          imageUrl={beat.image_url || beat.image || beat.images?.[0]?.src || ""}
+          audioUrl={beat.audio_url || ""}
+          tags={normalizeTags(beat.tags)}
+          featured={beat.featured || false}
+          downloads={beat.downloads || 0}
+          duration={beat.duration || 0}
+          isFree={
+            beat.is_free ||
+            normalizeTags(beat.tags).some(tag => tag.toLowerCase() === "free") ||
+            beat.price === 0 ||
+            false
+          }
+          onViewDetails={() => onBeatClick?.(beat)}
+        />
+      );
+    }
+
+    return (
+      <ResponsiveBeatCard
+        beat={{
+          ...beat,
+          id: beat.id,
+          title: beat.title || beat.name || "Untitled",
+          name: beat.title || beat.name || "Untitled",
+          image:
+            beat.image_url || beat.image || beat.images?.[0]?.src || "/api/placeholder/400/400",
+          image_url:
+            beat.image_url || beat.image || beat.images?.[0]?.src || "/api/placeholder/400/400",
+          audio_url: beat.audio_url || "",
+        }}
+      />
+    );
+  };
+
   return (
     <div ref={cardRef} className="min-h-[300px]">
-      {isVisible ? (
-        viewMode === "grid" ? (
-          <BeatCard
-            id={beat.id}
-            title={beat.title || beat.name || "Untitled"}
-            genre={beat.genre || beat.categories?.[0]?.name || ""}
-            bpm={beat.bpm || 0}
-            price={beat.price}
-            imageUrl={beat.image_url || beat.image || beat.images?.[0]?.src || ""}
-            audioUrl={beat.audio_url || ""}
-            tags={normalizeTags(beat.tags)}
-            featured={beat.featured || false}
-            downloads={beat.downloads || 0}
-            duration={beat.duration || 0}
-            isFree={
-              beat.is_free ||
-              normalizeTags(beat.tags).some(tag => tag.toLowerCase() === "free") ||
-              beat.price === 0 ||
-              false
-            }
-            onViewDetails={() => onBeatClick?.(beat)}
-          />
-        ) : (
-          <ResponsiveBeatCard
-            beat={{
-              ...beat,
-              id: beat.id,
-              title: beat.title || beat.name || "Untitled",
-              name: beat.title || beat.name || "Untitled",
-              image:
-                beat.image_url || beat.image || beat.images?.[0]?.src || "/api/placeholder/400/400",
-              image_url:
-                beat.image_url || beat.image || beat.images?.[0]?.src || "/api/placeholder/400/400",
-              audio_url: beat.audio_url || "",
-            }}
-          />
-        )
-      ) : (
-        <BeatCardSkeleton />
-      )}
+      {isVisible ? renderBeatCard() : <BeatCardSkeleton />}
     </div>
   );
 }
@@ -95,8 +98,7 @@ export function OptimizedBeatGrid({
   viewMode = "grid",
   className = "",
   onBeatClick,
-}: OptimizedBeatGridProps) {
-  const _isMobile = useIsMobile();
+}: Readonly<OptimizedBeatGridProps>): React.JSX.Element {
   const [loadedCount, setLoadedCount] = useState(12); // Initial load count
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -132,8 +134,8 @@ export function OptimizedBeatGrid({
           className
         )}
       >
-        {Array.from({ length: 8 }).map((_, i) => (
-          <BeatCardSkeleton key={i} />
+        {Array.from({ length: 8 }, (_, i) => (
+          <BeatCardSkeleton key={`skeleton-loading-${i.toString()}`} />
         ))}
       </div>
     );
@@ -150,11 +152,10 @@ export function OptimizedBeatGrid({
             : "grid-cols-1"
         )}
       >
-        {visibleBeats.map((beat, index) => (
+        {visibleBeats.map(beat => (
           <LazyBeatCard
             key={beat.id}
             beat={beat}
-            index={index}
             viewMode={viewMode}
             onBeatClick={handleBeatClick}
           />

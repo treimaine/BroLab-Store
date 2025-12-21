@@ -118,15 +118,18 @@ const RecommendationsPanel = memo(
                   key={`${favorite.id}-${index}`}
                   className="flex items-center space-x-3 p-3 rounded-lg bg-gray-800/50 hover:bg-gray-800/70 transition-colors"
                 >
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
                     {favorite.beatImageUrl ? (
                       <img
                         src={favorite.beatImageUrl}
                         alt={favorite.beatTitle}
                         className="w-full h-full object-cover rounded-lg"
+                        loading="lazy"
                       />
                     ) : (
-                      <Music className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                      <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center rounded-lg">
+                        <Music className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                      </div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">

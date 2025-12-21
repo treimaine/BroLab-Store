@@ -38,6 +38,8 @@ export function BeatCard({
   downloads = 0,
   className = "",
   isFree = false,
+  bpm,
+  duration,
   onViewDetails,
 }: BeatCardProps) {
   const { addItem } = useCartContext();
@@ -111,7 +113,15 @@ export function BeatCard({
           description: "This beat has been removed from your wishlist.",
         });
       } else {
-        await addToFavorites(beatIdAsNumber);
+        // Pass beat metadata for dashboard display enrichment
+        await addToFavorites(beatIdAsNumber, {
+          title,
+          genre,
+          imageUrl,
+          audioUrl,
+          price: typeof price === "string" ? Number.parseFloat(price) || 0 : price,
+          bpm,
+        });
         toast({
           title: "Added to Wishlist",
           description: "This beat has been added to your wishlist.",
@@ -223,6 +233,12 @@ export function BeatCard({
             </h3>
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-400 mb-2 sm:mb-3">
               <span className="bg-gray-700 px-2 py-1 rounded text-xs">{genre}</span>
+              {bpm && bpm > 0 && <span className="text-xs text-gray-400">{bpm} BPM</span>}
+              {duration && duration > 0 && (
+                <span className="text-xs text-gray-400">
+                  {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, "0")}
+                </span>
+              )}
               {downloads > 0 && (
                 <span className="text-[var(--color-gold)] text-xs">{downloads} downloads</span>
               )}

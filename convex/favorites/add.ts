@@ -4,6 +4,13 @@ import { mutation } from "../_generated/server";
 export const addToFavorites = mutation({
   args: {
     beatId: v.number(),
+    // Optional beat metadata for enrichment
+    beatTitle: v.optional(v.string()),
+    beatGenre: v.optional(v.string()),
+    beatImageUrl: v.optional(v.string()),
+    beatAudioUrl: v.optional(v.string()),
+    beatPrice: v.optional(v.number()),
+    beatBpm: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -41,6 +48,39 @@ export const addToFavorites = mutation({
       .first();
 
     if (existing) return existing;
+
+    // Ensure beat exists in Convex with metadata for dashboard display
+    const existingBeat = await ctx.db
+      .query("beats")
+      .withIndex("by_wordpress_id", q => q.eq("wordpressId", args.beatId))
+      .first();
+
+    if (!existingBeat) {
+      // Create beat record if it doesn't exist
+      await ctx.db.insert("beats", {
+        wordpressId: args.beatId,
+        title: args.beatTitle || `Beat ${args.beatId}`,
+        genre: args.beatGenre || "Unknown",
+        bpm: args.beatBpm || 0,
+        price: args.beatPrice ? Math.round(args.beatPrice * 100) : 0, // Convert to cents
+        imageUrl: args.beatImageUrl,
+        audioUrl: args.beatAudioUrl,
+        views: 0,
+        downloads: 0,
+        isActive: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    } else if (args.beatImageUrl && existingBeat.imageUrl !== args.beatImageUrl) {
+      // Always update beat with the latest imageUrl from WordPress if different
+      // This ensures the dashboard shows the same image as the shop
+      await ctx.db.patch(existingBeat._id, {
+        imageUrl: args.beatImageUrl,
+        title: args.beatTitle || existingBeat.title,
+        genre: args.beatGenre || existingBeat.genre,
+        updatedAt: Date.now(),
+      });
+    }
 
     return await ctx.db.insert("favorites", {
       userId: user._id,
