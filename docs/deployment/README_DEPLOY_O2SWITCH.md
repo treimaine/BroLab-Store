@@ -1,6 +1,7 @@
 # 🚀 Guide Déploiement o2switch - Cross-Platform
 
 ## 📋 Prérequis
+
 - Compte o2switch avec Node.js activé
 - cPanel access
 - FTP/SFTP configuré
@@ -8,6 +9,7 @@
 ## 🔧 Build Production Local
 
 ### Windows (PowerShell/Git Bash)
+
 ```powershell
 # Setup initial
 npm run setup
@@ -18,8 +20,9 @@ node scripts/deploy-o2switch.js
 ```
 
 ### Linux/macOS
+
 ```bash
-# Setup initial  
+# Setup initial
 npm install
 npm run build:prod
 
@@ -41,6 +44,7 @@ dist/
 ## ⚙️ Configuration o2switch
 
 ### 1. Variables Environnement (.env.production)
+
 ```env
 NODE_ENV=production
 PORT=5000
@@ -71,6 +75,7 @@ SESSION_SECRET=...
 ```
 
 ### 2. Structure cPanel
+
 ```
 /
 ├── public_html/           # Frontend (dist/public/)
@@ -84,13 +89,15 @@ SESSION_SECRET=...
 ```
 
 ### 3. Node.js Configuration cPanel
+
 - **Entry Point**: `app/index.js`
 - **Environment**: `Production`
-- **Node Version**: `18.x` ou plus récent
+- **Node Version**: `24.x` ou plus récent
 
 ## 🚀 Déploiement
 
 ### Méthode 1: FTP Upload
+
 ```bash
 # Build local
 npm run build:prod
@@ -101,16 +108,18 @@ npm run build:prod
 ```
 
 ### Méthode 2: rsync (Linux/Mac)
+
 ```bash
 # Sync frontend
 rsync -avz dist/public/ user@server:public_html/
 
-# Sync backend  
+# Sync backend
 rsync -avz dist/index.js user@server:app/
 rsync -avz .env.production user@server:app/
 ```
 
 ### Méthode 3: Git Deploy (Advanced)
+
 ```bash
 # Sur serveur o2switch
 git clone https://github.com/treimaine/BroLab-Store.git
@@ -126,6 +135,7 @@ ln -sf /path/to/BroLab-Store/dist/index.js /app/
 ## ✅ Validation Post-Déploiement
 
 ### Tests Fonctionnels
+
 - [ ] Page d'accueil charge
 - [ ] API endpoints répondent
 - [ ] Base données connectée
@@ -134,11 +144,13 @@ ln -sf /path/to/BroLab-Store/dist/index.js /app/
 - [ ] Emails envoyés
 
 ### Performance
+
 - [ ] Temps chargement < 3s
 - [ ] Images optimisées
 - [ ] Cache headers configurés
 
 ### Monitoring
+
 ```bash
 # Logs application
 tail -f ~/logs/nodejs.log
@@ -153,6 +165,7 @@ curl -I https://votre-domaine.com
 ## 🔧 Dépannage
 
 ### Erreurs Communes
+
 ```bash
 # Port déjà utilisé
 PORT=5001 npm run start:prod
@@ -160,21 +173,24 @@ PORT=5001 npm run start:prod
 # Permissions
 chmod +x app/index.js
 
-# Node modules  
+# Node modules
 npm cache clean --force
 rm -rf node_modules && npm install
 ```
 
 ### Variables Debug
+
 ```env
 DEBUG=express:*
 NODE_OPTIONS=--inspect
 ```
 
 ## 📞 Support o2switch
+
 - Documentation Node.js: support.o2switch.fr
 - Ticket support pour configuration avancée
 - Community forum pour questions générales
 
 ---
-*Guide testé sur Windows 11, Ubuntu 22.04, macOS Monterey*
+
+_Guide testé sur Windows 11, Ubuntu 22.04, macOS Monterey_

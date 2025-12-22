@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
+import { optionalAuth, requireAuth } from "../lib/authHelpers";
 
 export const recordDownload = mutation({
   args: {
@@ -8,20 +9,12 @@ export const recordDownload = mutation({
     downloadUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) throw new Error("User not found");
+    const { userId } = await requireAuth(ctx);
 
     // Enforce quota before recording download
     const activeSubscription = await ctx.db
       .query("subscriptions")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", userId))
       .filter(q => q.eq(q.field("status"), "active"))
       .first();
 
@@ -31,7 +24,7 @@ export const recordDownload = mutation({
 
     const downloadQuota = await ctx.db
       .query("quotas")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", userId))
       .filter(q => q.eq(q.field("quotaType"), "downloads"))
       .filter(q => q.eq(q.field("isActive"), true))
       .first();
@@ -46,7 +39,7 @@ export const recordDownload = mutation({
     }
 
     const downloadId = await ctx.db.insert("downloads", {
-      userId: user._id,
+      userId,
       beatId: args.beatId,
       licenseType: args.licenseType,
       downloadUrl: args.downloadUrl,
@@ -75,19 +68,12 @@ export const recordDownload = mutation({
 export const getUserDownloads = query({
   args: {},
   handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) return [];
+    const auth = await optionalAuth(ctx);
+    if (!auth) return [];
 
     const downloads = await ctx.db
       .query("downloads")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", auth.userId))
       .order("desc")
       .collect();
 
@@ -98,20 +84,13 @@ export const getUserDownloads = query({
 export const getUserDownloadQuota = query({
   args: {},
   handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return { downloadsUsed: 0, quota: 0, remaining: 0, progress: 0 };
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) return { downloadsUsed: 0, quota: 0, remaining: 0, progress: 0 };
+    const auth = await optionalAuth(ctx);
+    if (!auth) return { downloadsUsed: 0, quota: 0, remaining: 0, progress: 0 };
 
     // Get user's subscription to determine license type
     const subscription = await ctx.db
       .query("subscriptions")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", auth.userId))
       .first();
 
     // Determine license type and quota
@@ -126,7 +105,7 @@ export const getUserDownloadQuota = query({
     // Count downloads for this user
     const downloads = await ctx.db
       .query("downloads")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", auth.userId))
       .collect();
 
     const downloadsUsed = downloads.length;
@@ -146,20 +125,13 @@ export const getUserDownloadQuota = query({
 export const getDownloadStats = query({
   args: {},
   handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) return null;
+    const auth = await optionalAuth(ctx);
+    if (!auth) return null;
 
     // Get sample download data for debugging
     const downloads = await ctx.db
       .query("downloads")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", auth.userId))
       .take(5);
 
     return {

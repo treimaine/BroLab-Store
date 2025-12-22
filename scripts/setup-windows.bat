@@ -7,7 +7,7 @@ echo.
 echo [1/5] Checking Node.js...
 node --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ❌ Node.js not found. Please install Node.js 18+ from nodejs.org
+    echo ❌ Node.js not found. Please install Node.js 24+ from nodejs.org
     pause
     exit /b 1
 )

@@ -10,15 +10,15 @@ Ce plan d'implémentation guide la refactorisation des duplications de code iden
 
 Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** être modifiés par cette refactorisation:
 
-| Intégration             | Fichiers Protégés                                                                                  | Raison                                       |
-| ----------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| **Clerk Auth**          | `client/src/main.tsx` (ClerkProvider, ConvexProviderWithClerk), `client/src/hooks/useAuthState.ts` | Configuration racine de l'authentification   |
+| Intégration             | Fichiers Protégés                                                                                  | Raison                                      |
+| ----------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| **Clerk Auth**          | `client/src/main.tsx` (ClerkProvider, ConvexProviderWithClerk), `client/src/hooks/useAuthState.ts` | Configuration racine de l'authentification  |
 | **Convex-Clerk Bridge** | `convex/users/clerkSync.ts`, pattern `ctx.auth.getUserIdentity()`                                  | Synchronisation utilisateurs Clerk ↔ Convex |
-| **WooCommerce API**     | `server/routes/woo.ts`, `server/services/woo.ts`                                                   | Intégration catalogue produits               |
-| **WordPress API**       | `server/routes/wp.ts`, `server/services/wp.ts`                                                     | Intégration contenu CMS                      |
-| **WooCommerce Sync**    | `convex/sync/woocommerce.ts`, `convex/sync/wordpress.ts`                                           | Synchronisation commandes/produits           |
-| **Stripe/PayPal**       | `server/routes/stripe.ts`, `server/routes/paypal.ts`, `server/routes/webhooks.ts`                  | Paiements - NE JAMAIS TOUCHER                |
-| **Clerk Webhooks**      | `server/routes/clerk.ts`, `server/routes/clerk-billing.ts`                                         | Webhooks authentification                    |
+| **WooCommerce API**     | `server/routes/woo.ts`, `server/services/woo.ts`                                                   | Intégration catalogue produits              |
+| **WordPress API**       | `server/routes/wp.ts`, `server/services/wp.ts`                                                     | Intégration contenu CMS                     |
+| **WooCommerce Sync**    | `convex/sync/woocommerce.ts`, `convex/sync/wordpress.ts`                                           | Synchronisation commandes/produits          |
+| **Stripe/PayPal**       | `server/routes/stripe.ts`, `server/routes/paypal.ts`, `server/routes/webhooks.ts`                  | Paiements - NE JAMAIS TOUCHER               |
+| **Clerk Webhooks**      | `server/routes/clerk.ts`, `server/routes/clerk-billing.ts`                                         | Webhooks authentification                   |
 
 ### Règles de Sécurité
 
@@ -42,7 +42,7 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
     - Update all imports to use shared/validation
     - _Requirements: 1.5, 9.5_
 
-  - [ ]\* 1.3 Write property test for email validation consistency
+  - [x] 1.3 Write property test for email validation consistency
     - **Property 2: Email Validation Round-Trip**
     - **Validates: Requirements 1.5, 9.5**
 
@@ -54,8 +54,8 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
 - [ ] 2. Checkpoint - Validation consolidation complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 3. Implement Convex auth helpers
-  - [ ] 3.1 Create `convex/lib/authHelpers.ts` with requireAuth and optionalAuth
+- [x] 3. Implement Convex auth helpers
+  - [x] 3.1 Create `convex/lib/authHelpers.ts` with requireAuth and optionalAuth
     - Implement AuthResult interface
     - Implement requireAuth function that **wraps** `ctx.auth.getUserIdentity()` (ne remplace pas)
     - Implement optionalAuth function returning null for unauthenticated
@@ -68,7 +68,7 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
     - **Property 4: Optional Auth Null Safety**
     - **Validates: Requirements 2.1, 2.2, 2.3, 2.4**
 
-  - [ ] 3.3 Migrate first batch of Convex functions to use auth helpers
+  - [x] 3.3 Migrate first batch of Convex functions to use auth helpers
     - Update 10 most-used Convex mutations to use requireAuth
     - **⚠️ EXCLURE**: `convex/users/clerkSync.ts`, `convex/sync/*.ts`, `convex/auth/*.ts`
     - Verify backward compatibility

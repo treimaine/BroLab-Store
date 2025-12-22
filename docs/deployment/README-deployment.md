@@ -22,11 +22,13 @@ The BroLab beats store is production-ready and can be deployed to o2switch cPane
 ### ⚙️ cPanel Configuration
 
 #### Node.js App Settings
+
 - **App Root**: `public_html/brolab-beats`
 - **Startup File**: `server/index.js`
 - **Node.js Version**: 18.x or higher
 
 #### Environment Variables
+
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/database"
 STRIPE_SECRET_KEY="sk_live_your_live_key"
@@ -54,12 +56,14 @@ NODE_ENV="production"
 ### Pre-Deployment Checklist
 
 #### Local Testing
+
 - [ ] Production build successful: `npm run build`
 - [ ] Application starts: `npm run start`
 - [ ] All features tested locally
 - [ ] Environment variables configured
 
 #### Production Preparation
+
 - [ ] Live Stripe keys obtained
 - [ ] Live PayPal client ID configured
 - [ ] Production database created
@@ -76,6 +80,7 @@ NODE_ENV="production"
 ```
 
 **Package Contents:**
+
 - Optimized production build
 - Server-side compiled TypeScript
 - All necessary dependencies
@@ -84,6 +89,7 @@ NODE_ENV="production"
 ### Step 2: cPanel Upload & Setup
 
 #### File Upload
+
 1. Login to cPanel
 2. Open File Manager
 3. Navigate to `public_html`
@@ -91,17 +97,19 @@ NODE_ENV="production"
 5. Extract archive
 
 #### Node.js Application Setup
+
 1. Go to **Node.js Selector** or **Node.js App**
 2. Click **Create Application**
 3. Configure:
    ```
-   Node.js Version: 18.x or higher
+   Node.js Version: 24.x or higher
    App Root: public_html/brolab-beats
    App URL: your-domain.com
    Startup File: server/index.js
    ```
 
 #### Install Dependencies
+
 ```bash
 # In cPanel terminal or Node.js interface
 cd ~/public_html/brolab-beats
@@ -111,12 +119,14 @@ npm install --production
 ### Step 3: Database Configuration
 
 #### Create PostgreSQL Database
+
 1. Go to **PostgreSQL Databases** in cPanel
 2. Create database: `username_brolab_beats`
 3. Create user: `username_brolab_user`
 4. Assign user to database with all privileges
 
 #### Environment Variables Setup
+
 In Node.js app interface, add:
 
 ```env
@@ -150,6 +160,7 @@ PORT=3000
 ```
 
 #### Initialize Database
+
 ```bash
 # Push database schema
 npm run db:push
@@ -158,11 +169,13 @@ npm run db:push
 ### Step 4: Domain & SSL Configuration
 
 #### Domain Setup
+
 1. Point domain to cPanel server
 2. Update DNS A record
 3. Wait for DNS propagation (up to 24 hours)
 
 #### SSL Certificate
+
 1. Go to **SSL/TLS** in cPanel
 2. Enable **Let's Encrypt** certificate
 3. Force HTTPS redirects
@@ -171,12 +184,14 @@ npm run db:push
 ### Step 5: Application Startup
 
 #### Start Application
+
 1. In Node.js app interface
 2. Click **Start App**
 3. Monitor logs for startup success
 4. Test application at your domain
 
 #### Verify Functionality
+
 - [ ] Homepage loads correctly
 - [ ] Shop page displays products
 - [ ] Audio preview works
@@ -189,6 +204,7 @@ npm run db:push
 ### Application Health Checks
 
 #### Automated Monitoring
+
 ```bash
 # Check application status
 curl -s -o /dev/null -w "%{http_code}" https://yourdomain.com/
@@ -199,6 +215,7 @@ curl -s https://yourdomain.com/api/woocommerce/products | jq '.[0].name'
 ```
 
 #### Log Monitoring
+
 - Check cPanel Error Logs regularly
 - Monitor Node.js application logs
 - Set up alerting for critical errors
@@ -206,12 +223,14 @@ curl -s https://yourdomain.com/api/woocommerce/products | jq '.[0].name'
 ### Performance Optimization
 
 #### cPanel Optimizations
+
 - Enable **Gzip Compression**
 - Configure **Browser Caching**
 - Optimize **Database Settings**
 - Enable **Keep-Alive Connections**
 
 #### Application Optimizations
+
 - **Static Asset Caching**: Configure proper cache headers
 - **Database Indexing**: Add indexes for frequently queried data
 - **Image Optimization**: Compress and optimize images
@@ -222,6 +241,7 @@ curl -s https://yourdomain.com/api/woocommerce/products | jq '.[0].name'
 ### Production Security
 
 #### Essential Security Measures
+
 - [ ] SSL certificate installed and active
 - [ ] Strong session secrets configured
 - [ ] Database user has minimal required permissions
@@ -230,6 +250,7 @@ curl -s https://yourdomain.com/api/woocommerce/products | jq '.[0].name'
 - [ ] Security headers enabled
 
 #### Regular Security Tasks
+
 - Monitor for security updates
 - Regular database backups
 - Log security events
@@ -238,11 +259,13 @@ curl -s https://yourdomain.com/api/woocommerce/products | jq '.[0].name'
 ### Backup Strategy
 
 #### Automated Backups
+
 - **Database**: Daily automated backups
 - **Files**: Weekly full site backups
 - **Environment Variables**: Secure backup of configuration
 
 #### Disaster Recovery
+
 1. **Data Recovery**: Database restoration procedures
 2. **Application Recovery**: Quick redeployment process
 3. **DNS Recovery**: Backup DNS configuration
@@ -253,18 +276,20 @@ curl -s https://yourdomain.com/api/woocommerce/products | jq '.[0].name'
 ### Deployment Issues
 
 #### Application Won't Start
+
 ```bash
 # Check Node.js logs
 tail -f ~/logs/yourdomain.com_nodejs.log
 
 # Common fixes:
-1. Verify Node.js version (18+)
+1. Verify Node.js version (24+)
 2. Check file permissions
 3. Ensure all environment variables set
 4. Verify database connection
 ```
 
 #### Database Connection Errors
+
 ```bash
 # Test database connection
 psql $DATABASE_URL -c "SELECT version();"
@@ -277,6 +302,7 @@ psql $DATABASE_URL -c "SELECT version();"
 ```
 
 #### SSL/HTTPS Issues
+
 1. **Certificate not active**: Wait for Let's Encrypt provisioning
 2. **Mixed content**: Ensure all resources use HTTPS
 3. **Redirect loops**: Check .htaccess configuration
@@ -285,12 +311,14 @@ psql $DATABASE_URL -c "SELECT version();"
 ### Performance Issues
 
 #### Slow Loading
+
 1. **Enable compression**: Configure Gzip in cPanel
 2. **Optimize images**: Compress static assets
 3. **Database optimization**: Add necessary indexes
 4. **CDN setup**: Configure CDN for static files
 
 #### High Resource Usage
+
 1. **Monitor Node.js processes**: Check for memory leaks
 2. **Database optimization**: Optimize queries and indexes
 3. **Cache implementation**: Add caching layers
@@ -301,12 +329,14 @@ psql $DATABASE_URL -c "SELECT version();"
 ### Regular Maintenance Tasks
 
 #### Weekly Tasks
+
 - [ ] Monitor application logs
 - [ ] Check database performance
 - [ ] Verify backup completion
 - [ ] Test critical functionality
 
 #### Monthly Tasks
+
 - [ ] Update dependencies (security updates)
 - [ ] Database optimization and cleanup
 - [ ] Performance analysis and optimization
@@ -315,11 +345,13 @@ psql $DATABASE_URL -c "SELECT version();"
 ### Getting Help
 
 #### cPanel Support
+
 - Contact o2switch support for hosting issues
 - Use cPanel documentation for configuration
 - Check o2switch status page for service issues
 
 #### Application Support
+
 - Review application logs for errors
 - Check database connectivity and performance
 - Verify WooCommerce API integration

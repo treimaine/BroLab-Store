@@ -1,9 +1,16 @@
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
+import {
+  AuthenticationError,
+  UserNotFoundError,
+  optionalAuth,
+  requireAuth,
+} from "./lib/authHelpers";
 
 /**
  * Cart Items - Convex functions for shopping cart persistence
- * Follows the pattern from convex/favorites/ for consistency
+ * Uses centralized auth helpers for consistent authentication
  */
 
 // Sync cart items for authenticated user (batch update)
@@ -19,21 +26,23 @@ export const syncCart = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    // Verify user authentication
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    let userId: Id<"users">;
+    let clerkId: string;
 
-    // Get or create user
-    const existingUser = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
+    try {
+      const auth = await requireAuth(ctx);
+      userId = auth.userId;
+      clerkId = auth.clerkId;
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        throw new Error("Not authenticated");
+      }
+      if (error instanceof UserNotFoundError) {
+        // Create user if they don't exist (first-time sync)
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
 
-    const userId = existingUser
-      ? existingUser._id
-      : await ctx.db.insert("users", {
+        userId = await ctx.db.insert("users", {
           clerkId: identity.subject,
           email: identity.email || "",
           username: identity.name || `user_${identity.subject.slice(-8)}`,
@@ -43,6 +52,11 @@ export const syncCart = mutation({
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });
+        clerkId = identity.subject;
+      } else {
+        throw error;
+      }
+    }
 
     try {
       // Delete existing cart items for this user
@@ -72,7 +86,7 @@ export const syncCart = mutation({
       // Log successful sync to audit
       await ctx.db.insert("auditLogs", {
         userId,
-        clerkId: identity.subject,
+        clerkId,
         action: "cart_synced",
         resource: "cartItems",
         details: {
@@ -90,7 +104,7 @@ export const syncCart = mutation({
       // Log sync error to audit
       await ctx.db.insert("auditLogs", {
         userId,
-        clerkId: identity.subject,
+        clerkId,
         action: "cart_sync_failed",
         resource: "cartItems",
         details: {
@@ -109,26 +123,13 @@ export const syncCart = mutation({
 export const loadCart = query({
   args: {},
   handler: async ctx => {
-    // Verify user authentication
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return [];
-    }
-
-    // Get user
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) {
-      return [];
-    }
+    const auth = await optionalAuth(ctx);
+    if (!auth) return [];
 
     // Query cart items by userId using by_user index
     const cartItems = await ctx.db
       .query("cartItems")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", auth.userId))
       .collect();
 
     // Return cart items with beat details
@@ -164,19 +165,21 @@ export const addItem = mutation({
     price: v.number(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    let userId: Id<"users">;
 
-    const existingUser = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
+    try {
+      const auth = await requireAuth(ctx);
+      userId = auth.userId;
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        throw new Error("Not authenticated");
+      }
+      if (error instanceof UserNotFoundError) {
+        // Create user if they don't exist
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
 
-    const userId = existingUser
-      ? existingUser._id
-      : await ctx.db.insert("users", {
+        userId = await ctx.db.insert("users", {
           clerkId: identity.subject,
           email: identity.email || "",
           username: identity.name || `user_${identity.subject.slice(-8)}`,
@@ -186,6 +189,10 @@ export const addItem = mutation({
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });
+      } else {
+        throw error;
+      }
+    }
 
     // Check if item already exists
     const existingItems = await ctx.db
@@ -224,23 +231,11 @@ export const removeItem = mutation({
     licenseType: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const { userId } = await requireAuth(ctx);
 
     const items = await ctx.db
       .query("cartItems")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", userId))
       .collect();
 
     const item = items.find(i => i.beatId === args.beatId && i.licenseType === args.licenseType);
@@ -262,23 +257,11 @@ export const updateQuantity = mutation({
     quantity: v.number(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const { userId } = await requireAuth(ctx);
 
     const items = await ctx.db
       .query("cartItems")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", userId))
       .collect();
 
     const item = items.find(i => i.beatId === args.beatId && i.licenseType === args.licenseType);
@@ -302,23 +285,14 @@ export const updateQuantity = mutation({
 export const clearCart = mutation({
   args: {},
   handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const auth = await optionalAuth(ctx);
+    if (!auth) {
       throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) {
-      return { success: true, deletedCount: 0 };
     }
 
     const items = await ctx.db
       .query("cartItems")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", auth.userId))
       .collect();
 
     for (const item of items) {

@@ -1,5 +1,7 @@
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { mutation } from "../_generated/server";
+import { AuthenticationError, UserNotFoundError, requireAuth } from "../lib/authHelpers";
 
 export const addToFavorites = mutation({
   args: {
@@ -13,38 +15,44 @@ export const addToFavorites = mutation({
     beatBpm: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    let userId: Id<"users">;
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
+    try {
+      const auth = await requireAuth(ctx);
+      userId = auth.userId;
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        throw new Error("Not authenticated");
+      }
+      if (error instanceof UserNotFoundError) {
+        // Create user if they don't exist (first-time sync)
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Not authenticated");
 
-    if (!user) {
-      // Créer l'utilisateur s'il n'existe pas
-      const userId = await ctx.db.insert("users", {
-        clerkId: identity.subject,
-        email: identity.email || "",
-        username: identity.name || `user_${identity.subject.slice(-8)}`,
-        firstName: identity.givenName || "",
-        lastName: identity.familyName || "",
-        imageUrl: identity.pictureUrl || "",
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
+        userId = await ctx.db.insert("users", {
+          clerkId: identity.subject,
+          email: identity.email || "",
+          username: identity.name || `user_${identity.subject.slice(-8)}`,
+          firstName: identity.givenName || "",
+          lastName: identity.familyName || "",
+          imageUrl: identity.pictureUrl || "",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
 
-      return await ctx.db.insert("favorites", {
-        userId,
-        beatId: args.beatId,
-        createdAt: Date.now(),
-      });
+        return await ctx.db.insert("favorites", {
+          userId,
+          beatId: args.beatId,
+          createdAt: Date.now(),
+        });
+      }
+      throw error;
     }
 
-    // Vérifier si déjà en favoris
+    // Check if already in favorites
     const existing = await ctx.db
       .query("favorites")
-      .withIndex("by_user_beat", q => q.eq("userId", user._id).eq("beatId", args.beatId))
+      .withIndex("by_user_beat", q => q.eq("userId", userId).eq("beatId", args.beatId))
       .first();
 
     if (existing) return existing;
@@ -83,7 +91,7 @@ export const addToFavorites = mutation({
     }
 
     return await ctx.db.insert("favorites", {
-      userId: user._id,
+      userId,
       beatId: args.beatId,
       createdAt: Date.now(),
     });

@@ -52,34 +52,36 @@ graph TD
 
 ## 3. Route Definitions
 
-| Route | Purpose |
-|-------|----------|
-| / | Page d'accueil avec hero section et beats featured |
-| /shop | Catalogue complet des beats avec filtres avancés |
-| /product/:id | Page détail d'un beat avec preview et options d'achat |
-| /cart | Panier d'achat avec récapitulatif et checkout |
-| /checkout | Processus de paiement via Clerk Billing |
-| /dashboard | Dashboard utilisateur unifié (reconstruction complète) |
-| /dashboard/downloads | Gestion des téléchargements et licences |
-| /dashboard/reservations | Suivi des réservations de services |
-| /dashboard/subscription | Gestion abonnement Clerk Billing |
-| /services/mixing-mastering | Formulaire réservation mixing/mastering |
-| /services/recording | Formulaire réservation sessions d'enregistrement |
-| /services/custom-beats | Formulaire commande beats personnalisés |
-| /services/consultation | Formulaire réservation consultation production |
-| /admin | Interface administrateur (accès restreint) |
-| /admin/analytics | Dashboard analytics et métriques |
-| /admin/users | Gestion utilisateurs et abonnements |
-| /admin/content | Gestion contenu (beats, réservations) |
+| Route                      | Purpose                                                |
+| -------------------------- | ------------------------------------------------------ |
+| /                          | Page d'accueil avec hero section et beats featured     |
+| /shop                      | Catalogue complet des beats avec filtres avancés       |
+| /product/:id               | Page détail d'un beat avec preview et options d'achat  |
+| /cart                      | Panier d'achat avec récapitulatif et checkout          |
+| /checkout                  | Processus de paiement via Clerk Billing                |
+| /dashboard                 | Dashboard utilisateur unifié (reconstruction complète) |
+| /dashboard/downloads       | Gestion des téléchargements et licences                |
+| /dashboard/reservations    | Suivi des réservations de services                     |
+| /dashboard/subscription    | Gestion abonnement Clerk Billing                       |
+| /services/mixing-mastering | Formulaire réservation mixing/mastering                |
+| /services/recording        | Formulaire réservation sessions d'enregistrement       |
+| /services/custom-beats     | Formulaire commande beats personnalisés                |
+| /services/consultation     | Formulaire réservation consultation production         |
+| /admin                     | Interface administrateur (accès restreint)             |
+| /admin/analytics           | Dashboard analytics et métriques                       |
+| /admin/users               | Gestion utilisateurs et abonnements                    |
+| /admin/content             | Gestion contenu (beats, réservations)                  |
 
 ## 4. API Definitions
 
 ### 4.1 Core API
 
 #### Authentication (Clerk)
+
 ```
 GET /api/auth/user
 ```
+
 Response:
 | Param Name | Param Type | Description |
 |------------|------------|-------------|
@@ -88,9 +90,11 @@ Response:
 | features | array | Features disponibles selon plan |
 
 #### Convex Integration
+
 ```
 POST /api/convex/sync-user
 ```
+
 Request:
 | Param Name | Param Type | isRequired | Description |
 |------------|------------|------------|-------------|
@@ -105,9 +109,11 @@ Response:
 | userId | string | ID utilisateur Convex |
 
 #### Orders Management
+
 ```
 POST /api/orders
 ```
+
 Request:
 | Param Name | Param Type | isRequired | Description |
 |------------|------------|------------|-------------|
@@ -123,9 +129,11 @@ Response:
 | downloadUrls | array | URLs de téléchargement |
 
 #### Reservations Management
+
 ```
 POST /api/reservations
 ```
+
 Request:
 | Param Name | Param Type | isRequired | Description |
 |------------|------------|------------|-------------|
@@ -144,15 +152,19 @@ Response:
 ### 4.2 Clerk Webhooks
 
 #### User Events
+
 ```
 POST /api/webhooks/clerk/user
 ```
+
 Gère les événements : user.created, user.updated, user.deleted
 
 #### Subscription Events
+
 ```
 POST /api/webhooks/clerk/subscription
 ```
+
 Gère les événements : subscription.created, subscription.updated, subscription.cancelled
 
 ## 5. Server Architecture Diagram
@@ -308,6 +320,7 @@ erDiagram
 ### 6.2 Data Definition Language
 
 #### Convex Schema (schema.ts)
+
 ```typescript
 // Users Table
 export const users = defineTable({
@@ -320,8 +333,8 @@ export const users = defineTable({
   createdAt: v.number(),
   updatedAt: v.number(),
 })
-.index("by_clerk_id", ["clerkId"])
-.index("by_email", ["email"]);
+  .index("by_clerk_id", ["clerkId"])
+  .index("by_email", ["email"]);
 
 // Beats Table
 export const beats = defineTable({
@@ -344,9 +357,9 @@ export const beats = defineTable({
   createdAt: v.number(),
   updatedAt: v.optional(v.number()),
 })
-.index("by_wordpress_id", ["wordpressId"])
-.index("by_genre", ["genre"])
-.index("by_featured", ["featured"]);
+  .index("by_wordpress_id", ["wordpressId"])
+  .index("by_genre", ["genre"])
+  .index("by_featured", ["featured"]);
 
 // Orders Table
 export const orders = defineTable({
@@ -362,8 +375,8 @@ export const orders = defineTable({
   createdAt: v.number(),
   updatedAt: v.number(),
 })
-.index("by_user", ["userId"])
-.index("by_status", ["status"]);
+  .index("by_user", ["userId"])
+  .index("by_status", ["status"]);
 
 // Reservations Table
 export const reservations = defineTable({
@@ -378,12 +391,13 @@ export const reservations = defineTable({
   createdAt: v.number(),
   updatedAt: v.number(),
 })
-.index("by_user", ["userId"])
-.index("by_status", ["status"])
-.index("by_date", ["preferredDate"]);
+  .index("by_user", ["userId"])
+  .index("by_status", ["status"])
+  .index("by_date", ["preferredDate"]);
 ```
 
 #### Convex Functions Examples
+
 ```typescript
 // convex/users.ts
 export const createUser = mutation({
@@ -428,24 +442,28 @@ export const createOrder = mutation({
 ## 7. Migration Strategy
 
 ### 7.1 Phase 1: Database Migration
+
 1. **Backup Supabase data** - Export toutes les données existantes
 2. **Setup Convex** - Configuration projet et schémas
 3. **Data migration scripts** - Scripts de migration automatisés
 4. **Validation** - Tests d'intégrité des données migrées
 
 ### 7.2 Phase 2: Authentication Migration
+
 1. **Clerk setup** - Configuration projet et plans billing
 2. **User migration** - Migration utilisateurs existants vers Clerk
 3. **Session management** - Remplacement système auth custom
 4. **Testing** - Tests complets authentification
 
 ### 7.3 Phase 3: Payment System
+
 1. **Clerk Billing configuration** - Setup plans et features
 2. **Stripe migration** - Migration données paiement
 3. **Webhook setup** - Configuration événements Clerk
 4. **Testing** - Tests transactions complètes
 
 ### 7.4 Phase 4: Code Cleanup
+
 1. **Remove obsolete files** - Suppression fichiers Supabase/Stripe
 2. **Update imports** - Mise à jour toutes les importations
 3. **Bundle optimization** - Optimisation taille bundle
@@ -454,12 +472,14 @@ export const createOrder = mutation({
 ## 8. Deployment Configuration (o2switch)
 
 ### 8.1 Server Requirements
-- **Node.js**: Version 18+ 
+
+- **Node.js**: Version 24+
 - **Memory**: Minimum 2GB RAM
 - **Storage**: 10GB SSD
 - **SSL**: Certificat SSL/TLS
 
 ### 8.2 Environment Variables
+
 ```env
 # Production Environment
 NODE_ENV=production
@@ -487,6 +507,7 @@ SMTP_PASS=...
 ```
 
 ### 8.3 Build Process
+
 ```bash
 # Build frontend
 npm run build

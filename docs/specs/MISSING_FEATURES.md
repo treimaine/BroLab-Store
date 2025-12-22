@@ -737,7 +737,7 @@ Each task should be executed with:
 
 ### Contraintes Hébergement (o2switch)
 
-- **Node.js Version**: Limitation à Node.js 18+ sur cPanel
+- **Node.js Version**: Limitation à Node.js 24+ sur cPanel
 - **SSL Certificate**: ✅ Configuré et actif sur https://brolabentertainment.com
 - **CDN Integration**: Vérifier compatibilité avec stack WordPress existant
 - **Database Limits**: PostgreSQL limitations sur cPanel shared hosting

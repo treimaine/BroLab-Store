@@ -1,4 +1,5 @@
 import { query } from "../_generated/server";
+import { optionalAuth } from "../lib/authHelpers";
 
 export interface EnrichedDownload {
   _id: string;
@@ -20,29 +21,23 @@ export interface EnrichedDownload {
 export const getUserDownloadsEnriched = query({
   args: {},
   handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [] as EnrichedDownload[];
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-    if (!user) return [] as EnrichedDownload[];
+    const auth = await optionalAuth(ctx);
+    if (!auth) return [] as EnrichedDownload[];
 
     const [downloads, subscription, quota] = await Promise.all([
       ctx.db
         .query("downloads")
-        .withIndex("by_user", q => q.eq("userId", user._id))
+        .withIndex("by_user", q => q.eq("userId", auth.userId))
         .order("desc")
         .collect(),
       ctx.db
         .query("subscriptions")
-        .withIndex("by_user", q => q.eq("userId", user._id))
+        .withIndex("by_user", q => q.eq("userId", auth.userId))
         .filter(q => q.eq(q.field("status"), "active"))
         .first(),
       ctx.db
         .query("quotas")
-        .withIndex("by_user", q => q.eq("userId", user._id))
+        .withIndex("by_user", q => q.eq("userId", auth.userId))
         .filter(q => q.eq(q.field("quotaType"), "downloads"))
         .filter(q => q.eq(q.field("isActive"), true))
         .first(),

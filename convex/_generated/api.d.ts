@@ -47,6 +47,7 @@ import type * as invoices from "../invoices.js";
 import type * as invoices_createInvoiceRecord from "../invoices/createInvoiceRecord.js";
 import type * as invoices_generateInvoiceNumber from "../invoices/generateInvoiceNumber.js";
 import type * as invoices_updateInvoiceUrl from "../invoices/updateInvoiceUrl.js";
+import type * as lib_authHelpers from "../lib/authHelpers.js";
 import type * as lib_dashboardConfig from "../lib/dashboardConfig.js";
 import type * as lib_dashboardValidation from "../lib/dashboardValidation.js";
 import type * as lib_statisticsCalculator from "../lib/statisticsCalculator.js";
@@ -148,6 +149,7 @@ declare const fullApi: ApiFromModules<{
   "invoices/createInvoiceRecord": typeof invoices_createInvoiceRecord;
   "invoices/generateInvoiceNumber": typeof invoices_generateInvoiceNumber;
   "invoices/updateInvoiceUrl": typeof invoices_updateInvoiceUrl;
+  "lib/authHelpers": typeof lib_authHelpers;
   "lib/dashboardConfig": typeof lib_dashboardConfig;
   "lib/dashboardValidation": typeof lib_dashboardValidation;
   "lib/statisticsCalculator": typeof lib_statisticsCalculator;

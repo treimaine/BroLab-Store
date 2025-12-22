@@ -1,21 +1,15 @@
 import { query } from "../_generated/server";
+import { optionalAuth } from "../lib/authHelpers";
 
 export const getFavorites = query({
   args: {},
   handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) return [];
+    const auth = await optionalAuth(ctx);
+    if (!auth) return [];
 
     const favorites = await ctx.db
       .query("favorites")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", auth.userId))
       .collect();
 
     return favorites;
@@ -25,22 +19,15 @@ export const getFavorites = query({
 export const getFavoritesWithBeats = query({
   args: {},
   handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) return [];
+    const auth = await optionalAuth(ctx);
+    if (!auth) return [];
 
     const favorites = await ctx.db
       .query("favorites")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", auth.userId))
       .collect();
 
-    // Récupérer les détails des beats
+    // Get beat details
     const favoritesWithBeats = await Promise.all(
       favorites.map(async favorite => {
         const beat = await ctx.db
@@ -55,6 +42,6 @@ export const getFavoritesWithBeats = query({
       })
     );
 
-    return favoritesWithBeats.filter(f => f.beat); // Filtrer les beats non trouvés
+    return favoritesWithBeats.filter(f => f.beat); // Filter out beats not found
   },
 });

@@ -3,6 +3,7 @@
 ## Pre-Deployment Checklist
 
 ### Code & Build
+
 - [ ] All features tested locally
 - [ ] Production build successful (`npm run build`)
 - [ ] No TypeScript errors (`npm run check`)
@@ -13,6 +14,7 @@
 - [ ] Email system functional
 
 ### Security
+
 - [ ] Production API keys configured (Stripe Live, PayPal Live)
 - [ ] Strong session secret generated
 - [ ] Database user has minimal required permissions
@@ -23,6 +25,7 @@
 - [ ] Rate limiting configured for all endpoints
 
 ### Performance
+
 - [ ] Static assets optimized
 - [ ] Database indexes in place
 - [ ] Gzip compression enabled
@@ -33,13 +36,15 @@
 ## cPanel Deployment Steps
 
 ### 1. Server Requirements
-- [ ] Node.js 18+ supported
+
+- [ ] Node.js 24+ supported
 - [ ] PostgreSQL database available
 - [ ] SSL certificate available
 - [ ] Sufficient storage and bandwidth
 - [ ] Supabase account configured (if using Supabase)
 
 ### 2. File Upload
+
 - [ ] Production build uploaded to cPanel
 - [ ] Files extracted in correct directory
 - [ ] File permissions set correctly
@@ -47,6 +52,7 @@
 - [ ] Supabase configuration files included
 
 ### 3. Database Setup
+
 - [ ] PostgreSQL database created
 - [ ] Database user created with appropriate permissions
 - [ ] DATABASE_URL environment variable configured
@@ -55,6 +61,7 @@
 - [ ] RLS policies applied to database
 
 ### 4. Node.js App Configuration
+
 - [ ] Node.js app created in cPanel
 - [ ] Startup file set to `server/index.js`
 - [ ] App URL configured correctly
@@ -62,12 +69,14 @@
 - [ ] Supabase environment variables configured
 
 ### 5. Dependencies & Build
+
 - [ ] Production dependencies installed (`npm install --production`)
 - [ ] Application builds successfully
 - [ ] No build errors in logs
 - [ ] Supabase client libraries installed
 
 ### 6. Testing
+
 - [ ] Application starts without errors
 - [ ] Homepage loads correctly
 - [ ] Database connection successful
@@ -80,12 +89,14 @@
 - [ ] RLS security policies working
 
 ### 7. Domain & SSL
+
 - [ ] Domain pointed to cPanel server
 - [ ] DNS records configured
 - [ ] SSL certificate installed and active
 - [ ] HTTPS redirects working
 
 ### 8. Monitoring Setup
+
 - [ ] Error logging configured
 - [ ] Performance monitoring enabled
 - [ ] Backup schedule configured
@@ -95,6 +106,7 @@
 ## Post-Deployment Verification
 
 ### Functionality Tests
+
 - [ ] User registration/login works
 - [ ] Product catalog loads from WooCommerce
 - [ ] Audio previews play correctly
@@ -109,6 +121,7 @@
 - [ ] Admin file management accessible
 
 ### Performance Tests
+
 - [ ] Page load times acceptable (<3 seconds)
 - [ ] Database queries optimized
 - [ ] Static assets load quickly
@@ -117,6 +130,7 @@
 - [ ] Supabase connection stable
 
 ### Security Tests
+
 - [ ] HTTPS enforced on all pages
 - [ ] Sensitive data not exposed
 - [ ] API endpoints properly secured
@@ -128,6 +142,7 @@
 ## Maintenance Tasks
 
 ### Regular Monitoring
+
 - [ ] Check application logs weekly
 - [ ] Monitor database performance
 - [ ] Review security logs
@@ -136,6 +151,7 @@
 - [ ] Check file storage usage
 
 ### Updates
+
 - [ ] Keep dependencies updated
 - [ ] Apply security patches promptly
 - [ ] Update Node.js version as needed
@@ -143,6 +159,7 @@
 - [ ] Update Supabase client libraries
 
 ### Performance Optimization
+
 - [ ] Monitor and optimize slow queries
 - [ ] Review and compress large assets
 - [ ] Cache frequently accessed data
@@ -152,6 +169,7 @@
 ## Rollback Plan
 
 ### In Case of Issues
+
 1. **Stop the application** in cPanel Node.js interface
 2. **Restore previous version** from backup
 3. **Rollback database** if schema changes were made
@@ -159,6 +177,7 @@
 5. **Investigate and fix issues** in development environment
 
 ### Backup Strategy
+
 - [ ] Automated daily database backups
 - [ ] Code repository with version tags
 - [ ] Environment variables backed up securely
@@ -169,12 +188,14 @@
 ## Contact Information
 
 ### Support Contacts
+
 - **Hosting Provider**: o2switch support
 - **Domain Provider**: [Your domain registrar]
 - **Developer**: [Your contact information]
 - **Supabase Support**: [Supabase support portal]
 
 ### Emergency Procedures
+
 1. Contact hosting provider for server issues
 2. Check status pages for third-party services
 3. Monitor error logs for application issues
@@ -184,6 +205,7 @@
 ## Success Metrics
 
 ### Technical Metrics
+
 - [ ] Uptime > 99.5%
 - [ ] Page load time < 3 seconds
 - [ ] Error rate < 1%
@@ -192,6 +214,7 @@
 - [ ] Email delivery rate > 95%
 
 ### Business Metrics
+
 - [ ] User registration rate
 - [ ] Successful payment rate
 - [ ] Cart abandonment rate
@@ -202,6 +225,7 @@
 ## Environment Variables Checklist
 
 ### Required for Production
+
 - [ ] `DATABASE_URL` - Database connection string
 - [ ] `SUPABASE_URL` - Supabase project URL
 - [ ] `SUPABASE_ANON_KEY` - Supabase anonymous key
@@ -228,6 +252,7 @@ This checklist ensures a smooth deployment and ongoing maintenance of your BroLa
 ### Changelog
 
 **2025-01-23** - Deployment Checklist Update
+
 - Added Supabase database configuration requirements
 - Included Row-Level Security (RLS) setup and testing
 - Added file upload system deployment steps
