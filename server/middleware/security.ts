@@ -188,6 +188,23 @@ export const bodySizeLimits: RequestHandler = (req, res, next) => {
   next();
 };
 
+/**
+ * Routes exemptées du rate limiting (monitoring, health checks)
+ * Utilise un matching par préfixe pour inclure toutes les routes imbriquées
+ */
+const RATE_LIMIT_SKIP_PREFIXES = [
+  "/api/monitoring", // Toutes les routes de monitoring (/health, /status, /metrics, etc.)
+  "/health", // Health checks alternatifs à la racine
+];
+
+/**
+ * Vérifie si une route doit être exemptée du rate limiting
+ * Utilise un matching par préfixe pour supporter les routes imbriquées
+ */
+function shouldSkipRateLimit(path: string): boolean {
+  return RATE_LIMIT_SKIP_PREFIXES.some(prefix => path.startsWith(prefix));
+}
+
 // Rate limiting for API endpoints
 export const apiRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -199,10 +216,7 @@ export const apiRateLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
   keyGenerator: getClientIp, // Custom key generator for proxy environments
-  skip: req => {
-    // Skip rate limiting for health checks and monitoring
-    return req.path === "/api/monitoring/health" || req.path === "/api/monitoring/status";
-  },
+  skip: req => shouldSkipRateLimit(req.path),
   // Disable validation for proxy environments (Replit, Vercel, etc.)
   // We handle IP extraction ourselves via getClientIp
   validate: { xForwardedForHeader: false, trustProxy: false, default: true },
