@@ -1,3 +1,4 @@
+import { formatCurrencyDisplay } from "../../shared/utils/currency";
 import { PaymentData, ReservationEmailData, User } from "../templates/emailTemplates";
 import { EmailDeliveryResult, EmailRetryOptions, sendMailWithResult } from "./mail";
 
@@ -204,7 +205,7 @@ export class ReservationEmailService {
               ? `
           <div style="background: #EEF2FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="color: #8B5CF6; margin: 0 0 10px 0;">Payment Information</h3>
-            <p><strong>Amount:</strong> ${(payment.amount / 100).toFixed(2)} ${payment.currency.toUpperCase()}</p>
+            <p><strong>Amount:</strong> ${formatCurrencyDisplay(payment.amount, { currency: payment.currency })}</p>
             <p><strong>Payment Method:</strong> ${payment.paymentMethod || "Card"}</p>
             ${payment.paymentIntentId ? `<p><strong>Transaction ID:</strong> ${payment.paymentIntentId}</p>` : ""}
           </div>
@@ -421,7 +422,7 @@ export class ReservationEmailService {
           
           <div style="background: #F0FDF4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981;">
             <h3 style="color: #059669; margin: 0 0 10px 0;">Payment Details</h3>
-            <p><strong>Amount Paid:</strong> ${(payment.amount / 100).toFixed(2)} ${payment.currency.toUpperCase()}</p>
+            <p><strong>Amount Paid:</strong> ${formatCurrencyDisplay(payment.amount, { currency: payment.currency })}</p>
             <p><strong>Payment Method:</strong> ${payment.paymentMethod || "Card"}</p>
             ${payment.paymentIntentId ? `<p><strong>Transaction ID:</strong> ${payment.paymentIntentId}</p>` : ""}
             <p><strong>Status:</strong> <span style="color: #10B981; font-weight: bold;">PAID</span></p>
@@ -470,7 +471,7 @@ export class ReservationEmailService {
           
           <div style="background: #FEF2F2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #EF4444;">
             <h3 style="color: #DC2626; margin: 0 0 10px 0;">Payment Details</h3>
-            <p><strong>Amount:</strong> ${(payment.amount / 100).toFixed(2)} ${payment.currency.toUpperCase()}</p>
+            <p><strong>Amount:</strong> ${formatCurrencyDisplay(payment.amount, { currency: payment.currency })}</p>
             ${payment.paymentIntentId ? `<p><strong>Payment Intent ID:</strong> ${payment.paymentIntentId}</p>` : ""}
             <p><strong>Failure Reason:</strong> ${failureReason || "Payment processing failed"}</p>
           </div>

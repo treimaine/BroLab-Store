@@ -1,5 +1,6 @@
 import { Response, Router } from "express";
 import Stripe from "stripe";
+import { centsToDollars } from "../../shared/utils/currency";
 import { urls } from "../config/urls";
 import { handleRouteError } from "../types/routes";
 import { generateSecureRequestId } from "../utils/requestId";
@@ -294,7 +295,7 @@ const buildEnhancedMetadata = (
           0
         )
         ?.toString() || "0",
-    orderTotal: (amount / 100).toString(),
+    orderTotal: centsToDollars(amount).toString(),
     description: description || `${paymentType.replace("_", " ")} payment`,
   };
 };

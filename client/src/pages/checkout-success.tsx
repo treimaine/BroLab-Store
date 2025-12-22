@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { centsToDollars } from "@/utils/currency";
 import { CheckCircle, Download, Home, Music, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -67,7 +68,7 @@ export default function CheckoutSuccess() {
         const sessionData = await response.json();
         setCheckoutData({
           sessionId: sessionData.id,
-          amount: sessionData.amount / 100, // Convert from cents
+          amount: centsToDollars(sessionData.amount), // Convert from cents
           metadata: sessionData.metadata,
         });
       }

@@ -15,6 +15,9 @@ export enum ErrorType {
   AUTHORIZATION_ERROR = "authz_error",
   TOKEN_EXPIRED = "token_expired",
   INVALID_CREDENTIALS = "invalid_credentials",
+  AUTH_REQUIRED = "auth_required",
+  AUTH_INVALID = "auth_invalid",
+  FORBIDDEN = "forbidden",
 
   // Validation Errors
   VALIDATION_ERROR = "validation_error",
@@ -29,11 +32,27 @@ export enum ErrorType {
   SERVER_ERROR = "server_error",
   DATABASE_ERROR = "database_error",
   EXTERNAL_SERVICE_ERROR = "external_service_error",
+  INTERNAL_ERROR = "internal_error",
 
   // Client Errors
   CLIENT_ERROR = "client_error",
   NOT_FOUND = "not_found",
   CONFLICT = "conflict",
+
+  // Business Logic Errors
+  BUSINESS_ERROR = "business_error",
+  BEAT_NOT_AVAILABLE = "beat_not_available",
+  LICENSE_CONFLICT = "license_conflict",
+  RESERVATION_CONFLICT = "reservation_conflict",
+  ORDER_PROCESSING_FAILED = "order_processing_failed",
+  PAYMENT_FAILED = "payment_failed",
+  SUBSCRIPTION_REQUIRED = "subscription_required",
+
+  // File Errors
+  FILE_TOO_LARGE = "file_too_large",
+  FILE_TYPE_NOT_ALLOWED = "file_type_not_allowed",
+  UPLOAD_FAILED = "upload_failed",
+  VIRUS_DETECTED = "virus_detected",
 
   // System Errors
   MEMORY_ERROR = "memory_error",
@@ -72,6 +91,9 @@ export const ERROR_MESSAGES = {
   [ErrorType.AUTHORIZATION_ERROR]: "You don't have permission to perform this action.",
   [ErrorType.TOKEN_EXPIRED]: "Your session has expired. Please log in again.",
   [ErrorType.INVALID_CREDENTIALS]: "Invalid username or password.",
+  [ErrorType.AUTH_REQUIRED]: "Veuillez vous connecter pour continuer.",
+  [ErrorType.AUTH_INVALID]: "Session expirée, veuillez vous reconnecter.",
+  [ErrorType.FORBIDDEN]: "Vous n'avez pas accès à cette ressource.",
 
   [ErrorType.VALIDATION_ERROR]: "The provided data is invalid. Please check your input.",
   [ErrorType.SCHEMA_ERROR]: "Data format is incorrect.",
@@ -83,10 +105,27 @@ export const ERROR_MESSAGES = {
   [ErrorType.SERVER_ERROR]: "An internal server error occurred. Please try again later.",
   [ErrorType.DATABASE_ERROR]: "Database operation failed. Please try again.",
   [ErrorType.EXTERNAL_SERVICE_ERROR]: "External service is temporarily unavailable.",
+  [ErrorType.INTERNAL_ERROR]: "Une erreur est survenue, veuillez réessayer.",
 
   [ErrorType.CLIENT_ERROR]: "Invalid request. Please check your input.",
   [ErrorType.NOT_FOUND]: "The requested resource was not found.",
   [ErrorType.CONFLICT]: "The operation conflicts with the current state.",
+
+  // Business Logic Errors
+  [ErrorType.BUSINESS_ERROR]: "A business rule prevented this operation.",
+  [ErrorType.BEAT_NOT_AVAILABLE]: "This beat is no longer available for purchase.",
+  [ErrorType.LICENSE_CONFLICT]: "This license type conflicts with an existing purchase.",
+  [ErrorType.RESERVATION_CONFLICT]:
+    "This time slot is no longer available. Please choose another time.",
+  [ErrorType.ORDER_PROCESSING_FAILED]: "Order processing failed. Please try again.",
+  [ErrorType.PAYMENT_FAILED]: "Payment could not be processed. Please check your payment method.",
+  [ErrorType.SUBSCRIPTION_REQUIRED]: "This feature requires an active subscription.",
+
+  // File Errors
+  [ErrorType.FILE_TOO_LARGE]: "File size exceeds the maximum limit.",
+  [ErrorType.FILE_TYPE_NOT_ALLOWED]: "This file type is not allowed.",
+  [ErrorType.UPLOAD_FAILED]: "File upload failed. Please try again.",
+  [ErrorType.VIRUS_DETECTED]: "File failed security scan. Please ensure your file is safe.",
 
   [ErrorType.MEMORY_ERROR]: "System is running low on memory.",
   [ErrorType.DISK_SPACE_ERROR]: "Insufficient disk space.",
@@ -108,6 +147,9 @@ export const ERROR_HTTP_STATUS = {
   [ErrorType.AUTHORIZATION_ERROR]: 403,
   [ErrorType.TOKEN_EXPIRED]: 401,
   [ErrorType.INVALID_CREDENTIALS]: 401,
+  [ErrorType.AUTH_REQUIRED]: 401,
+  [ErrorType.AUTH_INVALID]: 401,
+  [ErrorType.FORBIDDEN]: 403,
 
   [ErrorType.VALIDATION_ERROR]: 400,
   [ErrorType.SCHEMA_ERROR]: 400,
@@ -119,10 +161,26 @@ export const ERROR_HTTP_STATUS = {
   [ErrorType.SERVER_ERROR]: 500,
   [ErrorType.DATABASE_ERROR]: 500,
   [ErrorType.EXTERNAL_SERVICE_ERROR]: 502,
+  [ErrorType.INTERNAL_ERROR]: 500,
 
   [ErrorType.CLIENT_ERROR]: 400,
   [ErrorType.NOT_FOUND]: 404,
   [ErrorType.CONFLICT]: 409,
+
+  // Business Logic Errors
+  [ErrorType.BUSINESS_ERROR]: 422,
+  [ErrorType.BEAT_NOT_AVAILABLE]: 404,
+  [ErrorType.LICENSE_CONFLICT]: 409,
+  [ErrorType.RESERVATION_CONFLICT]: 409,
+  [ErrorType.ORDER_PROCESSING_FAILED]: 422,
+  [ErrorType.PAYMENT_FAILED]: 422,
+  [ErrorType.SUBSCRIPTION_REQUIRED]: 402,
+
+  // File Errors
+  [ErrorType.FILE_TOO_LARGE]: 413,
+  [ErrorType.FILE_TYPE_NOT_ALLOWED]: 415,
+  [ErrorType.UPLOAD_FAILED]: 500,
+  [ErrorType.VIRUS_DETECTED]: 422,
 
   [ErrorType.MEMORY_ERROR]: 500,
   [ErrorType.DISK_SPACE_ERROR]: 500,
@@ -302,18 +360,30 @@ export function getErrorSeverity(errorType: ErrorType): ErrorSeverity {
     ErrorType.MEMORY_ERROR,
     ErrorType.DISK_SPACE_ERROR,
     ErrorType.DATABASE_ERROR,
+    ErrorType.PAYMENT_FAILED,
   ];
 
   const highErrors = [
     ErrorType.AUTHENTICATION_ERROR,
     ErrorType.AUTHORIZATION_ERROR,
     ErrorType.SERVER_ERROR,
+    ErrorType.AUTH_REQUIRED,
+    ErrorType.AUTH_INVALID,
+    ErrorType.FORBIDDEN,
+    ErrorType.INTERNAL_ERROR,
+    ErrorType.ORDER_PROCESSING_FAILED,
+    ErrorType.VIRUS_DETECTED,
   ];
 
   const mediumErrors = [
     ErrorType.NETWORK_ERROR,
     ErrorType.TIMEOUT_ERROR,
     ErrorType.RATE_LIMIT_ERROR,
+    ErrorType.BEAT_NOT_AVAILABLE,
+    ErrorType.LICENSE_CONFLICT,
+    ErrorType.RESERVATION_CONFLICT,
+    ErrorType.SUBSCRIPTION_REQUIRED,
+    ErrorType.UPLOAD_FAILED,
   ];
 
   if (criticalErrors.includes(errorType)) return ErrorSeverity.CRITICAL;
@@ -330,6 +400,8 @@ export function getErrorCategory(errorType: ErrorType): ErrorCategory {
     ErrorType.CONFIGURATION_ERROR,
     ErrorType.SERVER_ERROR,
     ErrorType.DATABASE_ERROR,
+    ErrorType.INTERNAL_ERROR,
+    ErrorType.UPLOAD_FAILED,
   ];
 
   const securityErrors = [
@@ -337,24 +409,40 @@ export function getErrorCategory(errorType: ErrorType): ErrorCategory {
     ErrorType.AUTHORIZATION_ERROR,
     ErrorType.TOKEN_EXPIRED,
     ErrorType.INVALID_CREDENTIALS,
+    ErrorType.AUTH_REQUIRED,
+    ErrorType.AUTH_INVALID,
+    ErrorType.FORBIDDEN,
+    ErrorType.VIRUS_DETECTED,
   ];
 
   const performanceErrors = [
     ErrorType.TIMEOUT_ERROR,
     ErrorType.RATE_LIMIT_ERROR,
     ErrorType.QUOTA_EXCEEDED,
+    ErrorType.FILE_TOO_LARGE,
   ];
 
   const externalErrors = [
     ErrorType.NETWORK_ERROR,
     ErrorType.CONNECTION_ERROR,
     ErrorType.EXTERNAL_SERVICE_ERROR,
+    ErrorType.PAYMENT_FAILED,
+  ];
+
+  const businessErrors = [
+    ErrorType.BUSINESS_ERROR,
+    ErrorType.BEAT_NOT_AVAILABLE,
+    ErrorType.LICENSE_CONFLICT,
+    ErrorType.RESERVATION_CONFLICT,
+    ErrorType.ORDER_PROCESSING_FAILED,
+    ErrorType.SUBSCRIPTION_REQUIRED,
   ];
 
   if (systemErrors.includes(errorType)) return ErrorCategory.SYSTEM;
   if (securityErrors.includes(errorType)) return ErrorCategory.SECURITY;
   if (performanceErrors.includes(errorType)) return ErrorCategory.PERFORMANCE;
   if (externalErrors.includes(errorType)) return ErrorCategory.EXTERNAL;
+  if (businessErrors.includes(errorType)) return ErrorCategory.USER;
 
   return ErrorCategory.USER;
 }

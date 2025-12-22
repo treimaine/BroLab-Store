@@ -11,6 +11,7 @@
  */
 
 import { ConvexHttpClient } from "convex/browser";
+import { centsToDollars } from "../../shared/utils/currency";
 import { ErrorSeverity } from "../utils/errorHandling";
 import { sendAdminNotification } from "./mail";
 
@@ -85,7 +86,7 @@ export class AdminNotificationService {
       metadata: {
         orderId,
         paymentIntentId,
-        amount: (amount / 100).toFixed(2),
+        amount: centsToDollars(amount).toFixed(2),
         currency: currency.toUpperCase(),
         failureReason: failureReason || "Unknown reason",
       },
@@ -168,7 +169,7 @@ export class AdminNotificationService {
       metadata: {
         orderId,
         chargeId,
-        amountRefunded: (amountRefunded / 100).toFixed(2),
+        amountRefunded: centsToDollars(amountRefunded).toFixed(2),
         currency: currency.toUpperCase(),
         reason: reason || "No reason provided",
       },

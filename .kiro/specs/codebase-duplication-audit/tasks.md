@@ -77,14 +77,14 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
 - [ ] 4. Checkpoint - Auth helpers implemented
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. Implement centralized error handling
-  - [ ] 5.1 Create `shared/utils/errorHandler.ts`
+- [x] 5. Implement centralized error handling
+  - [x] 5.1 Create `shared/utils/errorHandler.ts`
     - Implement AppError interface and createAppError function
     - Implement withErrorHandling wrapper
     - Implement isAppError type guard
     - _Requirements: 3.1, 3.2_
 
-  - [ ] 5.2 Create error type mappings in `shared/constants/errors.ts`
+  - [x] 5.2 Create error type mappings in `shared/constants/errors.ts`
     - Define ErrorType enum with all error categories
     - Create ERROR_MESSAGES mapping for user-friendly messages
     - Create ERROR_HTTP_STATUS mapping for HTTP status codes
@@ -94,8 +94,8 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
     - **Property 5: Error Handler Type Preservation**
     - **Validates: Requirements 3.1, 3.2, 3.4**
 
-- [ ] 6. Implement currency utilities
-  - [ ] 6.1 Create `shared/utils/currency.ts`
+- [x] 6. Implement currency utilities
+  - [x] 6.1 Create `shared/utils/currency.ts`
     - Implement centsToDollars and dollarsToCents functions
     - Implement formatCurrency with locale support
     - Implement formatCurrencyDisplay for templates
@@ -107,7 +107,7 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
     - **Property 11: Price Calculation Integer Arithmetic**
     - **Validates: Requirements 4.1, 4.3, 10.1, 10.5**
 
-  - [ ] 6.3 Migrate price formatting calls to use currency utilities
+  - [x] 6.3 Migrate price formatting calls to use currency utilities
     - Replace scattered toFixed(2) patterns with formatCurrency
     - Replace (amount / 100) patterns with centsToDollars
     - _Requirements: 4.2, 10.2_

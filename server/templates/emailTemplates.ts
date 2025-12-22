@@ -9,6 +9,7 @@
  * - Admin notifications
  */
 
+import { formatCurrencyDisplay } from "../../shared/utils/currency";
 import { logger } from "../lib/logger";
 
 // Type definitions
@@ -292,7 +293,7 @@ export const generateReservationConfirmationEmail = (
     paymentSection = `
     <div style="${EMAIL_STYLES.infoBox}">
       <h3 style="color: #8B5CF6; margin: 0 0 10px 0;">Payment Information</h3>
-      <p><strong>Amount Paid:</strong> ${(payment.amount / 100).toFixed(2)} ${payment.currency.toUpperCase()}</p>
+      <p><strong>Amount Paid:</strong> ${formatCurrencyDisplay(payment.amount, { currency: payment.currency })}</p>
       <p><strong>Payment Method:</strong> ${payment.paymentMethod || "Card"}</p>
       ${transactionIdSection}
     </div>
@@ -352,7 +353,7 @@ export const generatePaymentFailureEmail = (
       
       <div style="${EMAIL_STYLES.errorBox}">
         <h3 style="color: #DC2626; margin: 0 0 10px 0;">Payment Details</h3>
-        <p><strong>Amount:</strong> ${(payment.amount / 100).toFixed(2)} ${payment.currency.toUpperCase()}</p>
+        <p><strong>Amount:</strong> ${formatCurrencyDisplay(payment.amount, { currency: payment.currency })}</p>
         ${payment.paymentIntentId ? `<p><strong>Payment Intent ID:</strong> ${payment.paymentIntentId}</p>` : ""}
         <p><strong>Failure Reason:</strong> ${failureReason || "Payment processing failed"}</p>
       </div>
@@ -603,7 +604,7 @@ export const generatePaymentConfirmationEmail = (
       
       <div style="${EMAIL_STYLES.successBox}">
         <h3 style="color: #059669; margin: 0 0 10px 0;">Payment Details</h3>
-        <p><strong>Amount Paid:</strong> ${(payment.amount / 100).toFixed(2)} ${payment.currency.toUpperCase()}</p>
+        <p><strong>Amount Paid:</strong> ${formatCurrencyDisplay(payment.amount, { currency: payment.currency })}</p>
         <p><strong>Payment Method:</strong> ${payment.paymentMethod || "Card"}</p>
         ${payment.paymentIntentId ? `<p><strong>Transaction ID:</strong> ${payment.paymentIntentId}</p>` : ""}
         <p><strong>Status:</strong> <span style="color: #10B981; font-weight: bold;">PAID</span></p>

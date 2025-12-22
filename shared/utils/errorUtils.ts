@@ -1,73 +1,268 @@
 /**
  * BroLab Entertainment - Error Utilities
  *
- * Utilities for handling and formatting BroLab-specific error messages
+ * Centralized error handling utilities including:
+ * - AppError interface and factory functions
+ * - Error wrapping utilities for async operations
+ * - BroLab-specific error message formatting
  */
 
 import { ErrorMessages } from "../constants/ErrorMessages";
+import { ERROR_HTTP_STATUS, ERROR_MESSAGES, ErrorType } from "../constants/errors";
+
+// ================================
+// APP ERROR INTERFACE & UTILITIES
+// ================================
+
+/**
+ * Application error interface with typed properties
+ * Replaces scattered throw new Error() patterns
+ */
+export interface AppError extends Error {
+  type: ErrorType;
+  statusCode: number;
+  userMessage: string;
+  details?: Record<string, unknown>;
+  isOperational: boolean;
+}
+
+/**
+ * Create a typed application error
+ * Replaces scattered throw new Error() patterns across the codebase
+ *
+ * @param type - The error type from ErrorType enum
+ * @param message - Optional technical message (defaults to ERROR_MESSAGES mapping)
+ * @param details - Optional additional context for debugging
+ * @returns AppError instance with all properties set
+ *
+ * @example
+ * throw createAppError(ErrorType.AUTHENTICATION_ERROR);
+ * throw createAppError(ErrorType.VALIDATION_ERROR, "Email format invalid", { field: "email" });
+ */
+export function createAppError(
+  type: ErrorType,
+  message?: string,
+  details?: Record<string, unknown>
+): AppError {
+  const error = new Error(message || ERROR_MESSAGES[type]) as AppError;
+  error.name = "AppError";
+  error.type = type;
+  error.statusCode = ERROR_HTTP_STATUS[type];
+  error.userMessage = ERROR_MESSAGES[type];
+  error.details = details;
+  error.isOperational = true;
+  return error;
+}
+
+/**
+ * Type guard to check if an error is an AppError
+ *
+ * @param error - Unknown error to check
+ * @returns True if error is an AppError instance
+ *
+ * @example
+ * try {
+ *   await riskyOperation();
+ * } catch (error) {
+ *   if (isAppError(error)) {
+ *     // Handle typed error
+ *     console.log(error.type, error.statusCode);
+ *   }
+ * }
+ */
+export function isAppError(error: unknown): error is AppError {
+  return (
+    error instanceof Error &&
+    "type" in error &&
+    "isOperational" in error &&
+    "statusCode" in error &&
+    "userMessage" in error
+  );
+}
+
+/**
+ * Wrap async handlers with consistent error handling
+ * Replaces try-catch boilerplate across the codebase
+ *
+ * @param fn - Async function to wrap
+ * @param context - Optional context string for logging
+ * @returns Promise that resolves to the function result or throws AppError
+ *
+ * @example
+ * const result = await withErrorHandling(
+ *   () => fetchUserData(userId),
+ *   "fetchUserData"
+ * );
+ */
+export async function withErrorHandling<T>(fn: () => Promise<T>, context?: string): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: unknown) {
+    // If already an AppError, re-throw as-is
+    if (isAppError(error)) {
+      throw error;
+    }
+
+    // Extract message from unknown error
+    const message = error instanceof Error ? error.message : "Unknown error";
+
+    // Log with context for debugging
+    console.error(`Error in ${context || "operation"}:`, error);
+
+    // Wrap in AppError for consistent handling
+    throw createAppError(ErrorType.UNKNOWN_ERROR, message, {
+      originalError: error instanceof Error ? error.name : typeof error,
+      context,
+    });
+  }
+}
+
+/**
+ * Synchronous version of withErrorHandling for non-async operations
+ *
+ * @param fn - Synchronous function to wrap
+ * @param context - Optional context string for logging
+ * @returns Function result or throws AppError
+ */
+export function withErrorHandlingSync<T>(fn: () => T, context?: string): T {
+  try {
+    return fn();
+  } catch (error: unknown) {
+    if (isAppError(error)) {
+      throw error;
+    }
+
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error(`Error in ${context || "operation"}:`, error);
+
+    throw createAppError(ErrorType.UNKNOWN_ERROR, message, {
+      originalError: error instanceof Error ? error.name : typeof error,
+      context,
+    });
+  }
+}
+
+/**
+ * Convert any error to AppError for consistent handling
+ *
+ * @param error - Any error to convert
+ * @param defaultType - Default error type if not determinable
+ * @returns AppError instance
+ */
+export function toAppError(
+  error: unknown,
+  defaultType: ErrorType = ErrorType.UNKNOWN_ERROR
+): AppError {
+  if (isAppError(error)) {
+    return error;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  return createAppError(defaultType, message);
+}
+
+// ================================
+// BROLAB-SPECIFIC ERROR UTILITIES
+// ================================
+
+/**
+ * Error category definition for mapping keywords to messages
+ */
+interface ErrorCategoryRule {
+  keywords: string[];
+  message: string;
+}
+
+interface ErrorCategory {
+  triggers: string[];
+  rules: ErrorCategoryRule[];
+  fallback?: string;
+}
+
+/**
+ * Error mapping configuration - declarative approach to reduce cognitive complexity
+ */
+const ERROR_CATEGORIES: ErrorCategory[] = [
+  {
+    triggers: ["beat", "track", "audio"],
+    rules: [
+      { keywords: ["not found"], message: ErrorMessages.BEATS.NOT_FOUND },
+      { keywords: ["unavailable"], message: ErrorMessages.BEATS.UNAVAILABLE },
+      { keywords: ["license"], message: ErrorMessages.BEATS.INVALID_LICENSE },
+      { keywords: ["quota"], message: ErrorMessages.BEATS.INSUFFICIENT_QUOTA },
+      { keywords: ["upload"], message: ErrorMessages.BEATS.UPLOAD_FAILED },
+      { keywords: ["format"], message: ErrorMessages.BEATS.INVALID_AUDIO_FORMAT },
+      { keywords: ["size", "large"], message: ErrorMessages.BEATS.FILE_TOO_LARGE },
+      { keywords: ["virus"], message: ErrorMessages.BEATS.VIRUS_DETECTED },
+    ],
+  },
+  {
+    triggers: ["payment", "card", "billing"],
+    rules: [
+      { keywords: ["declined"], message: ErrorMessages.PAYMENT.CARD_DECLINED },
+      { keywords: ["expired"], message: ErrorMessages.PAYMENT.EXPIRED_CARD },
+      { keywords: ["insufficient"], message: ErrorMessages.PAYMENT.INSUFFICIENT_FUNDS },
+      { keywords: ["stripe"], message: ErrorMessages.PAYMENT.STRIPE_ERROR },
+      { keywords: ["paypal"], message: ErrorMessages.PAYMENT.PAYPAL_ERROR },
+    ],
+    fallback: ErrorMessages.PAYMENT.FAILED,
+  },
+  {
+    triggers: ["auth", "login", "unauthorized"],
+    rules: [
+      { keywords: ["unauthorized"], message: ErrorMessages.AUTH.UNAUTHORIZED },
+      { keywords: ["forbidden"], message: ErrorMessages.AUTH.FORBIDDEN },
+      { keywords: ["token"], message: ErrorMessages.AUTH.INVALID_TOKEN },
+      { keywords: ["session"], message: ErrorMessages.AUTH.SESSION_EXPIRED },
+      { keywords: ["suspended"], message: ErrorMessages.AUTH.ACCOUNT_SUSPENDED },
+    ],
+  },
+  {
+    triggers: ["file", "download", "upload"],
+    rules: [
+      { keywords: ["not found"], message: ErrorMessages.FILE.NOT_FOUND },
+      { keywords: ["download"], message: ErrorMessages.FILE.DOWNLOAD_FAILED },
+      { keywords: ["upload"], message: ErrorMessages.FILE.UPLOAD_FAILED },
+      { keywords: ["access"], message: ErrorMessages.FILE.ACCESS_DENIED },
+      { keywords: ["corrupted"], message: ErrorMessages.FILE.CORRUPTED },
+    ],
+  },
+];
+
+/**
+ * Check if message contains any of the keywords
+ */
+function matchesKeywords(message: string, keywords: string[]): boolean {
+  return keywords.some(keyword => message.includes(keyword));
+}
+
+/**
+ * Find matching error message from category rules
+ */
+function findMatchingRule(message: string, category: ErrorCategory): string | null {
+  for (const rule of category.rules) {
+    if (matchesKeywords(message, rule.keywords)) {
+      return rule.message;
+    }
+  }
+  return category.fallback ?? null;
+}
 
 /**
  * Maps generic error types to BroLab-specific error messages
+ * Uses declarative mapping to maintain low cognitive complexity
  */
 export function getBroLabErrorMessage(error: Error | string): string {
   const errorMessage = typeof error === "string" ? error : error.message;
   const lowerMessage = errorMessage.toLowerCase();
 
-  // Beat/Music specific errors
-  if (
-    lowerMessage.includes("beat") ||
-    lowerMessage.includes("track") ||
-    lowerMessage.includes("audio")
-  ) {
-    if (lowerMessage.includes("not found")) return ErrorMessages.BEATS.NOT_FOUND;
-    if (lowerMessage.includes("unavailable")) return ErrorMessages.BEATS.UNAVAILABLE;
-    if (lowerMessage.includes("license")) return ErrorMessages.BEATS.INVALID_LICENSE;
-    if (lowerMessage.includes("quota")) return ErrorMessages.BEATS.INSUFFICIENT_QUOTA;
-    if (lowerMessage.includes("upload")) return ErrorMessages.BEATS.UPLOAD_FAILED;
-    if (lowerMessage.includes("format")) return ErrorMessages.BEATS.INVALID_AUDIO_FORMAT;
-    if (lowerMessage.includes("size") || lowerMessage.includes("large"))
-      return ErrorMessages.BEATS.FILE_TOO_LARGE;
-    if (lowerMessage.includes("virus")) return ErrorMessages.BEATS.VIRUS_DETECTED;
-  }
-
-  // Payment specific errors
-  if (
-    lowerMessage.includes("payment") ||
-    lowerMessage.includes("card") ||
-    lowerMessage.includes("billing")
-  ) {
-    if (lowerMessage.includes("declined")) return ErrorMessages.PAYMENT.CARD_DECLINED;
-    if (lowerMessage.includes("expired")) return ErrorMessages.PAYMENT.EXPIRED_CARD;
-    if (lowerMessage.includes("insufficient")) return ErrorMessages.PAYMENT.INSUFFICIENT_FUNDS;
-    if (lowerMessage.includes("stripe")) return ErrorMessages.PAYMENT.STRIPE_ERROR;
-    if (lowerMessage.includes("paypal")) return ErrorMessages.PAYMENT.PAYPAL_ERROR;
-    return ErrorMessages.PAYMENT.FAILED;
-  }
-
-  // Authentication errors
-  if (
-    lowerMessage.includes("auth") ||
-    lowerMessage.includes("login") ||
-    lowerMessage.includes("unauthorized")
-  ) {
-    if (lowerMessage.includes("unauthorized")) return ErrorMessages.AUTH.UNAUTHORIZED;
-    if (lowerMessage.includes("forbidden")) return ErrorMessages.AUTH.FORBIDDEN;
-    if (lowerMessage.includes("token")) return ErrorMessages.AUTH.INVALID_TOKEN;
-    if (lowerMessage.includes("session")) return ErrorMessages.AUTH.SESSION_EXPIRED;
-    if (lowerMessage.includes("suspended")) return ErrorMessages.AUTH.ACCOUNT_SUSPENDED;
-  }
-
-  // File/Download errors
-  if (
-    lowerMessage.includes("file") ||
-    lowerMessage.includes("download") ||
-    lowerMessage.includes("upload")
-  ) {
-    if (lowerMessage.includes("not found")) return ErrorMessages.FILE.NOT_FOUND;
-    if (lowerMessage.includes("download")) return ErrorMessages.FILE.DOWNLOAD_FAILED;
-    if (lowerMessage.includes("upload")) return ErrorMessages.FILE.UPLOAD_FAILED;
-    if (lowerMessage.includes("access")) return ErrorMessages.FILE.ACCESS_DENIED;
-    if (lowerMessage.includes("corrupted")) return ErrorMessages.FILE.CORRUPTED;
+  for (const category of ERROR_CATEGORIES) {
+    if (matchesKeywords(lowerMessage, category.triggers)) {
+      const matchedMessage = findMatchingRule(lowerMessage, category);
+      if (matchedMessage) {
+        return matchedMessage;
+      }
+    }
   }
 
   return ErrorMessages.GENERIC.UNKNOWN_ERROR;

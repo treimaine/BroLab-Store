@@ -14,6 +14,7 @@
 import { DEFAULT_LICENSE_TERMS, LicenseType } from "../types/Beat";
 import { CURRENCY_SYMBOLS, Currency } from "../types/Order";
 import { SUBSCRIPTION_FEATURES, SubscriptionPlan } from "../types/User";
+import { centsToDollars } from "./currency";
 
 // ================================
 // TYPES
@@ -521,10 +522,10 @@ export function formatCurrencyAmount(amountCents: number, currency: Currency): s
 
   // JPY has no decimal places (100 cents = 1 yen display)
   if (currency === Currency.JPY) {
-    return `${symbol}${Math.round(amountCents / 100)}`;
+    return `${symbol}${Math.round(centsToDollars(amountCents))}`;
   }
 
-  const dollars = (amountCents / 100).toFixed(2);
+  const dollars = centsToDollars(amountCents).toFixed(2);
   return `${symbol}${dollars}`;
 }
 

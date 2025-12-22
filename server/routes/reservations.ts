@@ -2,6 +2,7 @@ import { Request, Response, Router } from "express";
 import { z } from "zod";
 import type { ReservationStatusEnum, ServiceTypeEnum } from "../../shared/schema";
 import { ReservationStatus } from "../../shared/schema";
+import { centsToDollars } from "../../shared/utils/currency";
 import type { CreateReservation } from "../../shared/validation/ReservationValidation";
 import {
   CommonParams,
@@ -73,7 +74,7 @@ function buildConfirmationEmailContent(
   const displayName = getUserDisplayName(user);
   const formattedDate = new Date(reservation.preferred_date).toLocaleDateString("en-US");
   const formattedTime = new Date(reservation.preferred_date).toLocaleTimeString("en-US");
-  const formattedPrice = (reservation.total_price / 100).toFixed(2);
+  const formattedPrice = centsToDollars(reservation.total_price).toFixed(2);
 
   return `
     <h2>Reservation Confirmation</h2>

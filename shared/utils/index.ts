@@ -4,6 +4,7 @@
 export * from "./analytics-manager";
 export * from "./business-logic";
 export * from "./cache-manager";
+export * from "./currency";
 export * from "./errorUtils";
 export * from "./sanitize";
 

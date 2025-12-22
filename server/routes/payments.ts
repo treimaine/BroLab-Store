@@ -6,6 +6,7 @@ import type {
   CreatePaymentSessionResponse,
   PaymentWebhookRequest,
 } from "../../shared/types/apiEndpoints";
+import { centsToDollars } from "../../shared/utils/currency";
 import { createPaymentSessionRequestSchema, validateBody } from "../../shared/validation/index";
 import PayPalService from "../services/paypal";
 import type { CreatePaymentSessionHandler } from "../types/ApiTypes";
@@ -320,7 +321,7 @@ const createPaymentSession: CreatePaymentSessionHandler = async (req, res) => {
       // Create PayPal order
       const paypalResult = await PayPalService.createPaymentOrder({
         serviceType: (metadata?.serviceType as string) || "service",
-        amount: amount / 100, // PayPal expects amount in dollars, not cents
+        amount: centsToDollars(amount), // PayPal expects amount in dollars, not cents
         currency: currency.toUpperCase(),
         description,
         reservationId,
