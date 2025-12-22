@@ -149,7 +149,9 @@ export const apiRateLimiter = rateLimit({
     // Skip rate limiting for health checks and monitoring
     return req.path === "/api/monitoring/health" || req.path === "/api/monitoring/status";
   },
-  validate: false, // Disable all validation warnings (we handle IP extraction ourselves)
+  // Disable validation for proxy environments (Replit, Vercel, etc.)
+  // We handle IP extraction ourselves via getClientIp
+  validate: { xForwardedForHeader: false, trustProxy: false, default: true },
 });
 
 // Stricter rate limiting for authentication endpoints
@@ -163,7 +165,7 @@ export const authRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getClientIp,
-  validate: false,
+  validate: { xForwardedForHeader: false, trustProxy: false, default: true },
 });
 
 // Stricter rate limiting for payment endpoints
@@ -177,7 +179,7 @@ export const paymentRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getClientIp,
-  validate: false,
+  validate: { xForwardedForHeader: false, trustProxy: false, default: true },
 });
 
 // Stricter rate limiting for download endpoints
@@ -191,5 +193,5 @@ export const downloadRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getClientIp,
-  validate: false,
+  validate: { xForwardedForHeader: false, trustProxy: false, default: true },
 });
