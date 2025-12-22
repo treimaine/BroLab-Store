@@ -8,8 +8,16 @@ jest.mock("convex/browser", () => ({
   })),
 }));
 
-// Mock Clerk pour les tests
-jest.mock("@clerk/clerk-sdk-node", () => ({
+// Mock Clerk pour les tests (utilise @clerk/express au lieu de @clerk/clerk-sdk-node déprécié)
+jest.mock("@clerk/express", () => ({
+  clerkMiddleware: () => (req: { auth?: object }, _res: unknown, next: () => void) => {
+    req.auth = req.auth || { userId: "user_123", sessionId: "sess_123" };
+    next();
+  },
+  getAuth: () => ({ userId: "user_123", sessionId: "sess_123" }),
+}));
+
+jest.mock("@clerk/backend", () => ({
   clerkClient: {
     users: {
       getUser: jest.fn().mockResolvedValue({

@@ -1,4 +1,4 @@
-import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
+import { clerkMiddleware, getAuth } from "@clerk/express";
 import { NextFunction, Request, Response } from "express";
 
 /**
@@ -46,37 +46,36 @@ export interface ClerkRequest extends Request {
 }
 
 // Middleware pour ajouter les données Clerk à toutes les requêtes
-export const withClerkAuth = ClerkExpressWithAuth({
-  onError: (error: Error) => {
-    console.error("Clerk auth error:", error);
-    return {
-      error: "Non autorisé",
-      message: "Authentification Clerk requise",
-    };
-  },
-});
+// Utilise @clerk/express au lieu de @clerk/clerk-sdk-node (déprécié)
+export const withClerkAuth = clerkMiddleware();
 
 // Middleware pour vérifier l'authentification Clerk
+// Utilise getAuth de @clerk/express pour récupérer les données d'authentification
 export const requireClerkAuth = (req: ClerkRequest, res: Response, next: NextFunction): void => {
-  if (!req.auth?.userId) {
+  const auth = getAuth(req);
+  if (!auth?.userId) {
     res.status(401).json({ error: "Non autorisé", message: "Authentification Clerk requise" });
     return;
   }
+  // Attacher les données auth à la requête pour compatibilité
+  req.auth = auth as ClerkRequest["auth"];
   next();
 };
 
 // Fonction utilitaire pour obtenir l'utilisateur Clerk actuel
 export const getCurrentClerkUser = (req: ClerkRequest) => {
-  return req.auth?.userId
+  const auth = getAuth(req);
+  return auth?.userId
     ? {
-        id: req.auth.userId,
-        sessionId: req.auth.sessionId,
-        getToken: req.auth.getToken,
+        id: auth.userId,
+        sessionId: auth.sessionId,
+        getToken: auth.getToken,
       }
     : null;
 };
 
 // Fonction utilitaire pour vérifier si l'utilisateur est authentifié via Clerk
 export const isClerkAuthenticated = (req: ClerkRequest): boolean => {
-  return !!req.auth?.userId;
+  const auth = getAuth(req);
+  return !!auth?.userId;
 };
