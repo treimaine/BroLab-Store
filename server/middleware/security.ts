@@ -117,20 +117,74 @@ export const compressionMiddleware = compression({
   threshold: 1024, // Only compress responses larger than 1KB
 });
 
-// Body size limits middleware
-export const bodySizeLimits: RequestHandler = (req, res, next) => {
-  // JSON body size limit (10MB for file uploads metadata)
+// Body size limits configuration by content type
+const BODY_SIZE_LIMITS: Record<string, number> = {
+  json: 10 * 1024 * 1024, // 10MB - file uploads metadata
+  urlencoded: 1 * 1024 * 1024, // 1MB - form submissions
+  multipart: 50 * 1024 * 1024, // 50MB - file uploads (audio files)
+  text: 1 * 1024 * 1024, // 1MB - plain text
+  xml: 5 * 1024 * 1024, // 5MB - XML payloads
+  default: 1 * 1024 * 1024, // 1MB - fallback for unknown types
+};
+
+/**
+ * Determine the appropriate size limit based on content type
+ */
+function getContentTypeLimit(req: Request): { limit: number; type: string } {
   if (req.is("application/json")) {
-    const contentLength = Number.parseInt(req.headers["content-length"] || "0", 10);
-    if (contentLength > 10 * 1024 * 1024) {
-      res.status(413).json({
-        error: "Request body too large",
-        code: "BODY_TOO_LARGE",
-        maxSize: "10MB",
-      });
-      return;
-    }
+    return { limit: BODY_SIZE_LIMITS.json, type: "json" };
   }
+  if (req.is("application/x-www-form-urlencoded")) {
+    return { limit: BODY_SIZE_LIMITS.urlencoded, type: "urlencoded" };
+  }
+  if (req.is("multipart/form-data")) {
+    return { limit: BODY_SIZE_LIMITS.multipart, type: "multipart" };
+  }
+  if (req.is("text/plain")) {
+    return { limit: BODY_SIZE_LIMITS.text, type: "text" };
+  }
+  if (req.is("application/xml") || req.is("text/xml")) {
+    return { limit: BODY_SIZE_LIMITS.xml, type: "xml" };
+  }
+  return { limit: BODY_SIZE_LIMITS.default, type: "default" };
+}
+
+/**
+ * Format bytes to human-readable string
+ */
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    return `${Math.round(bytes / (1024 * 1024))}MB`;
+  }
+  if (bytes >= 1024) {
+    return `${Math.round(bytes / 1024)}KB`;
+  }
+  return `${bytes}B`;
+}
+
+// Body size limits middleware - enforces limits for all content types
+export const bodySizeLimits: RequestHandler = (req, res, next) => {
+  const contentLength = Number.parseInt(req.headers["content-length"] || "0", 10);
+
+  // Skip if no content-length header or empty body
+  if (contentLength === 0) {
+    next();
+    return;
+  }
+
+  const { limit, type } = getContentTypeLimit(req);
+
+  if (contentLength > limit) {
+    res.status(413).json({
+      error: "Request body too large",
+      code: "BODY_TOO_LARGE",
+      contentType: type,
+      maxSize: formatBytes(limit),
+      receivedSize: formatBytes(contentLength),
+    });
+    return;
+  }
+
   next();
 };
 
