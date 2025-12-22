@@ -18,12 +18,17 @@ declare global {
 
 /**
  * Generate a unique request ID for error tracking and support
- * Format: REQ-{timestamp}-{random}
+ * Uses crypto.getRandomValues() for collision-resistant randomness
+ * Format: REQ-{16 hex characters}
  */
 function generateRequestId(): string {
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `REQ-${timestamp}-${random}`;
+  const array = new Uint8Array(8);
+  crypto.getRandomValues(array);
+  const random = Array.from(array)
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
+  return `REQ-${random}`;
 }
 
 /**
@@ -154,10 +159,18 @@ export async function apiRequest(
   options: BaseRequestOptions = {}
 ): Promise<Response> {
   const { credentials = "same-origin" } = options;
+  const requestId = generateRequestId();
+
+  const headers: Record<string, string> = {
+    "X-Request-ID": requestId,
+  };
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
 
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials,
   });
@@ -281,9 +294,13 @@ export function getCircuitBreakerStatus(url: string): CircuitBreakerState | unde
 // Helper: Build request headers
 function buildRequestHeaders(
   data: unknown,
-  customHeaders?: Record<string, string>
+  customHeaders?: Record<string, string>,
+  requestId?: string
 ): Record<string, string> {
   const headers: Record<string, string> = {};
+  if (requestId) {
+    headers["X-Request-ID"] = requestId;
+  }
   if (data) {
     headers["Content-Type"] = "application/json";
   }
@@ -344,7 +361,8 @@ async function executeFetchAttempt(
   data: unknown,
   customHeaders: Record<string, string> | undefined,
   timeout: number,
-  credentials: CredentialsMode = "same-origin"
+  credentials: CredentialsMode = "same-origin",
+  requestId?: string
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -352,7 +370,7 @@ async function executeFetchAttempt(
   try {
     const res = await fetch(url, {
       method,
-      headers: buildRequestHeaders(data, customHeaders),
+      headers: buildRequestHeaders(data, customHeaders, requestId),
       body: data ? JSON.stringify(data) : undefined,
       credentials,
       signal: controller.signal,
@@ -396,11 +414,21 @@ export async function enhancedApiRequest(
 
   checkCircuitBreaker(url);
 
+  // Generate request ID once for all retry attempts (correlation)
+  const requestId = generateRequestId();
   let lastError: Error = new Error("Request failed");
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      return await executeFetchAttempt(url, method, data, customHeaders, timeout, credentials);
+      return await executeFetchAttempt(
+        url,
+        method,
+        data,
+        customHeaders,
+        timeout,
+        credentials,
+        requestId
+      );
     } catch (error) {
       const { error: processedError, shouldThrow } = processError(error, url);
       lastError = processedError;
@@ -471,9 +499,13 @@ export const getQueryFn: <T>(options: QueryFnOptions) => QueryFunction<T> =
   async ({ queryKey }) => {
     // Validate and build the API path securely
     const apiPath = validateApiPath(queryKey);
+    const requestId = generateRequestId();
 
     const res = await fetch(apiPath, {
       credentials,
+      headers: {
+        "X-Request-ID": requestId,
+      },
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
