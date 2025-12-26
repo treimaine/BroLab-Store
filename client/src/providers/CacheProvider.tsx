@@ -103,21 +103,18 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
     clear: { failureCount: 0, currentDelay: BACKOFF_CONFIG.initialDelay, isPaused: false },
   });
 
-  // Helper to calculate backoff delay
-  const calculateBackoffDelay = useCallback(
-    (operation: CacheOperationType): number => {
-      const status = operationStatuses[operation];
-      if (status.failureCount === 0) {
-        return operation === "metrics" ? 30_000 : 5 * 60_000; // Default intervals
-      }
-      const delay = Math.min(
-        BACKOFF_CONFIG.initialDelay * Math.pow(BACKOFF_CONFIG.multiplier, status.failureCount),
-        BACKOFF_CONFIG.maxDelay
-      );
-      return delay;
-    },
-    [operationStatuses]
-  );
+  // Helper to calculate backoff delay - uses ref to avoid dependency cycle
+  const calculateBackoffDelay = useCallback((operation: CacheOperationType): number => {
+    const status = operationStatusesRef.current[operation];
+    if (status.failureCount === 0) {
+      return operation === "metrics" ? 30_000 : 5 * 60_000; // Default intervals
+    }
+    const delay = Math.min(
+      BACKOFF_CONFIG.initialDelay * Math.pow(BACKOFF_CONFIG.multiplier, status.failureCount),
+      BACKOFF_CONFIG.maxDelay
+    );
+    return delay;
+  }, []);
 
   // Helper to handle operation failure with backoff
   const handleOperationFailure = useCallback(
@@ -256,10 +253,14 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
   // Warm auth-required data only after auth state is confirmed and user is signed in
   useCacheWarming(authLoaded && isSignedIn ? authRequiredWarmingData : []);
 
-  // Update cache metrics and health - defined before useEffect that uses it
+  // Use refs to avoid dependency cycles in callbacks
+  const operationStatusesRef = useRef(operationStatuses);
+  operationStatusesRef.current = operationStatuses;
+
+  // Update cache metrics and health - uses ref to avoid dependency cycle
   const updateMetrics = useCallback(() => {
-    // Skip if metrics operation is paused
-    if (operationStatuses.metrics.isPaused) {
+    // Skip if metrics operation is paused (use ref to avoid dependency)
+    if (operationStatusesRef.current.metrics.isPaused) {
       return;
     }
 
@@ -285,7 +286,7 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
       handleOperationFailure("metrics", error);
       setCacheHealth("poor");
     }
-  }, [operationStatuses.metrics.isPaused, handleOperationSuccess, handleOperationFailure]);
+  }, [handleOperationSuccess, handleOperationFailure]);
 
   // Track tab visibility to pause timers when hidden (saves bandwidth and battery)
   const [isTabVisible, setIsTabVisible] = useState(() => !document.hidden);
@@ -306,6 +307,8 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
 
   // Initialize cache on mount (runs once)
   useEffect(() => {
+    let isMounted = true;
+
     const initializeCache = async (): Promise<void> => {
       try {
         setIsWarming(true);
@@ -316,22 +319,27 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
         // Preload critical data
         await cachingStrategy.preloadCriticalData();
 
-        // Update metrics
-        updateMetrics();
-
-        setIsInitialized(true);
-        console.log("✅ Cache provider initialized successfully");
+        if (isMounted) {
+          setIsInitialized(true);
+          console.log("✅ Cache provider initialized successfully");
+        }
       } catch (error) {
         console.error("❌ Failed to initialize cache provider:", error);
       } finally {
-        setIsWarming(false);
+        if (isMounted) {
+          setIsWarming(false);
+        }
       }
     };
 
     initializeCache();
-  }, [updateMetrics]);
 
-  // Schedule metrics updates with backoff
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Empty deps - run only once on mount
+
+  // Schedule metrics updates with backoff - stable callback using refs
   const scheduleMetricsUpdate = useCallback(() => {
     if (metricsTimeoutRef.current) {
       clearTimeout(metricsTimeoutRef.current);
@@ -341,21 +349,21 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
 
     metricsTimeoutRef.current = setTimeout(() => {
       updateMetrics();
-      // Reschedule if not paused
-      if (!operationStatuses.metrics.isPaused) {
+      // Reschedule if not paused (check ref for current value)
+      if (!operationStatusesRef.current.metrics.isPaused) {
         scheduleMetricsUpdate();
       }
     }, delay);
-  }, [calculateBackoffDelay, updateMetrics, operationStatuses.metrics.isPaused]);
+  }, [calculateBackoffDelay, updateMetrics]);
 
-  // Schedule optimization with backoff
+  // Schedule optimization with backoff - stable callback using refs
   const scheduleOptimization = useCallback(() => {
     if (optimizationTimeoutRef.current) {
       clearTimeout(optimizationTimeoutRef.current);
     }
 
-    // Skip if paused
-    if (operationStatuses.optimization.isPaused) {
+    // Skip if paused (check ref for current value)
+    if (operationStatusesRef.current.optimization.isPaused) {
       return;
     }
 
@@ -369,17 +377,12 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
         console.error("Cache optimization failed:", error);
         handleOperationFailure("optimization", error);
       }
-      // Reschedule if not paused
-      if (!operationStatuses.optimization.isPaused) {
+      // Reschedule if not paused (check ref for current value)
+      if (!operationStatusesRef.current.optimization.isPaused) {
         scheduleOptimization();
       }
     }, delay);
-  }, [
-    calculateBackoffDelay,
-    handleOperationSuccess,
-    handleOperationFailure,
-    operationStatuses.optimization.isPaused,
-  ]);
+  }, [calculateBackoffDelay, handleOperationSuccess, handleOperationFailure]);
 
   // Manage periodic timers based on tab visibility
   useEffect(() => {
@@ -401,7 +404,7 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
     }
 
     // Tab is visible - start scheduled operations
-    // Run immediately when tab becomes visible again
+    // Run metrics update once when tab becomes visible
     updateMetrics();
 
     // Schedule periodic updates with backoff support
@@ -409,7 +412,9 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
     scheduleOptimization();
 
     return clearTimeouts;
-  }, [isTabVisible, updateMetrics, scheduleMetricsUpdate, scheduleOptimization]);
+    // Only re-run when visibility changes, not when callbacks change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTabVisible]);
 
   // Cache actions - memoized to prevent unnecessary re-renders
   const warmCache = useCallback(async () => {

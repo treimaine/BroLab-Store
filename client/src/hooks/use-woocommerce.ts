@@ -34,6 +34,8 @@ export function useWooCommerce() {
         if (!response.ok) throw new Error("Failed to fetch products");
         return response.json();
       },
+      staleTime: 5 * 60 * 1000, // 5 minutes - avoid refetching on navigation
+      gcTime: 30 * 60 * 1000, // 30 minutes cache retention
     });
   };
 
@@ -49,6 +51,8 @@ export function useWooCommerce() {
       },
       // Disable query when id is invalid (0, empty, or NaN)
       enabled: Boolean(id) && id !== "0" && !Number.isNaN(Number(id)),
+      staleTime: 10 * 60 * 1000, // 10 minutes - product details change less often
+      gcTime: 60 * 60 * 1000, // 1 hour cache retention
     });
   };
 
@@ -61,6 +65,8 @@ export function useWooCommerce() {
         if (!response.ok) throw new Error("Failed to fetch categories");
         return response.json();
       },
+      staleTime: 30 * 60 * 1000, // 30 minutes - categories rarely change
+      gcTime: 60 * 60 * 1000, // 1 hour cache retention
     });
   };
 
