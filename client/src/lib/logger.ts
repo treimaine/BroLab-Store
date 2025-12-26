@@ -1,43 +1,21 @@
 /**
  * Comprehensive logging and debugging system for the mixing-mastering page
  * Implements detailed console logging, error tracking, and performance monitoring
+ *
+ * Uses clientLogger internally for PII sanitization while maintaining
+ * the specialized mixing-mastering logging API.
  */
 
-export interface LogContext {
-  page?: string;
-  component?: string;
-  action?: string;
-  userId?: string;
-  sessionId?: string;
-  timestamp?: string;
-  userAgent?: string;
-  url?: string;
-  [key: string]: unknown;
-}
+import { clientLogger, LogLevel } from "./clientLogger";
+import type { ErrorContext, LogContext, PerformanceMetrics } from "./loggerTypes";
 
-export interface ErrorContext extends LogContext {
-  errorType: "authentication" | "api" | "validation" | "file_upload" | "network" | "critical";
-  errorCode?: string | number;
-  stack?: string;
-  recoverable?: boolean;
-  retryCount?: number;
-  formData?: Record<string, unknown>;
-}
-
-export interface PerformanceMetrics {
-  pageLoadStart: number;
-  pageLoadEnd?: number;
-  authLoadTime?: number;
-  formValidationTime?: number;
-  apiRequestTime?: number;
-  fileUploadTime?: number;
-  renderTime?: number;
-}
+// Re-export types for backward compatibility
+export type { ErrorContext, LogContext, PerformanceMetrics } from "./loggerTypes";
 
 export class Logger {
   private static instance: Logger;
-  private sessionId: string;
-  private performanceMetrics: PerformanceMetrics;
+  private readonly sessionId: string;
+  private readonly performanceMetrics: PerformanceMetrics;
   private errorCount: number = 0;
   private debugMode: boolean;
 
@@ -62,7 +40,7 @@ export class Logger {
   }
 
   private generateSessionId(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private initializePerformanceMonitoring(): void {
@@ -79,7 +57,7 @@ export class Logger {
     }
 
     // Monitor navigation timing
-    window.addEventListener("load", () => {
+    globalThis.addEventListener("load", () => {
       setTimeout(() => {
         this.logNavigationTiming();
       }, 100);
@@ -92,7 +70,7 @@ export class Logger {
       sessionId: this.sessionId,
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent,
-      url: window.location.href,
+      url: globalThis.location.href,
     };
   }
 
@@ -107,16 +85,16 @@ export class Logger {
     const fullContext = { ...this.getBaseContext(), ...context };
 
     if (this.debugMode) {
-      console.log(`🔵 [INFO] ${message}`, fullContext);
+      clientLogger.logWithEmoji(LogLevel.INFO, "🔵", "INFO", message, fullContext);
     }
   }
 
   public logWarning(message: string, context?: LogContext): void {
     const fullContext = { ...this.getBaseContext(), ...context };
-    console.warn(`🟡 [WARNING] ${message}`, fullContext);
+    clientLogger.logWithEmoji(LogLevel.WARN, "🟡", "WARNING", message, fullContext);
   }
 
-  public logError(message: string, error: Error | unknown, errorContext?: ErrorContext): void {
+  public logError(message: string, error: unknown, errorContext?: ErrorContext): void {
     this.errorCount++;
 
     const fullContext: ErrorContext = {
@@ -128,7 +106,7 @@ export class Logger {
       errorCount: this.errorCount,
     };
 
-    console.error(`🔴 [ERROR] ${message}`, {
+    clientLogger.logWithEmoji(LogLevel.ERROR, "🔴", "ERROR", message, {
       error,
       context: fullContext,
     });
@@ -145,15 +123,11 @@ export class Logger {
     };
 
     if (this.debugMode) {
-      console.log(`🔐 [AUTH] ${event}`, authContext);
+      clientLogger.logWithEmoji(LogLevel.INFO, "🔐", "AUTH", event, authContext);
     }
   }
 
-  public logAuthenticationError(
-    message: string,
-    error: Error | unknown,
-    context?: LogContext
-  ): void {
+  public logAuthenticationError(message: string, error: unknown, context?: LogContext): void {
     const errorContext: ErrorContext = {
       ...this.getBaseContext(),
       ...context,
@@ -173,11 +147,17 @@ export class Logger {
     };
 
     if (this.debugMode) {
-      console.log(`🌐 [API] Request: ${method} ${url}`, apiContext);
+      clientLogger.logWithEmoji(
+        LogLevel.INFO,
+        "🌐",
+        "API",
+        `Request: ${method} ${url}`,
+        apiContext
+      );
     }
   }
 
-  public logApiError(message: string, error: Error | unknown, context?: LogContext): void {
+  public logApiError(message: string, error: unknown, context?: LogContext): void {
     const errorContext: ErrorContext = {
       ...this.getBaseContext(),
       ...context,
@@ -204,15 +184,17 @@ export class Logger {
     };
 
     if (this.debugMode) {
-      console.log(`📝 [VALIDATION] ${field}: ${isValid ? "valid" : "invalid"}`, validationContext);
+      clientLogger.logWithEmoji(
+        LogLevel.INFO,
+        "📝",
+        "VALIDATION",
+        `${field}: ${isValid ? "valid" : "invalid"}`,
+        validationContext
+      );
     }
   }
 
-  public logFormValidationError(
-    message: string,
-    error: Error | unknown,
-    context?: LogContext
-  ): void {
+  public logFormValidationError(message: string, error: unknown, context?: LogContext): void {
     const errorContext: ErrorContext = {
       ...this.getBaseContext(),
       ...context,
@@ -232,11 +214,11 @@ export class Logger {
     };
 
     if (this.debugMode) {
-      console.log(`📁 [FILE_UPLOAD] ${event}`, uploadContext);
+      clientLogger.logWithEmoji(LogLevel.INFO, "📁", "FILE_UPLOAD", event, uploadContext);
     }
   }
 
-  public logFileUploadError(message: string, error: Error | unknown, context?: LogContext): void {
+  public logFileUploadError(message: string, error: unknown, context?: LogContext): void {
     const errorContext: ErrorContext = {
       ...this.getBaseContext(),
       ...context,
@@ -257,7 +239,7 @@ export class Logger {
     };
 
     if (this.debugMode) {
-      console.log(`⚡ [PERFORMANCE] ${metric}`, perfContext);
+      clientLogger.logWithEmoji(LogLevel.INFO, "⚡", "PERFORMANCE", metric, perfContext);
     }
   }
 
@@ -287,7 +269,7 @@ export class Logger {
     };
 
     if (this.debugMode) {
-      console.log(`👤 [USER_ACTION] ${action}`, actionContext);
+      clientLogger.logWithEmoji(LogLevel.INFO, "👤", "USER_ACTION", action, actionContext);
     }
   }
 
@@ -301,17 +283,18 @@ export class Logger {
     };
 
     if (this.debugMode) {
-      console.log(`📊 [ERROR_PATTERN] ${errorKey}`, errorData);
+      clientLogger.logWithEmoji(LogLevel.INFO, "📊", "ERROR_PATTERN", errorKey, errorData);
     }
   }
 
   private logNavigationTiming(): void {
-    if (!window.performance || !window.performance.timing) {
+    // Use modern Performance Navigation Timing API
+    const entries = globalThis.performance?.getEntriesByType?.("navigation");
+    if (!entries || entries.length === 0) {
       return;
     }
 
-    const timing = window.performance.timing;
-    const navigationStart = timing.navigationStart;
+    const timing = entries[0] as PerformanceNavigationTiming;
 
     const metrics = {
       dns: timing.domainLookupEnd - timing.domainLookupStart,
@@ -320,7 +303,7 @@ export class Logger {
       response: timing.responseEnd - timing.responseStart,
       dom: timing.domContentLoadedEventEnd - timing.domContentLoadedEventStart,
       load: timing.loadEventEnd - timing.loadEventStart,
-      total: timing.loadEventEnd - navigationStart,
+      total: timing.loadEventEnd - timing.startTime,
     };
 
     this.logPerformance("navigation_timing", metrics);
@@ -340,13 +323,13 @@ export class Logger {
   public enableDebugMode(): void {
     this.debugMode = true;
     localStorage.setItem("debug-mixing-mastering", "true");
-    console.log("🔧 Debug mode enabled for mixing-mastering page");
+    clientLogger.info("Debug mode enabled for mixing-mastering page");
   }
 
   public disableDebugMode(): void {
     this.debugMode = false;
     localStorage.removeItem("debug-mixing-mastering");
-    console.log("🔧 Debug mode disabled for mixing-mastering page");
+    clientLogger.info("Debug mode disabled for mixing-mastering page");
   }
 }
 
@@ -354,59 +337,58 @@ export class Logger {
 export const logger = Logger.getInstance();
 
 // Export convenience functions
-export const logInfo = (message: string, context?: LogContext) => logger.logInfo(message, context);
-export const logWarning = (message: string, context?: LogContext) =>
+export const logInfo = (message: string, context?: LogContext): void =>
+  logger.logInfo(message, context);
+export const logWarning = (message: string, context?: LogContext): void =>
   logger.logWarning(message, context);
-export const logError = (message: string, error: Error | unknown, context?: ErrorContext) =>
+export const logError = (message: string, error: unknown, context?: ErrorContext): void =>
   logger.logError(message, error, context);
-export const logAuthEvent = (event: string, context?: LogContext) =>
+export const logAuthEvent = (event: string, context?: LogContext): void =>
   logger.logAuthenticationEvent(event, context);
-export const logAuthError = (message: string, error: Error | unknown, context?: LogContext) =>
+export const logAuthError = (message: string, error: unknown, context?: LogContext): void =>
   logger.logAuthenticationError(message, error, context);
-export const logApiRequest = (method: string, url: string, context?: LogContext) =>
+export const logApiRequest = (method: string, url: string, context?: LogContext): void =>
   logger.logApiRequest(method, url, context);
-export const logApiError = (message: string, error: Error | unknown, context?: LogContext) =>
+export const logApiError = (message: string, error: unknown, context?: LogContext): void =>
   logger.logApiError(message, error, context);
 export const logFormValidation = (
   field: string,
   isValid: boolean,
   error?: string,
   context?: LogContext
-) => logger.logFormValidation(field, isValid, error, context);
+): void => logger.logFormValidation(field, isValid, error, context);
 export const logFormValidationError = (
   message: string,
-  error: Error | unknown,
+  error: unknown,
   context?: LogContext
-) => logger.logFormValidationError(message, error, context);
-export const logFileUpload = (event: string, fileName?: string, context?: LogContext) =>
+): void => logger.logFormValidationError(message, error, context);
+export const logFileUpload = (event: string, fileName?: string, context?: LogContext): void =>
   logger.logFileUpload(event, fileName, context);
-export const logFileUploadError = (message: string, error: Error | unknown, context?: LogContext) =>
+export const logFileUploadError = (message: string, error: unknown, context?: LogContext): void =>
   logger.logFileUploadError(message, error, context);
 export const logPerformance = (
   metric: string,
   data: Record<string, unknown>,
   context?: LogContext
-) => logger.logPerformance(metric, data, context);
-export const startTimer = (name: string) => logger.startPerformanceTimer(name);
-export const logUserAction = (action: string, context?: LogContext) =>
+): void => logger.logPerformance(metric, data, context);
+export const startTimer = (name: string): (() => void) => logger.startPerformanceTimer(name);
+export const logUserAction = (action: string, context?: LogContext): void =>
   logger.logUserAction(action, context);
 
 // Debug utilities for development
 export const debugUtils = {
-  enableDebug: () => logger.enableDebugMode(),
-  disableDebug: () => logger.disableDebugMode(),
-  getSummary: () => logger.getDebugSummary(),
-  getPageLoadTime: () => logger.getPageLoadTime(),
+  enableDebug: (): void => logger.enableDebugMode(),
+  disableDebug: (): void => logger.disableDebugMode(),
+  getSummary: (): Record<string, unknown> => logger.getDebugSummary(),
+  getPageLoadTime: (): number | null => logger.getPageLoadTime(),
 };
 
-// Extend Window interface for debug utilities
+// Extend globalThis interface for debug utilities
 declare global {
-  interface Window {
-    mixingMasteringDebug?: typeof debugUtils;
-  }
+  var mixingMasteringDebug: typeof debugUtils | undefined;
 }
 
 // Make debug utils available globally in development
 if (process.env.NODE_ENV === "development") {
-  window.mixingMasteringDebug = debugUtils;
+  globalThis.mixingMasteringDebug = debugUtils;
 }

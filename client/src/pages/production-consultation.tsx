@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { logApiError, logApiRequest, logUserAction, logger } from "@/lib/logger";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { Calendar, Clock, Mail, MessageCircle, Phone, User, Video } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -66,6 +67,11 @@ export default function ProductionConsultation() {
   }, [isSignedIn, user]);
 
   const handleInputChange = (field: keyof ConsultationFormData, value: string) => {
+    logUserAction(`Form field changed: ${field}`, {
+      component: "production_consultation",
+      action: "form_field_change",
+      field,
+    });
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -83,7 +89,10 @@ export default function ProductionConsultation() {
         return;
       }
 
-      console.log("🚀 Starting consultation reservation");
+      logger.logInfo("Starting consultation reservation", {
+        component: "production_consultation",
+        action: "form_submission_start",
+      });
       // Convert form data to reservation format using new schema
       const getPriceAmount = (duration: string): number => {
         switch (duration) {
@@ -130,7 +139,10 @@ Additional Message: ${formData.message}`,
         acceptTerms: true,
       };
 
-      console.log("🚀 Sending consultation reservation data:", reservationData);
+      logApiRequest("POST", "/api/reservations", {
+        component: "production_consultation",
+        action: "reservation_api_call",
+      });
       const response = await fetch("/api/reservations", {
         method: "POST",
         headers: {
@@ -141,7 +153,11 @@ Additional Message: ${formData.message}`,
         credentials: "include", // Required for Clerk __session cookie
       });
 
-      console.log("📡 Consultation response status:", response.status);
+      logger.logInfo("Consultation response received", {
+        component: "production_consultation",
+        action: "reservation_response",
+        status: response.status,
+      });
 
       if (response.ok) {
         const reservation = await response.json();
@@ -168,7 +184,15 @@ Additional Message: ${formData.message}`,
       } else {
         throw new Error("Failed to book consultation");
       }
-    } catch {
+    } catch (error) {
+      logApiError(
+        "Consultation booking failed",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          component: "production_consultation",
+          action: "form_submission_error",
+        }
+      );
       toast({
         title: "Booking Failed",
         description: "Please try again or contact us directly.",

@@ -1,4 +1,5 @@
 import { toast } from "@/hooks/use-toast";
+import { clientLogger } from "@/lib/clientLogger";
 import { MutationCache, QueryCache, QueryClient, QueryFunction } from "@tanstack/react-query";
 
 // Extend Window interface for Google Analytics
@@ -119,6 +120,7 @@ function getUserFriendlyErrorMessage(error: unknown): {
 
 /**
  * Show error toast with request ID for support
+ * Uses structured logging with PII sanitization instead of raw console.error
  */
 function showErrorToast(error: unknown, context: string, requestId: string): void {
   const { title, description } = getUserFriendlyErrorMessage(error);
@@ -129,14 +131,59 @@ function showErrorToast(error: unknown, context: string, requestId: string): voi
     description: `${description}\n\nRef: ${requestId}`,
   });
 
-  // Log the full error with request ID for debugging
-  console.error(`[${requestId}] ${context}:`, error);
+  // Log error through secure logger with sanitization
+  const errorObj = error instanceof Error ? error : new Error(String(error));
+  const errorContext: Record<string, unknown> = {
+    context,
+  };
+
+  // Extract safe metadata from error if available
+  const errorWithMeta = error as { status?: number; statusText?: string };
+  if (errorWithMeta?.status) {
+    errorContext.status = errorWithMeta.status;
+  }
+  if (errorWithMeta?.statusText) {
+    errorContext.statusText = errorWithMeta.statusText;
+  }
+
+  clientLogger.error("Request failed", errorObj, errorContext, requestId);
 }
 
-async function throwIfResNotOk(res: Response) {
+/**
+ * Structured error body from API responses
+ * Allows extraction of actionable details for retries and user-facing toasts
+ */
+interface StructuredErrorBody {
+  error?: string;
+  message?: string;
+  code?: string;
+  details?: Record<string, unknown>;
+  field?: string;
+}
+
+/**
+ * Throws an ApiError if the response is not OK
+ * Parses JSON error bodies when possible to surface actionable details
+ */
+async function throwIfResNotOk(res: Response): Promise<void> {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    const text = await res.text();
+    let errorData: StructuredErrorBody | undefined;
+    let errorMessage = text || res.statusText;
+
+    // Attempt to parse JSON for structured error details
+    if (text) {
+      try {
+        const parsed = JSON.parse(text) as StructuredErrorBody;
+        errorData = parsed;
+        // Use structured message if available
+        errorMessage = parsed.error || parsed.message || text;
+      } catch {
+        // Keep raw text if not valid JSON
+      }
+    }
+
+    throw new ApiError(res.status, errorMessage, res, errorData);
   }
 }
 
@@ -150,7 +197,11 @@ export type CredentialsMode = "same-origin" | "include" | "omit";
 
 export interface BaseRequestOptions {
   credentials?: CredentialsMode;
+  signal?: AbortSignal;
+  timeout?: number;
 }
+
+const DEFAULT_API_TIMEOUT = 30000; // 30 seconds
 
 export async function apiRequest(
   method: string,
@@ -158,8 +209,42 @@ export async function apiRequest(
   data?: unknown,
   options: BaseRequestOptions = {}
 ): Promise<Response> {
-  const { credentials = "same-origin" } = options;
+  const {
+    credentials = "same-origin",
+    signal: externalSignal,
+    timeout = DEFAULT_API_TIMEOUT,
+  } = options;
   const requestId = generateRequestId();
+
+  // Check if already aborted before starting
+  if (externalSignal?.aborted) {
+    throw new AbortError("Request was aborted");
+  }
+
+  // Create internal controller for timeout and combined abort handling
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  // Track if abort was from timeout
+  let abortedByTimeout = false;
+
+  const handleTimeout = (): void => {
+    abortedByTimeout = true;
+    controller.abort();
+  };
+
+  const handleExternalAbort = (): void => {
+    controller.abort();
+  };
+
+  // Listen to external signal if provided
+  if (externalSignal) {
+    externalSignal.addEventListener("abort", handleExternalAbort, { once: true });
+  }
+
+  // Replace setTimeout with proper tracking
+  clearTimeout(timeoutId);
+  const trackedTimeoutId = setTimeout(handleTimeout, timeout);
 
   const headers: Record<string, string> = {
     "X-Request-ID": requestId,
@@ -168,15 +253,29 @@ export async function apiRequest(
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: data ? JSON.stringify(data) : undefined,
-    credentials,
-  });
+  try {
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      credentials,
+      signal: controller.signal,
+    });
 
-  await throwIfResNotOk(res);
-  return res;
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error) {
+    // Transform DOMException AbortError into typed AbortError
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new AbortError(abortedByTimeout ? "Request timed out" : "Request was aborted");
+    }
+    throw error;
+  } finally {
+    clearTimeout(trackedTimeoutId);
+    if (externalSignal) {
+      externalSignal.removeEventListener("abort", handleExternalAbort);
+    }
+  }
 }
 
 // Enhanced API request with retry mechanism and better error handling

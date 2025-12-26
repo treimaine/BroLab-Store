@@ -115,12 +115,22 @@ const CACHE_STRATEGIES: Record<
  * Comprehensive Caching Strategy Service
  */
 export class CachingStrategyService {
-  private queryClient: QueryClient;
-  private performanceMetrics: Map<string, number> = new Map();
+  private readonly queryClient: QueryClient;
+  private readonly performanceMetrics: Map<string, number> = new Map();
+  private serviceWorkerInitialized = false;
 
   constructor(queryClient: QueryClient) {
     this.queryClient = queryClient;
-    this.initializeServiceWorkerCache();
+  }
+
+  /**
+   * Initialize service worker cache - call this after construction
+   */
+  async initialize(): Promise<void> {
+    if (!this.serviceWorkerInitialized) {
+      await this.initializeServiceWorkerCache();
+      this.serviceWorkerInitialized = true;
+    }
   }
 
   /**
@@ -328,14 +338,21 @@ export class CachingStrategyService {
     cacheHitRate: number;
     averageResponseTime: number;
     cacheSize: number;
+    totalQueries: number;
+    cacheHits: number;
+    cacheMisses: number;
     metrics: Record<string, number>;
   } {
     const metrics = Object.fromEntries(this.performanceMetrics);
+    const { hits, misses } = this.calculateHitMissCounts();
 
     return {
       cacheHitRate: this.calculateHitRate(),
       averageResponseTime: this.calculateAverageResponseTime(),
       cacheSize: this.queryClient.getQueryCache().getAll().length,
+      totalQueries: hits + misses,
+      cacheHits: hits,
+      cacheMisses: misses,
       metrics,
     };
   }
@@ -352,7 +369,7 @@ export class CachingStrategyService {
       const queries = this.queryClient.getQueryCache().getAll();
       if (queries.length > 1000) {
         const sortedQueries = queries
-          .sort((a, b) => (a.state.dataUpdatedAt || 0) - (b.state.dataUpdatedAt || 0))
+          .toSorted((a, b) => (a.state.dataUpdatedAt || 0) - (b.state.dataUpdatedAt || 0))
           .slice(0, 200); // Remove oldest 200 queries
 
         sortedQueries.forEach(query => {
@@ -370,7 +387,7 @@ export class CachingStrategyService {
   // Private helper methods
 
   private async initializeServiceWorkerCache(): Promise<void> {
-    if ("serviceWorker" in navigator && "caches" in window) {
+    if ("serviceWorker" in navigator && "caches" in globalThis) {
       try {
         await caches.open("brolab-cache-v1");
       } catch (error) {
@@ -380,7 +397,7 @@ export class CachingStrategyService {
   }
 
   private async cacheInServiceWorker<T>(key: string, data: T, dataType: DataType): Promise<void> {
-    if ("caches" in window) {
+    if ("caches" in globalThis) {
       try {
         const cache = await caches.open("brolab-cache-v1");
         const response = new Response(JSON.stringify(data), {
@@ -394,7 +411,7 @@ export class CachingStrategyService {
   }
 
   private async getFromServiceWorker<T>(key: string, dataType: DataType): Promise<T | null> {
-    if ("caches" in window) {
+    if ("caches" in globalThis) {
       try {
         const cache = await caches.open("brolab-cache-v1");
         const response = await cache.match(`/cache/${dataType}/${key}`);
@@ -420,20 +437,25 @@ export class CachingStrategyService {
     this.performanceMetrics.set(key, current + 1);
   }
 
-  private calculateHitRate(): number {
-    let totalHits = 0;
-    let totalMisses = 0;
+  private calculateHitMissCounts(): { hits: number; misses: number } {
+    let hits = 0;
+    let misses = 0;
 
     for (const [key, value] of this.performanceMetrics.entries()) {
       if (key.startsWith("hit_")) {
-        totalHits += value;
+        hits += value;
       } else if (key.startsWith("miss_")) {
-        totalMisses += value;
+        misses += value;
       }
     }
 
-    const total = totalHits + totalMisses;
-    return total > 0 ? (totalHits / total) * 100 : 0;
+    return { hits, misses };
+  }
+
+  private calculateHitRate(): number {
+    const { hits, misses } = this.calculateHitMissCounts();
+    const total = hits + misses;
+    return total > 0 ? (hits / total) * 100 : 0;
   }
 
   private calculateAverageResponseTime(): number {

@@ -12,6 +12,7 @@ import {
 import { StandardHero } from "@/components/ui/StandardHero";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { logApiError, logApiRequest, logger, logUserAction } from "@/lib/logger";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { Calendar, Clock, Mail, MapPin, Mic, Phone, User } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -62,6 +63,11 @@ export default function RecordingSessions() {
   }, [isSignedIn, user]);
 
   const handleInputChange = (field: keyof BookingFormData, value: string) => {
+    logUserAction(`Form field changed: ${field}`, {
+      component: "recording_sessions",
+      action: "form_field_change",
+      field,
+    });
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -79,7 +85,10 @@ export default function RecordingSessions() {
         return;
       }
 
-      console.log("🚀 Starting reservation submission for recording session");
+      logger.logInfo("Starting reservation submission for recording session", {
+        component: "recording_sessions",
+        action: "form_submission_start",
+      });
       // Convert form data to reservation format using new schema
       const budgetMap: Record<string, number> = {
         "300-500": 40000, // $400 in cents
@@ -110,7 +119,10 @@ export default function RecordingSessions() {
         acceptTerms: true,
       };
 
-      console.log("🚀 Sending reservation data:", reservationData);
+      logApiRequest("POST", "/api/reservations", {
+        component: "recording_sessions",
+        action: "reservation_api_call",
+      });
 
       // Get authentication token from Clerk
       const token = await getToken();
@@ -133,7 +145,11 @@ export default function RecordingSessions() {
         credentials: "include", // Required for Clerk __session cookie
       });
 
-      console.log("📡 Reservation response status:", response.status);
+      logger.logInfo("Reservation response received", {
+        component: "recording_sessions",
+        action: "reservation_response",
+        status: response.status,
+      });
 
       if (response.ok) {
         const reservation = await response.json();
@@ -162,7 +178,11 @@ export default function RecordingSessions() {
         setLocation("/checkout");
       } else {
         const errorText = await response.text();
-        console.error("❌ Reservation failed:", response.status, errorText);
+        logApiError("Reservation failed", new Error(`${response.status}: ${errorText}`), {
+          component: "recording_sessions",
+          action: "reservation_failed",
+          status: response.status,
+        });
         toast({
           title: "Booking Failed",
           description: `Failed to create reservation: ${response.status} - ${errorText}`,
@@ -170,7 +190,11 @@ export default function RecordingSessions() {
         });
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
+      logger.logError("Recording session submission failed", error, {
+        errorType: "api",
+        component: "recording_sessions",
+        action: "form_submission_error",
+      });
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       toast({
         title: "Booking Failed",

@@ -9,6 +9,7 @@ import { StandardHero } from "@/components/ui/StandardHero";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useEnhancedFormSubmission } from "@/hooks/useEnhancedFormSubmission";
+import { logger } from "@/lib/logger";
 import { useUser } from "@clerk/clerk-react";
 import { AlertTriangle, CheckCircle, Clock, Loader2, Music, Star } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -75,7 +76,11 @@ export default function CustomBeats() {
       }, 2000);
     },
     onSubmissionError: error => {
-      console.error("❌ Custom Beat submission failed:", error);
+      logger.logError("Custom Beat submission failed", error, {
+        errorType: "api",
+        component: "custom_beats",
+        action: "form_submission_error",
+      });
     },
   });
 
@@ -206,9 +211,18 @@ Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadlin
       // Update submitted requests for UI
       setSubmittedRequests(prev => [...prev, request]);
 
-      console.log("✅ Custom Beat reservation created successfully");
+      logger.logInfo("Custom Beat reservation created successfully", {
+        component: "custom_beats",
+        action: "reservation_created",
+        genre: request.genre,
+        priority: request.priority,
+      });
     } catch (error) {
-      console.error("❌ Custom Beat submission failed:", error);
+      logger.logError("Custom Beat submission failed", error, {
+        errorType: "api",
+        component: "custom_beats",
+        action: "form_submission_error",
+      });
       // Error handling is managed by the enhanced form submission hook
     }
   };

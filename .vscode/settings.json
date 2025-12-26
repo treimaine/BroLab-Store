@@ -65,5 +65,6 @@
     "**/dist": true,
     "**/.git": true
   },
-  "kiroAgent.configureMCP": "Enabled"
+  "kiroAgent.configureMCP": "Enabled",
+  "typescript.autoClosingTags": false
 }

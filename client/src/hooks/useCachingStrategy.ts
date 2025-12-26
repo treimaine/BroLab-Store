@@ -7,7 +7,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
-import { DataType, cacheUtils, cachingStrategy } from "../services/cachingStrategy";
+import { DataType, cachingStrategy } from "../services/cachingStrategy";
 
 // Hook options interface
 interface UseCachingOptions<T> {
@@ -321,8 +321,8 @@ export function useCacheWarming(
 ) {
   useEffect(() => {
     const warmCache = async () => {
-      // Sort by priority
-      const sortedData = warmingData.sort((a, b) => {
+      // Sort by priority using toSorted to avoid mutation
+      const sortedData = [...warmingData].toSorted((a, b) => {
         const priorityOrder = { high: 0, medium: 1, low: 2 };
         return priorityOrder[a.priority || "medium"] - priorityOrder[b.priority || "medium"];
       });
@@ -376,5 +376,5 @@ function getStaleTimeForDataType(dataType: DataType): number {
   }
 }
 
-// Export utility functions
-export { DataType, cacheUtils };
+// Export utility functions using re-export syntax
+export { DataType, cacheUtils } from "../services/cachingStrategy";
