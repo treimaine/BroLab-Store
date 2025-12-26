@@ -505,6 +505,53 @@ export class PayPalService {
       throw error;
     }
   }
+
+  /**
+   * Performs a lightweight health check by attempting to fetch a non-existent order
+   * This validates OAuth credentials and API connectivity without creating transactions
+   * Returns healthy=true if auth succeeds (even if order not found - expected behavior)
+   */
+  static async healthCheck(): Promise<{
+    healthy: boolean;
+    latencyMs: number;
+    error?: string;
+  }> {
+    const startTime = Date.now();
+    try {
+      const ordersController = new OrdersController(paypalClient);
+
+      // Attempt to get a non-existent order - this triggers OAuth authentication
+      // A 404 "RESOURCE_NOT_FOUND" means auth succeeded but order doesn't exist (expected)
+      // A 401/403 means credential issues (unhealthy)
+      await ordersController.getOrder({ id: "HEALTH_CHECK_PING" });
+
+      // If we somehow get here without error, credentials are valid
+      return { healthy: true, latencyMs: Date.now() - startTime };
+    } catch (error: unknown) {
+      const latencyMs = Date.now() - startTime;
+
+      // Check if this is a "not found" error - means auth succeeded
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorString = JSON.stringify(error);
+
+      // PayPal returns RESOURCE_NOT_FOUND for invalid order IDs after successful auth
+      if (
+        errorMessage.includes("RESOURCE_NOT_FOUND") ||
+        errorMessage.includes("INVALID_RESOURCE_ID") ||
+        errorString.includes("RESOURCE_NOT_FOUND") ||
+        errorString.includes("INVALID_RESOURCE_ID")
+      ) {
+        return { healthy: true, latencyMs };
+      }
+
+      // Any other error indicates a real problem (auth failure, network issue, etc.)
+      return {
+        healthy: false,
+        latencyMs,
+        error: errorMessage,
+      };
+    }
+  }
 }
 
 export default PayPalService;

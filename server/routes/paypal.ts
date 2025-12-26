@@ -343,18 +343,35 @@ router.get("/order/:orderId", requireAuth, async (req: AuthenticatedRequest, res
 
 /**
  * GET /api/paypal/health
- * Vérification de la santé du service PayPal
+ * Vérification de la santé du service PayPal avec ping API réel
+ * Valide les credentials OAuth et la connectivité avant checkout
  */
 router.get("/health", async (req: Request, res: Response) => {
   try {
-    res.json({
-      success: true,
-      message: "PayPal service is healthy",
-      timestamp: new Date().toISOString(),
-      environment: process.env.PAYPAL_MODE || "sandbox",
-    });
+    const healthResult = await PayPalService.healthCheck();
+
+    if (healthResult.healthy) {
+      res.json({
+        success: true,
+        message: "PayPal service is healthy",
+        timestamp: new Date().toISOString(),
+        environment: process.env.PAYPAL_MODE || "sandbox",
+        latencyMs: healthResult.latencyMs,
+        apiConnectivity: true,
+      });
+    } else {
+      res.status(503).json({
+        success: false,
+        message: "PayPal service is unhealthy",
+        timestamp: new Date().toISOString(),
+        environment: process.env.PAYPAL_MODE || "sandbox",
+        latencyMs: healthResult.latencyMs,
+        apiConnectivity: false,
+        error: healthResult.error,
+      });
+    }
   } catch (error: unknown) {
-    handleRouteError(error, res, "PayPal service is unhealthy");
+    handleRouteError(error, res, "PayPal health check failed");
   }
 });
 

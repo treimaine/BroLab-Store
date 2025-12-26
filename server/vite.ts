@@ -1,9 +1,9 @@
 import express, { type Express } from "express";
-import fs from "fs";
-import { type Server } from "http";
 import { nanoid } from "nanoid";
-import path, { dirname } from "path";
-import { fileURLToPath } from "url";
+import fs from "node:fs";
+import { type Server } from "node:http";
+import path, { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createLogger, createServer as createViteServer } from "vite";
 import { ErrorMessages } from "../shared/constants/ErrorMessages";
 import viteConfig from "../vite.config";
@@ -18,7 +18,31 @@ export function log(message: string, source = "express") {
   secureLogger.info(message, { source });
 }
 
-export async function setupVite(app: Express, server: Server) {
+/**
+ * Injects CSP nonce into HTML script tags.
+ * Adds nonce attribute to all script tags for CSP compliance.
+ *
+ * @param html - The HTML content to process
+ * @param nonce - The CSP nonce to inject
+ * @returns HTML with nonce attributes added to script tags
+ */
+function injectNonceIntoHtml(html: string, nonce: string): string {
+  // Add nonce to inline script tags (type="module" and regular scripts)
+  // Matches: <script>, <script type="module">, <script type="text/javascript">
+  return html.replaceAll(
+    /<script(\s+(?:type\s*=\s*["'][^"']*["'])?[^>]*)>/gi,
+    (match, attributes: string) => {
+      // Don't add nonce if already present
+      if (attributes.includes("nonce=")) {
+        return match;
+      }
+      // Add nonce attribute
+      return `<script nonce="${nonce}"${attributes}>`;
+    }
+  );
+}
+
+export async function setupVite(app: Express, server: Server): Promise<void> {
   const serverOptions = {
     middlewareMode: true,
     hmr: {
@@ -55,10 +79,19 @@ export async function setupVite(app: Express, server: Server) {
     try {
       const clientTemplate = path.resolve(__dirname, "..", "client", "index.html");
 
-      // always reload the index.html file from disk incase it changes
+      // always reload the index.html file from disk in case it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(`src="/src/main.tsx"`, `src="/src/main.tsx?v=${nanoid()}"`);
-      const page = await vite.transformIndexHtml(url, template);
+
+      // Transform HTML with Vite
+      let page = await vite.transformIndexHtml(url, template);
+
+      // Inject CSP nonce into script tags if available
+      const nonce = res.locals.cspNonce;
+      if (nonce) {
+        page = injectNonceIntoHtml(page, nonce);
+      }
+
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
@@ -67,7 +100,7 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
-export function serveStatic(app: Express) {
+export function serveStatic(app: Express): void {
   const distPath = path.resolve(__dirname, "..", "dist", "public");
 
   if (!fs.existsSync(distPath)) {
@@ -77,7 +110,17 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
+  // Inject CSP nonce for production builds
   app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+    const indexPath = path.resolve(distPath, "index.html");
+    let html = fs.readFileSync(indexPath, "utf-8");
+
+    // Inject CSP nonce into script tags if available
+    const nonce = res.locals.cspNonce;
+    if (nonce) {
+      html = injectNonceIntoHtml(html, nonce);
+    }
+
+    res.status(200).set({ "Content-Type": "text/html" }).send(html);
   });
 }

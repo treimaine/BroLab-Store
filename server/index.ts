@@ -1,12 +1,16 @@
 import { config } from "dotenv";
 import express, { NextFunction, Response, type Request } from "express";
-import { app } from "./app";
 import { choosePort } from "./lib/cliPort";
 import { enforcePaymentSecrets, env } from "./lib/env";
 import { parsePortFlags } from "./lib/findFreePort";
 import { logger } from "./lib/logger";
 // RLS Security removed - using Convex for security
 import { log, serveStatic, setupVite } from "./vite";
+
+// Re-export app using export...from syntax (SonarQube S7763)
+export { app } from "./app";
+// Import for local usage
+import { app } from "./app";
 
 // Load environment variables from .env file
 config();
@@ -25,7 +29,7 @@ try {
 // Rate limiting only for API routes, not for static assets/frontend
 app.use("/api", (req, res, next): void => {
   // Simple rate limiting - 1000 requests per 15 minutes for API only
-  const clientIp = req.ip || req.connection.remoteAddress;
+  const clientIp = req.ip || req.socket.remoteAddress;
   const now = Date.now();
   const windowMs = 15 * 60 * 1000; // 15 minutes
   const maxRequests = 1000;
@@ -37,9 +41,7 @@ app.use("/api", (req, res, next): void => {
 
   const globalWithRateLimit = globalThis as typeof globalThis & GlobalWithRateLimit;
 
-  if (!globalWithRateLimit.rateLimitStore) {
-    globalWithRateLimit.rateLimitStore = new Map();
-  }
+  globalWithRateLimit.rateLimitStore ??= new Map();
 
   const key = `${clientIp}-${Math.floor(now / windowMs)}`;
   const currentCount = globalWithRateLimit.rateLimitStore.get(key) || 0;
@@ -89,72 +91,69 @@ app.use((req, res, next) => {
   next();
 });
 
-export { app }; // <-- exporter l'app configurée
-
-// Démarrage du serveur uniquement si ce fichier est exécuté directement (compatible ESM)
+// Server startup only when this file is executed directly (ESM compatible)
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
-  (async () => {
-    const { createServer } = await import("http");
-    const server = createServer(app);
+  const { createServer } = await import("node:http");
+  const server = createServer(app);
 
-    // Routes are already registered in app.ts
+  // Routes are already registered in app.ts
 
-    app.use(
-      (
-        err: Error & { status?: number; statusCode?: number },
-        _req: Request,
-        res: Response,
-        _next: NextFunction
-      ) => {
-        const status = err.status || err.statusCode || 500;
-        const message = err.message || "Internal Server Error";
-        res.status(status).json({ message });
-        throw err;
-      }
-    );
-
-    const { port: flagPort, auto, maxTries } = parsePortFlags();
-    const envPort = env.PORT ? Number(env.PORT) : undefined;
-    const basePort = flagPort || envPort || 5000;
-    const port = await choosePort({
-      base: basePort,
-      maxTries: maxTries || 10,
-      auto: !!auto,
-      argv: process.argv,
-      isTTY: !!process.stdin.isTTY,
-      envPort,
-    });
-
-    if (app.get("env") === "development") {
-      await setupVite(app, server);
-    } else {
-      serveStatic(app);
+  app.use(
+    (
+      err: Error & { status?: number; statusCode?: number },
+      _req: Request,
+      res: Response,
+      _next: NextFunction
+    ) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      res.status(status).json({ message });
+      throw err;
     }
+  );
 
-    const serverInstance = server.listen(port, async () => {
-      logger.info("API running", { port, basePort, url: `http://localhost:${port}` });
+  const { port: flagPort, auto, maxTries } = parsePortFlags();
+  const envPort = env.PORT ? Number(env.PORT) : undefined;
+  const basePort = flagPort || envPort || 5000;
+  const port = await choosePort({
+    base: basePort,
+    maxTries: maxTries || 10,
+    auto: !!auto,
+    argv: process.argv,
+    isTTY: !!process.stdin.isTTY,
+    envPort,
+  });
 
-      // Warm cache on server startup
-      try {
-        // Import cache warming service dynamically to avoid circular dependencies
-        const { warmingUtils } = await import("./services/cacheWarmingService");
-        await warmingUtils.warmOnStartup();
-        logger.info("Cache warming completed on startup");
-      } catch (error) {
-        logger.warn("Cache warming failed on startup", {
-          error: error instanceof Error ? error.message : error,
-        });
-      }
-    });
-    serverInstance.on("error", (err: Error & { code?: string }) => {
-      if (err.code === "EADDRINUSE") {
-        console.error(
-          `\n❌ Port ${port} déjà utilisé (race condition). Un autre serveur est peut-être déjà lancé.`
-        );
-        process.exit(1);
-      } else {
-        throw err;
-      }
-    });
-  })();
+  if (app.get("env") === "development") {
+    await setupVite(app, server);
+  } else {
+    serveStatic(app);
+  }
+
+  const serverInstance = server.listen(port, async () => {
+    logger.info("API running", { port, basePort, url: `http://localhost:${port}` });
+
+    // Warm cache on server startup
+    try {
+      // Import cache warming service dynamically to avoid circular dependencies
+      const { warmingUtils } = await import("./services/cacheWarmingService");
+      await warmingUtils.warmOnStartup();
+      logger.info("Cache warming completed on startup");
+    } catch (error) {
+      logger.warn("Cache warming failed on startup", {
+        error: error instanceof Error ? error.message : error,
+      });
+    }
+  });
+
+  serverInstance.on("error", (err: Error & { code?: string }) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(
+        `\n❌ Port ${port} already in use (race condition). Another server may already be running.`
+      );
+      process.exit(1);
+    } else {
+      throw err;
+    }
+  });
 }

@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Request as ExpressRequest, Router } from "express";
+import { logger } from "../lib/logger";
 import {
   generateRobotsTxt,
   generateSitemapIndex,
@@ -12,6 +13,101 @@ import {
 } from "../types/routes";
 
 const router = Router();
+
+// Allowlist of trusted hosts for sitemap URL generation
+const ALLOWED_HOSTS: readonly string[] = [
+  "brolabentertainment.com",
+  "www.brolabentertainment.com",
+  "localhost",
+] as const;
+
+// Pattern for Vercel preview deployments (e.g., project-abc123.vercel.app)
+const VERCEL_PREVIEW_PATTERN = /^[\w-]+\.vercel\.app$/;
+
+// Retry configuration for WooCommerce API requests
+interface WcRetryConfig {
+  maxRetries: number;
+  baseDelay: number;
+  maxDelay: number;
+  timeout: number;
+}
+
+const WC_RETRY_CONFIG: WcRetryConfig = {
+  maxRetries: 3,
+  baseDelay: 1000,
+  maxDelay: 10000,
+  timeout: 15000,
+};
+
+/**
+ * Fetch with timeout, bounded retries, and structured logging
+ * Retries on network errors, timeouts, 5xx, and 429 (rate limit)
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  config: WcRetryConfig = WC_RETRY_CONFIG
+): Promise<Response> {
+  let lastError: Error | null = null;
+  const sanitizedUrl = url.split("?")[0]; // Remove credentials from logs
+
+  for (let attempt = 1; attempt <= config.maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      // Retry on server errors or rate limiting
+      if (response.status >= 500 || response.status === 429) {
+        const retryable = attempt < config.maxRetries;
+        logger.warn("[Sitemap] WooCommerce API returned retryable status", {
+          attempt,
+          maxRetries: config.maxRetries,
+          status: response.status,
+          retryable,
+          endpoint: sanitizedUrl,
+        });
+
+        if (!retryable) {
+          return response; // Return last response after exhausting retries
+        }
+
+        const delay = Math.min(config.baseDelay * Math.pow(2, attempt - 1), config.maxDelay);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      const isTimeout = lastError.name === "AbortError";
+      const retryable = attempt < config.maxRetries;
+
+      logger.warn("[Sitemap] WooCommerce fetch failed", {
+        attempt,
+        maxRetries: config.maxRetries,
+        error: lastError.message,
+        isTimeout,
+        retryable,
+        endpoint: sanitizedUrl,
+      });
+
+      if (retryable) {
+        const delay = Math.min(config.baseDelay * Math.pow(2, attempt - 1), config.maxDelay);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError ?? new Error("All retry attempts failed");
+}
 
 // WooCommerce API configuration
 const WOOCOMMERCE_API_URL =
@@ -27,8 +123,8 @@ function isWooCommerceEnabled(): boolean {
 }
 
 /**
- * WooCommerce API request with graceful degradation
- * Returns empty array when credentials are missing instead of throwing
+ * WooCommerce API request with graceful degradation, timeouts, and retries
+ * Returns empty array when credentials are missing or after exhausting retries
  */
 async function wcApiRequest<T = WooCommerceApiProduct[]>(
   endpoint: string,
@@ -37,9 +133,10 @@ async function wcApiRequest<T = WooCommerceApiProduct[]>(
   // Graceful degradation: return empty data when WooCommerce is disabled
   if (!isWooCommerceEnabled()) {
     if (process.env.NODE_ENV !== "test") {
-      console.warn(
-        "[Sitemap] WooCommerce API disabled - credentials missing, returning empty data"
-      );
+      logger.warn("[Sitemap] WooCommerce API disabled - credentials missing", {
+        endpoint,
+        reason: "missing_credentials",
+      });
     }
     return [] as T;
   }
@@ -54,23 +151,36 @@ async function wcApiRequest<T = WooCommerceApiProduct[]>(
   url.searchParams.append("consumer_key", WC_CONSUMER_KEY as string);
   url.searchParams.append("consumer_secret", WC_CONSUMER_SECRET as string);
 
-  const response = await fetch(url.toString(), {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "User-Agent": "BroLab-Frontend/1.0",
-      Accept: "application/json",
-      ...options.headers,
-    },
-  });
+  try {
+    const response = await fetchWithRetry(url.toString(), {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "BroLab-Frontend/1.0",
+        Accept: "application/json",
+        ...options.headers,
+      },
+    });
 
-  if (!response.ok) {
-    // Graceful degradation on API errors - log and return empty
-    console.error(`[Sitemap] WooCommerce API error: ${response.status} ${response.statusText}`);
+    if (!response.ok) {
+      // Graceful degradation on API errors after retries exhausted
+      logger.error("[Sitemap] WooCommerce API error after retries", {
+        endpoint,
+        status: response.status,
+        statusText: response.statusText,
+      });
+      return [] as T;
+    }
+
+    return response.json();
+  } catch (error) {
+    // All retries exhausted - graceful degradation
+    logger.error("[Sitemap] WooCommerce API request failed after all retries", {
+      endpoint,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [] as T;
   }
-
-  return response.json();
 }
 
 /**
@@ -105,10 +215,31 @@ async function wcApiRequestAllPages(baseEndpoint: string): Promise<WooCommerceAp
 }
 
 /**
- * Détermine l'URL de base selon l'environnement
+ * Validates if a host is in the allowlist
+ * Supports exact matches and Vercel preview deployment patterns
+ */
+function isHostAllowed(host: string): boolean {
+  // Remove port if present for validation
+  const hostWithoutPort = host.split(":")[0].toLowerCase();
+
+  // Check exact matches
+  if (ALLOWED_HOSTS.includes(hostWithoutPort)) {
+    return true;
+  }
+
+  // Check Vercel preview deployment pattern
+  if (VERCEL_PREVIEW_PATTERN.test(hostWithoutPort)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Détermine l'URL de base selon l'environnement (fallback)
  * Évite les fuites d'URLs staging en production et vice-versa
  */
-function getBaseUrl(): string {
+function getBaseUrlFallback(): string {
   // Variable d'environnement explicite (priorité maximale)
   if (process.env.FRONTEND_URL) {
     return process.env.FRONTEND_URL;
@@ -124,16 +255,56 @@ function getBaseUrl(): string {
   return `http://localhost:${port}`;
 }
 
-// Base URL pour les liens (dérivée de l'environnement)
-const BASE_URL = getBaseUrl();
+/**
+ * Extracts base URL from request headers with allowlist validation
+ * Falls back to environment-based URL if host is not allowed
+ *
+ * Supports reverse proxies via X-Forwarded-Host and X-Forwarded-Proto headers
+ */
+function getBaseUrlFromRequest(req: ExpressRequest): string {
+  // Extract host from headers (proxy-aware)
+  const forwardedHost = req.get("X-Forwarded-Host");
+  const host = forwardedHost || req.get("Host");
+
+  if (!host) {
+    logger.info("[Sitemap] No host header found, using fallback URL");
+    return getBaseUrlFallback();
+  }
+
+  // Validate host against allowlist
+  if (!isHostAllowed(host)) {
+    logger.warn("[Sitemap] Host not in allowlist, using fallback URL", {
+      receivedHost: host,
+      allowedHosts: [...ALLOWED_HOSTS],
+    });
+    return getBaseUrlFallback();
+  }
+
+  // Extract protocol (proxy-aware)
+  const forwardedProto = req.get("X-Forwarded-Proto");
+  const protocol = forwardedProto || (req.secure ? "https" : "http");
+
+  // Build and return the base URL
+  const baseUrl = `${protocol}://${host}`;
+
+  logger.info("[Sitemap] Using request-derived base URL", {
+    baseUrl,
+    source: forwardedHost ? "X-Forwarded-Host" : "Host",
+  });
+
+  return baseUrl;
+}
 
 /**
  * GET /sitemap.xml
  * Génère le sitemap XML principal avec tous les beats et pages
  * Graceful degradation: returns static pages only when WooCommerce is disabled
  */
-router.get("/sitemap.xml", async (_req, res) => {
+router.get("/sitemap.xml", async (req, res) => {
   try {
+    // Derive base URL from request headers with allowlist validation
+    const baseUrl = getBaseUrlFromRequest(req);
+
     // Check WooCommerce availability and set debug header
     const wooEnabled = isWooCommerceEnabled();
     res.setHeader("X-WooCommerce-Status", wooEnabled ? "enabled" : "disabled");
@@ -187,7 +358,7 @@ router.get("/sitemap.xml", async (_req, res) => {
 
     // Générer le sitemap XML (static pages always included, beats/categories only if available)
     const sitemapXML = generateSitemapXML(beats, categories, {
-      baseUrl: BASE_URL,
+      baseUrl,
       includeImages: true,
       includeCategories: categories.length > 0,
       includeStaticPages: true,
@@ -207,11 +378,12 @@ router.get("/sitemap.xml", async (_req, res) => {
  * GET /sitemap-index.xml
  * Génère un sitemap index pour les gros sites
  */
-router.get("/sitemap-index.xml", async (_req, res) => {
+router.get("/sitemap-index.xml", async (req, res) => {
   try {
+    const baseUrl = getBaseUrlFromRequest(req);
     const sitemaps = ["/sitemap.xml", "/sitemap-beats.xml", "/sitemap-categories.xml"];
 
-    const sitemapIndexXML = generateSitemapIndex(BASE_URL, sitemaps);
+    const sitemapIndexXML = generateSitemapIndex(baseUrl, sitemaps);
 
     res.setHeader("Content-Type", "application/xml");
     res.setHeader("Cache-Control", "public, max-age=3600");
@@ -227,9 +399,10 @@ router.get("/sitemap-index.xml", async (_req, res) => {
  * GET /robots.txt
  * Génère le fichier robots.txt
  */
-router.get("/robots.txt", async (_req, res) => {
+router.get("/robots.txt", async (req, res) => {
   try {
-    const robotsTxt = generateRobotsTxt(BASE_URL);
+    const baseUrl = getBaseUrlFromRequest(req);
+    const robotsTxt = generateRobotsTxt(baseUrl);
 
     res.setHeader("Content-Type", "text/plain");
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache 24 heures
@@ -246,8 +419,11 @@ router.get("/robots.txt", async (_req, res) => {
  * Sitemap spécifique pour les beats uniquement
  * Graceful degradation: returns empty but valid XML when WooCommerce is disabled
  */
-router.get("/sitemap-beats.xml", async (_req, res) => {
+router.get("/sitemap-beats.xml", async (req, res) => {
   try {
+    // Derive base URL from request headers with allowlist validation
+    const baseUrl = getBaseUrlFromRequest(req);
+
     // Check WooCommerce availability and set debug header
     const wooEnabled = isWooCommerceEnabled();
     res.setHeader("X-WooCommerce-Status", wooEnabled ? "enabled" : "disabled");
@@ -296,7 +472,7 @@ router.get("/sitemap-beats.xml", async (_req, res) => {
 
     // Generate sitemap (will be empty but valid XML if no products)
     const sitemapXML = generateSitemapXML(beats, [], {
-      baseUrl: BASE_URL,
+      baseUrl,
       includeImages: true,
       includeCategories: false,
       includeStaticPages: false,

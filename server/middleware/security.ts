@@ -1,7 +1,8 @@
 import compression from "compression";
-import { Request, RequestHandler } from "express";
+import { NextFunction, Request, RequestHandler, Response } from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import { generateCspNonce } from "../utils/cspNonce";
 
 /**
  * Custom key generator for rate limiting behind proxies (Vercel, etc.)
@@ -35,75 +36,158 @@ function normalizeIp(ip: string): string {
 
 /**
  * Security middleware configuration
- * Implements helmet, compression, body-size limits, and rate limiting
+ * Implements helmet with CSP nonces, compression, body-size limits, and rate limiting
  */
 
-// Helmet configuration for security headers
-export const helmetMiddleware = helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "'unsafe-eval'",
-        "https://cdn.jsdelivr.net",
-        "https://*.clerk.accounts.dev",
-        "https://*.clerk.com",
-        "https://replit.com",
-        "https://*.replit.com",
-        "https://*.replit.app",
-        "https://*.repl.co",
-      ],
-      styleSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "https://fonts.googleapis.com",
-        "https://*.clerk.accounts.dev",
-        "https://*.clerk.com",
-        "https://*.replit.com",
-        "https://*.replit.app",
-      ],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: [
-        "'self'",
-        "data:",
-        "https:",
-        "blob:",
-        "https://*.clerk.accounts.dev",
-        "https://*.clerk.com",
-        "https://*.replit.com",
-        "https://*.replit.app",
-      ],
-      connectSrc: [
-        "'self'",
-        "https:",
-        "wss:",
-        "https://*.clerk.accounts.dev",
-        "https://*.clerk.com",
-        "https://api.clerk.com",
-        "https://api.clerk.dev",
-        "https://*.replit.com",
-        "https://*.replit.app",
-        "wss://*.replit.com",
-        "wss://*.replit.app",
-      ],
-      mediaSrc: ["'self'", "https:", "blob:"],
-      objectSrc: ["'none'"],
-      frameSrc: [
-        "'self'",
-        "https:",
-        "https://*.clerk.accounts.dev",
-        "https://*.clerk.com",
-        "https://*.replit.com",
-        "https://*.replit.app",
-      ],
-      upgradeInsecureRequests: [],
+/**
+ * Trusted script sources for CSP.
+ * These external domains are allowed to load scripts.
+ */
+const TRUSTED_SCRIPT_SOURCES = [
+  "https://cdn.jsdelivr.net",
+  "https://*.clerk.accounts.dev",
+  "https://*.clerk.com",
+  "https://replit.com",
+  "https://*.replit.com",
+  "https://*.replit.app",
+  "https://*.repl.co",
+  "https://js.stripe.com",
+  "https://challenges.cloudflare.com",
+];
+
+/**
+ * Trusted style sources for CSP.
+ * Note: 'unsafe-inline' is required for Tailwind CSS and React inline styles.
+ * This is a known limitation - style nonces would require build-time integration.
+ */
+const TRUSTED_STYLE_SOURCES = [
+  "https://fonts.googleapis.com",
+  "https://*.clerk.accounts.dev",
+  "https://*.clerk.com",
+  "https://*.replit.com",
+  "https://*.replit.app",
+];
+
+/**
+ * SHA-256 hashes for known inline scripts that cannot use nonces.
+ * These are scripts embedded in index.html or injected by third parties.
+ *
+ * To generate a hash: echo -n "script content" | openssl dgst -sha256 -binary | base64
+ */
+const SCRIPT_HASHES: string[] = [
+  // Add hashes for any inline scripts that cannot be modified to use nonces
+  // Example: "'sha256-abc123...'"
+];
+
+/**
+ * CSP Nonce Middleware
+ *
+ * Generates a unique cryptographic nonce for each request and configures
+ * Content Security Policy headers dynamically. This replaces 'unsafe-inline'
+ * and 'unsafe-eval' with nonce-based script allowlisting.
+ *
+ * The nonce is stored in res.locals.cspNonce for use in HTML templates.
+ *
+ * @param req - Express request object
+ * @param res - Express response object
+ * @param next - Express next function
+ */
+export const helmetMiddleware: RequestHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  // Generate unique nonce for this request
+  const nonce = generateCspNonce();
+  res.locals.cspNonce = nonce;
+
+  // Configure helmet with dynamic CSP using the nonce
+  const helmetConfig = helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          `'nonce-${nonce}'`,
+          // Include strict-dynamic for modern browsers - allows nonce-approved scripts
+          // to load additional scripts without explicit CSP entries
+          "'strict-dynamic'",
+          // Hashes for known inline scripts
+          ...SCRIPT_HASHES,
+          // Trusted external sources
+          ...TRUSTED_SCRIPT_SOURCES,
+        ],
+        scriptSrcAttr: ["'none'"], // Block inline event handlers (onclick, etc.)
+        styleSrc: [
+          "'self'",
+          // Note: 'unsafe-inline' is still required for Tailwind CSS and React
+          // Style nonces require build-time CSS extraction which is complex with Vite
+          "'unsafe-inline'",
+          ...TRUSTED_STYLE_SOURCES,
+        ],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "https:",
+          "blob:",
+          "https://*.clerk.accounts.dev",
+          "https://*.clerk.com",
+          "https://*.replit.com",
+          "https://*.replit.app",
+        ],
+        connectSrc: [
+          "'self'",
+          "https:",
+          "wss:",
+          "https://*.clerk.accounts.dev",
+          "https://*.clerk.com",
+          "https://api.clerk.com",
+          "https://api.clerk.dev",
+          "https://*.convex.cloud",
+          "wss://*.convex.cloud",
+          "https://*.replit.com",
+          "https://*.replit.app",
+          "wss://*.replit.com",
+          "wss://*.replit.app",
+        ],
+        mediaSrc: ["'self'", "https:", "blob:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+        frameSrc: [
+          "'self'",
+          "https:",
+          "https://*.clerk.accounts.dev",
+          "https://*.clerk.com",
+          "https://*.replit.com",
+          "https://*.replit.app",
+          "https://js.stripe.com",
+          "https://challenges.cloudflare.com",
+        ],
+        workerSrc: ["'self'", "blob:"],
+        childSrc: ["'self'", "blob:"],
+        upgradeInsecureRequests: [],
+      },
     },
-  },
-  crossOriginEmbedderPolicy: false, // Allow embedding for audio/video
-  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin resources
-});
+    crossOriginEmbedderPolicy: false, // Allow embedding for audio/video
+    crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin resources
+    // Additional security headers
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true,
+    },
+    noSniff: true,
+    xssFilter: true,
+    hidePoweredBy: true,
+  });
+
+  // Apply helmet middleware
+  helmetConfig(req, res, next);
+};
 
 // Compression middleware for response optimization
 export const compressionMiddleware = compression({
