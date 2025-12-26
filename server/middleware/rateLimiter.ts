@@ -2,7 +2,8 @@ import { NextFunction, Request, Response } from "express";
 
 // In-memory rate limiter implementation
 class InMemoryRateLimiter {
-  private limits: Map<string, { count: number; resetTime: number; blocked: number }> = new Map();
+  private readonly limits: Map<string, { count: number; resetTime: number; blocked: number }> =
+    new Map();
 
   async checkLimit(
     key: string,
@@ -114,8 +115,8 @@ interface RateLimitResult {
 }
 
 export class RateLimiter {
-  private config: RateLimitConfig;
-  private action: string;
+  private readonly config: RateLimitConfig;
+  private readonly action: string;
   constructor(action: string, config: RateLimitConfig) {
     this.action = action;
     const defaults = {
@@ -137,11 +138,15 @@ export class RateLimiter {
       const userId = req.isAuthenticated() ? req.user!.id.toString() : null;
       const ip = this.getClientIP(req);
 
-      const key = this.config.keyGenerator
-        ? this.config.keyGenerator(req)
-        : userId
-          ? `${userId}:${this.action}`
-          : `${ip}:${this.action}`;
+      // Generate rate limit key - extract nested ternary for clarity
+      let key: string;
+      if (this.config.keyGenerator) {
+        key = this.config.keyGenerator(req);
+      } else if (userId) {
+        key = `${userId}:${this.action}`;
+      } else {
+        key = `${ip}:${this.action}`;
+      }
 
       // Check rate limit using the shared rate limiter
       const result: RateLimitResult = await rateLimiter.checkLimit(key, {
@@ -195,8 +200,8 @@ export class RateLimiter {
           }
         }
 
-        // Handle different overloads of res.end properly
-        if (typeof chunk === "undefined") {
+        // Handle different overloads of res.end properly - compare with undefined directly
+        if (chunk === undefined) {
           return originalEnd();
         } else if (typeof encoding === "function") {
           // encoding is actually a callback
@@ -229,14 +234,15 @@ export class RateLimiter {
   }
 
   private getClientIP(req: ExtendedRequest): string {
-    // Get client IP from various sources
+    // Get client IP from various sources (preferred methods first)
     if (req.ip) return req.ip;
     if (req.socket?.remoteAddress) return req.socket.remoteAddress;
 
-    // Handle deprecated connection property safely
-    const connection = req.connection as unknown as SocketConnection | undefined;
-    if (connection?.remoteAddress) return connection.remoteAddress;
-    if (connection?.socket?.remoteAddress) return connection.socket.remoteAddress;
+    // Fallback: Handle legacy connection property (deprecated in Node.js)
+    // Using type assertion to safely access deprecated property for backward compatibility
+    const legacyConnection = (req as unknown as { connection?: SocketConnection }).connection;
+    if (legacyConnection?.remoteAddress) return legacyConnection.remoteAddress;
+    if (legacyConnection?.socket?.remoteAddress) return legacyConnection.socket.remoteAddress;
 
     return "unknown";
   }

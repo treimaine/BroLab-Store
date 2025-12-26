@@ -21,6 +21,7 @@ import { ComponentPreloader } from "@/components/loading/ComponentPreloader";
 import { AdminRoutes, LegalRoutes, ServiceRoutes } from "@/config/routeChunks";
 import { useDeferredMountStaggered } from "@/hooks/useDeferredMount";
 import { useInteractionPreloader } from "@/hooks/useInteractionPreloader";
+import { useNetworkAwarePreload } from "@/hooks/useNetworkAwarePreload";
 import { useIsFeatureEnabled } from "@/stores/useFeatureFlagsStore";
 import {
   bundleOptimization,
@@ -257,18 +258,31 @@ function App() {
     bundleOptimization.preloadOnUserInteraction();
   }, []);
 
-  // Conditionally preload audio player components only when feature is enabled
-  // This saves bandwidth on non-audio pages by not loading heavy audio modules
-  useEffect(() => {
-    if (!isGlobalAudioEnabled) return;
+  // Network-aware preloading for audio components
+  // On fast connections (4G/5G/WiFi): preload after 2s delay
+  // On slow/metered connections: wait for user interaction to save bandwidth
+  const { shouldAutoPreload, hasPreloaded, triggerPreload } = useNetworkAwarePreload({
+    autoPreloadDelay: 2000,
+  });
 
-    const preloadTimer = setTimeout(() => {
+  // Conditionally preload audio player components based on network conditions
+  useEffect(() => {
+    if (!isGlobalAudioEnabled || hasPreloaded) return;
+
+    const preloadAudioComponents = (): void => {
       import("@/components/audio/EnhancedGlobalAudioPlayer").catch(() => {});
       import("@/components/audio/SonaarModernPlayer").catch(() => {});
-    }, 2000);
+      triggerPreload();
+    };
 
-    return () => clearTimeout(preloadTimer);
-  }, [isGlobalAudioEnabled]);
+    if (shouldAutoPreload) {
+      // Fast connection: preload after delay (original behavior)
+      const preloadTimer = setTimeout(preloadAudioComponents, 2000);
+      return () => clearTimeout(preloadTimer);
+    }
+    // Slow/metered connection: preload triggered by user interaction via hook
+    return undefined;
+  }, [isGlobalAudioEnabled, shouldAutoPreload, hasPreloaded, triggerPreload]);
 
   // Cache warming with proper cleanup on auth state changes
   useEffect(() => {
