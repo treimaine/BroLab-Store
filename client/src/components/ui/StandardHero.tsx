@@ -25,7 +25,7 @@ export function StandardHero({
   className,
   titleClassName,
   subtitleClassName,
-}: StandardHeroProps) {
+}: Readonly<StandardHeroProps>) {
   return (
     <section className={cn("relative pt-16 pb-20 overflow-hidden", className)}>
       {/* Gradient Background */}

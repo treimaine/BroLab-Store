@@ -26,17 +26,26 @@ export interface EmailDeliveryResult {
 // Configuration du transporteur SMTP avec support Resend et Gmail
 const createTransporter = (): Transporter => {
   // Use Resend if API key is provided (recommended for production)
-  if (process.env.RESEND_API_KEY) {
+  const resendKey = process.env.RESEND_API_KEY;
+  console.log("📧 Email config check:", {
+    hasResendKey: !!resendKey,
+    keyPrefix: resendKey ? resendKey.substring(0, 6) + "..." : "none",
+    nodeEnv: process.env.NODE_ENV,
+  });
+
+  if (resendKey) {
+    console.log("📧 Email transporter: Using Resend SMTP");
     return nodemailer.createTransport({
       host: "smtp.resend.com",
       port: 465,
       secure: true,
       auth: {
         user: "resend",
-        pass: process.env.RESEND_API_KEY,
+        pass: resendKey,
       },
     });
   }
+  console.log("📧 Email transporter: Resend API key not found, falling back to Gmail SMTP");
 
   // Fallback to Gmail SMTP
   const smtpUser = process.env.SMTP_USER;
