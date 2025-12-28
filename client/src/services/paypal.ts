@@ -2,9 +2,36 @@ import { apiService, isApiError } from "@/services/ApiService";
 import { PayPalOrder, PayPalPaymentRequest, PayPalPaymentResponse } from "../config/paypal";
 
 /**
- * Service PayPal côté client
- * Gère les appels API vers le serveur pour les paiements PayPal
- * ✅ CORRECTION: Utilise approvalLink et gère correctement les paramètres PayPal
+ * Extract error message from various error types
+ * Avoids nested ternary operations (SonarQube S3358)
+ */
+function extractErrorMessage(error: unknown, defaultMessage: string): string {
+  if (isApiError(error)) {
+    return String(error.body) || `HTTP ${error.status}: ${error.statusText}`;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return defaultMessage;
+}
+
+/**
+ * Extract HTTP error message from API errors
+ * Avoids nested ternary operations (SonarQube S3358)
+ */
+function extractHttpErrorMessage(error: unknown, defaultMessage: string): string {
+  if (isApiError(error)) {
+    return `HTTP ${error.status}: ${error.statusText}`;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return defaultMessage;
+}
+
+/**
+ * PayPal client-side service
+ * Handles API calls to the server for PayPal payments
  */
 export class PayPalClientService {
   private static readonly API_BASE = "/payment/paypal";
@@ -36,14 +63,9 @@ export class PayPalClientService {
       };
     } catch (error) {
       console.error("❌ Error creating PayPal order:", error);
-      const errorMessage = isApiError(error)
-        ? String(error.body) || `HTTP ${error.status}: ${error.statusText}`
-        : error instanceof Error
-          ? error.message
-          : "Failed to create PayPal order";
       return {
         success: false,
-        error: errorMessage,
+        error: extractErrorMessage(error, "Failed to create PayPal order"),
       };
     }
   }
@@ -76,14 +98,9 @@ export class PayPalClientService {
       };
     } catch (error) {
       console.error("❌ Error capturing payment:", error);
-      const errorMessage = isApiError(error)
-        ? String(error.body) || `HTTP ${error.status}: ${error.statusText}`
-        : error instanceof Error
-          ? error.message
-          : "Failed to capture payment";
       return {
         success: false,
-        error: errorMessage,
+        error: extractErrorMessage(error, "Failed to capture payment"),
       };
     }
   }
@@ -125,14 +142,9 @@ export class PayPalClientService {
       };
     } catch (error) {
       console.error("❌ PayPal service health check failed:", error);
-      const errorMessage = isApiError(error)
-        ? `HTTP ${error.status}: ${error.statusText}`
-        : error instanceof Error
-          ? error.message
-          : "Health check failed";
       return {
         success: false,
-        error: errorMessage,
+        error: extractHttpErrorMessage(error, "Health check failed"),
       };
     }
   }

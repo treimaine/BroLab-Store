@@ -5,12 +5,12 @@ import { useEffect, useRef, useState } from "react";
 const DEFAULT_AVATAR = "/assets/default-avatar.svg";
 
 interface AvatarProps {
-  src?: string | null;
-  alt?: string;
-  size?: "sm" | "md" | "lg";
-  className?: string;
-  editable?: boolean;
-  onUpload?: (url: string) => void;
+  readonly src?: string | null;
+  readonly alt?: string;
+  readonly size?: "sm" | "md" | "lg";
+  readonly className?: string;
+  readonly editable?: boolean;
+  readonly onUpload?: (url: string) => void;
 }
 
 const sizeClasses = {
@@ -29,15 +29,14 @@ export function Avatar({
 }: AvatarProps) {
   const [imgSrc, setImgSrc] = useState(src || DEFAULT_AVATAR);
   const [isUploading, setIsUploading] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Mettre à jour imgSrc quand src change
+  // Update imgSrc when src changes
   useEffect(() => {
     setImgSrc(src || DEFAULT_AVATAR);
   }, [src]);
 
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -61,18 +60,14 @@ export function Avatar({
       onUpload?.(url);
     } catch (error) {
       console.error("Avatar upload error:", error);
-      notificationService.error("Impossible de mettre à jour l'avatar. Veuillez réessayer.");
+      notificationService.error("Unable to update avatar. Please try again.");
     } finally {
       setIsUploading(false);
     }
   };
 
   return (
-    <div
-      className="relative group"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <div className="relative group">
       <img
         src={imgSrc}
         alt={alt}
@@ -86,7 +81,7 @@ export function Avatar({
         onError={() => {
           if (imgSrc !== DEFAULT_AVATAR) {
             setImgSrc(DEFAULT_AVATAR);
-            notificationService.error("Impossible de charger l'avatar");
+            notificationService.error("Unable to load avatar");
           }
         }}
       />
@@ -105,7 +100,7 @@ export function Avatar({
             className={cn(
               "absolute inset-0 flex items-center justify-center rounded-full",
               "bg-black bg-opacity-50 transition-opacity duration-200",
-              isHovered ? "opacity-100" : "opacity-0",
+              "opacity-0 group-hover:opacity-100 focus:opacity-100",
               "focus:outline-none focus:ring-2 focus:ring-[var(--accent-purple)] focus:ring-offset-2"
             )}
           >

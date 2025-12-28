@@ -14,6 +14,7 @@
 import { useCartContext } from "@/components/cart/cart-provider";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { TabVisibilityManager } from "@/hooks/useTabVisibilityManager";
 import { useAudioStore } from "@/stores/useAudioStore";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -398,9 +399,6 @@ function BicolorWaveform({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Track tab visibility to prevent animation accumulation when tab is hidden
-    let isTabVisible = !document.hidden;
-
     const drawWaveform = (): void => {
       const width = canvas.width;
       const height = canvas.height;
@@ -418,7 +416,7 @@ function BicolorWaveform({
         // Use pre-generated waveform data with slight animation when playing
         let heightMultiplier = waveformData[i] || 0.5;
 
-        if (isPlaying && isTabVisible) {
+        if (isPlaying && TabVisibilityManager.isVisible()) {
           // Add subtle animation when playing (only if tab is visible)
           const time = Date.now() / 1000;
           const animOffset = Math.sin(time * 3 + i * 0.2) * 0.1;
@@ -444,20 +442,25 @@ function BicolorWaveform({
 
     const animate = (): void => {
       // Stop animation loop if tab is hidden to prevent accumulation
-      if (!isTabVisible) return;
+      if (!TabVisibilityManager.isVisible()) return;
 
       drawWaveform();
       animationRef.current = requestAnimationFrame(animate);
     };
 
     const handleVisibilityChange = (): void => {
-      isTabVisible = !document.hidden;
-      if (isTabVisible && isPlaying) {
-        // Cancel any pending frame and restart cleanly
+      if (TabVisibilityManager.isVisible() && isPlaying) {
+        // Cancel any pending frame and restart cleanly with staggered delay
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current);
         }
-        animate();
+        // Stagger restart to prevent thundering herd
+        const staggerDelay = Math.random() * 200 + 100;
+        setTimeout(() => {
+          if (TabVisibilityManager.isVisible() && isPlaying) {
+            animate();
+          }
+        }, staggerDelay);
       }
     };
 

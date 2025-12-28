@@ -41,25 +41,35 @@ const emergencyCartResetFn = (): void => {
   globalThis.location.reload();
 };
 
-// Test current cart pricing
+// Test current cart pricing - returns true if all prices are valid, false otherwise
 const validateCartPricingFn = (): boolean => {
   const cartItems = storage.getCart();
-  if (cartItems.length > 0) {
-    console.log("Current cart data:", cartItems);
 
-    cartItems.forEach((item: CartItem, index: number) => {
-      console.log(
-        `Item ${index}: ${item.title ?? "Unknown"} - ${item.price ?? 0} (${item.licenseType ?? "Unknown"})`
-      );
-      if ((item.price ?? 0) < 29.99) {
-        console.error(
-          `❌ INVALID PRICING: ${item.price ?? 0} for ${item.licenseType ?? "Unknown"}`
-        );
-      }
-    });
+  if (cartItems.length === 0) {
+    console.log("Cart is empty - nothing to validate");
     return true;
   }
-  return true;
+
+  console.log("Current cart data:", cartItems);
+  let isValid = true;
+
+  cartItems.forEach((item: CartItem, index: number) => {
+    const price = item.price ?? 0;
+    const licenseType = item.licenseType ?? "Unknown";
+
+    console.log(`Item ${index}: ${item.title ?? "Unknown"} - ${price} (${licenseType})`);
+
+    if (price < 29.99) {
+      console.error(`❌ INVALID PRICING: ${price} for ${licenseType}`);
+      isValid = false;
+    }
+  });
+
+  if (isValid) {
+    console.log("✅ All cart prices are valid");
+  }
+
+  return isValid;
 };
 
 // Export the functions

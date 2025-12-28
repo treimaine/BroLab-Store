@@ -15,6 +15,7 @@
 
 import { toast } from "@/hooks/use-toast";
 import { useCacheWarming } from "@/hooks/useCachingStrategy";
+import { useStaggeredResume } from "@/hooks/useTabVisibilityManager";
 import { apiService } from "@/services/ApiService";
 import { useUser } from "@clerk/clerk-react";
 import {
@@ -287,22 +288,15 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
     }
   }, [handleOperationSuccess, handleOperationFailure]);
 
-  // Track tab visibility to pause timers when hidden (saves bandwidth and battery)
-  const [isTabVisible, setIsTabVisible] = useState(() => !document.hidden);
+  // Use centralized tab visibility manager with staggered resume
+  // This prevents the "thundering herd" problem when tab becomes visible
+  const { isVisible: isTabVisible, isReady: isTabReady } = useStaggeredResume({
+    baseDelay: 100,
+    staggerRange: 400,
+    minVisibleTime: 200,
+  });
   const metricsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optimizationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Listen for visibility changes
-  useEffect(() => {
-    const handleVisibilityChange = (): void => {
-      setIsTabVisible(!document.hidden);
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
 
   // Initialize cache on mount (runs once)
   useEffect(() => {
@@ -383,7 +377,7 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
     }, delay);
   }, [calculateBackoffDelay, handleOperationSuccess, handleOperationFailure]);
 
-  // Manage periodic timers based on tab visibility
+  // Manage periodic timers based on tab visibility (with staggered resume)
   useEffect(() => {
     // Clear existing timeouts when tab becomes hidden
     const clearTimeouts = (): void => {
@@ -402,7 +396,12 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
       return;
     }
 
-    // Tab is visible - start scheduled operations
+    // Wait for staggered resume to be ready before starting operations
+    if (!isTabReady) {
+      return;
+    }
+
+    // Tab is visible and ready - start scheduled operations
     // Run metrics update once when tab becomes visible
     updateMetrics();
 
@@ -411,9 +410,9 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
     scheduleOptimization();
 
     return clearTimeouts;
-    // Only re-run when visibility changes, not when callbacks change
+    // Only re-run when visibility/ready state changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTabVisible]);
+  }, [isTabVisible, isTabReady]);
 
   // Cache actions - memoized to prevent unnecessary re-renders
   const warmCache = useCallback(async () => {

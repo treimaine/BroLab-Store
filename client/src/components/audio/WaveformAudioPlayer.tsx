@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { TabVisibilityManager } from "@/hooks/useTabVisibilityManager";
 import { cn } from "@/lib/utils";
 import { Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
@@ -168,26 +169,31 @@ export function WaveformAudioPlayer({
 
     drawWaveform();
 
-    // Track tab visibility to prevent animation accumulation
-    let isTabVisible = !document.hidden;
+    // Use centralized TabVisibilityManager to prevent duplicate listeners
     let animationFrame: number;
 
     const animate = (): void => {
       // Stop animation loop if tab is hidden to prevent accumulation
-      if (!isTabVisible) return;
+      if (!TabVisibilityManager.isVisible()) return;
 
       drawWaveform();
       animationFrame = requestAnimationFrame(animate);
     };
 
     const handleVisibilityChange = (): void => {
-      isTabVisible = !document.hidden;
-      if (isTabVisible && isPlaying) {
-        // Cancel any pending frame and restart cleanly
+      if (TabVisibilityManager.isVisible() && isPlaying) {
+        // Cancel any pending frame and restart cleanly after a small delay
+        // to stagger with other components
         if (animationFrame) {
           cancelAnimationFrame(animationFrame);
         }
-        animate();
+        // Stagger restart to prevent thundering herd
+        const staggerDelay = Math.random() * 200 + 50;
+        setTimeout(() => {
+          if (TabVisibilityManager.isVisible() && isPlaying) {
+            animate();
+          }
+        }, staggerDelay);
       }
     };
 

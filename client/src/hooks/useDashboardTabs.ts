@@ -8,6 +8,7 @@
  * - 4.1: Real-time updates without full page refreshes
  */
 
+import { useTabVisible } from "@/hooks/useTabVisibilityManager";
 import { RealtimeContext, type RealtimeEventType } from "@/providers/DashboardRealtimeProvider";
 import { useCallback, useContext, useEffect, useState } from "react";
 
@@ -109,13 +110,13 @@ const TAB_CONFIGS: Record<DashboardTab, TabConfig> = {
 };
 
 export function useDashboardTabs(initialTab: DashboardTab = "overview"): DashboardTabsHook {
-  const [activeTab, setActiveTabState] = useState<DashboardTab>(initialTab);
+  const [currentTab, setCurrentTab] = useState<DashboardTab>(initialTab);
   const [tabHistory, setTabHistory] = useState<DashboardTab[]>([initialTab]);
   const { setActiveTab: setRealtimeActiveTab } = useRealtimeContext();
 
   // Set active tab with history tracking
   const setActiveTab = useCallback((tab: DashboardTab) => {
-    setActiveTabState(prevTab => {
+    setCurrentTab(prevTab => {
       if (prevTab === tab) return prevTab;
 
       // Update tab history
@@ -145,7 +146,7 @@ export function useDashboardTabs(initialTab: DashboardTab = "overview"): Dashboa
 
       if (previousTab) {
         setTabHistory(newHistory);
-        setActiveTabState(previousTab);
+        setCurrentTab(previousTab);
       }
     }
   }, [tabHistory]);
@@ -160,16 +161,16 @@ export function useDashboardTabs(initialTab: DashboardTab = "overview"): Dashboa
 
   // Get active events for current tab
   const getActiveEvents = useCallback((): RealtimeEventType[] => {
-    return TAB_CONFIGS[activeTab].events;
-  }, [activeTab]);
+    return TAB_CONFIGS[currentTab].events;
+  }, [currentTab]);
 
   // Update real-time context when active tab changes
   useEffect(() => {
-    setRealtimeActiveTab(activeTab);
-  }, [activeTab, setRealtimeActiveTab]);
+    setRealtimeActiveTab(currentTab);
+  }, [currentTab, setRealtimeActiveTab]);
 
   return {
-    activeTab,
+    activeTab: currentTab,
     setActiveTab,
     getTabConfig,
     getActiveEvents,
@@ -195,15 +196,12 @@ export function useTabPolling(tab: DashboardTab, callback: () => void, enabled: 
 }
 
 // Hook for managing tab visibility and focus
+// Uses centralized TabVisibilityManager to prevent duplicate event listeners
 export function useTabVisibility() {
-  const [isVisible, setIsVisible] = useState(!document.hidden);
-  const [isFocused, setIsFocused] = useState(document.hasFocus());
+  const isVisible = useTabVisible();
+  const [isFocused, setIsFocused] = useState(() => document.hasFocus());
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      setIsVisible(!document.hidden);
-    };
-
     const handleFocus = () => {
       setIsFocused(true);
     };
@@ -212,12 +210,10 @@ export function useTabVisibility() {
       setIsFocused(false);
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleFocus);
     window.addEventListener("blur", handleBlur);
 
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("blur", handleBlur);
     };

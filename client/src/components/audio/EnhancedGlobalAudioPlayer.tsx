@@ -2,6 +2,7 @@ import { useCartContext } from "@/components/cart/cart-provider";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { TabVisibilityManager } from "@/hooks/useTabVisibilityManager";
 import { useAudioStore } from "@/stores/useAudioStore";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -470,12 +471,9 @@ export function EnhancedGlobalAudioPlayer() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Track tab visibility to prevent animation accumulation
-    let isTabVisible = !document.hidden;
-
     const animate = (): void => {
       // Stop animation loop if tab is hidden to prevent accumulation
-      if (!isTabVisible || !analyser || !dataArray) return;
+      if (!TabVisibilityManager.isVisible() || !analyser || !dataArray) return;
 
       analyser.getByteFrequencyData(dataArray);
 
@@ -498,13 +496,18 @@ export function EnhancedGlobalAudioPlayer() {
     };
 
     const handleVisibilityChange = (): void => {
-      isTabVisible = !document.hidden;
-      if (isTabVisible && isPlaying) {
-        // Cancel any pending frame and restart cleanly
+      if (TabVisibilityManager.isVisible() && isPlaying) {
+        // Cancel any pending frame and restart cleanly with staggered delay
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current);
         }
-        animate();
+        // Stagger restart to prevent thundering herd
+        const staggerDelay = Math.random() * 200 + 150;
+        setTimeout(() => {
+          if (TabVisibilityManager.isVisible() && isPlaying) {
+            animate();
+          }
+        }, staggerDelay);
       }
     };
 

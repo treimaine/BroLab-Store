@@ -8,7 +8,7 @@ _Last updated: December 28, 2025 - SYNCHRONIZED WITH CODEBASE_
 | --------------------- | ----------- | ---------------------------------------- |
 | Orders System         | ✅ Complete | Backend + Frontend (Dashboard OrdersTab) |
 | Recently Viewed Beats | ✅ Complete | Hook + UI Component                      |
-| Wishlist Persistence  | ❌ Missing  | UI exists, Convex backend needed         |
+| Wishlist Persistence  | ✅ Complete | Full Convex backend + REST API + UI      |
 | Producer Portal       | ❌ Missing  | New feature required                     |
 | Content Moderation    | ❌ Missing  | Depends on Producer Portal               |
 
@@ -27,6 +27,42 @@ _Last updated: December 28, 2025 - SYNCHRONIZED WITH CODEBASE_
 - `client/src/components/dashboard/OrdersTab.tsx` - Dashboard integration
 - Orders accessible via Dashboard → Orders tab
 
+### Task 2: Wishlist Backend Persistence ✅ DONE
+
+**Status**: Fully implemented
+**Completed**: December 2025
+
+**Implementation**:
+
+- **Convex Schema** (`convex/schema.ts`):
+  - Table `favorites` with indexes: `by_user`, `by_beat`, `by_user_beat`, `by_user_created`, `by_created_at`
+- **Convex Mutations/Queries** (`convex/favorites/`):
+  - `add.ts` → `addToFavorites` mutation with beat metadata enrichment
+  - `remove.ts` → `removeFromFavorites` mutation
+  - `getFavorites.ts` → `getFavorites` and `getFavoritesWithBeats` queries
+  - `restore.ts` → Restore functionality
+  - `serverFunctions.ts` → Server-side functions with clerkId support
+- **REST API Routes** (`server/routes/wishlist.ts`):
+  - `GET /api/wishlist` → Get user's wishlist
+  - `POST /api/wishlist` → Add beat to wishlist
+  - `DELETE /api/wishlist/:beatId` → Remove beat from wishlist
+  - `DELETE /api/wishlist` → Clear entire wishlist
+- **Frontend Hooks**:
+  - `client/src/hooks/useWishlist.ts` → TanStack Query hook (REST API)
+  - `client/src/hooks/useFavorites.ts` → Convex real-time hook
+- **UI Page** (`client/src/pages/wishlist.tsx`):
+  - Full wishlist page with beat cards
+  - Remove individual items or clear all
+  - Loading and error states
+
+**Features**:
+
+- ✅ Wishlist items persist across browser sessions
+- ✅ Real-time sync via Convex subscriptions
+- ✅ Proper error handling and notifications
+- ✅ Integration with BeatCard components
+- ✅ Authentication required (Clerk)
+
 ### Task 4: Recently Viewed Beats UI ✅ DONE
 
 **Status**: Fully implemented
@@ -42,36 +78,6 @@ _Last updated: December 28, 2025 - SYNCHRONIZED WITH CODEBASE_
 ---
 
 ## 🎯 ACTIONABLE TASKS FOR MISSING FEATURES
-
-### P0 - CRITICAL TASKS (Immediate Action Required)
-
-#### Task 2: Implement Wishlist Backend Persistence
-
-**Status**: UI complete ✅, Backend stubs only ❌
-**Priority**: P0 - Critical functionality gap
-**Estimated Time**: 3-4 hours
-**Dependencies**: Convex database, existing wishlist UI
-
-**Action Items**:
-
-1. Create Convex schema for wishlist table in `/convex/schema.ts`
-2. Implement Convex mutations in `/convex/wishlist.ts`:
-   - `addToWishlist(userId, beatId)`
-   - `removeFromWishlist(userId, beatId)`
-   - `clearWishlist(userId)`
-3. Implement Convex queries in `/convex/wishlist.ts`:
-   - `getUserWishlist(userId)`
-   - `isInWishlist(userId, beatId)`
-4. Update API routes in `/server/routes/wishlist.ts` to use Convex
-5. Add proper error handling and validation
-6. Create tests in `__tests__/wishlist.test.ts`
-
-**Acceptance Criteria**:
-
-- Wishlist items persist across browser sessions
-- Real-time sync when items added/removed
-- Proper error handling for network issues
-- Integration with existing UI components works seamlessly
 
 ### P1 - HIGH PRIORITY TASKS (Business Impact)
 
@@ -252,16 +258,16 @@ _Last updated: December 28, 2025 - SYNCHRONIZED WITH CODEBASE_
 
 ### IMPLEMENTATION PRIORITY ORDER
 
-1. **Task 1**: Frontend Order Pages (P0) - 4-6 hours
-2. **Task 2**: Wishlist Backend Persistence (P0) - 3-4 hours
-3. **Task 4**: Recently Viewed Beats UI (P1) - 2-3 hours
+1. **Task 1**: Frontend Order Pages (P0) - ✅ DONE
+2. **Task 2**: Wishlist Backend Persistence (P0) - ✅ DONE
+3. **Task 4**: Recently Viewed Beats UI (P1) - ✅ DONE
 4. **Task 3**: Producer Portal (P1) - 12-16 hours
 5. **Task 5**: Content Moderation System (P1) - 8-10 hours
 6. **Task 8**: Revenue Sharing System (P1) - 8-12 hours
 7. **Task 6**: Advanced Analytics Dashboard (P2) - 10-12 hours
 8. **Task 7**: Progressive Web App (P2) - 6-8 hours
 
-**Total Estimated Time**: 53-71 hours (13-18 days of development)
+**Remaining Estimated Time**: 46-58 hours (12-15 days of development)
 
 ### TASK EXECUTION GUIDELINES
 
@@ -519,25 +525,29 @@ Each task should be executed with:
 
 ## 🔍 LACUNES IDENTIFIÉES LORS DE L'AUDIT (Janvier 27, 2025)
 
-### ❌ FONCTIONNALITÉS MANQUANTES CRITIQUES
+### ✅ FONCTIONNALITÉS PRÉCÉDEMMENT MANQUANTES - MAINTENANT COMPLÈTES
 
-#### 1. Pages Frontend pour Commandes
+#### 1. Pages Frontend pour Commandes ✅ TERMINÉ
 
-- **Statut**: Backend complet ✅, Frontend manquant ❌
-- **Impact**: Utilisateurs ne peuvent pas voir leur historique de commandes
-- **Détails**: Hook `useOrders` existe, API complète, mais aucune page UI
+- **Statut**: Backend complet ✅, Frontend complet ✅
+- **Implémentation**: Dashboard OrdersTab avec OrderCard, OrderList, OrderStatusHistory
 
-#### 2. Persistance Wishlist/Favoris
+#### 2. Persistance Wishlist/Favoris ✅ TERMINÉ
 
-- **Statut**: UI complète ✅, Backend stubs seulement ❌
-- **Impact**: Favoris ne sont pas sauvegardés (retours vides)
-- **Détails**: Routes API avec TODO, pas de persistance Convex
+- **Statut**: UI complète ✅, Backend Convex complet ✅
+- **Implémentation**:
+  - Schéma Convex `favorites` avec indexes optimisés
+  - Mutations: `addToFavorites`, `removeFromFavorites`, `clearFavorites`
+  - Queries: `getFavorites`, `getFavoritesWithBeats`
+  - Routes REST: GET/POST/DELETE `/api/wishlist`
+  - Hooks: `useWishlist` (REST), `useFavorites` (Convex temps réel)
 
-#### 3. Composants UI Beats Récents
+#### 3. Composants UI Beats Récents ✅ TERMINÉ
 
-- **Statut**: Hook complet ✅, Composants UI manquants ❌
-- **Impact**: Fonctionnalité invisible pour les utilisateurs
-- **Détails**: `useRecentlyViewedBeats` fonctionne, mais pas d'affichage
+- **Statut**: Hook complet ✅, Composants UI complets ✅
+- **Implémentation**: `RecentlyViewedBeats.tsx` + `useRecentlyViewedBeats.ts`
+
+### ❌ FONCTIONNALITÉS MANQUANTES RESTANTES
 
 #### 4. Portail Producteurs
 
@@ -547,39 +557,37 @@ Each task should be executed with:
 
 ## 🎯 PRIORITÉS RECOMMANDÉES - Analyse État Actuel
 
-### P0 - CRITIQUE (Bloqueurs UX)
+### P0 - CRITIQUE (Bloqueurs UX) - ✅ TOUS RÉSOLUS
 
-#### 1. Pages Frontend Commandes – ❌ MANQUANT
+#### 1. Pages Frontend Commandes – ✅ TERMINÉ
 
-- [ ] **Interface utilisateur commandes** - (P0, CRITIQUE) - TODO
-      _Backend complet, UI manquante_
+- [x] **Interface utilisateur commandes** - (P0, CRITIQUE) - ✅ DONE
+      _Backend complet, UI complète_
   - ✅ Backend Convex: mutations et queries complètes
   - ✅ API REST: routes complètes avec authentification
   - ✅ Hook frontend: `useOrders` avec TanStack Query
-  - ❌ Page liste commandes: `/orders` ou `/dashboard/orders`
-  - ❌ Page détail commande: `/orders/[id]`
-  - ❌ Composants UI: OrderCard, OrderStatus, OrderHistory
+  - ✅ Dashboard OrdersTab avec OrderCard, OrderList, OrderStatusHistory
 
-#### 2. Persistance Wishlist/Favoris – ❌ MANQUANT
+#### 2. Persistance Wishlist/Favoris – ✅ TERMINÉ
 
-- [ ] **Backend persistance wishlist** - (P0, CRITIQUE) - TODO
-      _UI complète, backend stubs seulement_
+- [x] **Backend persistance wishlist** - (P0, CRITIQUE) - ✅ DONE
+      _UI complète, backend Convex complet_
   - ✅ Frontend complet: hook, page, composants
-  - ✅ Routes API: structure présente
-  - ❌ Persistance Convex: mutations/queries manquantes
-  - ❌ Schéma base de données: table wishlist absente
-  - ❌ Tests backend: validation persistance manquante
+  - ✅ Routes API: `/api/wishlist` (GET/POST/DELETE)
+  - ✅ Persistance Convex: `convex/favorites/` (add, remove, getFavorites, serverFunctions)
+  - ✅ Schéma base de données: table `favorites` avec indexes optimisés
+  - ✅ Hooks: `useWishlist` (REST) + `useFavorites` (Convex temps réel)
 
 ### P1 - PRIORITÉ ÉLEVÉE (Impact Business)
 
-#### 1. Composants UI Beats Récents – ❌ MANQUANT
+#### 1. Composants UI Beats Récents – ✅ TERMINÉ
 
-- [ ] **Interface utilisateur beats récents** - (P1, MOYEN) - TODO
-      _Hook complet, composants UI manquants_
+- [x] **Interface utilisateur beats récents** - (P1, MOYEN) - ✅ DONE
+      _Hook complet, composants UI complets_
   - ✅ Hook `useRecentlyViewedBeats`: localStorage, gestion d'état
-  - ❌ Composant `RecentlyViewedBeats`: affichage liste
-  - ❌ Intégration pages: home, shop, dashboard
-  - ❌ Styles et animations: design cohérent
+  - ✅ Composant `RecentlyViewedBeats.tsx`: affichage liste
+  - ✅ Intégration avec BeatCard
+  - ✅ Fonctionnalité clear history
 
 #### 2. Gestion et Contenus Producteurs
 
@@ -590,7 +598,7 @@ Each task should be executed with:
 - [ ] **Workflow modération contenu** - (P1, MOYEN, fullstack) - TODO
       _Système révision pour beats soumis, contrôle qualité_
 
-#### 8. Gestion Contenu Producteurs (NOUVELLE PRIORITÉ)
+#### 3. Gestion Contenu Producteurs (NOUVELLE PRIORITÉ)
 
 - [ ] **Interface modération admin** - (P1, ÉLEVÉ, 6-8h) - TODO
       _Workflow approbation beats soumis, contrôle qualité_
@@ -599,26 +607,27 @@ Each task should be executed with:
   - Workflow approbation/rejet automatisé
   - Notifications producteurs sur statut soumissions
 
-#### 3. Expérience Utilisateur Critique
+#### 4. Expérience Utilisateur Critique
 
-- ⚠️ **Wishlist et favoris** - (P1, ÉLEVÉ) - WIP (Backend incomplet)
-  _UI complète; API avec stubs seulement_
+- ✅ **Wishlist et favoris** - (P1, ÉLEVÉ) - ✅ TERMINÉ
+  _UI complète + Backend Convex complet_
   - ✅ Hook `useWishlist` complet avec TanStack Query
+  - ✅ Hook `useFavorites` avec Convex temps réel
   - ✅ Page `wishlist.tsx` complète avec interface utilisateur
-  - ⚠️ API `/api/wishlist`: routes présentes mais avec TODO (pas de persistance Convex)
-  - ❌ Persistance base de données manquante (retours vides uniquement)
+  - ✅ API `/api/wishlist`: routes complètes avec persistance Convex
+  - ✅ Persistance base de données fonctionnelle
   - ✅ Auth/notifications côté UI intégrées
 
-- ✅ **Beats vus récemment** - (P1, MOYEN, 2-3h) - ✅ IMPLÉMENTÉ
+- ✅ **Beats vus récemment** - (P1, MOYEN) - ✅ TERMINÉ
   _Améliore engagement utilisateur_
   - ✅ Historique navigation avec localStorage (`brl_recent_beats`)
   - ✅ Hook `useRecentlyViewedBeats` complet avec gestion d'état
   - ✅ Limite 12 beats maximum avec gestion des doublons
   - ✅ Fonctionnalités: ajout, suppression, vidage historique
   - ✅ Persistance localStorage avec gestion d'erreurs
-  - ❌ Composant UI et intégration dans les pages: à vérifier/implémenter
+  - ✅ Composant UI `RecentlyViewedBeats.tsx` implémenté
 
-#### 4. SEO & Découvrabilité
+#### 5. SEO & Découvrabilité
 
 - ✅ **Optimisation SEO** - (P1, ÉLEVÉ, 3-4h) - ✅ TERMINÉ
   _App désormais visible sur moteurs de recherche_
@@ -628,7 +637,7 @@ Each task should be executed with:
   - ✅ Cache et optimisation performance (1h cache, robots.txt)
   - ❌ Meta tags dynamiques et Schema markup: à vérifier dans le frontend
 
-#### 5. Business & Analytics
+#### 6. Business & Analytics
 
 - [x] **Backend système parrainage** - (P1, MOYEN) - ✅ TERMINÉ
       _Système de parrainage complet avec récompenses_
@@ -638,14 +647,13 @@ Each task should be executed with:
   - ✅ Système de récompenses automatisé
 - [ ] **Dashboard analytics avancé** - (P1, MOYEN, frontend) - WIP
       _Métriques ventes, comportement utilisateur, funnels conversion_
-  # Monitoring basique présent dans server/routes/monitoring.ts, manque heatmaps/A-B testing
   - ✅ Monitoring basique opérationnel (métriques système, health checks)
   - ❌ Heatmaps utilisateur et A/B testing manquants
   - ❌ Analytics comportementaux avancés à implémenter
 
 ### P2 - AMÉLIORATIONS FUTURES (Fonctionnalités Futures)
 
-#### 6. Performance & Monitoring
+#### 7. Performance & Monitoring
 
 - [ ] **Monitoring d'erreurs (Sentry)** - (P2, BAS, 2-3h) - TODO
       _Monitoring erreurs production_
@@ -659,7 +667,7 @@ Each task should be executed with:
   - Capacités offline
   - Expérience type app
 
-#### 7. DevOps & Déploiement
+#### 8. DevOps & Déploiement
 
 - [x] **Configuration SSL production** - (P0, CRITIQUE, 1h) - ✅ CONFIGURÉ
       _Configuration certificat SSL, application HTTPS_
