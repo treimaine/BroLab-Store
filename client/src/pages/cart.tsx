@@ -46,8 +46,8 @@ export default function Cart() {
           <div className="lg:col-span-2 space-y-4">
             {cart.items.map((item, index) => (
               <div key={`${item.beatId}-${item.licenseType}-${index}`} className="card-dark p-6">
-                <div className="flex items-center space-x-4">
-                  <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="w-full sm:w-20 h-32 sm:h-20 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center overflow-hidden">
                     {item.imageUrl ? (
                       <img
                         src={item.imageUrl}
@@ -66,14 +66,14 @@ export default function Cart() {
                     <p className="text-gray-300 mb-2">{item.genre}</p>
 
                     {/* License Selector */}
-                    <div className="flex items-center space-x-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                       <Select
                         value={item.licenseType}
                         onValueChange={value =>
                           updateLicense(item.beatId, item.licenseType, value as LicenseTypeEnum)
                         }
                       >
-                        <SelectTrigger className="w-48 form-input text-sm">
+                        <SelectTrigger className="w-full sm:w-48 form-input text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -95,7 +95,7 @@ export default function Cart() {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center justify-between sm:justify-end gap-4">
                     <div className="flex items-center space-x-2">
                       <Button
                         size="sm"
@@ -104,7 +104,7 @@ export default function Cart() {
                           updateQuantity(item.beatId, item.licenseType, item.quantity - 1)
                         }
                         disabled={item.quantity <= 1}
-                        className="w-8 h-8 p-0 border-[var(--medium-gray)] text-white hover:bg-[var(--medium-gray)]"
+                        className="w-10 h-10 sm:w-8 sm:h-8 p-0 border-[var(--medium-gray)] text-white hover:bg-[var(--medium-gray)]"
                       >
                         <Minus className="w-4 h-4" />
                       </Button>
@@ -117,7 +117,7 @@ export default function Cart() {
                         onClick={() =>
                           updateQuantity(item.beatId, item.licenseType, item.quantity + 1)
                         }
-                        className="w-8 h-8 p-0 border-[var(--medium-gray)] text-white hover:bg-[var(--medium-gray)]"
+                        className="w-10 h-10 sm:w-8 sm:h-8 p-0 border-[var(--medium-gray)] text-white hover:bg-[var(--medium-gray)]"
                       >
                         <Plus className="w-4 h-4" />
                       </Button>

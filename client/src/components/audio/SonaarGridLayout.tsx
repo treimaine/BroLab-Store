@@ -162,7 +162,7 @@ const GridItem = memo(function GridItem({
                   type="button"
                   onClick={handlePrevious}
                   className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    "w-12 h-12 rounded-full flex items-center justify-center",
                     "bg-black/50 hover:bg-black/70 text-white",
                     "transition-all duration-200 hover:scale-110 backdrop-blur-sm"
                   )}
@@ -193,7 +193,7 @@ const GridItem = memo(function GridItem({
                   type="button"
                   onClick={handleNext}
                   className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center",
+                    "w-12 h-12 rounded-full flex items-center justify-center",
                     "bg-black/50 hover:bg-black/70 text-white",
                     "transition-all duration-200 hover:scale-110 backdrop-blur-sm"
                   )}

@@ -60,7 +60,7 @@ export function useFavorites() {
     if (!isAuthenticated) {
       throw new Error("User must be authenticated to add favorites");
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     await addToFavoritesMutation({
       beatId,
       beatTitle: metadata?.title,

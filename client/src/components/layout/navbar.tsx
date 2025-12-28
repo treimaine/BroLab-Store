@@ -141,7 +141,7 @@ export function Navbar() {
                             key={item.href}
                             href={item.href}
                             className={`
-                              flex items-center gap-3 px-4 py-3 text-base font-medium rounded-lg transition-colors
+                              flex items-center gap-3 px-4 py-3 text-base font-medium rounded-lg transition-colors focus-ring
                               ${
                                 isActive(item.href)
                                   ? "text-[var(--accent-purple)] bg-[var(--accent-purple)]/10"
@@ -172,7 +172,7 @@ export function Navbar() {
                                 key={item.value}
                                 href={dashboardPath}
                                 className={`
-                                  flex items-center gap-3 px-4 py-3 text-base font-medium rounded-lg transition-colors
+                                  flex items-center gap-3 px-4 py-3 text-base font-medium rounded-lg transition-colors focus-ring
                                   ${
                                     location.includes(`tab=${item.value}`)
                                       ? "text-[var(--accent-purple)] bg-[var(--accent-purple)]/10"
@@ -195,7 +195,7 @@ export function Navbar() {
                   <div className="border-t border-[var(--medium-gray)] pt-4 sm:pt-6 space-y-3 sm:space-y-4">
                     <Link
                       href="/cart"
-                      className="flex items-center gap-3 px-4 py-3 text-white hover:text-[var(--accent-purple)] hover:bg-[var(--medium-gray)] rounded-lg transition-colors"
+                      className="flex items-center gap-3 px-4 py-3 text-white hover:text-[var(--accent-purple)] hover:bg-[var(--medium-gray)] rounded-lg transition-colors focus-ring"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       <ShoppingCart className="w-5 h-5" />
@@ -250,7 +250,7 @@ export function Navbar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`nav-link text-sm lg:text-base ${isActive(item.href) ? "text-[var(--accent-purple)]" : ""}`}
+                className={`nav-link text-sm lg:text-base focus-ring rounded ${isActive(item.href) ? "text-[var(--accent-purple)]" : ""}`}
               >
                 {item.label}
               </Link>
@@ -261,7 +261,7 @@ export function Navbar() {
           <div className="flex items-center space-x-2 sm:space-x-4">
             <Link
               href="/cart"
-              className="relative p-2 text-white hover:text-[var(--accent-purple)] transition-colors"
+              className="relative p-2 text-white hover:text-[var(--accent-purple)] transition-colors focus-ring rounded"
             >
               <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" />
               {itemCount > 0 && (

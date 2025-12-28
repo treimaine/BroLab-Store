@@ -465,11 +465,44 @@ export const SonaarFiltersSearch = memo(function SonaarFiltersSearch({
       {/* Desktop Filters */}
       <div className="hidden lg:block">{FiltersContent}</div>
 
-      {/* Mobile Filters Panel */}
+      {/* Mobile Filters Panel - Fixed position overlay */}
       {showMobileFilters && (
-        <Card className="lg:hidden bg-[var(--dark-gray)] border-[var(--medium-gray)]">
-          <CardContent className="p-4">{FiltersContent}</CardContent>
-        </Card>
+        <>
+          {/* Backdrop overlay */}
+          <button
+            type="button"
+            className="lg:hidden fixed inset-0 z-40 bg-black/50 cursor-default border-none"
+            onClick={() => setShowMobileFilters(false)}
+            onKeyDown={e => e.key === "Escape" && setShowMobileFilters(false)}
+            aria-label="Close filters panel"
+          />
+          {/* Filters panel */}
+          <Card className="lg:hidden fixed inset-x-4 top-20 bottom-20 z-50 bg-[var(--dark-gray)] border-[var(--medium-gray)] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-[var(--medium-gray)]">
+              <h2 className="text-lg font-semibold text-white">Filters</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMobileFilters(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            {/* Scrollable content */}
+            <CardContent className="p-4 overflow-y-auto flex-1">{FiltersContent}</CardContent>
+            {/* Sticky apply button at bottom */}
+            <div className="sticky bottom-0 p-4 border-t border-[var(--medium-gray)] bg-[var(--dark-gray)]">
+              <Button
+                onClick={() => setShowMobileFilters(false)}
+                className="w-full bg-[var(--accent-purple)] hover:bg-[var(--accent-purple)]/90 text-white min-h-[44px]"
+              >
+                Apply Filters ({filteredResults} results)
+              </Button>
+            </div>
+          </Card>
+        </>
       )}
 
       {/* Results Count */}

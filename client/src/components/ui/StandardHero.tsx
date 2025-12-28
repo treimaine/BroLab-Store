@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
+import { ReactNode } from "react";
 
 interface StandardHeroProps {
   title: string;
@@ -24,14 +24,10 @@ export function StandardHero({
   children,
   className,
   titleClassName,
-  subtitleClassName
+  subtitleClassName,
 }: StandardHeroProps) {
   return (
-    <section className={cn(
-      "relative pt-16 pb-20 overflow-hidden",
-      className
-    )}
-    >
+    <section className={cn("relative pt-16 pb-20 overflow-hidden", className)}>
       {/* Gradient Background */}
       {gradient && (
         <>
@@ -42,28 +38,30 @@ export function StandardHero({
           </div>
         </>
       )}
-      
+
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className={cn(centered && "text-center")}>
-          <h1 className={cn(
-            "text-5xl lg:text-7xl font-bold text-white mb-6 leading-tight",
-            titleClassName
-          )}
+          <h1
+            className={cn(
+              "text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-6 leading-tight",
+              titleClassName
+            )}
           >
             {title}
           </h1>
-          
+
           {subtitle && (
-            <p className={cn(
-              "text-xl lg:text-2xl text-gray-300 mb-10 leading-relaxed",
-              centered && "max-w-3xl mx-auto",
-              subtitleClassName
-            )}
+            <p
+              className={cn(
+                "text-xl lg:text-2xl text-gray-300 mb-10 leading-relaxed",
+                centered && "max-w-3xl mx-auto",
+                subtitleClassName
+              )}
             >
               {subtitle}
             </p>
           )}
-          
+
           {children}
         </div>
       </div>

@@ -135,7 +135,7 @@ export function Footer(): JSX.Element {
 
           {/* Quick Links */}
           <div>
-            <h4 className="text-white font-bold mb-4">Quick Links</h4>
+            <h4 className="text-lg sm:text-xl text-white font-bold mb-4">Quick Links</h4>
             <ul className="space-y-2">
               <li>
                 <Link
@@ -175,7 +175,7 @@ export function Footer(): JSX.Element {
 
           {/* Legal */}
           <div>
-            <h4 className="text-white font-bold mb-4">Legal</h4>
+            <h4 className="text-lg sm:text-xl text-white font-bold mb-4">Legal</h4>
             <ul className="space-y-2">
               <li>
                 <Link

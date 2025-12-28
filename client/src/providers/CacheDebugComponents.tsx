@@ -6,6 +6,7 @@
  */
 
 import { useCache } from "@/hooks/useCache";
+import * as React from "react";
 import type { CacheOperationType } from "./CacheProvider";
 
 type CacheHealthStatus = "excellent" | "good" | "fair" | "poor";
@@ -36,6 +37,7 @@ function getHealthColorClass(health: CacheHealthStatus): string {
  */
 export function CacheStatusIndicator(): JSX.Element | null {
   const { cacheHealth, metrics, isWarming, operationStatuses } = useCache();
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
 
   const getHealthColor = (health: string): string => {
     switch (health) {
@@ -72,6 +74,20 @@ export function CacheStatusIndicator(): JSX.Element | null {
     s => s.failureCount > 0 && !s.isPaused
   );
 
+  // Collapsed: show only icon with expand button
+  if (isCollapsed) {
+    return (
+      <button
+        onClick={() => setIsCollapsed(false)}
+        className="fixed bottom-4 left-4 z-50 bg-black/80 text-white p-2 rounded-lg text-xs hover:bg-black/90 transition-colors"
+        aria-label="Expand cache status"
+        title="Cache status - click to expand"
+      >
+        <span>{getHealthIcon(cacheHealth)}</span>
+      </button>
+    );
+  }
+
   return (
     <div className="fixed bottom-4 left-4 z-50 bg-black/80 text-white p-2 rounded-lg text-xs">
       <div className="flex items-center space-x-2">
@@ -84,6 +100,13 @@ export function CacheStatusIndicator(): JSX.Element | null {
             ⚠️
           </span>
         )}
+        <button
+          onClick={() => setIsCollapsed(true)}
+          className="text-gray-400 hover:text-white transition-colors ml-1"
+          aria-label="Collapse panel"
+        >
+          ◀
+        </button>
       </div>
       <div className="text-gray-400 mt-1">
         Hit Rate: {metrics.hitRate.toFixed(1)}% | Size: {metrics.cacheSize}
@@ -97,6 +120,7 @@ export function CacheStatusIndicator(): JSX.Element | null {
  */
 export function CacheDebugPanel(): JSX.Element {
   const { metrics, actions, cacheHealth, isWarming, operationStatuses } = useCache();
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
 
   const healthColorClass = getHealthColorClass(cacheHealth);
 
@@ -111,77 +135,97 @@ export function CacheDebugPanel(): JSX.Element {
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 bg-black/90 text-white p-4 rounded-lg text-sm max-w-xs">
-      <h3 className="font-bold mb-2">Cache Debug Panel</h3>
+    <div className="fixed bottom-20 left-4 z-50 bg-black/90 text-white p-4 rounded-lg text-sm max-w-xs">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-bold">Cache Debug Panel</h3>
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="text-gray-400 hover:text-white transition-colors p-1"
+          aria-label={isCollapsed ? "Expand panel" : "Collapse panel"}
+        >
+          {isCollapsed ? "▼" : "▲"}
+        </button>
+      </div>
 
-      <div className="space-y-2">
-        <div>
-          <strong>Health:</strong>
-          <span className={`ml-2 ${healthColorClass}`}>{cacheHealth}</span>
+      {isCollapsed ? (
+        <div className="mt-2 flex items-center gap-2 text-xs">
+          <span className={healthColorClass}>{cacheHealth}</span>
+          <span className="text-gray-400">|</span>
+          <span>{metrics.hitRate.toFixed(0)}%</span>
+          {isWarming && <span className="animate-pulse">🔥</span>}
         </div>
+      ) : (
+        <>
+          <div className="space-y-2">
+            <div>
+              <strong>Health:</strong>
+              <span className={`ml-2 ${healthColorClass}`}>{cacheHealth}</span>
+            </div>
 
-        <div>
-          <strong>Hit Rate:</strong> {metrics.hitRate.toFixed(1)}%
-        </div>
+            <div>
+              <strong>Hit Rate:</strong> {metrics.hitRate.toFixed(1)}%
+            </div>
 
-        <div>
-          <strong>Cache Size:</strong> {metrics.cacheSize}
-        </div>
+            <div>
+              <strong>Cache Size:</strong> {metrics.cacheSize}
+            </div>
 
-        <div>
-          <strong>Status:</strong> {isWarming ? "Warming..." : "Ready"}
-        </div>
+            <div>
+              <strong>Status:</strong> {isWarming ? "Warming..." : "Ready"}
+            </div>
 
-        <div className="border-t border-gray-700 pt-2 mt-2">
-          <strong className="text-xs text-gray-400">Operations:</strong>
-          <div className="mt-1 space-y-1">
-            {(Object.entries(operationStatuses) as [CacheOperationType, OperationStatus][]).map(
-              ([op, status]) => (
-                <div key={op} className="flex items-center justify-between">
-                  <span className="text-xs capitalize">{op}</span>
-                  <div className="flex items-center gap-2">
-                    {getOperationStatusBadge(status)}
-                    {status.isPaused && (
-                      <button
-                        onClick={() => actions.resumeOperation(op)}
-                        className="text-xs bg-blue-600 hover:bg-blue-700 px-1 rounded"
-                      >
-                        Resume
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            )}
+            <div className="border-t border-gray-700 pt-2 mt-2">
+              <strong className="text-xs text-gray-400">Operations:</strong>
+              <div className="mt-1 space-y-1">
+                {(Object.entries(operationStatuses) as [CacheOperationType, OperationStatus][]).map(
+                  ([op, status]) => (
+                    <div key={op} className="flex items-center justify-between">
+                      <span className="text-xs capitalize">{op}</span>
+                      <div className="flex items-center gap-2">
+                        {getOperationStatusBadge(status)}
+                        {status.isPaused && (
+                          <button
+                            onClick={() => actions.resumeOperation(op)}
+                            className="text-xs bg-blue-600 hover:bg-blue-700 px-1 rounded"
+                          >
+                            Resume
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="mt-4 space-y-1">
-        <button
-          onClick={actions.warmCache}
-          disabled={isWarming || operationStatuses.warm.isPaused}
-          className="block w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
-        >
-          Warm Cache
-        </button>
+          <div className="mt-4 space-y-1">
+            <button
+              onClick={actions.warmCache}
+              disabled={isWarming || operationStatuses.warm.isPaused}
+              className="block w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
+            >
+              Warm Cache
+            </button>
 
-        <button
-          onClick={actions.optimizeCache}
-          disabled={operationStatuses.optimization.isPaused}
-          className="block w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
-        >
-          Optimize
-        </button>
+            <button
+              onClick={actions.optimizeCache}
+              disabled={operationStatuses.optimization.isPaused}
+              className="block w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
+            >
+              Optimize
+            </button>
 
-        <button
-          onClick={actions.clearCache}
-          disabled={operationStatuses.clear.isPaused}
-          className="block w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
-        >
-          Clear Cache
-        </button>
-      </div>
+            <button
+              onClick={actions.clearCache}
+              disabled={operationStatuses.clear.isPaused}
+              className="block w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
+            >
+              Clear Cache
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

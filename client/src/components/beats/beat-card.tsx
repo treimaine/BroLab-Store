@@ -151,7 +151,7 @@ export function BeatCard({
           <button
             onClick={handleViewDetails}
             type="button"
-            className="absolute inset-0 w-full h-full cursor-pointer z-10"
+            className="absolute inset-0 w-full h-full cursor-pointer z-10 focus-ring"
             aria-label={`View details for ${title}`}
           >
             <span className="sr-only">View details for {title}</span>
@@ -160,7 +160,7 @@ export function BeatCard({
           {/* Wishlist Button */}
           <button
             onClick={handleWishlistToggle}
-            className={`absolute top-2 right-2 sm:top-3 sm:right-3 p-1.5 sm:p-2 rounded-full transition-all duration-200 z-30 ${
+            className={`absolute top-2 right-2 sm:top-3 sm:right-3 p-1.5 sm:p-2 min-h-[44px] min-w-[44px] rounded-full transition-all duration-200 z-30 focus-ring ${
               isFavorite(beatIdAsNumber)
                 ? "bg-red-500 text-white hover:bg-red-600"
                 : "bg-black/70 text-white hover:bg-red-500 hover:text-white"
@@ -222,7 +222,7 @@ export function BeatCard({
           <button
             onClick={handleViewDetails}
             type="button"
-            className="cursor-pointer text-left w-full"
+            className="cursor-pointer text-left w-full focus-ring rounded-lg"
             aria-label={`View details for ${title}`}
           >
             <h3

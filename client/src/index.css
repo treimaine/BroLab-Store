@@ -53,13 +53,16 @@
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+  }
+
   body {
     @apply font-sans antialiased bg-[var(--deep-black)] text-foreground;
     font-family: "Inter", system-ui, sans-serif;
-  }
-
-  html {
-    scroll-behavior: smooth;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -221,6 +224,32 @@
 
   .audio-progress-fill {
     @apply bg-[var(--accent-purple)] h-2 rounded-full transition-all duration-300;
+  }
+}
+
+@layer utilities {
+  /* Minimum touch target size (WCAG 2.5.5 - 44x44px) */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Safe area padding for notched devices */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+
+  /* Focus visible ring for accessibility */
+  .focus-ring {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-purple)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--dark-gray)];
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 
