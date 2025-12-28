@@ -614,14 +614,16 @@ async function handleUserEvent(
     const userId = (data.user_id as string) || (data.id as string);
     const emailAddresses = data.email_addresses as Array<{ email_address: string }> | undefined;
     const email = emailAddresses?.[0]?.email_address || "unknown@temp.com";
+    const firstName = (data.first_name as string) || undefined;
+    const lastName = (data.last_name as string) || undefined;
 
     // Log extracted data for debugging
     console.log(`📊 [${requestId}] User data extracted:`, {
       clerkId: userId,
       email,
       username: data.username,
-      firstName: data.first_name,
-      lastName: data.last_name,
+      firstName,
+      lastName,
     });
 
     // Use the existing upsertUser function from server/lib/convex.ts
@@ -632,8 +634,8 @@ async function handleUserEvent(
       clerkId: userId,
       email: email,
       username: (data.username as string) || undefined,
-      firstName: (data.first_name as string) || undefined,
-      lastName: (data.last_name as string) || undefined,
+      firstName,
+      lastName,
       imageUrl: (data.image_url as string) || undefined,
     });
 
@@ -644,6 +646,26 @@ async function handleUserEvent(
 
     if (!result) {
       throw new Error("User sync returned null");
+    }
+
+    // Sync contact to Resend Audience on user.created
+    if (eventType === "user.created" && email !== "unknown@temp.com") {
+      try {
+        const { getResendContactService } = await import("../services/ResendContactService");
+        const resendService = getResendContactService();
+        const syncResult = await resendService.syncContact({
+          email,
+          firstName,
+          lastName,
+        });
+        console.log(
+          `📧 [${requestId}] Resend contact sync:`,
+          syncResult.success ? "success" : syncResult.error
+        );
+      } catch (resendError) {
+        // Don't fail the webhook if Resend sync fails
+        console.warn(`⚠️ [${requestId}] Resend contact sync failed (non-blocking):`, resendError);
+      }
     }
   } catch (error) {
     console.error(`❌ [${requestId}] Error syncing user:`, error);
