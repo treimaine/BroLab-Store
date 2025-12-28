@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { query } from "../_generated/server";
+import { optionalAuth } from "../lib/authHelpers";
 
 type QuotaResult = {
   canDownload: boolean;
@@ -18,15 +19,8 @@ type QuotaResult = {
 async function getUserId(ctx: QueryCtx, userId?: Id<"users">): Promise<Id<"users"> | null> {
   if (userId) return userId;
 
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) return null;
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-    .first();
-
-  return user?._id || null;
+  const auth = await optionalAuth(ctx);
+  return auth?.userId || null;
 }
 
 /**

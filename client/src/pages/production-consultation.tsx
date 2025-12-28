@@ -13,7 +13,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { logApiError, logApiRequest, logUserAction, logger } from "@/lib/logger";
-import { useAuth, useUser } from "@clerk/clerk-react";
+import { apiService, isApiError } from "@/services/ApiService";
+import { useUser } from "@clerk/clerk-react";
 import { Calendar, Clock, Mail, MessageCircle, Phone, User, Video } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -38,7 +39,6 @@ export default function ProductionConsultation() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user, isSignedIn } = useUser();
-  const { getToken } = useAuth();
   const [formData, setFormData] = useState<ConsultationFormData>({
     name: "",
     email: "",
@@ -143,56 +143,55 @@ Additional Message: ${formData.message}`,
         component: "production_consultation",
         action: "reservation_api_call",
       });
-      const response = await fetch("/api/reservations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${await getToken()}`,
-        },
-        body: JSON.stringify(reservationData),
-        credentials: "include", // Required for Clerk __session cookie
+
+      const response = await apiService.post<{ id: string }>("/reservations", reservationData, {
+        requireAuth: true,
       });
 
       logger.logInfo("Consultation response received", {
         component: "production_consultation",
         action: "reservation_response",
-        status: response.status,
+        status: 200,
       });
 
-      if (response.ok) {
-        const reservation = await response.json();
+      const reservation = response.data;
 
-        // Create pending payment for checkout
-        const pendingPayment = {
-          service: "consultation",
-          serviceName: "Production Consultation",
-          serviceDetails: `${formData.consultationType === "video" ? "Video" : "Audio"} consultation - ${formData.duration} minutes`,
-          reservationId: reservation.id,
-          price: reservationData.budget / 100, // Convert cents to dollars
-          quantity: 1,
-        };
+      // Create pending payment for checkout
+      const pendingPayment = {
+        service: "consultation",
+        serviceName: "Production Consultation",
+        serviceDetails: `${formData.consultationType === "video" ? "Video" : "Audio"} consultation - ${formData.duration} minutes`,
+        reservationId: reservation.id,
+        price: reservationData.budget / 100, // Convert cents to dollars
+        quantity: 1,
+      };
 
-        // Add to existing services array
-        const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
-        const updatedServices = [...existingServices, pendingPayment];
-        sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
-        toast({
-          title: "Consultation Booked!",
-          description: "We'll contact you within 24 hours to confirm your consultation session.",
-        });
-        setLocation("/checkout");
-      } else {
-        throw new Error("Failed to book consultation");
-      }
+      // Add to existing services array
+      const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
+      const updatedServices = [...existingServices, pendingPayment];
+      sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
+      toast({
+        title: "Consultation Booked!",
+        description: "We'll contact you within 24 hours to confirm your consultation session.",
+      });
+      setLocation("/checkout");
     } catch (error) {
-      logApiError(
-        "Consultation booking failed",
-        error instanceof Error ? error : new Error(String(error)),
-        {
+      if (isApiError(error)) {
+        logApiError("Consultation booking failed", error, {
           component: "production_consultation",
           action: "form_submission_error",
-        }
-      );
+          status: error.status,
+        });
+      } else {
+        logApiError(
+          "Consultation booking failed",
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            component: "production_consultation",
+            action: "form_submission_error",
+          }
+        );
+      }
       toast({
         title: "Booking Failed",
         description: "Please try again or contact us directly.",

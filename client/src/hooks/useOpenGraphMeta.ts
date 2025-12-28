@@ -1,3 +1,4 @@
+import { apiService } from "@/services/ApiService";
 import { useEffect, useState } from "react";
 
 /**
@@ -18,27 +19,24 @@ export function useOpenGraphMeta(
         switch (type) {
           case "beat":
             if (!beatId) return;
-            endpoint = `/api/opengraph/beat/${beatId}`;
+            endpoint = `/opengraph/beat/${beatId}`;
             break;
           case "shop":
-            endpoint = "/api/opengraph/shop";
+            endpoint = "/opengraph/shop";
             break;
           case "home":
-            endpoint = "/api/opengraph/home";
+            endpoint = "/opengraph/home";
             break;
           case "page":
             if (!pageName) return;
-            endpoint = `/api/opengraph/page/${pageName}`;
+            endpoint = `/opengraph/page/${pageName}`;
             break;
           default:
             return;
         }
 
-        const response = await fetch(endpoint);
-        if (response.ok) {
-          const html = await response.text();
-          setOpenGraphHTML(html);
-        }
+        const response = await apiService.get<string>(endpoint);
+        setOpenGraphHTML(response.data);
       } catch (error) {
         console.error("Error fetching Open Graph meta tags:", error);
       }

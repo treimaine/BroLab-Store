@@ -16,13 +16,15 @@ interface PerformanceWithMemory extends Performance {
   memory?: MemoryInfo;
 }
 
-interface NavigatorWithConnection extends Navigator {
-  connection?: {
-    effectiveType: string;
-    downlink: number;
-    rtt: number;
-    saveData: boolean;
-  };
+interface NetworkConnectionInfo {
+  effectiveType: string;
+  downlink: number;
+  rtt: number;
+  saveData: boolean;
+}
+
+interface NavigatorWithConnection {
+  connection?: NetworkConnectionInfo;
 }
 
 // Memory leak detection with optimized thresholds

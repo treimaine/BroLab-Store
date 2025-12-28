@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+import { notificationService } from "@/services/NotificationService";
 import { useUser } from "@clerk/clerk-react";
 import { AlertCircle, CheckCircle, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -20,7 +20,6 @@ export function ClerkPaymentForm({
   isLoading = false,
 }: ClerkPaymentFormProps): JSX.Element {
   const { user, isLoaded } = useUser();
-  const { toast } = useToast();
   const [paymentStatus, setPaymentStatus] = useState<
     "idle" | "processing" | "succeeded" | "failed"
   >("idle");
@@ -31,13 +30,11 @@ export function ClerkPaymentForm({
   useEffect(() => {
     if (isLoaded && !user) {
       onError("Authentication required");
-      toast({
+      notificationService.error("Please sign in to complete your purchase.", {
         title: "Authentication Required",
-        description: "Please sign in to complete your purchase.",
-        variant: "destructive",
       });
     }
-  }, [isLoaded, user, onError, toast]);
+  }, [isLoaded, user, onError]);
 
   const handlePayment = async () => {
     if (!user) {
@@ -98,10 +95,8 @@ export function ClerkPaymentForm({
       setErrorDetails(errorMessage);
       onError(errorMessage);
 
-      toast({
+      notificationService.error(errorMessage, {
         title: "Payment Error",
-        description: errorMessage,
-        variant: "destructive",
       });
     } finally {
       setIsProcessing(false);

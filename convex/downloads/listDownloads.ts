@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
+import { optionalAuth } from "../lib/authHelpers";
 
 /**
  * List all downloads for a user
@@ -26,15 +27,9 @@ export const listDownloads = query({
 
     // If still no userId, try to get from auth
     if (!userId) {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) return [];
-
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-        .first();
-      if (!user) return [];
-      userId = user._id;
+      const auth = await optionalAuth(ctx);
+      if (!auth) return [];
+      userId = auth.userId;
     }
 
     const limit = Math.min(args.limit || 100, 500);

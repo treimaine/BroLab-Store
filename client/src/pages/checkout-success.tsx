@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { apiService } from "@/services/ApiService";
 import { centsToDollars } from "@/utils/currency";
 import { CheckCircle, Download, Home, Music, User } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -63,15 +64,16 @@ export default function CheckoutSuccess() {
 
   const fetchSessionDetails = async (sessionId: string) => {
     try {
-      const response = await fetch(`/api/clerk/checkout-session/${sessionId}`);
-      if (response.ok) {
-        const sessionData = await response.json();
-        setCheckoutData({
-          sessionId: sessionData.id,
-          amount: centsToDollars(sessionData.amount), // Convert from cents
-          metadata: sessionData.metadata,
-        });
-      }
+      const response = await apiService.get<{
+        id: string;
+        amount: number;
+        metadata: Record<string, string>;
+      }>(`/clerk/checkout-session/${sessionId}`);
+      setCheckoutData({
+        sessionId: response.data.id,
+        amount: centsToDollars(response.data.amount), // Convert from cents
+        metadata: response.data.metadata,
+      });
     } catch (error) {
       console.error("Error fetching session details:", error);
     }

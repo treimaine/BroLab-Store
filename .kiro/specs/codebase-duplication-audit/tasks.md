@@ -115,8 +115,8 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
 - [ ] 7. Checkpoint - Core utilities complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 8. Implement client-side services
-  - [ ] 8.1 Create `client/src/services/StorageManager.ts`
+- [x] 8. Implement client-side services
+  - [x] 8.1 Create `client/src/services/StorageManager.ts`
     - Implement StorageManager class with typed get/set methods
     - Implement TTL support for expiring items
     - Implement typed getters for common keys (cart, language, recentlyViewed)
@@ -128,7 +128,7 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
     - **Property 9: Storage Manager Error Resilience**
     - **Validates: Requirements 6.1, 6.3, 6.4, 6.5**
 
-  - [ ] 8.3 Create `client/src/services/ApiService.ts`
+  - [x] 8.3 Create `client/src/services/ApiService.ts`
     - Implement ApiService class with typed request methods
     - Implement retry logic with exponential backoff
     - Implement timeout handling
@@ -142,47 +142,47 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
 - [ ] 9. Checkpoint - Client services complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 10. Migrate existing code to use new utilities
-  - [ ] 10.1 Migrate localStorage calls to StorageManager
+- [x] 10. Migrate existing code to use new utilities
+  - [x] 10.1 Migrate localStorage calls to StorageManager
     - Search for direct localStorage.getItem/setItem calls
     - Replace with storage.get/set calls
     - Update cart-related storage to use typed methods
     - **⚠️ NE PAS modifier** le comportement du panier existant
     - _Requirements: 6.2_
 
-  - [ ] 10.2 Migrate fetch calls to ApiService
+  - [x] 10.2 Migrate fetch calls to ApiService
     - Identify direct fetch() calls in client code
     - Replace with apiService methods
     - Ensure auth headers are properly handled
     - **⚠️ EXCLURE**: `client/src/api/woocommerce.ts` - intégration WooCommerce existante
     - _Requirements: 7.2, 7.4_
 
-  - [ ] 10.3 Migrate remaining Convex functions to auth helpers
+  - [x] 10.3 Migrate remaining Convex functions to auth helpers
     - Update remaining mutations to use requireAuth/optionalAuth
     - Remove duplicated ctx.auth.getUserIdentity() patterns
     - **⚠️ EXCLURE**: `convex/users/clerkSync.ts`, `convex/sync/*.ts`, `convex/auth/*.ts`
     - _Requirements: 2.5_
 
-- [ ] 11. Implement notification service consolidation
-  - [ ] 11.1 Create `client/src/services/NotificationService.ts`
+- [x] 11. Implement notification service consolidation
+  - [x] 11.1 Create `client/src/services/NotificationService.ts`
     - Implement typed notification methods (success, error, warning, info)
     - Implement notification queuing
     - Integrate with existing toast system
     - _Requirements: 8.1, 8.4, 8.5_
 
-  - [ ] 11.2 Migrate toast calls to NotificationService
+  - [x] 11.2 Migrate toast calls to NotificationService
     - Replace scattered toast() calls with notificationService methods
     - Ensure error messages are user-friendly
     - _Requirements: 8.2, 8.3_
 
-- [ ] 12. Final cleanup and documentation
-  - [ ] 12.1 Remove deprecated duplicate files
+- [x] 12. Final cleanup and documentation
+  - [x] 12.1 Remove deprecated duplicate files
     - Delete or mark as deprecated: convex/lib/validation.ts (if fully migrated)
     - Delete or mark as deprecated: server/lib/validation.ts (if fully migrated)
     - Update any remaining imports
     - _Requirements: 9.3, 9.5_
 
-  - [ ] 12.2 Update import paths across codebase
+  - [x] 12.2 Update import paths across codebase
     - Ensure all imports use the new consolidated paths
     - Verify no circular dependencies introduced
     - _Requirements: 1.2, 1.3_

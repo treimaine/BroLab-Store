@@ -1,6 +1,14 @@
-import { UnifiedFilters, calculateAvailableRanges, extractServerSideFilters, filterClientSide, getAvailableOptions } from '@/lib/unifiedFilters';
-import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  UnifiedFilters,
+  calculateAvailableRanges,
+  extractServerSideFilters,
+  filterClientSide,
+  getAvailableOptions,
+} from "@/lib/unifiedFilters";
+import { apiService } from "@/services/ApiService";
+import type { BeatProduct } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface UseUnifiedFiltersOptions {
   initialFilters?: Partial<UnifiedFilters>;
@@ -9,16 +17,16 @@ interface UseUnifiedFiltersOptions {
 
 export function useUnifiedFilters(options: UseUnifiedFiltersOptions = {}) {
   const { initialFilters = {}, pageSize = 12 } = options;
-  
+
   // État des filtres unifiés
   const [filters, setFilters] = useState<UnifiedFilters>({
     // Filtres côté serveur
-    search: '',
+    search: "",
     categories: [],
     priceRange: undefined,
-    sortBy: 'date',
-    sortOrder: 'desc',
-    
+    sortBy: "date",
+    sortOrder: "desc",
+
     // Filtres côté client
     bpmRange: undefined,
     keys: [],
@@ -31,10 +39,10 @@ export function useUnifiedFilters(options: UseUnifiedFiltersOptions = {}) {
     isFree: undefined,
     hasVocals: undefined,
     stems: undefined,
-    
-    ...initialFilters
+
+    ...initialFilters,
   });
-  
+
   const [currentPage, setCurrentPage] = useState(1);
   const [availableOptions, setAvailableOptions] = useState<{
     keys: string[];
@@ -55,46 +63,45 @@ export function useUnifiedFilters(options: UseUnifiedFiltersOptions = {}) {
     bpm: { min: 60, max: 200 },
     duration: { min: 60, max: 300 },
   });
-  
+
   // Extraire les filtres côté serveur pour l'API
   const serverFilters = extractServerSideFilters(filters);
-  
-  // Requête pour les produits côté serveur
+
+  // Query for server-side products
   const {
     data: serverProducts,
     isLoading: isLoadingServer,
     error: serverError,
-    refetch: refetchServer
+    refetch: refetchServer,
   } = useQuery({
-    queryKey: ['woocommerce', 'products', serverFilters, currentPage],
+    queryKey: ["woocommerce", "products", serverFilters, currentPage],
     queryFn: async () => {
       const params = new URLSearchParams();
-      
-      // Ajouter les filtres côté serveur
+
+      // Add server-side filters
       Object.entries(serverFilters).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
           params.append(key, value.toString());
         }
       });
-      
-      // Ajouter la pagination
-      params.append('per_page', pageSize.toString());
-      params.append('page', currentPage.toString());
-      
-      const response = await fetch(`/api/woocommerce/products?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch products');
-      return response.json();
+
+      // Add pagination
+      params.append("per_page", pageSize.toString());
+      params.append("page", currentPage.toString());
+
+      const response = await apiService.get<BeatProduct[]>(`/woocommerce/products?${params}`);
+      return response.data;
     },
     enabled: true,
   });
-  
+
   // Filtrer les produits côté client
   const filteredProducts = useMemo(() => {
     if (!serverProducts) return [];
-    
+
     // Appliquer les filtres côté client
     const clientFiltered = filterClientSide(serverProducts, filters);
-    
+
     return clientFiltered;
   }, [serverProducts, filters]);
 
@@ -116,36 +123,36 @@ export function useUnifiedFilters(options: UseUnifiedFiltersOptions = {}) {
   useEffect(() => {
     setAvailableRanges(availableRangesMemo);
   }, [availableRangesMemo]);
-  
+
   // Mettre à jour les filtres
-  const updateFilter = useCallback(<K extends keyof UnifiedFilters>(
-    key: K,
-    value: UnifiedFilters[K]
-  ) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
-    setCurrentPage(1); // Reset à la première page
-  }, []);
-  
+  const updateFilter = useCallback(
+    <K extends keyof UnifiedFilters>(key: K, value: UnifiedFilters[K]) => {
+      setFilters(prev => ({
+        ...prev,
+        [key]: value,
+      }));
+      setCurrentPage(1); // Reset à la première page
+    },
+    []
+  );
+
   // Mettre à jour plusieurs filtres à la fois
   const updateFilters = useCallback((newFilters: Partial<UnifiedFilters>) => {
     setFilters(prev => ({
       ...prev,
-      ...newFilters
+      ...newFilters,
     }));
     setCurrentPage(1);
   }, []);
-  
+
   // Réinitialiser tous les filtres
   const clearFilters = useCallback(() => {
     setFilters({
-      search: '',
+      search: "",
       categories: [],
       priceRange: undefined,
-      sortBy: 'date',
-      sortOrder: 'desc',
+      sortBy: "date",
+      sortOrder: "desc",
       bpmRange: undefined,
       keys: [],
       moods: [],
@@ -160,7 +167,7 @@ export function useUnifiedFilters(options: UseUnifiedFiltersOptions = {}) {
     });
     setCurrentPage(1);
   }, []);
-  
+
   // Vérifier si des filtres sont actifs
   const hasActiveFilters = useMemo(() => {
     return !!(
@@ -180,10 +187,10 @@ export function useUnifiedFilters(options: UseUnifiedFiltersOptions = {}) {
       filters.stems !== undefined
     );
   }, [filters]);
-  
+
   // Obtenir les produits finaux
   const products = filteredProducts;
-  
+
   // Calculer les statistiques
   const stats = {
     totalProducts: serverProducts?.length || 0,
@@ -192,27 +199,27 @@ export function useUnifiedFilters(options: UseUnifiedFiltersOptions = {}) {
     currentPage,
     pageSize,
   };
-  
+
   return {
     // Données
     products,
     availableOptions,
     availableRanges,
     stats,
-    
+
     // État
     filters,
     isLoading: isLoadingServer,
     error: serverError,
-    
+
     // Actions
     updateFilter,
     updateFilters,
     clearFilters,
     setCurrentPage,
     refetch: refetchServer,
-    
+
     // Utilitaires
     hasActiveFilters: hasActiveFilters,
   };
-} 
+}

@@ -9,6 +9,7 @@ import {
   AnalyticsContextType,
   useAnalyticsContext,
 } from "@/hooks/useAnalyticsContext";
+import { storage } from "@/services/StorageManager";
 
 interface AnalyticsProviderProps {
   children: React.ReactNode;
@@ -82,12 +83,11 @@ const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
         setIsTrackingEnabled(analyticsManager.isTrackingAllowed());
 
         // Check for existing consent
-        const existingConsent = localStorage.getItem("analytics-consent");
+        const existingConsent = storage.getAnalyticsConsent();
         if (existingConsent) {
-          const consentData = JSON.parse(existingConsent);
-          setConsentGiven(consentData.granted);
+          setConsentGiven(existingConsent.granted);
 
-          if (consentData.granted) {
+          if (existingConsent.granted) {
             await analyticsManager.setPrivacySettings({
               trackingEnabled: true,
               cookieConsent: true,
@@ -149,7 +149,7 @@ const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
         timestamp: Date.now(),
         version: "1.0",
       };
-      localStorage.setItem("analytics-consent", JSON.stringify(consentData));
+      storage.setAnalyticsConsent(consentData);
 
       // Enable tracking
       await updatePrivacySettings({
@@ -169,7 +169,7 @@ const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
   const revokeConsent = useCallback(async () => {
     try {
       // Remove consent
-      localStorage.removeItem("analytics-consent");
+      storage.removeAnalyticsConsent();
 
       // Disable tracking and clear data
       await updatePrivacySettings({
@@ -178,7 +178,7 @@ const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
       });
 
       // Clear stored analytics data
-      localStorage.removeItem("analytics_interactions");
+      storage.remove("analytics_interactions");
 
       setConsentGiven(false);
       setShowPrivacyBanner(false);

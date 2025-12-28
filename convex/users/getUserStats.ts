@@ -1,33 +1,26 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
+import { requireAuth } from "../lib/authHelpers";
 
 // Get comprehensive user statistics
 export const getUserStats = query({
   args: {},
   handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    const auth = await requireAuth(ctx);
 
-    const clerkId = identity.subject;
-
-    // Get user from database
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
-      .first();
+    // Fetch user from database using the userId from auth
+    const user = await ctx.db.get(auth.userId);
 
     if (!user) {
-      // Return default stats for new users
+      // Return default stats for new users (shouldn't happen since requireAuth validates user exists)
       return {
         user: {
-          id: clerkId,
-          email: identity.email || "",
-          username: identity.name || `user_${clerkId.slice(-8)}`,
-          firstName: identity.givenName || "",
-          lastName: identity.familyName || "",
-          imageUrl: identity.pictureUrl || "",
+          id: auth.clerkId,
+          email: auth.identity.email || "",
+          username: auth.identity.name || `user_${auth.clerkId.slice(-8)}`,
+          firstName: auth.identity.givenName || "",
+          lastName: auth.identity.familyName || "",
+          imageUrl: auth.identity.pictureUrl || "",
         },
         stats: {
           totalFavorites: 0,

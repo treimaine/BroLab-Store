@@ -1,4 +1,5 @@
 import { query } from "../_generated/server";
+import { optionalAuth } from "../lib/authHelpers";
 
 export interface ActivityItem {
   _id: string;
@@ -10,18 +11,12 @@ export interface ActivityItem {
 export const getRecent = query({
   args: {},
   handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [] as ActivityItem[];
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-    if (!user) return [] as ActivityItem[];
+    const auth = await optionalAuth(ctx);
+    if (!auth) return [] as ActivityItem[];
 
     const activities = await ctx.db
       .query("activityLog")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", auth.userId))
       .order("desc")
       .take(50);
 

@@ -1,13 +1,25 @@
 /**
- * Request Validation Middleware for BroLab Entertainment API
+ * @fileoverview Express Request Validation Middleware for BroLab Entertainment API
  *
- * This module provides type-safe request validation middleware using Zod schemas
- * to ensure all API endpoints have proper request/response validation.
+ * ⚠️ DEPRECATION NOTICE:
+ * For validation functions (validateEmail, validateUUID, sanitizeInput, etc.),
+ * prefer importing directly from the shared validation module:
  *
- * For validation functions (validateEmail, validateUUID, etc.), import from:
  * ```typescript
- * import { validateEmail, sanitizeInput } from '@shared/validation';
+ * import { validateEmail, sanitizeInput, validateBody, validateQuery } from '@shared/validation';
+ * // or
+ * import { validateEmail, sanitizeInput } from '../../shared/validation/index';
  * ```
+ *
+ * This file contains:
+ * 1. RE-EXPORTS from shared/validation for backward compatibility
+ * 2. EXPRESS-SPECIFIC middleware (validateRequestBody, validateRequestQuery, etc.)
+ * 3. EXPRESS-SPECIFIC utilities (formatApiResponse, handleValidationErrors, etc.)
+ *
+ * The Express-specific middleware in this file is NOT duplicated elsewhere and
+ * should remain here. Only the re-exports are for backward compatibility.
+ *
+ * @module server/lib/validation
  */
 
 import { NextFunction, Request, Response } from "express";
@@ -16,10 +28,10 @@ import { BroLabErrorType } from "../../shared/types/Error";
 import { getRequestId, sendInternalError, sendValidationError } from "./errorResponses";
 
 // ================================
-// RE-EXPORTS FROM SHARED VALIDATION
+// RE-EXPORTS FROM SHARED VALIDATION (Backward Compatibility)
 // ================================
-// These re-exports maintain backward compatibility for existing imports
-// The single source of truth is in shared/validation/
+// ⚠️ DEPRECATED: Import directly from shared/validation/index instead
+// These re-exports are maintained only for backward compatibility
 
 export {
   sanitizeEmail,
@@ -97,8 +109,11 @@ export function validateRequestBody<T>(schema: ZodSchema<T>) {
 /**
  * Extended request interface with validated data properties
  */
-export interface ValidatedRequest<TBody = unknown, TQuery = unknown, TParams = unknown>
-  extends Request {
+export interface ValidatedRequest<
+  TBody = unknown,
+  TQuery = unknown,
+  TParams = unknown,
+> extends Request {
   validatedQuery?: TQuery;
   validatedData?: TBody | TQuery;
   body: TBody;

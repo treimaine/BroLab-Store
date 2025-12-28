@@ -1,3 +1,5 @@
+import { storage } from "@/services/StorageManager";
+
 /** Tracking event data payload - supports primitive values and nested objects */
 type TrackingEventData = Record<string, string | number | boolean | null | undefined>;
 
@@ -10,12 +12,7 @@ interface TrackingEvent {
 
 // Generate a session ID for tracking
 function getSessionId(): string {
-  let sessionId = localStorage.getItem("session_id");
-  if (!sessionId) {
-    sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-    localStorage.setItem("session_id", sessionId);
-  }
-  return sessionId;
+  return storage.getSessionId();
 }
 
 // Main tracking function
@@ -29,8 +26,7 @@ export function track(event: string, data: TrackingEventData = {}): void {
     };
 
     // Get existing queue
-    const queueKey = "tracking_queue";
-    const existingQueue = JSON.parse(localStorage.getItem(queueKey) || "[]");
+    const existingQueue = storage.getTrackingQueue<TrackingEvent>();
 
     // Add new event
     existingQueue.push(trackingEvent);
@@ -40,8 +36,8 @@ export function track(event: string, data: TrackingEventData = {}): void {
       existingQueue.splice(0, existingQueue.length - 100);
     }
 
-    // Save back to localStorage
-    localStorage.setItem(queueKey, JSON.stringify(existingQueue));
+    // Save back to storage
+    storage.setTrackingQueue(existingQueue);
 
     // Console log for development only
     if (import.meta.env.DEV) {
@@ -122,16 +118,12 @@ export const trackAudioAction = (
 
 // Get tracking queue for analytics/debugging
 export function getTrackingQueue(): TrackingEvent[] {
-  try {
-    return JSON.parse(localStorage.getItem("tracking_queue") || "[]");
-  } catch {
-    return [];
-  }
+  return storage.getTrackingQueue<TrackingEvent>();
 }
 
 // Clear tracking queue (useful for testing)
 export function clearTrackingQueue(): void {
-  localStorage.removeItem("tracking_queue");
+  storage.removeTrackingQueue();
 }
 
 // Export tracking events for analysis

@@ -4,6 +4,7 @@
  */
 
 import { FEATURE_FLAGS, getDashboardConfig } from "@/config/dashboard";
+import { storage } from "@/services/StorageManager";
 import { validateDashboardConfig } from "@/utils/configValidator";
 import type { DashboardConfig } from "@shared/types/dashboard";
 
@@ -21,7 +22,6 @@ export interface ConfigSubscriber {
 class ConfigurationManager {
   private config: DashboardConfig;
   private readonly subscribers: Map<string, ConfigSubscriber> = new Map();
-  private readonly storageKey = "dashboard-config-overrides";
 
   constructor() {
     this.config = getDashboardConfig();
@@ -218,13 +218,13 @@ class ConfigurationManager {
   }
 
   /**
-   * Persist configuration overrides to localStorage
+   * Persist configuration overrides to storage
    */
   private persistOverrides(overrides: Partial<DashboardConfig>): void {
     try {
       const existing = this.getStoredOverrides();
       const merged = { ...existing, ...overrides };
-      localStorage.setItem(this.storageKey, JSON.stringify(merged));
+      storage.setDashboardConfigOverrides(merged);
     } catch (error) {
       console.error("Failed to persist configuration overrides:", error);
     }
@@ -252,8 +252,7 @@ class ConfigurationManager {
    */
   private getStoredOverrides(): Partial<DashboardConfig> {
     try {
-      const stored = localStorage.getItem(this.storageKey);
-      return stored ? JSON.parse(stored) : {};
+      return storage.getDashboardConfigOverrides<Partial<DashboardConfig>>();
     } catch (error) {
       console.error("Failed to get stored configuration overrides:", error);
       return {};
@@ -265,7 +264,7 @@ class ConfigurationManager {
    */
   private clearPersistedOverrides(): void {
     try {
-      localStorage.removeItem(this.storageKey);
+      storage.removeDashboardConfigOverrides();
     } catch (error) {
       console.error("Failed to clear persisted configuration overrides:", error);
     }

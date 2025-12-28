@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { mutation } from "../_generated/server";
+import { requireAuth } from "../lib/authHelpers";
 
 type UpdateArgs = {
   reservationId: Id<"reservations">;
@@ -128,8 +129,7 @@ export const updateReservationStatus = mutation({
     paypalOrderId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const { userId } = await requireAuth(ctx);
 
     const reservation = await ctx.db.get(args.reservationId);
     if (!reservation) throw new Error("Reservation not found");
@@ -154,9 +154,8 @@ export const updateReservationStatus = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .unique();
-
+      .filter(q => q.eq(q.field("_id"), userId))
+      .first();
     if (!user) throw new Error("User not found");
 
     const isOwner = reservation.userId === user._id;

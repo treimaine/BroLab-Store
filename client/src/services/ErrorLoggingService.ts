@@ -11,6 +11,7 @@ import type {
   ErrorContext,
   RecoveryAttempt,
 } from "@/services/ErrorHandlingManager";
+import { storage } from "@/services/StorageManager";
 
 // ================================
 // TYPE ALIASES
@@ -524,11 +525,7 @@ export class ErrorLoggingService {
     this.remoteQueue = [];
 
     if (this.config.localStorage) {
-      try {
-        localStorage.removeItem("error_logs");
-      } catch (error) {
-        console.warn("Failed to clear logs from localStorage:", error);
-      }
+      storage.removeErrorLogs();
     }
   }
 
@@ -813,22 +810,21 @@ export class ErrorLoggingService {
 
   private loadLogsFromStorage(): void {
     try {
-      const stored = localStorage.getItem("error_logs");
-      if (stored) {
-        const logs = JSON.parse(stored) as LogEntry[];
+      const logs = storage.getErrorLogs<LogEntry>();
+      if (logs.length > 0) {
         this.logEntries = logs.slice(-this.config.maxLocalEntries);
       }
     } catch (error) {
-      console.warn("Failed to load logs from localStorage:", error);
+      console.warn("Failed to load logs from storage:", error);
     }
   }
 
   private saveLogsToStorage(): void {
     try {
       const logsToStore = this.logEntries.slice(-this.config.maxLocalEntries);
-      localStorage.setItem("error_logs", JSON.stringify(logsToStore));
+      storage.setErrorLogs(logsToStore);
     } catch (error) {
-      console.warn("Failed to save logs to localStorage:", error);
+      console.warn("Failed to save logs to storage:", error);
     }
   }
 

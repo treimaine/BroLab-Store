@@ -1,4 +1,5 @@
 import { query } from "../_generated/server";
+import { optionalAuth } from "../lib/authHelpers";
 
 /**
  * Vérifie l'état de toutes les souscriptions
@@ -141,23 +142,23 @@ export const listAllSubscriptions = query({
 export const verifyUserSubscriptions = query({
   args: {},
   handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const auth = await optionalAuth(ctx);
+    if (!auth) {
       return { error: "Not authenticated" };
     }
 
+    // Query users table specifically for proper typing
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
+      .filter(q => q.eq(q.field("_id"), auth.userId))
       .first();
-
     if (!user) {
       return { error: "User not found" };
     }
 
     const subscriptions = await ctx.db
       .query("subscriptions")
-      .withIndex("by_user", q => q.eq("userId", user._id))
+      .withIndex("by_user", q => q.eq("userId", auth.userId))
       .collect();
 
     return {

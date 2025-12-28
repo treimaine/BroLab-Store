@@ -6,6 +6,7 @@
 import { v } from "convex/values";
 import type { DashboardConfig } from "../../shared/types/dashboard";
 import { query } from "../_generated/server";
+import { optionalAuth } from "./authHelpers";
 
 /**
  * Default dashboard configuration
@@ -123,8 +124,8 @@ export const getDashboardConfig = query({
 export const getUserDashboardConfig = query({
   args: {},
   handler: async (ctx): Promise<DashboardConfig> => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const auth = await optionalAuth(ctx);
+    if (!auth) {
       const envConfig = getEnvironmentConfig();
       return {
         ui: { ...DEFAULT_CONFIG.ui, ...envConfig.ui },
@@ -134,10 +135,10 @@ export const getUserDashboardConfig = query({
       };
     }
 
-    // Get user preferences
+    // Get user preferences - query users table specifically for proper typing
     const user = await ctx.db
       .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
+      .filter(q => q.eq(q.field("_id"), auth.userId))
       .first();
 
     const envConfig = getEnvironmentConfig();
@@ -213,20 +214,8 @@ export const isFeatureEnabled = query({
   },
   handler: async (ctx, { feature }): Promise<boolean> => {
     // Get user config inline to avoid circular calls
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      const envConfig = getEnvironmentConfig();
-      const config = {
-        ui: { ...DEFAULT_CONFIG.ui, ...envConfig.ui },
-        pagination: { ...DEFAULT_CONFIG.pagination, ...envConfig.pagination },
-        realtime: { ...DEFAULT_CONFIG.realtime, ...envConfig.realtime },
-        features: { ...DEFAULT_CONFIG.features, ...envConfig.features },
-      };
-      return config.features[feature];
-    }
-
-    // User lookup reserved for future user-specific feature flags
-    // Currently returns base config for authenticated users
+    // Auth is available for future user-specific feature flags
+    const _auth = await optionalAuth(ctx);
     const envConfig = getEnvironmentConfig();
     const config = {
       ui: { ...DEFAULT_CONFIG.ui, ...envConfig.ui },
@@ -234,6 +223,9 @@ export const isFeatureEnabled = query({
       realtime: { ...DEFAULT_CONFIG.realtime, ...envConfig.realtime },
       features: { ...DEFAULT_CONFIG.features, ...envConfig.features },
     };
+
+    // User lookup reserved for future user-specific feature flags
+    // Currently returns base config for both authenticated and unauthenticated users
     return config.features[feature];
   },
 });
@@ -317,16 +309,17 @@ export const getPerformanceConfig = query({
 export const getCurrencyConfig = query({
   args: {},
   handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
+    const auth = await optionalAuth(ctx);
 
     // Default to USD
     const currency = "USD";
     let locale = "en-US";
 
-    if (identity) {
+    if (auth) {
+      // Query users table specifically for proper typing
       const user = await ctx.db
         .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
+        .filter(q => q.eq(q.field("_id"), auth.userId))
         .first();
 
       if (user?.preferences?.language) {

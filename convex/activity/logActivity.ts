@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
+import { requireAuth } from "../lib/authHelpers";
 
 export const logActivity = mutation({
   args: {
@@ -8,10 +9,8 @@ export const logActivity = mutation({
     details: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Unauthorized");
-    }
+    // Verify user is authenticated (we don't need the result, just the check)
+    await requireAuth(ctx);
 
     // Insert activity log entry
     const activityId = await ctx.db.insert("activityLog", {

@@ -5,6 +5,7 @@ import {
   SUPPORTED_CURRENCIES,
   SUPPORTED_LANGUAGES,
 } from "@/contexts/CurrencyLanguageContext";
+import { storage } from "@/services/StorageManager";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { IntlProvider } from "react-intl";
 
@@ -78,17 +79,17 @@ export const CurrencyLanguageProvider: React.FC<{ children: React.ReactNode }> =
         setCurrency(mapping.currency);
 
         // Language preference: honor stored value or default to English; do not auto-switch
-        const storedLang = localStorage.getItem("brolab_language");
+        const storedLang = storage.getLanguage();
         setLanguage(
           storedLang && storedLang in SUPPORTED_LANGUAGES
             ? (storedLang as keyof typeof SUPPORTED_LANGUAGES)
             : "en"
         );
 
-        // Save preferences to localStorage
-        localStorage.setItem("brolab_currency", mapping.currency);
-        if (!storedLang) localStorage.setItem("brolab_language", "en");
-        localStorage.setItem("brolab_country", countryCode);
+        // Save preferences to storage
+        storage.setCurrency(mapping.currency);
+        if (!storedLang || storedLang === "en") storage.setLanguage("en");
+        storage.setCountry(countryCode);
       }
     } catch (error) {
       console.warn("Geolocation detection failed, using defaults:", error);
@@ -99,12 +100,12 @@ export const CurrencyLanguageProvider: React.FC<{ children: React.ReactNode }> =
 
   const handleSetCurrency = useCallback((newCurrency: keyof typeof SUPPORTED_CURRENCIES) => {
     setCurrency(newCurrency);
-    localStorage.setItem("brolab_currency", newCurrency);
+    storage.setCurrency(newCurrency);
   }, []);
 
   const handleSetLanguage = useCallback((newLanguage: keyof typeof SUPPORTED_LANGUAGES) => {
     setLanguage(newLanguage);
-    localStorage.setItem("brolab_language", newLanguage);
+    storage.setLanguage(newLanguage);
   }, []);
 
   const convertPrice = useCallback(

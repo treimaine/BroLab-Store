@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
+import { notificationService } from "@/services/NotificationService";
 
 import { useUser } from "@clerk/clerk-react";
 import { CreditCardIcon, Loader2 } from "lucide-react";
@@ -30,7 +30,6 @@ export function PayPalButton({
   className = "",
 }: Readonly<PayPalButtonProps>) {
   const { user } = useUser();
-  const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -42,11 +41,7 @@ export function PayPalButton({
    */
   const handlePayPalPayment = async () => {
     if (!user) {
-      toast({
-        title: "Erreur",
-        description: "Vous devez être connecté pour effectuer un paiement",
-        variant: "destructive",
-      });
+      notificationService.error("Vous devez être connecté pour effectuer un paiement");
       return;
     }
 
@@ -97,10 +92,8 @@ export function PayPalButton({
         console.log("🆔 Order ID:", result.orderId);
 
         // Afficher le message de succès
-        toast({
+        notificationService.success(`Redirection vers PayPal dans 3 secondes...`, {
           title: "Commande PayPal Créée !",
-          description: `Redirection vers PayPal dans 3 secondes...`,
-          variant: "default",
         });
 
         // Rediriger vers PayPal après 3 secondes
@@ -115,10 +108,8 @@ export function PayPalButton({
       console.error("❌ PayPal payment error:", error);
       const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
 
-      toast({
+      notificationService.error(errorMessage, {
         title: "Erreur de Paiement",
-        description: errorMessage,
-        variant: "destructive",
       });
 
       onPaymentError?.(errorMessage);

@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- Modal component exports both component and management hook */
 import { Button } from "@/components/ui/button";
+import { storage } from "@/services/StorageManager";
 import { Gift, Mail, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -27,7 +28,7 @@ export function NewsletterModal({ isOpen, onClose }: NewsletterModalProps): JSX.
       setIsSubmitted(true);
 
       // Store that user has signed up
-      localStorage.setItem("brolab-newsletter-signup", "true");
+      storage.setNewsletterSignup(true);
 
       // Close modal after success message
       setTimeout(() => {
@@ -137,7 +138,7 @@ export function useNewsletterModal() {
 
   useEffect(() => {
     // Check if user has already signed up
-    const hasSignedUp = localStorage.getItem("brolab-newsletter-signup");
+    const hasSignedUp = storage.getNewsletterSignup();
 
     if (!hasSignedUp) {
       // Show modal after a delay on first visit

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
+import { requireAuth } from "../lib/authHelpers";
 
 export const getFile = query({
   args: {
@@ -7,29 +8,24 @@ export const getFile = query({
     clerkId: v.optional(v.string()), // For server-side calls from Express
   },
   handler: async (ctx, args) => {
-    let clerkIdToUse: string;
+    let userId;
 
     // Support both authenticated client calls and server-side calls with clerkId
     if (args.clerkId) {
-      // Server-side call with explicit clerkId
-      clerkIdToUse = args.clerkId;
-    } else {
-      // Client-side call with authentication
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
-        throw new Error("Unauthorized");
+      // Server-side call with explicit clerkId - look up user directly
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", q => q.eq("clerkId", args.clerkId!))
+        .first();
+
+      if (!user) {
+        throw new Error("User not found");
       }
-      clerkIdToUse = identity.subject;
-    }
-
-    // Get user from Convex
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", clerkIdToUse))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
+      userId = user._id;
+    } else {
+      // Client-side call with authentication - use auth helper
+      const auth = await requireAuth(ctx);
+      userId = auth.userId;
     }
 
     const file = await ctx.db.get(args.fileId);
@@ -39,7 +35,7 @@ export const getFile = query({
     }
 
     // Verify user owns the file
-    if (file.userId !== user._id && file.ownerId !== user._id) {
+    if (file.userId !== userId && file.ownerId !== userId) {
       throw new Error("Access denied");
     }
 

@@ -1,5 +1,7 @@
 // Cart utilities and types
 import { LicensePricing } from "@/../../shared/schema";
+import { storage } from "@/services/StorageManager";
+
 export interface CartItem {
   beatId: number;
   title: string;
@@ -101,12 +103,11 @@ export interface Cart {
 
 // Cart manager for localStorage persistence
 class CartManager {
-  private static STORAGE_KEY = "brolab_cart";
+  private static readonly STORAGE_KEY = "cart";
 
   getCart(): Cart {
     try {
-      const stored = localStorage.getItem(CartManager.STORAGE_KEY);
-      const items: CartItem[] = stored ? JSON.parse(stored) : [];
+      const items = storage.getCart();
       const total = calculateCartTotal(items);
       return {
         items,
@@ -120,7 +121,7 @@ class CartManager {
   }
 
   private saveCart(items: CartItem[]): void {
-    localStorage.setItem(CartManager.STORAGE_KEY, JSON.stringify(items));
+    storage.setCart(items);
   }
 
   addItem(newItem: Omit<CartItem, "price">) {
@@ -225,4 +226,4 @@ class CartManager {
 export const cartManager = new CartManager();
 
 // Export for backward compatibility
-export { cartManager as default };
+export default cartManager;

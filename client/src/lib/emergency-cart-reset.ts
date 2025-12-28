@@ -1,3 +1,5 @@
+import { storage } from "@/services/StorageManager";
+
 // Extend globalThis interface for debugging utilities
 declare global {
   var emergencyCartReset: typeof emergencyCartResetFn | undefined;
@@ -14,17 +16,24 @@ interface CartItem {
 
 // Emergency cart reset utility
 const emergencyCartResetFn = (): void => {
-  // Clear all possible cart storage
-  localStorage.removeItem("brolab_cart");
-  localStorage.removeItem("cart");
-  localStorage.removeItem("shopping_cart");
+  // Clear cart using StorageManager
+  storage.setCart([]);
 
-  // Clear any other cart-related keys
-  Object.keys(localStorage).forEach(key => {
-    if (key.includes("cart") || key.includes("brolab")) {
-      localStorage.removeItem(key);
-    }
-  });
+  // Also clear any legacy cart storage keys directly
+  try {
+    localStorage.removeItem("brolab_cart");
+    localStorage.removeItem("cart");
+    localStorage.removeItem("shopping_cart");
+
+    // Clear any other cart-related keys
+    Object.keys(localStorage).forEach(key => {
+      if (key.includes("cart") || key.includes("brolab")) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (error) {
+    console.warn("Failed to clear legacy cart storage:", error);
+  }
 
   console.log("🚨 Emergency cart reset completed");
 
@@ -34,27 +43,21 @@ const emergencyCartResetFn = (): void => {
 
 // Test current cart pricing
 const validateCartPricingFn = (): boolean => {
-  const storedCart = localStorage.getItem("brolab_cart");
-  if (storedCart) {
-    try {
-      const cartData = JSON.parse(storedCart) as CartItem[];
-      console.log("Current cart data:", cartData);
+  const cartItems = storage.getCart();
+  if (cartItems.length > 0) {
+    console.log("Current cart data:", cartItems);
 
-      cartData.forEach((item: CartItem, index: number) => {
-        console.log(
-          `Item ${index}: ${item.title ?? "Unknown"} - ${item.price ?? 0} (${item.licenseType ?? "Unknown"})`
+    cartItems.forEach((item: CartItem, index: number) => {
+      console.log(
+        `Item ${index}: ${item.title ?? "Unknown"} - ${item.price ?? 0} (${item.licenseType ?? "Unknown"})`
+      );
+      if ((item.price ?? 0) < 29.99) {
+        console.error(
+          `❌ INVALID PRICING: ${item.price ?? 0} for ${item.licenseType ?? "Unknown"}`
         );
-        if ((item.price ?? 0) < 29.99) {
-          console.error(
-            `❌ INVALID PRICING: ${item.price ?? 0} for ${item.licenseType ?? "Unknown"}`
-          );
-        }
-      });
-      return true;
-    } catch (e) {
-      console.error("Cart data corrupted:", e);
-      return false;
-    }
+      }
+    });
+    return true;
   }
   return true;
 };

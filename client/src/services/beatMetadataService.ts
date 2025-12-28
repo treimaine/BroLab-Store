@@ -6,6 +6,7 @@
  */
 
 import type { Download as DashboardDownload } from "../../../shared/types/dashboard";
+import { apiService } from "./ApiService";
 
 // ================================
 // TYPES
@@ -113,20 +114,11 @@ class BeatMetadataService {
     signal?: AbortSignal
   ): Promise<BeatMetadata | null> {
     try {
-      const response = await fetch(`/api/woocommerce/products/${beatId}`, {
+      const response = await apiService.get<WooCommerceProduct>(`/woocommerce/products/${beatId}`, {
         signal,
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
       });
 
-      if (!response.ok) {
-        console.warn(`Failed to fetch metadata for beat ${beatId}: ${response.status}`);
-        return null;
-      }
-
-      const data: WooCommerceProduct = await response.json();
+      const data = response.data;
 
       const metadata: BeatMetadata = {
         title: data?.name || data?.title || data?.beat?.name,

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
+import { optionalAuth } from "../lib/authHelpers";
 
 export const getForYouBeats = query({
   args: {
@@ -7,7 +8,7 @@ export const getForYouBeats = query({
     genre: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const auth = await optionalAuth(ctx);
     const limit = args.limit || 10;
 
     let beats;
@@ -28,25 +29,18 @@ export const getForYouBeats = query({
     }
 
     // Si utilisateur connecté, ajouter les favoris
-    if (identity) {
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-        .first();
+    if (auth) {
+      const favorites = await ctx.db
+        .query("favorites")
+        .withIndex("by_user", q => q.eq("userId", auth.userId))
+        .collect();
 
-      if (user) {
-        const favorites = await ctx.db
-          .query("favorites")
-          .withIndex("by_user", q => q.eq("userId", user._id))
-          .collect();
+      const favoriteBeatIds = new Set(favorites.map(f => f.beatId));
 
-        const favoriteBeatIds = new Set(favorites.map(f => f.beatId));
-
-        return beats.map(beat => ({
-          ...beat,
-          isFavorite: favoriteBeatIds.has(beat.wordpressId),
-        }));
-      }
+      return beats.map(beat => ({
+        ...beat,
+        isFavorite: favoriteBeatIds.has(beat.wordpressId),
+      }));
     }
 
     return beats.map(beat => ({

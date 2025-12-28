@@ -1,29 +1,17 @@
 import { v } from "convex/values";
 import { internalQuery, query } from "../_generated/server";
+import { requireAuth } from "../lib/authHelpers";
 
 export const getUserReservations = query({
   args: {
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const userId = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .unique();
-
-    if (!userId) {
-      throw new Error("User not found");
-    }
+    const { userId } = await requireAuth(ctx);
 
     const reservations = await ctx.db
       .query("reservations")
-      .withIndex("by_user", q => q.eq("userId", userId._id))
+      .withIndex("by_user", q => q.eq("userId", userId))
       .order("desc")
       .take(args.limit || 50);
 

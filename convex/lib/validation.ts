@@ -1,10 +1,32 @@
 import { v } from "convex/values";
 
+/**
+ * @fileoverview Convex-specific validation module
+ *
+ * ⚠️ DEPRECATION NOTICE:
+ * For validation functions (validateEmail, validateUUID, sanitizeInput, etc.),
+ * prefer importing directly from the shared validation module:
+ *
+ * ```typescript
+ * import { validateEmail, sanitizeInput } from "../../shared/validation/validators";
+ * import { sanitizeEmail, sanitizeFilename } from "../../shared/validation/sanitizers";
+ * ```
+ *
+ * This file contains:
+ * 1. RE-EXPORTS from shared/validation for backward compatibility
+ * 2. CONVEX-SPECIFIC validation schemas (userValidation, orderValidation, etc.)
+ * 3. CONVEX-SPECIFIC functions (validateClerkId, validateAndSanitizeUser, etc.)
+ *
+ * The Convex-specific code in this file is NOT duplicated elsewhere and should
+ * remain here. Only the re-exports are for backward compatibility.
+ *
+ * @module convex/lib/validation
+ */
+
 // ================================
-// RE-EXPORTS FROM SHARED VALIDATION
+// RE-EXPORTS FROM SHARED VALIDATION (Backward Compatibility)
 // ================================
-// These re-exports maintain backward compatibility for existing imports
-// The single source of truth is in shared/validation/validators.ts
+// The single source of truth is in shared/validation/
 
 // Import and re-export validateEmail from shared module for backward compatibility
 import { validateEmail as validateEmailImpl } from "../../shared/validation/validators";

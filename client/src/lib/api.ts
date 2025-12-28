@@ -1,3 +1,4 @@
+import { apiService } from "@/services/ApiService";
 import { apiRequest } from "./queryClient";
 
 // Newsletter API
@@ -22,9 +23,8 @@ export const contactApi = {
 // WordPress API helpers
 export const wordpressApi = {
   getPage: async (slug: string): Promise<unknown> => {
-    const response = await fetch(`/api/wordpress/pages/${slug}`);
-    if (!response.ok) throw new Error("Failed to fetch page");
-    return response.json() as Promise<unknown>;
+    const response = await apiService.get(`/wordpress/pages/${slug}`);
+    return response.data;
   },
 
   getPosts: async (params?: {
@@ -37,9 +37,8 @@ export const wordpressApi = {
     if (params?.page) searchParams.append("page", params.page.toString());
     if (params?.search) searchParams.append("search", params.search);
 
-    const response = await fetch(`/api/wordpress/posts?${searchParams}`);
-    if (!response.ok) throw new Error("Failed to fetch posts");
-    return response.json() as Promise<unknown>;
+    const response = await apiService.get(`/wordpress/posts?${searchParams}`);
+    return response.data;
   },
 };
 
@@ -108,21 +107,18 @@ export const wooCommerceApi = {
     if (filters?.orderby) params.append("orderby", filters.orderby);
     if (filters?.order) params.append("order", filters.order);
 
-    const response = await fetch(`/api/woocommerce/products?${params}`);
-    if (!response.ok) throw new Error("Failed to fetch products");
-    return response.json() as Promise<unknown>;
+    const response = await apiService.get(`/woocommerce/products?${params}`);
+    return response.data;
   },
 
   getProduct: async (id: string): Promise<unknown> => {
-    const response = await fetch(`/api/woocommerce/products/${id}`);
-    if (!response.ok) throw new Error("Failed to fetch product");
-    return response.json() as Promise<unknown>;
+    const response = await apiService.get(`/woocommerce/products/${id}`);
+    return response.data;
   },
 
   getCategories: async (): Promise<unknown> => {
-    const response = await fetch("/api/woocommerce/categories");
-    if (!response.ok) throw new Error("Failed to fetch categories");
-    return response.json() as Promise<unknown>;
+    const response = await apiService.get("/woocommerce/categories");
+    return response.data;
   },
 
   createOrder: async (orderData: WooCommerceOrderData): Promise<Response> => {

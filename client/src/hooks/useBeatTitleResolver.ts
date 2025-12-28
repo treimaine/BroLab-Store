@@ -5,6 +5,7 @@
  * WooCommerce API when they are missing from the Convex database.
  */
 
+import { apiService } from "@/services/ApiService";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface BeatTitleCache {
@@ -75,22 +76,13 @@ export function useBeatTitleResolver(
 
     try {
       console.log(`🔄 Fetching beat title for ID: ${beatId}`); // Debug log
-      const response = await fetch(`/api/woocommerce/products/${beatId}`);
+      const response = await apiService.get<{
+        beat?: { name?: string; title?: string };
+        name?: string;
+        title?: string;
+      }>(`/woocommerce/products/${beatId}`);
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          // Product not found, cache as "Beat {id}" to avoid repeated fetches
-          const fallbackTitle = `Beat ${beatId}`;
-          globalCache[beatId] = {
-            title: fallbackTitle,
-            fetchedAt: Date.now(),
-          };
-          return fallbackTitle;
-        }
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = response.data;
       // API returns { beat: {...} } or direct product object
       const product = data.beat || data;
       const title = product.name || product.title || `Beat ${beatId}`;
@@ -104,6 +96,21 @@ export function useBeatTitleResolver(
 
       return title;
     } catch (error) {
+      // Check if it's a 404 error
+      if (
+        error &&
+        typeof error === "object" &&
+        "status" in error &&
+        (error as { status: number }).status === 404
+      ) {
+        // Product not found, cache as "Beat {id}" to avoid repeated fetches
+        const fallbackTitle = `Beat ${beatId}`;
+        globalCache[beatId] = {
+          title: fallbackTitle,
+          fetchedAt: Date.now(),
+        };
+        return fallbackTitle;
+      }
       console.error(`Failed to fetch beat ${beatId} title:`, error);
       return null;
     } finally {

@@ -1,3 +1,4 @@
+import { apiService, isApiError } from "@/services/ApiService";
 import { PayPalOrder, PayPalPaymentRequest, PayPalPaymentResponse } from "../config/paypal";
 
 /**
@@ -6,7 +7,7 @@ import { PayPalOrder, PayPalPaymentRequest, PayPalPaymentResponse } from "../con
  * ✅ CORRECTION: Utilise approvalLink et gère correctement les paramètres PayPal
  */
 export class PayPalClientService {
-  private static readonly API_BASE = "/api/payment/paypal";
+  private static readonly API_BASE = "/payment/paypal";
 
   /**
    * Crée une commande PayPal pour le paiement d'une réservation
@@ -19,34 +20,30 @@ export class PayPalClientService {
     try {
       console.log("🚀 Creating PayPal payment order:", paymentRequest);
 
-      const response = await fetch(`${this.API_BASE}/create-order`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders,
-        },
-        body: JSON.stringify(paymentRequest),
-      });
+      const response = await apiService.post<{ approvalLink: string; orderId: string }>(
+        `${this.API_BASE}/create-order`,
+        paymentRequest,
+        { headers: authHeaders as Record<string, string> }
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log("✅ PayPal order created successfully:", result);
+      console.log("✅ PayPal order created successfully:", response.data);
 
       // ✅ CORRECTION: Utiliser approvalLink au lieu de paymentUrl
       return {
         success: true,
-        paymentUrl: result.approvalLink, // ✅ CORRECTION: approvalLink PayPal
-        orderId: result.orderId,
+        paymentUrl: response.data.approvalLink, // ✅ CORRECTION: approvalLink PayPal
+        orderId: response.data.orderId,
       };
     } catch (error) {
       console.error("❌ Error creating PayPal order:", error);
+      const errorMessage = isApiError(error)
+        ? String(error.body) || `HTTP ${error.status}: ${error.statusText}`
+        : error instanceof Error
+          ? error.message
+          : "Failed to create PayPal order";
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to create PayPal order",
+        error: errorMessage,
       };
     }
   }
@@ -66,31 +63,27 @@ export class PayPalClientService {
         throw new Error("Invalid PayPal order ID");
       }
 
-      const response = await fetch(`${this.API_BASE}/capture-payment`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ orderId }),
-      });
+      const response = await apiService.post<{ transactionId: string }>(
+        `${this.API_BASE}/capture-payment`,
+        { orderId }
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log("✅ Payment captured successfully:", result);
+      console.log("✅ Payment captured successfully:", response.data);
 
       return {
         success: true,
-        transactionId: result.transactionId,
+        transactionId: response.data.transactionId,
       };
     } catch (error) {
       console.error("❌ Error capturing payment:", error);
+      const errorMessage = isApiError(error)
+        ? String(error.body) || `HTTP ${error.status}: ${error.statusText}`
+        : error instanceof Error
+          ? error.message
+          : "Failed to capture payment";
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to capture payment",
+        error: errorMessage,
       };
     }
   }
@@ -108,15 +101,11 @@ export class PayPalClientService {
         throw new Error("Invalid PayPal order ID");
       }
 
-      const response = await fetch(`${this.API_BASE}/order/${orderId}`);
+      const response = await apiService.get<{ order: PayPalOrder }>(
+        `${this.API_BASE}/order/${orderId}`
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      return result.order;
+      return response.data.order;
     } catch (error) {
       console.error("❌ Error getting order details:", error);
       throw error;
@@ -128,22 +117,22 @@ export class PayPalClientService {
    */
   static async checkHealth(): Promise<{ success: boolean; message?: string; error?: string }> {
     try {
-      const response = await fetch(`${this.API_BASE}/health`);
+      const response = await apiService.get<{ message: string }>(`${this.API_BASE}/health`);
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
       return {
         success: true,
-        message: result.message,
+        message: response.data.message,
       };
     } catch (error) {
       console.error("❌ PayPal service health check failed:", error);
+      const errorMessage = isApiError(error)
+        ? `HTTP ${error.status}: ${error.statusText}`
+        : error instanceof Error
+          ? error.message
+          : "Health check failed";
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Health check failed",
+        error: errorMessage,
       };
     }
   }

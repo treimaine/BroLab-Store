@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
+import { notificationService } from "@/services/NotificationService";
 import { useUser } from "@clerk/clerk-react";
 import { AlertCircle, TestTube } from "lucide-react";
 import { useState } from "react";
@@ -20,16 +20,13 @@ interface TestResult {
 
 export function ClerkPaymentTest() {
   const { user, isLoaded } = useUser();
-  const { toast } = useToast();
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
 
   const runPaymentTest = async () => {
     if (!user) {
-      toast({
+      notificationService.error("Please sign in to test payments", {
         title: "Authentication Required",
-        description: "Please sign in to test payments",
-        variant: "destructive",
       });
       return;
     }
@@ -67,9 +64,8 @@ export function ClerkPaymentTest() {
         message: "Checkout session created successfully",
       });
 
-      toast({
+      notificationService.success("Checkout session created successfully", {
         title: "Test Successful",
-        description: "Checkout session created successfully",
       });
     } catch (error) {
       console.error("Payment test error:", error);
@@ -79,10 +75,8 @@ export function ClerkPaymentTest() {
         message: "Failed to create checkout session",
       });
 
-      toast({
+      notificationService.error(error instanceof Error ? error.message : "Unknown error", {
         title: "Test Failed",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
       });
     } finally {
       setIsTesting(false);

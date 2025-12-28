@@ -1,3 +1,4 @@
+import { apiService } from "@/services/ApiService";
 import { useEffect, useState } from "react";
 
 /**
@@ -17,23 +18,20 @@ export function useSchemaMarkup(
         switch (type) {
           case "beat":
             if (!beatId) return;
-            endpoint = `/api/schema/beat/${beatId}`;
+            endpoint = `/schema/beat/${beatId}`;
             break;
           case "beats-list":
-            endpoint = "/api/schema/beats-list";
+            endpoint = "/schema/beats-list";
             break;
           case "organization":
-            endpoint = "/api/schema/organization";
+            endpoint = "/schema/organization";
             break;
           default:
             return;
         }
 
-        const response = await fetch(endpoint);
-        if (response.ok) {
-          const markup = await response.text();
-          setSchemaMarkup(markup);
-        }
+        const response = await apiService.get<string>(endpoint);
+        setSchemaMarkup(response.data);
       } catch (error) {
         console.error("Error fetching schema markup:", error);
       }

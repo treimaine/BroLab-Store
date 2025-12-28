@@ -3,6 +3,7 @@
  * Provides comprehensive translation support with pluralization and context-aware translations
  */
 
+import { storage } from "@/services/StorageManager";
 import { useCallback, useEffect, useState } from "react";
 import { translations, type Language } from "./translations";
 
@@ -73,11 +74,10 @@ function getPluralForm(count: number, language: Language): keyof PluralRules {
 export function useI18n() {
   const [currentLanguage, setCurrentLanguage] = useState<Language>("en");
 
-  // Initialize language from localStorage or default to English
+  // Initialize language from storage or default to English
   useEffect(() => {
     try {
-      const stored =
-        globalThis.window === undefined ? null : localStorage.getItem("brolab_language");
+      const stored = globalThis.window === undefined ? null : storage.getLanguage();
       if (stored && stored in translations) {
         setCurrentLanguage(stored as Language);
         return;
@@ -150,7 +150,7 @@ export function useI18n() {
   );
 
   /**
-   * Change current language and persist to localStorage
+   * Change current language and persist to storage
    */
   const changeLanguage = useCallback((language: Language) => {
     if (!(language in translations)) {
@@ -161,7 +161,7 @@ export function useI18n() {
     setCurrentLanguage(language);
     try {
       if (globalThis.window !== undefined) {
-        localStorage.setItem("brolab_language", language);
+        storage.setLanguage(language);
         // Dispatch custom event for other components to react
         globalThis.window.dispatchEvent(
           new CustomEvent("languageChanged", { detail: { language } })

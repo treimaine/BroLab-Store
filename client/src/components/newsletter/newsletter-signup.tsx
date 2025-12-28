@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { notificationService } from "@/services/NotificationService";
 import { Mail, X } from "lucide-react";
 import { useState } from "react";
 
@@ -16,7 +16,6 @@ export function NewsletterSignup({
 }: Readonly<NewsletterSignupProps>): JSX.Element | null {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -25,19 +24,14 @@ export function NewsletterSignup({
     setIsLoading(true);
     try {
       await apiRequest("POST", "/api/newsletter/subscribe", { email });
-      toast({
+      notificationService.success("You've been subscribed to our newsletter.", {
         title: "Success!",
-        description: "You've been subscribed to our newsletter.",
       });
       setEmail("");
       onClose();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to subscribe";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      notificationService.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

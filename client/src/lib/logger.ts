@@ -6,6 +6,7 @@
  * the specialized mixing-mastering logging API.
  */
 
+import { storage } from "@/services/StorageManager";
 import { clientLogger, LogLevel } from "./clientLogger";
 import type { ErrorContext, LogContext, PerformanceMetrics } from "./loggerTypes";
 
@@ -24,9 +25,7 @@ export class Logger {
     this.performanceMetrics = {
       pageLoadStart: performance.now(),
     };
-    this.debugMode =
-      process.env.NODE_ENV === "development" ||
-      localStorage.getItem("debug-mixing-mastering") === "true";
+    this.debugMode = process.env.NODE_ENV === "development" || storage.getMixingMasteringDebug();
 
     // Initialize performance monitoring
     this.initializePerformanceMonitoring();
@@ -322,13 +321,13 @@ export class Logger {
 
   public enableDebugMode(): void {
     this.debugMode = true;
-    localStorage.setItem("debug-mixing-mastering", "true");
+    storage.setMixingMasteringDebug(true);
     clientLogger.info("Debug mode enabled for mixing-mastering page");
   }
 
   public disableDebugMode(): void {
     this.debugMode = false;
-    localStorage.removeItem("debug-mixing-mastering");
+    storage.setMixingMasteringDebug(false);
     clientLogger.info("Debug mode disabled for mixing-mastering page");
   }
 }

@@ -1,5 +1,5 @@
-import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { notificationService } from "@/services/NotificationService";
 import { useUser } from "@clerk/clerk-react";
 import { Camera } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -30,7 +30,6 @@ export function AvatarUpload({
   const [imgSrc, setImgSrc] = useState(src || DEFAULT_AVATAR);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
   const { user } = useUser();
 
   // Mettre à jour imgSrc quand src change
@@ -44,30 +43,22 @@ export function AvatarUpload({
 
     // Validation du fichier
     if (!file.type.startsWith("image/")) {
-      toast({
+      notificationService.error("Veuillez sélectionner un fichier image valide.", {
         title: "Erreur de validation",
-        description: "Veuillez sélectionner un fichier image valide.",
-        variant: "destructive",
       });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       // 5MB
-      toast({
+      notificationService.error("Le fichier est trop volumineux. Taille maximale : 5MB.", {
         title: "Erreur de validation",
-        description: "Le fichier est trop volumineux. Taille maximale : 5MB.",
-        variant: "destructive",
       });
       return;
     }
 
     if (!user?.id) {
-      toast({
-        title: "Erreur",
-        description: "Vous devez être connecté pour uploader un avatar.",
-        variant: "destructive",
-      });
+      notificationService.error("Vous devez être connecté pour uploader un avatar.");
       return;
     }
 
@@ -92,17 +83,12 @@ export function AvatarUpload({
       setImgSrc(url);
       onUpload?.(url);
 
-      toast({
+      notificationService.success("Votre photo de profil a été mise à jour avec succès.", {
         title: "Avatar mis à jour",
-        description: "Votre photo de profil a été mise à jour avec succès.",
       });
     } catch (error) {
       console.error("Avatar upload error:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de mettre à jour l'avatar. Veuillez réessayer.",
-        variant: "destructive",
-      });
+      notificationService.error("Impossible de mettre à jour l'avatar. Veuillez réessayer.");
     } finally {
       setIsUploading(false);
       // Reset l'input pour permettre la sélection du même fichier
@@ -129,11 +115,7 @@ export function AvatarUpload({
         onError={() => {
           if (imgSrc !== DEFAULT_AVATAR) {
             setImgSrc(DEFAULT_AVATAR);
-            toast({
-              title: "Erreur",
-              description: "Impossible de charger l'avatar",
-              variant: "destructive",
-            });
+            notificationService.error("Impossible de charger l'avatar");
           }
         }}
       />

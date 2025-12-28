@@ -13,7 +13,8 @@ import { StandardHero } from "@/components/ui/StandardHero";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { logApiError, logApiRequest, logger, logUserAction } from "@/lib/logger";
-import { useAuth, useUser } from "@clerk/clerk-react";
+import { apiService, isApiError } from "@/services/ApiService";
+import { useUser } from "@clerk/clerk-react";
 import { Calendar, Clock, Mail, MapPin, Mic, Phone, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
@@ -36,7 +37,6 @@ export default function RecordingSessions() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user, isSignedIn } = useUser();
-  const { getToken } = useAuth();
   const [formData, setFormData] = useState<BookingFormData>({
     name: "",
     email: "",
@@ -124,78 +124,59 @@ export default function RecordingSessions() {
         action: "reservation_api_call",
       });
 
-      // Get authentication token from Clerk
-      const token = await getToken();
-      if (!token) {
-        toast({
-          title: "Authentication Error",
-          description: "Unable to get authentication token. Please try signing in again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const response = await fetch("/api/reservations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(reservationData),
-        credentials: "include", // Required for Clerk __session cookie
+      const response = await apiService.post<{ id: string }>("/reservations", reservationData, {
+        requireAuth: true,
       });
 
       logger.logInfo("Reservation response received", {
         component: "recording_sessions",
         action: "reservation_response",
-        status: response.status,
+        status: 200,
       });
 
-      if (response.ok) {
-        const reservation = await response.json();
+      const reservation = response.data;
 
-        // Create pending payment for checkout
-        const pendingPayment = {
-          service: "recording",
-          serviceName: "Recording Session",
-          serviceDetails: `${formData.sessionType} - ${formData.duration} hour${Number.parseInt(formData.duration, 10) > 1 ? "s" : ""} (${formData.location})`,
-          reservationId: reservation.id,
-          price: reservationData.budget / 100, // Convert cents to dollars
-          quantity: 1,
-        };
+      // Create pending payment for checkout
+      const pendingPayment = {
+        service: "recording",
+        serviceName: "Recording Session",
+        serviceDetails: `${formData.sessionType} - ${formData.duration} hour${Number.parseInt(formData.duration, 10) > 1 ? "s" : ""} (${formData.location})`,
+        reservationId: reservation.id,
+        price: reservationData.budget / 100, // Convert cents to dollars
+        quantity: 1,
+      };
 
-        // Add to existing services array
-        const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
-        const updatedServices = [...existingServices, pendingPayment];
-        sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
+      // Add to existing services array
+      const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
+      const updatedServices = [...existingServices, pendingPayment];
+      sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
 
-        toast({
-          title: "Recording Session Reserved!",
-          description: "Complete your payment to confirm the booking.",
-        });
+      toast({
+        title: "Recording Session Reserved!",
+        description: "Complete your payment to confirm the booking.",
+      });
 
-        // Redirect to checkout
-        setLocation("/checkout");
-      } else {
-        const errorText = await response.text();
-        logApiError("Reservation failed", new Error(`${response.status}: ${errorText}`), {
-          component: "recording_sessions",
-          action: "reservation_failed",
-          status: response.status,
-        });
-        toast({
-          title: "Booking Failed",
-          description: `Failed to create reservation: ${response.status} - ${errorText}`,
-          variant: "destructive",
-        });
-      }
+      // Redirect to checkout
+      setLocation("/checkout");
     } catch (error) {
       logger.logError("Recording session submission failed", error, {
         errorType: "api",
         component: "recording_sessions",
         action: "form_submission_error",
       });
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+
+      let errorMessage = "Unknown error occurred";
+      if (isApiError(error)) {
+        logApiError("Reservation failed", error, {
+          component: "recording_sessions",
+          action: "reservation_failed",
+          status: error.status,
+        });
+        errorMessage = `Failed to create reservation: ${error.status} - ${error.statusText}`;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       toast({
         title: "Booking Failed",
         description: errorMessage,

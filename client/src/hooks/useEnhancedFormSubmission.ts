@@ -2,6 +2,7 @@ import { useToast } from "@/hooks/use-toast";
 import { addBreadcrumb } from "@/lib/errorTracker";
 import { logger } from "@/lib/logger";
 import { performanceMonitor, startTimer } from "@/lib/performanceMonitor";
+import { apiService } from "@/services/ApiService";
 import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useState } from "react";
 
@@ -593,25 +594,10 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
           name: "create_reservation",
           description: "Creating reservation",
           action: async () => {
-            const token = await getToken();
-            const response = await fetch("/api/reservations", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify(formData),
-              credentials: "include", // Required for Clerk __session cookie
+            const response = await apiService.post("/reservations", formData, {
+              requireAuth: true,
             });
-
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              throw new Error(
-                errorData.message || `HTTP ${response.status}: ${response.statusText}`
-              );
-            }
-
-            return response.json();
+            return response.data;
           },
           canRetry: true,
           timeout: 30000,
@@ -639,14 +625,9 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
           name: "create_payment_intent",
           description: "Setting up payment",
           action: async () => {
-            const token = await getToken();
-            const response = await fetch("/api/payment/stripe/create-payment-intent", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
+            const response = await apiService.post(
+              "/payment/stripe/create-payment-intent",
+              {
                 // Payment intent data would be derived from formData
                 amount: 10000, // This would be calculated from the form
                 currency: "usd",
@@ -654,16 +635,10 @@ export function useEnhancedFormSubmission(options: UseEnhancedFormSubmissionOpti
                   type: "service_reservation",
                   service: serviceName,
                 },
-              }),
-              credentials: "include", // Required for Clerk __session cookie
-            });
-
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              throw new Error(errorData.message || `Payment setup failed: ${response.statusText}`);
-            }
-
-            return response.json();
+              },
+              { requireAuth: true }
+            );
+            return response.data;
           },
           canRetry: true,
           timeout: 30000,

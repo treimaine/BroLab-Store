@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLoyaltyRewards, useRedeemReward, useRewardEligibility } from "@/hooks/use-loyalty";
-import { useToast } from "@/hooks/use-toast";
+import { notificationService } from "@/services/NotificationService";
 import { Check, Gift, Lock } from "lucide-react";
 
 interface RewardsGridProps {
@@ -13,7 +13,6 @@ interface RewardsGridProps {
 export function RewardsGrid({ userId, className }: Readonly<RewardsGridProps>) {
   const { rewards, isLoading } = useLoyaltyRewards();
   const { redeemReward, isLoading: isRedeeming } = useRedeemReward();
-  const { toast } = useToast();
 
   if (isLoading) {
     return (
@@ -44,16 +43,11 @@ export function RewardsGrid({ userId, className }: Readonly<RewardsGridProps>) {
   const handleRedeem = async (rewardId: number) => {
     try {
       await redeemReward({ userId, rewardId });
-      toast({
+      notificationService.success("Votre récompense a été réclamée avec succès.", {
         title: "Succès !",
-        description: "Votre récompense a été réclamée avec succès.",
       });
     } catch (error) {
-      toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Une erreur est survenue",
-        variant: "destructive",
-      });
+      notificationService.error(error instanceof Error ? error.message : "Une erreur est survenue");
     }
   };
 

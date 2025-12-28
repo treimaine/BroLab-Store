@@ -15,6 +15,7 @@
 
 import { toast } from "@/hooks/use-toast";
 import { useCacheWarming } from "@/hooks/useCachingStrategy";
+import { apiService } from "@/services/ApiService";
 import { useUser } from "@clerk/clerk-react";
 import {
   ReactNode,
@@ -206,9 +207,8 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
         key: "featured-beats",
         dataType: DataType.DYNAMIC,
         fetcher: async () => {
-          const response = await fetch("/api/beats/featured");
-          if (!response.ok) throw new Error("Failed to fetch featured beats");
-          return response.json();
+          const response = await apiService.get("/beats/featured");
+          return response.data;
         },
         priority: "high" as const,
       },
@@ -216,9 +216,8 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
         key: "categories",
         dataType: DataType.STATIC,
         fetcher: async () => {
-          const response = await fetch("/api/categories");
-          if (!response.ok) throw new Error("Failed to fetch categories");
-          return response.json();
+          const response = await apiService.get("/categories");
+          return response.data;
         },
         priority: "medium" as const,
       },
@@ -233,13 +232,13 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
         key: "subscription-plans",
         dataType: DataType.STATIC,
         fetcher: async () => {
-          const response = await fetch("/api/subscription/plans");
-          // Gracefully handle 401 if auth state changes during fetch
-          if (response.status === 401) {
+          try {
+            const response = await apiService.get("/subscription/plans", { requireAuth: true });
+            return response.data;
+          } catch {
+            // Gracefully handle 401 if auth state changes during fetch
             return null;
           }
-          if (!response.ok) throw new Error("Failed to fetch subscription plans");
-          return response.json();
         },
         priority: "high" as const,
       },

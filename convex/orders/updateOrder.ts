@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import { mutation } from "../_generated/server";
+import { requireAuth } from "../lib/authHelpers";
 
 export const updateOrder = mutation({
   args: {
@@ -10,10 +11,7 @@ export const updateOrder = mutation({
     paymentStatus: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Vous devez être connecté pour mettre à jour une commande");
-    }
+    const { userId } = await requireAuth(ctx);
 
     // Convertir l'orderId string en Id
     const orderId = args.orderId as Id<"orders">;
@@ -24,20 +22,9 @@ export const updateOrder = mutation({
       throw new Error("Commande non trouvée");
     }
 
-    // Vérifier que l'utilisateur est propriétaire de la commande
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    // Vérifier que l'utilisateur existe et que la commande lui appartient
-    if (!user) {
-      throw new Error("Utilisateur non trouvé");
-    }
-
     // Vérifier que la commande appartient à l'utilisateur
     // Utiliser une vérification de type appropriée
-    if (order.userId && order.userId !== user._id) {
+    if (order.userId && order.userId !== userId) {
       throw new Error("Vous n'êtes pas autorisé à modifier cette commande");
     }
 

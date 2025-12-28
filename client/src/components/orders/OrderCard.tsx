@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
+import { notificationService } from "@/services/NotificationService";
 import type { Order } from "@shared/schema";
 import { Download, ExternalLink } from "lucide-react";
 
@@ -12,7 +12,6 @@ interface OrderCardProps {
 }
 
 export function OrderCard({ order, showDetails = true, onOrderClick }: Readonly<OrderCardProps>) {
-  const { toast } = useToast();
   const downloadInvoice = async (): Promise<void> => {
     return;
   };
@@ -21,11 +20,7 @@ export function OrderCard({ order, showDetails = true, onOrderClick }: Readonly<
     try {
       await downloadInvoice();
     } catch {
-      toast({
-        title: "Erreur",
-        description: "Impossible de télécharger la facture",
-        variant: "destructive",
-      });
+      notificationService.error("Impossible de télécharger la facture");
     }
   };
 

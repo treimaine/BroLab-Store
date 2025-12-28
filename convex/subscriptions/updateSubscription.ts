@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { mutation } from "../_generated/server";
+import { requireAuth } from "../lib/authHelpers";
 
 type UpdateArgs = {
   subscriptionId: Id<"subscriptions">;
@@ -163,17 +164,9 @@ export const updateCurrentUserSubscription = mutation({
     plan: v.optional(v.string()),
   },
   handler: async (ctx, _args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    const { userId } = await requireAuth(ctx);
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) throw new Error("User not found");
-
-    return await ctx.db.patch(user._id, {
+    return await ctx.db.patch(userId, {
       updatedAt: Date.now(),
     });
   },

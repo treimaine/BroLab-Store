@@ -1,5 +1,5 @@
-import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { notificationService } from "@/services/NotificationService";
 import { useEffect, useRef, useState } from "react";
 
 const DEFAULT_AVATAR = "/assets/default-avatar.svg";
@@ -31,7 +31,6 @@ export function Avatar({
   const [isUploading, setIsUploading] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
 
   // Mettre à jour imgSrc quand src change
   useEffect(() => {
@@ -62,11 +61,7 @@ export function Avatar({
       onUpload?.(url);
     } catch (error) {
       console.error("Avatar upload error:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de mettre à jour l'avatar. Veuillez réessayer.",
-        variant: "destructive",
-      });
+      notificationService.error("Impossible de mettre à jour l'avatar. Veuillez réessayer.");
     } finally {
       setIsUploading(false);
     }
@@ -91,11 +86,7 @@ export function Avatar({
         onError={() => {
           if (imgSrc !== DEFAULT_AVATAR) {
             setImgSrc(DEFAULT_AVATAR);
-            toast({
-              title: "Erreur",
-              description: "Impossible de charger l'avatar",
-              variant: "destructive",
-            });
+            notificationService.error("Impossible de charger l'avatar");
           }
         }}
       />

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
+import { requireAuth } from "../lib/authHelpers";
 
 /**
  * Get a reservation by its ID
@@ -24,15 +25,8 @@ export const getReservationById = query({
     }
 
     // Verify ownership for authenticated calls
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
+    const { userId } = await requireAuth(ctx);
+    const user = await ctx.db.get(userId);
 
     if (!user) {
       throw new Error("User not found");
