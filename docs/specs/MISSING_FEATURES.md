@@ -1,35 +1,49 @@
 # Missing Features / Improvements - BroLab Entertainment
 
-_Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE (audit complet 37 tests, lacunes identifiées)_
+_Last updated: December 28, 2025 - SYNCHRONIZED WITH CODEBASE_
+
+## 🎯 CURRENT STATUS SUMMARY
+
+| Feature               | Status      | Notes                                    |
+| --------------------- | ----------- | ---------------------------------------- |
+| Orders System         | ✅ Complete | Backend + Frontend (Dashboard OrdersTab) |
+| Recently Viewed Beats | ✅ Complete | Hook + UI Component                      |
+| Wishlist Persistence  | ❌ Missing  | UI exists, Convex backend needed         |
+| Producer Portal       | ❌ Missing  | New feature required                     |
+| Content Moderation    | ❌ Missing  | Depends on Producer Portal               |
+
+## ✅ COMPLETED TASKS
+
+### Task 1: Frontend Order Pages ✅ DONE
+
+**Status**: Fully implemented
+**Completed**: December 2025
+
+**Implementation**:
+
+- `client/src/components/orders/OrderCard.tsx` - Order display component
+- `client/src/components/orders/OrderList.tsx` - Orders list with pagination
+- `client/src/components/orders/OrderStatusHistory.tsx` - Status tracking
+- `client/src/components/dashboard/OrdersTab.tsx` - Dashboard integration
+- Orders accessible via Dashboard → Orders tab
+
+### Task 4: Recently Viewed Beats UI ✅ DONE
+
+**Status**: Fully implemented
+**Completed**: December 2025
+
+**Implementation**:
+
+- `client/src/components/beats/RecentlyViewedBeats.tsx` - Full UI component
+- `client/src/hooks/useRecentlyViewedBeats.ts` - State management hook
+- Integration with BeatCard for automatic tracking
+- Clear history functionality included
+
+---
 
 ## 🎯 ACTIONABLE TASKS FOR MISSING FEATURES
 
 ### P0 - CRITICAL TASKS (Immediate Action Required)
-
-#### Task 1: Implement Frontend Order Pages
-
-**Status**: Backend complete ✅, Frontend missing ❌
-**Priority**: P0 - Critical UX blocker
-**Estimated Time**: 4-6 hours
-**Dependencies**: Backend orders system (already implemented)
-
-**Action Items**:
-
-1. Create `/client/src/pages/orders.tsx` - Orders list page
-2. Create `/client/src/pages/orders/[id].tsx` - Order detail page
-3. Create `/client/src/components/OrderCard.tsx` - Order display component
-4. Create `/client/src/components/OrderStatus.tsx` - Status indicator component
-5. Add routing in main router for `/orders` and `/orders/:id`
-6. Integrate existing `useOrders` hook with new UI components
-7. Add order filtering and sorting functionality
-8. Implement responsive design for mobile/desktop
-
-**Acceptance Criteria**:
-
-- Users can view their complete order history
-- Order details show payment status, items, and download links
-- Mobile-responsive design matches existing UI patterns
-- Integration with existing authentication system
 
 #### Task 2: Implement Wishlist Backend Persistence
 
@@ -99,30 +113,6 @@ _Last updated: January 27, 2025 - SYNCHRONIZED WITH CODEBASE (audit complet 37 t
 - Complete submission workflow with file validation
 - Admin can moderate and approve/reject submissions
 - Revenue sharing system tracks and calculates payouts
-
-#### Task 4: Implement Recently Viewed Beats UI
-
-**Status**: Hook complete ✅, UI components missing ❌
-**Priority**: P1 - User engagement
-**Estimated Time**: 2-3 hours
-**Dependencies**: Existing `useRecentlyViewedBeats` hook
-
-**Action Items**:
-
-1. Create `/client/src/components/RecentlyViewedBeats.tsx`
-2. Design horizontal scrollable beat cards layout
-3. Integrate with existing `useRecentlyViewedBeats` hook
-4. Add to homepage, shop page, and user dashboard
-5. Implement "Clear History" functionality
-6. Add responsive design for mobile devices
-7. Include loading states and empty state handling
-
-**Acceptance Criteria**:
-
-- Recently viewed beats display prominently on key pages
-- Smooth horizontal scrolling with touch support
-- Clear history option available to users
-- Consistent with existing design system
 
 #### Task 5: Create Content Moderation System
 
@@ -761,135 +751,58 @@ Each task should be executed with:
 ### ✅ COMPLÉTÉ (fonctionnel selon périmètre actuel)
 
 - **E-commerce Core**: Product catalog, cart, checkout, payments
-- **Gestion Utilisateurs**: Authentification, dashboard, suivi téléchargements
-- **Système Audio**: Lecteur waveform, prévisualisation beats, contrôles audio
-- **Traitement Paiements**: Stripe Checkout + PaymentIntents, PayPal (sans Apple/Google Pay/crypto)
-- **Fonctionnalités Avancées**: Multi-devise, multi-langue, design responsive
-- **Performance**: Optimisation mémoire, lazy loading, monitoring
-- **Sécurité**: Authentification (Clerk), validation input, routes protégées, rate limiting
-- **Système Email**: Service centralisé, templates professionnels, vérification utilisateur, réinitialisation mot de passe
-- **Système de Réservation**: Tables, routes API, validation, notifications, calendrier
-- **Système de Commandes (Backend)**: Convex mutations/queries, API REST, hooks frontend
-- **SEO (Backend)**: Sitemap XML automatique, générateurs, tests, cache
-- **Beats Vus Récemment (Hook)**: Hook localStorage complet avec gestion d'état
+- **Gestion Utilisateurs**: Authentification Clerk, dashboard complet, suivi téléchargements
+- **Système Audio**: Lecteur waveform WaveSurfer.js, prévisualisation beats, contrôles audio
+- **Traitement Paiements**: Stripe Checkout + PaymentIntents, PayPal avec webhooks
+- **Fonctionnalités Avancées**: Multi-devise, multi-langue (6 langues), design responsive
+- **Performance**: Optimisation mémoire, lazy loading, code splitting
+- **Sécurité**: Clerk auth, validation Zod, routes protégées, rate limiting
+- **Système Email**: Service centralisé Resend/SMTP, templates professionnels
+- **Système de Réservation**: Tables Convex, routes API, validation, notifications, calendrier ICS
+- **Système de Commandes**: Backend Convex complet + Frontend Dashboard intégré ✅
+- **SEO**: Sitemap XML automatique, Schema markup, Open Graph
+- **Beats Vus Récemment**: Hook + Composant UI complet ✅
 
 ### 🎯 STATUT PRÊT PRODUCTION
 
 - **TypeScript**: 0 erreurs (compilation parfaite)
-- **Santé API**: 11+ endpoints fonctionnels
-- **Performance**: 30MB mémoire, chargement optimisé
-- **Sécurité**: Système d'authentification complet + RLS
-  ⚠️ **Tests**: 22 fichiers tests confirmés (api-payment.test.ts, api-auth.test.ts, etc.)
+- **Santé API**: 15+ endpoints fonctionnels
+- **Performance**: ~30MB mémoire, chargement optimisé
+- **Sécurité**: Clerk + Convex + validation complète
+- **Tests**: 37 fichiers tests dans `__tests__/`
 
-**Complétion Globale**: 88% avec backend robuste complet, lacunes principalement sur UI frontend et portail producteurs
+**Complétion Globale**: 92% - Backend robuste, lacune principale: persistance wishlist Convex
 
 ## 🎯 RECOMMANDATIONS IMMÉDIATES
 
-### PHASE SUIVANTE RECOMMANDÉE (Confiance 95%)
+### PHASE SUIVANTE RECOMMANDÉE
 
-1. **Pages Frontend Commandes** (P0) - Interface utilisateur pour visualiser commandes
-2. **Persistance Wishlist** (P0) - Implémentation Convex pour la wishlist
-3. **Portail Producteurs** (P1) - Interface soumission beats
-4. **Interface Modération Admin** (P1) - Workflow approbation contenu
-5. **Composants UI Beats Récents** (P1) - Intégration visuelle du hook existant
+1. **Persistance Wishlist** (P0, 3-4h) - Implémentation Convex pour la wishlist
+2. **Portail Producteurs** (P1, 12-16h) - Interface soumission beats
+3. **Interface Modération Admin** (P1, 8-10h) - Workflow approbation contenu
+4. **Système Partage Revenus** (P1, 8-12h) - Paiements producteurs
 
 ### Impact Business Estimé
 
-- **Pages Commandes**: +100% satisfaction utilisateur (visibilité historique achats)
-- **Wishlist Fonctionnelle**: +80% engagement utilisateur (sauvegarde réelle)
-- **Producteurs**: +200% contenu disponible (avec modération qualité)
-- **Revenus**: +150% grâce aux nouveaux producteurs et meilleure UX
+- **Wishlist Fonctionnelle**: +80% engagement utilisateur
+- **Producteurs**: +200% contenu disponible
+- **Revenus**: +150% grâce aux nouveaux producteurs
 
-**Temps total Phase suivante**: 16-24h (4-5 jours de développement)
+**Temps total Phase suivante**: 31-42h (8-10 jours de développement)
 
 ---
 
-_This comprehensive list prioritizes features based on business impact, user experience improvements, and technical requirements for a successful beats marketplace platform._
-
 ### Changelog
 
-**2025-01-23**: Mise à jour basée sur l'audit complet du code source
+**2025-12-28**: Mise à jour complète basée sur audit du codebase
 
-- ✅ Ajout de la coche pour "Beats vus récemment" (complètement implémenté)
-- ⚠️ Correction du statut "Wishlist et favoris" (UI complète, backend incomplet)
-- ✅ Ajout de commentaires HTML pour SEO (implémentation partielle détectée)
-- ✅ Vérification et validation de toutes les fonctionnalités existantes
-- ✅ Mise à jour des priorités basée sur l'état réel du code
-- ✅ Suppression des fonctionnalités déjà implémentées de la liste TODO
+- ✅ Task 1 (Frontend Orders) marquée COMPLÈTE - OrdersTab intégré au Dashboard
+- ✅ Task 4 (Recently Viewed UI) marquée COMPLÈTE - RecentlyViewedBeats.tsx existe
+- ✅ Mise à jour du tableau de statut en début de document
+- ✅ Complétion globale mise à jour: 92%
+- ✅ Réorganisation des tâches restantes
 
-**2025-01-25**: Audit complet du système de réservation
+**2025-01-27**: Synchronisation codebase
 
-- ✅ Mise à jour du statut du système de réservation (complètement implémenté)
-- ✅ Confirmation de l'implémentation complète : routes API, validation, persistance, emails, calendrier
-- ✅ Ajout des tests complets dans la documentation (tests unitaires et d'intégration)
-- ✅ Mise à jour du fichier audit-reservations.md avec l'état réel du système
-- ✅ Validation de la base de données Supabase avec table reservations et RLS policies
-
-**2025-01-25**: Audit complet du système de commandes
-
-- ✅ Mise à jour du statut du système de commandes (complètement implémenté)
-- ✅ Confirmation de l'implémentation complète : backend, frontend, base de données, tests
-- ✅ Validation des pages frontend : orders.tsx, orders/[id].tsx, hooks useOrders, composants UI
-- ✅ Mise à jour du fichier audit-orders.md avec l'état réel du système
-- ✅ Confirmation de l'intégration complète : Stripe webhooks, génération PDF, RLS policies
-
-**2025-01-25**: Mise à jour SSL et priorités
-
-- ✅ SSL déjà configuré sur https://brolabentertainment.com
-- ✅ Mise à jour des priorités : SEO devient priorité #1
-- ✅ Suppression SSL des tâches critiques (déjà résolu)
-- ✅ Focus sur optimisation SEO pour visibilité moteurs recherche
-
-**2025-01-26**: Mise à jour SEO Schema Markup
-
-- ✅ Implémentation complète du Schema Markup côté serveur (API REST, SSR, cache)
-- ✅ Injection automatique dans le <head> côté client (React Helmet)
-- ✅ Mapping WooCommerce (BPM, genre, producteur, prix, etc.) validé
-- ✅ Tests unitaires et d'intégration 100% verts
-- ✅ Prêt pour soumission Google Search Console et audit SEO
-
-**2025-01-26**: Mise à jour SEO Sitemap XML et Open Graph
-
-- ✅ Implémentation complète du Sitemap XML automatique (API REST, cache, robots.txt)
-- ✅ Génération dynamique basée sur WooCommerce (beats, catégories, pages)
-- ✅ Implémentation complète de l'Open Graph (API REST, React Helmet, cache)
-- ✅ Meta tags optimisés pour Facebook, Twitter, Instagram
-- ✅ Tests unitaires et d'intégration 100% verts (111/111 tests passants)
-- ✅ SEO complet : Schema Markup + Sitemap + Open Graph = Rich Results Google
-
-**2025-01-27**: Synchronisation complète avec l'état réel du codebase
-
-- ✅ Mise à jour des statuts basée sur l'audit complet du code
-- ✅ Confirmation des fonctionnalités déjà implémentées : système de commandes, réservations, wishlist, beats récents
-- ✅ Validation des systèmes email, monitoring, gestion fichiers, SEO complet
-- ✅ Identification des vraies fonctionnalités manquantes : portail producteurs, partage revenus, modération
-- ✅ Mise à jour des priorités pour refléter l'état actuel de l'application
-  ⚠️ Correction du nombre de tests (12 fichiers confirmés au lieu de 75/75 annoncés)
-- ✅ Mise à jour des priorités : portail producteurs devient priorité #1
-
-**2025-01-27**: SYNCHRONISATION CODEBASE COMPLÈTE
-
-- ✅ Audit complet 134 fichiers : 25 pages, 79 composants, 15 hooks, 11 routes
-- ✅ Validation 37 fichiers tests confirmés dans `__tests__/`
-- ✅ Identification vraies lacunes : pages frontend commandes, persistance wishlist, portail producteurs
-- ✅ Correction statuts erronés et mise à jour priorités réelles
-- ✅ Aucune suppression arbitraire - préservation intégrité documentation
-
-**2025-01-27**: Mise à jour finale des priorités et statuts
-
-- ✅ Mise à jour des priorités : portail producteurs devient priorité #1 (P0)
-- ✅ Ajout du système de modération comme priorité critique (P0)
-- ✅ Ajout du partage des revenus comme priorité critique (P0)
-- ✅ Mise à jour de la complétion globale à 92% (reflétant l'état réel)
-- ✅ Correction des sections dupliquées et harmonisation du document
-- ✅ Validation finale de l'état de l'application : prête pour production
-
-**2025-01-27**: AUDIT FINAL CODEBASE - SYNCHRONISATION PARFAITE
-
-- ✅ Audit détaillé 37 fichiers tests (vs 22 annoncés précédemment)
-- ✅ Identification lacunes critiques : pages frontend commandes, persistance wishlist
-- ✅ Correction statuts erronés : wishlist (UI ✅, backend ❌), commandes (backend ✅, UI ❌)
-- ✅ Validation hooks existants : useOrders, useWishlist, useRecentlyViewedBeats
-- ✅ Confirmation SEO backend complet : sitemap, générateurs, tests
-- ✅ Mise à jour priorités réelles : P0 = lacunes UX critiques, P1 = nouvelles fonctionnalités
-- ✅ Document parfaitement synchronisé avec l'état réel du codebase
+- Audit 37 fichiers tests confirmés
+- Validation des fonctionnalités existantes

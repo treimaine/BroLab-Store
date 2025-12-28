@@ -81,9 +81,10 @@ export function WaveformAudioPlayer({
     if (!showWaveform || !audioRef.current) return;
 
     try {
-      audioContextRef.current ??= new (globalThis.AudioContext ||
-        (globalThis as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext)();
+      audioContextRef.current ??= new (
+        globalThis.AudioContext ||
+        (globalThis as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      )();
       if (!mediaSourceRef.current && audioRef.current) {
         mediaSourceRef.current = audioContextRef.current.createMediaElementSource(audioRef.current);
       }
@@ -167,16 +168,37 @@ export function WaveformAudioPlayer({
 
     drawWaveform();
 
+    // Track tab visibility to prevent animation accumulation
+    let isTabVisible = !document.hidden;
     let animationFrame: number;
+
+    const animate = (): void => {
+      // Stop animation loop if tab is hidden to prevent accumulation
+      if (!isTabVisible) return;
+
+      drawWaveform();
+      animationFrame = requestAnimationFrame(animate);
+    };
+
+    const handleVisibilityChange = (): void => {
+      isTabVisible = !document.hidden;
+      if (isTabVisible && isPlaying) {
+        // Cancel any pending frame and restart cleanly
+        if (animationFrame) {
+          cancelAnimationFrame(animationFrame);
+        }
+        animate();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     if (isPlaying) {
-      const animate = () => {
-        drawWaveform();
-        animationFrame = requestAnimationFrame(animate);
-      };
       animate();
     }
 
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (animationFrame) {
         cancelAnimationFrame(animationFrame);
       }

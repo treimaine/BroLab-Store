@@ -460,7 +460,7 @@ export function EnhancedGlobalAudioPlayer() {
     setCurrentTime(newTime);
   };
 
-  // Waveform animation
+  // Waveform animation - visibility-aware to prevent freeze on tab switch
   useEffect(() => {
     const analyser = analyserRef.current;
     const dataArray = dataArrayRef.current;
@@ -470,8 +470,12 @@ export function EnhancedGlobalAudioPlayer() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Track tab visibility to prevent animation accumulation
+    let isTabVisible = !document.hidden;
+
     const animate = (): void => {
-      if (!analyser || !dataArray) return;
+      // Stop animation loop if tab is hidden to prevent accumulation
+      if (!isTabVisible || !analyser || !dataArray) return;
 
       analyser.getByteFrequencyData(dataArray);
 
@@ -493,9 +497,22 @@ export function EnhancedGlobalAudioPlayer() {
       animationRef.current = requestAnimationFrame(animate);
     };
 
+    const handleVisibilityChange = (): void => {
+      isTabVisible = !document.hidden;
+      if (isTabVisible && isPlaying) {
+        // Cancel any pending frame and restart cleanly
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+        animate();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     animate();
 
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }

@@ -302,8 +302,13 @@ export const apiRateLimiter = rateLimit({
   keyGenerator: getClientIp, // Custom key generator for proxy environments
   skip: req => shouldSkipRateLimit(req.path),
   // Disable validation for proxy environments (Replit, Vercel, etc.)
-  // We handle IP extraction ourselves via getClientIp
-  validate: { xForwardedForHeader: false, trustProxy: false, default: true },
+  // We handle IP extraction and IPv6 normalization ourselves via getClientIp
+  validate: {
+    xForwardedForHeader: false,
+    trustProxy: false,
+    default: true,
+    keyGeneratorIpFallback: false,
+  },
 });
 
 // Stricter rate limiting for authentication endpoints
@@ -317,7 +322,12 @@ export const authRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getClientIp,
-  validate: { xForwardedForHeader: false, trustProxy: false, default: true },
+  validate: {
+    xForwardedForHeader: false,
+    trustProxy: false,
+    default: true,
+    keyGeneratorIpFallback: false,
+  },
 });
 
 // Stricter rate limiting for payment endpoints
@@ -331,7 +341,12 @@ export const paymentRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getClientIp,
-  validate: { xForwardedForHeader: false, trustProxy: false, default: true },
+  validate: {
+    xForwardedForHeader: false,
+    trustProxy: false,
+    default: true,
+    keyGeneratorIpFallback: false,
+  },
 });
 
 // Stricter rate limiting for download endpoints
@@ -345,5 +360,10 @@ export const downloadRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getClientIp,
-  validate: { xForwardedForHeader: false, trustProxy: false, default: true },
+  validate: {
+    xForwardedForHeader: false,
+    trustProxy: false,
+    default: true,
+    keyGeneratorIpFallback: false,
+  },
 });

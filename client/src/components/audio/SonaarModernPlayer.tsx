@@ -398,6 +398,9 @@ function BicolorWaveform({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Track tab visibility to prevent animation accumulation when tab is hidden
+    let isTabVisible = !document.hidden;
+
     const drawWaveform = (): void => {
       const width = canvas.width;
       const height = canvas.height;
@@ -415,8 +418,8 @@ function BicolorWaveform({
         // Use pre-generated waveform data with slight animation when playing
         let heightMultiplier = waveformData[i] || 0.5;
 
-        if (isPlaying) {
-          // Add subtle animation when playing
+        if (isPlaying && isTabVisible) {
+          // Add subtle animation when playing (only if tab is visible)
           const time = Date.now() / 1000;
           const animOffset = Math.sin(time * 3 + i * 0.2) * 0.1;
           heightMultiplier = Math.max(0.15, Math.min(1, heightMultiplier + animOffset));
@@ -439,17 +442,35 @@ function BicolorWaveform({
       }
     };
 
+    const animate = (): void => {
+      // Stop animation loop if tab is hidden to prevent accumulation
+      if (!isTabVisible) return;
+
+      drawWaveform();
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    const handleVisibilityChange = (): void => {
+      isTabVisible = !document.hidden;
+      if (isTabVisible && isPlaying) {
+        // Cancel any pending frame and restart cleanly
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+        animate();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     if (isPlaying) {
-      const animate = (): void => {
-        drawWaveform();
-        animationRef.current = requestAnimationFrame(animate);
-      };
       animate();
     } else {
       drawWaveform();
     }
 
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
