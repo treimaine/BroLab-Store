@@ -174,30 +174,116 @@ function _extractStems(product: WooCommerceProduct): boolean {
   );
 }
 
-// Helper regex patterns for metadata extraction
-const BPM_PATTERN = /(\d{2,3})\s*bpm/i;
-const KEY_PATTERN = /([A-G][b#]?(?:maj|min|major|minor)?)/i;
-const DURATION_PATTERN = /(\d+:\d+)/;
+// Helper regex patterns for metadata extraction from text (name, description, audio URL)
+const BPM_PATTERNS = [
+  /(\d{2,3})\s*bpm/i, // "140 BPM" or "140bpm"
+  /bpm[:\s]*(\d{2,3})/i, // "BPM: 140" or "BPM 140"
+  /_(\d{2,3})BPM_/i, // "_140BPM_" in filename
+  /(\d{2,3})BPM/i, // "140BPM" anywhere
+  /tempo[:\s]*(\d{2,3})/i, // "Tempo: 140"
+];
 
-// Helper function to extract BPM from product name
-function extractBpmFromName(name: string | undefined): string {
-  if (!name) return "";
-  const match = BPM_PATTERN.exec(name);
+const KEY_PATTERNS = [
+  /\bkey[:\s]*([A-G][#b]?)\s*(maj(?:or)?|min(?:or)?|m)?\b/i, // "Key: C Major" or "Key : F#m"
+  /_([A-G][#b]?m)(?:in)?_/i, // "_Fm_" or "_Cmin_" in filename
+  /_([A-G][#b]?)min_/i, // "_Cmin_" in filename
+  /\b([A-G][#b]?)\s*(maj(?:or)?|min(?:or)?)\b/i, // "C Major", "F#min"
+  /\b([A-G][#b]?m)\b/i, // "Fm" standalone
+];
+
+const MOOD_PATTERNS = [
+  /mood[:\s]*([a-z]+)/i, // "Mood: Dark"
+  /vibe[:\s]*([a-z]+)/i, // "Vibe: Chill"
+  /\b(dark|chill|upbeat|sad|happy|aggressive|energetic|mellow|dreamy|intense|smooth|hard|soft|emotional|epic|ambient)\b/i,
+];
+
+const DURATION_PATTERN = /(\d+:\d{2})/;
+
+// Helper function to extract BPM from any text source
+function extractBpmFromText(text: string | undefined): string {
+  if (!text) return "";
+  for (const pattern of BPM_PATTERNS) {
+    const match = pattern.exec(text);
+    if (match?.[1]) {
+      const bpm = Number.parseInt(match[1], 10);
+      // Validate BPM is in reasonable range (40-300)
+      if (bpm >= 40 && bpm <= 300) {
+        return match[1];
+      }
+    }
+  }
+  return "";
+}
+
+// Helper function to normalize musical key format
+function normalizeKeyFormat(note: string, mode: string): string {
+  const upperNote = note.toUpperCase();
+  const lowerMode = mode.toLowerCase();
+
+  // Handle cases like "Fm" where note already includes 'm'
+  if (upperNote.endsWith("M")) {
+    return upperNote.slice(0, -1) + "m";
+  }
+
+  // Minor modes
+  if (lowerMode === "m" || lowerMode === "min" || lowerMode === "minor") {
+    return `${upperNote}m`;
+  }
+
+  // Major modes
+  if (lowerMode === "maj" || lowerMode === "major") {
+    return `${upperNote} Major`;
+  }
+
+  // Default: note with optional mode
+  return upperNote + (lowerMode ? ` ${lowerMode}` : "");
+}
+
+// Helper function to extract musical key from any text source
+function extractKeyFromText(text: string | undefined): string {
+  if (!text) return "";
+
+  for (const pattern of KEY_PATTERNS) {
+    const match = pattern.exec(text);
+    if (match?.[1]) {
+      return normalizeKeyFormat(match[1], match[2] || "");
+    }
+  }
+
+  return "";
+}
+
+// Helper function to extract mood from any text source
+function extractMoodFromText(text: string | undefined): string {
+  if (!text) return "";
+  for (const pattern of MOOD_PATTERNS) {
+    const match = pattern.exec(text);
+    if (match?.[1]) {
+      // Capitalize first letter
+      return match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+    }
+  }
+  return "";
+}
+
+// Helper function to extract duration from any text source
+function extractDurationFromText(text: string | undefined): string {
+  if (!text) return "";
+  const match = DURATION_PATTERN.exec(text);
   return match?.[1] || "";
 }
 
-// Helper function to extract key from product name
-function extractKeyFromName(name: string | undefined): string {
-  if (!name) return "";
-  const match = KEY_PATTERN.exec(name);
-  return match?.[1] || "";
+// Legacy aliases for backward compatibility (prefixed with _ as unused)
+function _extractBpmFromName(name: string | undefined): string {
+  return extractBpmFromText(name);
 }
 
-// Helper function to extract duration from product name
-function extractDurationFromName(name: string | undefined): string {
-  if (!name) return "";
-  const match = DURATION_PATTERN.exec(name);
-  return match?.[1] || "";
+function _extractKeyFromName(name: string | undefined): string {
+  return extractKeyFromText(name);
+}
+
+function _extractDurationFromName(name: string | undefined): string {
+  return extractDurationFromText(name);
 }
 
 // Helper function to infer genre from product name
@@ -259,62 +345,210 @@ function extractMetaValue(
   return (meta?.value as string) || defaultValue;
 }
 
-// Helper function to extract audio URL from Sonaar data
-function extractAudioFromSonaarData(sonaarData: unknown): string | null {
+// Interface for extracted Sonaar metadata
+interface SonaarExtractedData {
+  audioUrl: string | null;
+  bpm: string;
+  key: string;
+  mood: string;
+  duration: string;
+  artist: string;
+}
+
+// Helper function to extract audio URL and metadata from Sonaar data
+function extractFromSonaarData(sonaarData: unknown): SonaarExtractedData {
+  const result: SonaarExtractedData = {
+    audioUrl: null,
+    bpm: "",
+    key: "",
+    mood: "",
+    duration: "",
+    artist: "",
+  };
+
   if (Array.isArray(sonaarData) && sonaarData.length > 0) {
     const firstTrack = sonaarData[0];
-    return (
-      firstTrack.track_mp3 || firstTrack.audio_preview || firstTrack.src || firstTrack.url || null
-    );
-  }
-  if (sonaarData && typeof sonaarData === "object") {
+
+    // Extract audio URL
+    result.audioUrl =
+      firstTrack.track_mp3 ||
+      firstTrack.audio_preview ||
+      firstTrack.src ||
+      firstTrack.url ||
+      firstTrack.stream_link ||
+      null;
+
+    // Extract duration from Sonaar data
+    result.duration = firstTrack.stream_lenght || firstTrack.duration || "";
+
+    // Extract artist from Sonaar data
+    result.artist = firstTrack.artist_name || firstTrack.track_mp3_artist || "";
+
+    // Try to extract BPM/Key from audio filename
+    const audioUrl = result.audioUrl || "";
+    if (audioUrl) {
+      result.bpm = extractBpmFromText(audioUrl);
+      result.key = extractKeyFromText(audioUrl);
+    }
+  } else if (sonaarData && typeof sonaarData === "object") {
     const data = sonaarData as Record<string, unknown>;
-    return (
+
+    result.audioUrl =
       (data.track_mp3 as string) ||
       (data.audio_preview as string) ||
       (data.src as string) ||
       (data.url as string) ||
-      null
-    );
+      (data.stream_link as string) ||
+      null;
+
+    result.duration = (data.stream_lenght as string) || (data.duration as string) || "";
+    result.artist = (data.artist_name as string) || (data.track_mp3_artist as string) || "";
+
+    // Try to extract BPM/Key from audio filename
+    const audioUrl = result.audioUrl || "";
+    if (audioUrl) {
+      result.bpm = extractBpmFromText(audioUrl);
+      result.key = extractKeyFromText(audioUrl);
+    }
   }
-  return null;
+
+  return result;
 }
 
-// Helper function to extract audio URL from product metadata
-function extractAudioUrl(product: WooCommerceProduct): string | null {
-  const albTracklistMeta = product.meta_data?.find(
+// Legacy function for backward compatibility (prefixed with _ as unused)
+function _extractAudioFromSonaarData(sonaarData: unknown): string | null {
+  return extractFromSonaarData(sonaarData).audioUrl;
+}
+
+// Helper function to find tracklist metadata
+function findTracklistMeta(
+  metaData: WooCommerceMetaData[] | undefined
+): WooCommerceMetaData | undefined {
+  return metaData?.find(
     (meta: WooCommerceMetaData) =>
       meta.key === "alb_tracklist" || meta.key === "tracklist" || meta.key === "sonaar_tracklist"
   );
-  const audioUrlMeta = product.meta_data?.find(
+}
+
+// Helper function to find audio URL metadata
+function findAudioUrlMeta(
+  metaData: WooCommerceMetaData[] | undefined
+): WooCommerceMetaData | undefined {
+  return metaData?.find(
     (meta: WooCommerceMetaData) =>
       meta.key === "audio_url" ||
       meta.key === "sonaar_audio_file" ||
       meta.key === "audio_preview" ||
       meta.key === "track_mp3"
   );
+}
 
-  if (albTracklistMeta?.value) {
-    try {
-      const sonaarData =
-        typeof albTracklistMeta.value === "string"
-          ? JSON.parse(albTracklistMeta.value)
-          : albTracklistMeta.value;
-      const audioUrl = extractAudioFromSonaarData(sonaarData);
-      if (audioUrl) return audioUrl;
-    } catch {
-      // Ignore parsing errors
+// Helper function to log product meta keys for debugging
+function logProductMetaKeys(
+  product: WooCommerceProduct,
+  albTracklistMeta: WooCommerceMetaData | undefined,
+  audioUrlMeta: WooCommerceMetaData | undefined
+): void {
+  if (product.meta_data && product.meta_data.length > 0) {
+    const metaKeys = product.meta_data.map((m: WooCommerceMetaData) => m.key);
+    secureLogger.debug("Product meta_data keys", {
+      productId: product.id,
+      metaKeys: metaKeys.slice(0, 20),
+      hasAlbTracklist: !!albTracklistMeta,
+      hasAudioUrl: !!audioUrlMeta,
+    });
+  }
+}
+
+// Helper function to extract from tracklist metadata
+function extractFromTracklistMeta(
+  albTracklistMeta: WooCommerceMetaData,
+  productId: number
+): SonaarExtractedData | null {
+  try {
+    const sonaarData =
+      typeof albTracklistMeta.value === "string"
+        ? JSON.parse(albTracklistMeta.value)
+        : albTracklistMeta.value;
+
+    secureLogger.debug("Sonaar alb_tracklist data", {
+      productId,
+      isArray: Array.isArray(sonaarData),
+      firstTrackKeys: Array.isArray(sonaarData) && sonaarData[0] ? Object.keys(sonaarData[0]) : [],
+    });
+
+    const extracted = extractFromSonaarData(sonaarData);
+    if (extracted.audioUrl) {
+      secureLogger.debug("Extracted from Sonaar URL", {
+        productId,
+        audioUrl: extracted.audioUrl,
+        bpm: extracted.bpm,
+        key: extracted.key,
+      });
+      return extracted;
     }
+  } catch (error) {
+    secureLogger.debug("Failed to parse alb_tracklist", {
+      productId,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
   }
-
-  if (audioUrlMeta) {
-    return audioUrlMeta.value as string;
-  }
-
   return null;
 }
 
-// Helper function to extract product metadata with multiple fallback keys
+// Helper function to extract audio URL and metadata from product
+function extractAudioUrlAndMetadata(product: WooCommerceProduct): SonaarExtractedData {
+  const defaultResult: SonaarExtractedData = {
+    audioUrl: null,
+    bpm: "",
+    key: "",
+    mood: "",
+    duration: "",
+    artist: "",
+  };
+
+  const albTracklistMeta = findTracklistMeta(product.meta_data);
+  const audioUrlMeta = findAudioUrlMeta(product.meta_data);
+
+  logProductMetaKeys(product, albTracklistMeta, audioUrlMeta);
+
+  // Extract from Sonaar alb_tracklist (primary source)
+  if (albTracklistMeta?.value) {
+    const extracted = extractFromTracklistMeta(albTracklistMeta, product.id);
+    if (extracted) return extracted;
+  }
+
+  // Fallback to direct audio_url meta
+  if (audioUrlMeta?.value) {
+    const audioUrl = audioUrlMeta.value as string;
+    return {
+      ...defaultResult,
+      audioUrl,
+      bpm: extractBpmFromText(audioUrl),
+      key: extractKeyFromText(audioUrl),
+    };
+  }
+
+  return defaultResult;
+}
+
+// Legacy function for backward compatibility
+function extractAudioUrl(product: WooCommerceProduct): string | null {
+  return extractAudioUrlAndMetadata(product).audioUrl;
+}
+
+// Helper function to strip HTML tags from text
+function stripHtmlTags(html: string | undefined): string {
+  if (!html) return "";
+  return html
+    .replaceAll(/<[^>]*>/g, " ")
+    .replaceAll(/&[^;]+;/g, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+}
+
+// Helper function to extract product metadata with multiple fallback sources
+// Priority: meta_data > Sonaar audio URL > description > product name
 function extractProductMetadata(product: WooCommerceProduct): {
   bpm: string;
   key: string;
@@ -326,47 +560,74 @@ function extractProductMetadata(product: WooCommerceProduct): {
 } {
   const getMeta = (key: string): string => extractMetaValue(product.meta_data, key);
 
-  const bpm =
-    getMeta("bpm") ||
-    getMeta("_bpm") ||
-    getMeta("tempo") ||
-    getMeta("_tempo") ||
-    extractBpmFromName(product.name);
+  // Get Sonaar extracted data (from audio URL filename)
+  const sonaarData = extractAudioUrlAndMetadata(product);
 
-  const key =
+  // Combine all text sources for fallback extraction (strip HTML first)
+  const description = stripHtmlTags(product.description);
+  const shortDescription = stripHtmlTags(product.short_description);
+  const productName = product.name || "";
+  const allTextSources = `${productName} ${description} ${shortDescription}`;
+
+  // Debug: Log extraction attempts
+  const bpmFromMeta = getMeta("bpm") || getMeta("_bpm") || getMeta("tempo") || getMeta("_tempo");
+  const bpmFromSonaar = sonaarData.bpm;
+  const bpmFromText = extractBpmFromText(allTextSources);
+
+  console.log(`[DEBUG] Product ${product.id} (${product.name}):`, {
+    bpmFromMeta,
+    bpmFromSonaar,
+    bpmFromText,
+    audioUrl: sonaarData.audioUrl?.substring(0, 50),
+    descriptionSample: description.substring(0, 100),
+  });
+
+  // BPM: meta_data > Sonaar URL > description > product name
+  const bpm = bpmFromMeta || bpmFromSonaar || bpmFromText;
+
+  // Key: meta_data > Sonaar URL > description > product name
+  const keyFromMeta =
     getMeta("key") ||
     getMeta("_key") ||
     getMeta("musical_key") ||
     getMeta("_musical_key") ||
-    getMeta("song_key") ||
-    extractKeyFromName(product.name);
+    getMeta("song_key");
+  const key = keyFromMeta || sonaarData.key || extractKeyFromText(allTextSources);
 
+  // Mood: meta_data > description > categories
   const mood =
     getMeta("mood") ||
     getMeta("_mood") ||
     getMeta("vibe") ||
     getMeta("_vibe") ||
     getMeta("energy") ||
+    extractMoodFromText(allTextSources) ||
     findMoodFromCategories(product.categories);
 
+  // Artist: meta_data > Sonaar data > default
   const artist =
     getMeta("artist") ||
     getMeta("_artist") ||
     getMeta("producer") ||
     getMeta("_producer") ||
+    sonaarData.artist ||
     "Treigua";
 
+  // Genre: categories > meta_data > inferred from name
   const genreFromMeta =
     getMeta("genre") || getMeta("_genre") || getMeta("music_genre") || getMeta("style");
   const genre = product.categories?.[0]?.name || genreFromMeta || inferGenreFromName(product.name);
 
+  // Duration: meta_data > Sonaar data > extracted from text
   const duration =
     getMeta("duration") ||
     getMeta("_duration") ||
     getMeta("length") ||
     getMeta("time") ||
-    extractDurationFromName(product.name);
+    sonaarData.duration ||
+    extractDurationFromText(allTextSources);
 
+  // Instruments: meta_data > default based on genre
   const instruments =
     getMeta("instruments") ||
     getMeta("_instruments") ||
@@ -387,6 +648,18 @@ function transformProduct(
 
   const audioUrl = extractAudioUrl(product);
   const productIsFree = isProductFree(product);
+
+  // Debug log to see what's being extracted
+  if (metadata.bpm || metadata.key) {
+    secureLogger.debug("Extracted metadata for product", {
+      productId: product.id,
+      productName: product.name,
+      bpm: metadata.bpm,
+      key: metadata.key,
+      mood: metadata.mood,
+      audioUrl: audioUrl ? "present" : "missing",
+    });
+  }
 
   const hasVocals = getMeta("has_vocals") === "yes" || getMeta("_has_vocals") === "yes";
   const stems =

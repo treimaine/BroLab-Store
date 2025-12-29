@@ -4,6 +4,20 @@
 
 Ce document présente l'architecture de refactorisation pour éliminer les duplications de code identifiées dans l'application BroLab Entertainment. L'objectif est de consolider les patterns répétés en abstractions réutilisables tout en maintenant la compatibilité avec le code existant.
 
+**État d'avancement global:** 75% complété
+
+| Module                   | Statut      | Notes                                        |
+| ------------------------ | ----------- | -------------------------------------------- |
+| Validation consolidation | ✅ Complété | `shared/validation/` est la source unique    |
+| Auth helpers Convex      | 🔄 60%      | ~20 fonctions migrées, ~25 restantes         |
+| Error handling           | 🔄 40%      | Classes d'erreur créées, adoption partielle  |
+| Currency utilities       | ✅ Complété | `shared/utils/currency.ts`                   |
+| Env config               | 🔄 70%      | Configs centralisées, accès directs restants |
+| localStorage patterns    | ✅ Complété | `StorageManager.ts`                          |
+| fetch/API patterns       | ✅ Complété | `ApiService.ts`                              |
+| Toast/notification       | ⚠️ 20%      | NotificationService à créer                  |
+| Price patterns           | ✅ Complété | Calculs en cents standardisés                |
+
 ## Architecture
 
 ### Stratégie de Consolidation
@@ -13,9 +27,9 @@ Ce document présente l'architecture de refactorisation pour éliminer les dupli
 │                    COUCHE PARTAGÉE (shared/)                    │
 ├─────────────────────────────────────────────────────────────────┤
 │  validation/     │  utils/          │  constants/               │
-│  - schemas       │  - formatters    │  - errors                 │
-│  - middleware    │  - currency      │  - config                 │
-│  - helpers       │  - sanitizers    │  - messages               │
+│  ✅ schemas      │  ✅ currency     │  🔄 errors                │
+│  ✅ validators   │  ✅ formatters   │  ✅ config                │
+│  ✅ sanitizers   │  🔄 errorHandler │  ✅ messages              │
 └─────────────────────────────────────────────────────────────────┘
                               │
           ┌───────────────────┼───────────────────┐
@@ -23,9 +37,12 @@ Ce document présente l'architecture de refactorisation pour éliminer les dupli
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
 │   CONVEX        │  │   SERVER        │  │   CLIENT        │
 │   convex/lib/   │  │   server/lib/   │  │   client/src/   │
-│   - authHelpers │  │   - errorHandler│  │   - apiClient   │
-│   - queryHelpers│  │   - validation  │  │   - storage     │
+│   🔄 authHelpers│  │   🔄 errorHandler│  │   ✅ ApiService │
+│   ✅ validation │  │   ✅ validation  │  │   ✅ Storage    │
+│   (re-export)   │  │   (re-export)    │  │   ⚠️ Notif.    │
 └─────────────────┘  └─────────────────┘  └─────────────────┘
+
+Légende: ✅ Complété | 🔄 En cours | ⚠️ À faire
 ```
 
 ### Principe de Factorisation
@@ -381,6 +398,8 @@ export const apiService = new ApiService();
 
 ### 6. Client Storage Manager (`client/src/services/StorageManager.ts`)
 
+**Statut:** ✅ Implémenté
+
 ```typescript
 export interface StorageOptions {
   prefix?: string;
@@ -490,22 +509,191 @@ class StorageManager {
 export const storage = new StorageManager();
 ```
 
+### 7. Notification Service (`client/src/services/NotificationService.ts`)
+
+**Statut:** ⚠️ À implémenter (Requirement 8)
+
+**Rationale:** Les ~40+ appels `toast()` dispersés dans le codebase doivent être centralisés pour:
+
+- Uniformiser les messages utilisateur
+- Permettre le queuing des notifications
+- Faciliter l'internationalisation
+- Centraliser la gestion des erreurs utilisateur
+
+```typescript
+import { toast } from "@/hooks/use-toast";
+
+export type NotificationType = "success" | "error" | "warning" | "info";
+
+export interface NotificationOptions {
+  title?: string;
+  description: string;
+  duration?: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+}
+
+interface QueuedNotification {
+  type: NotificationType;
+  options: NotificationOptions;
+  timestamp: number;
+}
+
+/**
+ * Centralized notification service
+ * Replaces 40+ scattered toast() calls
+ * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
+ */
+class NotificationService {
+  private queue: QueuedNotification[] = [];
+  private isProcessing = false;
+  private readonly DEBOUNCE_MS = 300;
+
+  /**
+   * Show success notification
+   */
+  success(message: string, options?: Partial<NotificationOptions>): void {
+    this.notify("success", { description: message, ...options });
+  }
+
+  /**
+   * Show error notification with user-friendly message
+   */
+  error(message: string, options?: Partial<NotificationOptions>): void {
+    this.notify("error", {
+      description: this.getUserFriendlyMessage(message),
+      ...options,
+    });
+  }
+
+  /**
+   * Show warning notification
+   */
+  warning(message: string, options?: Partial<NotificationOptions>): void {
+    this.notify("warning", { description: message, ...options });
+  }
+
+  /**
+   * Show info notification
+   */
+  info(message: string, options?: Partial<NotificationOptions>): void {
+    this.notify("info", { description: message, ...options });
+  }
+
+  /**
+   * Convert technical errors to user-friendly messages
+   */
+  private getUserFriendlyMessage(message: string): string {
+    const errorMappings: Record<string, string> = {
+      "Network Error": "Problème de connexion. Veuillez réessayer.",
+      Unauthorized: "Session expirée. Veuillez vous reconnecter.",
+      "Not Found": "Ressource non trouvée.",
+      "Internal Server Error": "Une erreur est survenue. Veuillez réessayer.",
+    };
+
+    for (const [key, value] of Object.entries(errorMappings)) {
+      if (message.includes(key)) return value;
+    }
+    return message;
+  }
+
+  private notify(type: NotificationType, options: NotificationOptions): void {
+    this.queue.push({ type, options, timestamp: Date.now() });
+    this.processQueue();
+  }
+
+  private async processQueue(): Promise<void> {
+    if (this.isProcessing || this.queue.length === 0) return;
+
+    this.isProcessing = true;
+
+    while (this.queue.length > 0) {
+      const notification = this.queue.shift();
+      if (!notification) continue;
+
+      const variant = notification.type === "error" ? "destructive" : "default";
+
+      toast({
+        variant,
+        title: notification.options.title,
+        description: notification.options.description,
+        duration: notification.options.duration || 5000,
+      });
+
+      // Debounce between notifications
+      if (this.queue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, this.DEBOUNCE_MS));
+      }
+    }
+
+    this.isProcessing = false;
+  }
+}
+
+export const notificationService = new NotificationService();
+```
+
+### Fichiers à migrer vers NotificationService
+
+| Fichier                                        | Appels toast | Priorité |
+| ---------------------------------------------- | ------------ | -------- |
+| `client/src/pages/shop.tsx`                    | ~5           | Haute    |
+| `client/src/pages/product.tsx`                 | ~4           | Haute    |
+| `client/src/pages/checkout-success.tsx`        | ~3           | Haute    |
+| `client/src/pages/mixing-mastering.tsx`        | ~4           | Moyenne  |
+| `client/src/pages/recording-sessions.tsx`      | ~3           | Moyenne  |
+| `client/src/pages/production-consultation.tsx` | ~3           | Moyenne  |
+| `client/src/pages/payment-*.tsx`               | ~8           | Haute    |
+| `client/src/providers/CacheProvider.tsx`       | ~2           | Basse    |
+
 ## Data Models
 
-### Duplication Map
+### Duplication Map - État Actuel
 
-| ID      | Type           | Fichiers Concernés                                                       | Score Similarité | Risque | Effort |
-| ------- | -------------- | ------------------------------------------------------------------------ | ---------------- | ------ | ------ |
-| DUP-001 | Structural     | 50+ fichiers convex/\*.ts                                                | 95%              | Élevé  | M      |
-| DUP-002 | Structural     | server/lib/_.ts, convex/_.ts                                             | 90%              | Élevé  | M      |
-| DUP-003 | Exact          | shared/validation.ts, convex/lib/validation.ts, server/lib/validation.ts | 85%              | Élevé  | S      |
-| DUP-004 | Functional     | client/src/\*_/_.ts (fetch calls)                                        | 80%              | Moyen  | L      |
-| DUP-005 | Functional     | client/src/\*_/_.ts (localStorage)                                       | 85%              | Moyen  | M      |
-| DUP-006 | Near-duplicate | server/templates/_.ts, server/services/_.ts                              | 90%              | Moyen  | S      |
-| DUP-007 | Exact          | shared/constants/errors.ts, shared/constants/ErrorMessages.ts            | 70%              | Faible | S      |
-| DUP-008 | Functional     | client/src/\*_/_.ts (toast calls)                                        | 75%              | Faible | S      |
-| DUP-009 | Structural     | server/lib/env.ts, client/src/config/\*.ts                               | 60%              | Moyen  | M      |
-| DUP-010 | Exact          | validateEmail (3 implémentations)                                        | 100%             | Faible | S      |
+| ID      | Type           | Fichiers Concernés                                                       | Score Similarité | Statut  | Effort |
+| ------- | -------------- | ------------------------------------------------------------------------ | ---------------- | ------- | ------ |
+| DUP-001 | Structural     | 50+ fichiers convex/\*.ts                                                | 95%              | 🔄 60%  | M      |
+| DUP-002 | Structural     | server/lib/_.ts, convex/_.ts                                             | 90%              | 🔄 40%  | M      |
+| DUP-003 | Exact          | shared/validation.ts, convex/lib/validation.ts, server/lib/validation.ts | 85%              | ✅ 100% | S      |
+| DUP-004 | Functional     | client/src/\*_/_.ts (fetch calls)                                        | 80%              | ✅ 100% | L      |
+| DUP-005 | Functional     | client/src/\*_/_.ts (localStorage)                                       | 85%              | ✅ 100% | M      |
+| DUP-006 | Near-duplicate | server/templates/_.ts, server/services/_.ts                              | 90%              | 🔄 40%  | S      |
+| DUP-007 | Exact          | shared/constants/errors.ts, shared/constants/ErrorMessages.ts            | 70%              | ✅ 100% | S      |
+| DUP-008 | Functional     | client/src/\*_/_.ts (toast calls)                                        | 75%              | ⚠️ 20%  | S      |
+| DUP-009 | Structural     | server/lib/env.ts, client/src/config/\*.ts                               | 60%              | 🔄 70%  | M      |
+| DUP-010 | Exact          | validateEmail (3 implémentations)                                        | 100%             | ✅ 100% | S      |
+
+### Fichiers Migrés vers requireAuth
+
+Les fonctions Convex suivantes utilisent maintenant `requireAuth`:
+
+- `convex/users/getUserStats.ts`
+- `convex/subscriptions/incrementDownloadUsage.ts`
+- `convex/subscriptions/updateSubscription.ts`
+- `convex/reservations/*.ts` (4 fichiers)
+- `convex/orders/updateOrder.ts`
+- `convex/files/*.ts` (4 fichiers)
+- `convex/favorites/*.ts` (2 fichiers)
+- `convex/downloads/record.ts`
+- `convex/cartItems.ts`
+- `convex/activity/logActivity.ts`
+
+### Fichiers à Migrer (instances directes restantes)
+
+- `convex/dashboard.ts` (~3 instances de `ctx.auth.getUserIdentity()`)
+- `convex/orders.ts` (~8 instances)
+- `convex/downloads.ts` (~3 instances)
+- `convex/auth/roles.ts` (~4 instances)
+
+### Instances console.error à Centraliser
+
+- `server/wordpress.ts`: ~15 instances
+- `server/services/ReservationPaymentService.ts`: ~8 instances
+- `server/services/mail.ts`: ~3 instances
+- `shared/validation/index.ts`: ~3 instances
+- `shared/utils/`: ~5 instances
 
 ## Correctness Properties
 
@@ -576,6 +764,18 @@ _For any_ retryable error (network failure, timeout), the API client SHALL retry
 _For any_ sequence of price operations (addition, subtraction, multiplication by integer), all intermediate and final results SHALL be integers (cents), avoiding floating-point precision errors.
 
 **Validates: Requirements 10.1, 10.5**
+
+### Property 12: Notification Queue Processing
+
+_For any_ sequence of notifications triggered in rapid succession, the NotificationService SHALL process them in order with appropriate debouncing, ensuring no notifications are lost.
+
+**Validates: Requirements 8.1, 8.4**
+
+### Property 13: Error Message User-Friendliness
+
+_For any_ technical error message passed to `notificationService.error()`, the displayed message SHALL be a user-friendly translation that does not expose technical details.
+
+**Validates: Requirements 8.3**
 
 ## Error Handling
 
@@ -682,16 +882,17 @@ describe("Currency Formatting", () => {
 });
 ```
 
-### Unit Test Coverage
+### Unit Test Coverage - État Actuel
 
-| Module                                  | Test File                                 | Coverage Target |
-| --------------------------------------- | ----------------------------------------- | --------------- |
-| `shared/validation/`                    | `__tests__/shared/validation.test.ts`     | 90%             |
-| `convex/lib/authHelpers.ts`             | `__tests__/convex/authHelpers.test.ts`    | 95%             |
-| `shared/utils/errorHandler.ts`          | `__tests__/shared/errorHandler.test.ts`   | 90%             |
-| `shared/utils/currency.ts`              | `__tests__/shared/currency.test.ts`       | 95%             |
-| `client/src/services/ApiService.ts`     | `__tests__/client/ApiService.test.ts`     | 85%             |
-| `client/src/services/StorageManager.ts` | `__tests__/client/StorageManager.test.ts` | 90%             |
+| Module                                       | Test File                                      | Coverage Target | Statut      |
+| -------------------------------------------- | ---------------------------------------------- | --------------- | ----------- |
+| `shared/validation/`                         | `__tests__/shared/validation.test.ts`          | 90%             | ✅ Existant |
+| `convex/lib/authHelpers.ts`                  | `__tests__/convex/authHelpers.test.ts`         | 95%             | ⚠️ À créer  |
+| `shared/utils/errorHandler.ts`               | `__tests__/shared/errorHandler.test.ts`        | 90%             | ⚠️ À créer  |
+| `shared/utils/currency.ts`                   | `__tests__/shared/currency.test.ts`            | 95%             | ⚠️ À créer  |
+| `client/src/services/ApiService.ts`          | `__tests__/client/ApiService.test.ts`          | 85%             | ⚠️ À créer  |
+| `client/src/services/StorageManager.ts`      | `__tests__/client/StorageManager.test.ts`      | 90%             | ⚠️ À créer  |
+| `client/src/services/NotificationService.ts` | `__tests__/client/NotificationService.test.ts` | 85%             | ⚠️ À créer  |
 
 ### Test Categories
 
@@ -705,4 +906,57 @@ describe("Currency Formatting", () => {
 - Mock `localStorage` for StorageManager tests
 - Mock `fetch` for ApiService tests
 - Mock Convex `ctx` for auth helper tests
+- Mock `toast` for NotificationService tests
 - Use `fast-check` arbitraries for generating test data
+
+## Prochaines Étapes de Design
+
+### Priorité Haute (Requirement 8 - Toast/Notification)
+
+1. **Créer NotificationService** - Implémenter le service centralisé de notifications
+2. **Migrer les appels toast** - Remplacer les ~40 appels `toast()` dispersés
+3. **Ajouter le mapping d'erreurs** - Traduire les erreurs techniques en messages utilisateur
+
+### Priorité Moyenne (Requirements 2, 3)
+
+4. **Compléter migration auth** - Migrer les ~25 instances `ctx.auth.getUserIdentity()` restantes
+5. **Centraliser error handling** - Remplacer les ~35 `console.error` par le logger centralisé
+
+### Priorité Basse (Requirement 5)
+
+6. **Finaliser config env** - Éliminer les accès `process.env` directs restants
+
+## Décisions de Design
+
+### Rationale: Re-export Pattern
+
+**Décision:** Utiliser des re-exports depuis `shared/` vers `convex/lib/` et `server/lib/` plutôt que de supprimer les anciens fichiers.
+
+**Justification:**
+
+- Maintient la compatibilité avec les imports existants
+- Permet une migration progressive sans casser le code
+- Facilite le rollback en cas de problème
+- Évite les conflits de merge dans les branches parallèles
+
+### Rationale: NotificationService avec Queue
+
+**Décision:** Implémenter un système de queue avec debouncing pour les notifications.
+
+**Justification:**
+
+- Évite le spam de notifications lors d'erreurs multiples
+- Garantit que toutes les notifications sont affichées
+- Permet un contrôle fin sur le timing d'affichage
+- Facilite les tests unitaires
+
+### Rationale: Exclusion des Intégrations Critiques
+
+**Décision:** Ne jamais modifier les fichiers d'intégration (Clerk, Stripe, PayPal, WordPress).
+
+**Justification:**
+
+- Ces intégrations sont testées et fonctionnelles
+- Le risque de régression est trop élevé
+- Les patterns d'auth dans ces fichiers sont spécifiques à chaque intégration
+- La refactorisation n'apporte pas de valeur significative pour ces cas

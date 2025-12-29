@@ -5,6 +5,7 @@ import {
 } from "@/components/audio/SonaarFiltersSearch";
 import { SonaarGridLayout, type GridBeat } from "@/components/audio/SonaarGridLayout";
 import { TableBeatView } from "@/components/beats/TableBeatView";
+import { useCartContext } from "@/components/cart/cart-provider";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import { useFavorites } from "@/hooks/useFavorites";
 import { useUnifiedFilters } from "@/hooks/useUnifiedFilters";
 import type { BeatProduct } from "@shared/schema";
 import { LayoutGrid, List, RotateCcw } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
 type WooCategory = { id: number; name: string };
@@ -106,6 +107,20 @@ export default function Shop() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const { toast } = useToast();
   const { addToFavorites, removeFromFavorites, isFavorite } = useFavorites();
+  const { addItem } = useCartContext();
+
+  // Force grid mode on mobile screens
+  useEffect(() => {
+    const handleResize = (): void => {
+      if (window.innerWidth < 640 && viewMode === "table") {
+        setViewMode("grid");
+      }
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [viewMode]);
 
   // Use unified filtering system
   const {
@@ -341,6 +356,33 @@ export default function Shop() {
     [isFavorite, addToFavorites, removeFromFavorites, toast]
   );
 
+  const handleAddToCart = useCallback(
+    (beat: GridBeat) => {
+      // For free products, redirect to product page for download
+      if (beat.isFree) {
+        setLocation(`/product/${beat.id}`);
+        return;
+      }
+
+      // Add to cart for paid products
+      addItem({
+        beatId: beat.id,
+        title: beat.title,
+        genre: beat.genre || "Unknown",
+        imageUrl: beat.imageUrl || "",
+        licenseType: "basic" as const,
+        quantity: 1,
+        isFree: false,
+      });
+
+      toast({
+        title: "Added to Cart",
+        description: `${beat.title} has been added to your cart.`,
+      });
+    },
+    [addItem, toast, setLocation]
+  );
+
   const handleProductView = useCallback(
     (productId: number) => {
       setLocation(`/product/${productId}`);
@@ -377,8 +419,8 @@ export default function Shop() {
       />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* View Mode Toggle */}
-        <div className="flex items-center justify-end gap-2 mb-6">
+        {/* View Mode Toggle - Hidden on mobile, only Grid mode available */}
+        <div className="hidden sm:flex items-center justify-end gap-2 mb-6">
           <Button
             variant={viewMode === "grid" ? "default" : "outline"}
             size="sm"
@@ -417,6 +459,7 @@ export default function Shop() {
           <SonaarGridLayout
             beats={gridBeats}
             onBeatSelect={handleGridBeatSelect}
+            onAddToCart={handleAddToCart}
             onToggleFavorite={handleToggleFavorite}
             isFavorite={isFavorite}
             columns={4}

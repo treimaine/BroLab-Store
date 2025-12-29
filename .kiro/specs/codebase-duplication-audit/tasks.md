@@ -142,7 +142,7 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
 - [ ] 9. Checkpoint - Client services complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [x] 10. Migrate existing code to use new utilities
+- [ ] 10. Migrate existing code to use new utilities
   - [x] 10.1 Migrate localStorage calls to StorageManager
     - Search for direct localStorage.getItem/setItem calls
     - Replace with storage.get/set calls
@@ -157,21 +157,35 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
     - **⚠️ EXCLURE**: `client/src/api/woocommerce.ts` - intégration WooCommerce existante
     - _Requirements: 7.2, 7.4_
 
-  - [x] 10.3 Migrate remaining Convex functions to auth helpers
+  - [ ] 10.3 Migrate remaining Convex functions to auth helpers
     - Update remaining mutations to use requireAuth/optionalAuth
-    - Remove duplicated ctx.auth.getUserIdentity() patterns
+    - Target files: `convex/dashboard.ts`, `convex/orders.ts`, `convex/downloads.ts`, `convex/auth/roles.ts`
+    - Remove duplicated ctx.auth.getUserIdentity() patterns (~25 instances remaining)
     - **⚠️ EXCLURE**: `convex/users/clerkSync.ts`, `convex/sync/*.ts`, `convex/auth/*.ts`
     - _Requirements: 2.5_
 
-- [x] 11. Implement notification service consolidation
-  - [x] 11.1 Create `client/src/services/NotificationService.ts`
+  - [ ] 10.4 Centralize console.error calls to use logger
+    - Replace direct console.error calls with centralized logger
+    - Target files: `server/wordpress.ts` (~15), `server/services/ReservationPaymentService.ts` (~8), `server/services/mail.ts` (~3)
+    - Ensure structured logging with context
+    - _Requirements: 3.3_
+
+- [ ] 11. Implement notification service consolidation
+  - [ ] 11.1 Create `client/src/services/NotificationService.ts`
     - Implement typed notification methods (success, error, warning, info)
-    - Implement notification queuing
+    - Implement notification queuing with debouncing
+    - Implement user-friendly error message mapping
     - Integrate with existing toast system
     - _Requirements: 8.1, 8.4, 8.5_
 
-  - [x] 11.2 Migrate toast calls to NotificationService
+  - [ ]\* 11.2 Write property tests for NotificationService
+    - **Property 12: Notification Queue Processing**
+    - **Property 13: Error Message User-Friendliness**
+    - **Validates: Requirements 8.1, 8.3, 8.4**
+
+  - [ ] 11.3 Migrate toast calls to NotificationService
     - Replace scattered toast() calls with notificationService methods
+    - Priority files: `shop.tsx`, `product.tsx`, `checkout-success.tsx`, `payment-*.tsx`
     - Ensure error messages are user-friendly
     - _Requirements: 8.2, 8.3_
 

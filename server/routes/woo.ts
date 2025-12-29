@@ -28,11 +28,11 @@ function fixAudioUrl(url: string): string {
   if (!url) return url;
   // Replace the main domain with the WordPress subdomain for audio files
   return url
-    .replace(
+    .replaceAll(
       "https://brolabentertainment.com/wp-content/",
       "https://wp.brolabentertainment.com/wp-content/"
     )
-    .replace(
+    .replaceAll(
       "https://www.brolabentertainment.com/wp-content/",
       "https://wp.brolabentertainment.com/wp-content/"
     );
@@ -88,38 +88,159 @@ interface AudioTrack {
   artist?: string;
   duration?: string;
   mediaId?: number; // WordPress media attachment ID for fetching title
+  mediaDescription?: string; // WordPress media description (contains BPM, Key info)
+  bpm?: string; // BPM extracted from media description
+  key?: string; // Musical key extracted from media description
 }
 
-// Fetch media title from WordPress REST API
-async function fetchMediaTitle(mediaId: number): Promise<string | null> {
+// WordPress media API response interface
+interface WordPressMediaResponse {
+  title?: { rendered?: string; raw?: string };
+  description?: { rendered?: string; raw?: string };
+  caption?: { rendered?: string; raw?: string };
+  alt_text?: string;
+  excerpt?: { rendered?: string; raw?: string };
+  content?: { rendered?: string; raw?: string };
+  meta?: Record<string, unknown>;
+  media_details?: {
+    artist?: string;
+    album?: string;
+    title?: string;
+    bpm?: string; // ID3 BPM tag from audio file
+  };
+}
+
+// Fetch media details (title + description + BPM) from WordPress REST API
+async function fetchMediaDetails(
+  mediaId: number
+): Promise<{ title: string | null; description: string | null; mediaDetailsBpm: string | null }> {
   try {
     const wpApiUrl =
       process.env.WORDPRESS_API_URL || "https://brolabentertainment.com/wp-json/wp/v2";
     const response = await fetch(`${wpApiUrl}/media/${mediaId}`);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.log(`❌ Media ${mediaId} fetch failed: ${response.status}`);
+      return { title: null, description: null, mediaDetailsBpm: null };
+    }
 
-    const media = (await response.json()) as { title?: { rendered?: string } };
-    return media.title?.rendered || null;
+    const media = (await response.json()) as WordPressMediaResponse;
+    const title = media.title?.rendered || media.title?.raw || null;
+
+    // Get BPM from ID3 tags (media_details.bpm) - but we'll prioritize description
+    const mediaDetailsBpm = media.media_details?.bpm || null;
+
+    // Log ALL available fields including RAW versions
+    console.log(`📋 Media ${mediaId} ALL FIELDS:`, {
+      title: media.title?.rendered?.substring(0, 50),
+      description_rendered: media.description?.rendered?.substring(0, 150),
+      description_raw: media.description?.raw?.substring(0, 150),
+      caption_rendered: media.caption?.rendered?.substring(0, 150),
+      caption_raw: media.caption?.raw?.substring(0, 150),
+      media_details_bpm: mediaDetailsBpm,
+    });
+
+    // Priority order for description:
+    // 1. description.raw - contains the actual text like "Elevate_(@treigua_130BPM_Cmin)"
+    // 2. caption.raw
+    // 3. caption.rendered
+    // 4. description.rendered (often contains shortcodes, less reliable)
+    const possibleDescriptions = [
+      media.description?.raw, // RAW description - highest priority
+      media.caption?.raw,
+      media.caption?.rendered,
+      media.description?.rendered,
+      media.alt_text,
+    ].filter(Boolean);
+
+    // Find the description that contains BPM or Key pattern
+    const bestDescription = findBestDescription(possibleDescriptions as string[]);
+
+    return { title, description: bestDescription, mediaDetailsBpm };
   } catch (error) {
     console.error(`Failed to fetch media ${mediaId}:`, error);
-    return null;
+    return { title: null, description: null, mediaDetailsBpm: null };
   }
 }
 
-// Enrich tracks with titles from WordPress media library
+// Helper function to clean HTML from description
+function cleanDescription(desc: string): string {
+  return desc
+    .replaceAll(/<[^>]*>/g, " ")
+    .replaceAll(/&[^;]+;/g, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+}
+
+// Helper function to find the best description containing metadata
+function findBestDescription(possibleDescriptions: string[]): string | null {
+  for (const desc of possibleDescriptions) {
+    if (desc) {
+      const cleanDesc = cleanDescription(desc);
+
+      // Look for BPM pattern like "130BPM" or musical key like "Cmin"
+      const hasBpm = /(\d{2,3})BPM/i.test(cleanDesc);
+      const hasKey = /([A-G][#b]?m(?:in)?|[A-G][#b]?\s*(?:maj|min))/i.test(cleanDesc);
+
+      if (hasBpm || hasKey) {
+        console.log(`✅ Found metadata in description: ${cleanDesc.substring(0, 100)}`);
+        return cleanDesc;
+      }
+    }
+  }
+
+  // Fallback to first available description
+  if (possibleDescriptions[0]) {
+    return cleanDescription(possibleDescriptions[0]);
+  }
+
+  return null;
+}
+
+// Enrich tracks with titles and descriptions from WordPress media library
 async function enrichTracksWithMediaTitles(tracks: AudioTrack[]): Promise<AudioTrack[]> {
   const enrichedTracks = await Promise.all(
     tracks.map(async track => {
-      // If track already has a title, keep it
-      if (track.title) return track;
-
-      // If track has mediaId, fetch title from WordPress
+      // If track has mediaId, fetch details from WordPress
       if (track.mediaId) {
-        const mediaTitle = await fetchMediaTitle(track.mediaId);
-        if (mediaTitle) {
-          console.log(`🎵 Fetched media title for ID ${track.mediaId}: ${mediaTitle}`);
-          return { ...track, title: mediaTitle };
+        const { title, description, mediaDetailsBpm } = await fetchMediaDetails(track.mediaId);
+        const enrichedTrack = { ...track };
+
+        if (title && !track.title) {
+          enrichedTrack.title = title;
+          console.log(`🎵 Fetched media title for ID ${track.mediaId}: ${title}`);
         }
+
+        if (description) {
+          enrichedTrack.mediaDescription = description;
+
+          // PRIORITY 1: Extract BPM from description (user-entered, most reliable)
+          const trackBpm = extractBpmFromText(description);
+          if (trackBpm) {
+            enrichedTrack.bpm = trackBpm;
+            console.log(`🎹 Track ${track.mediaId} BPM from DESCRIPTION: ${trackBpm}`);
+          }
+
+          // Extract Key from description
+          const trackKey = extractKeyFromText(description);
+          if (trackKey) {
+            enrichedTrack.key = trackKey;
+            console.log(`🎹 Track ${track.mediaId} Key from DESCRIPTION: ${trackKey}`);
+          }
+        }
+
+        // PRIORITY 2: Fallback to ID3 tags if no BPM found in description
+        if (!enrichedTrack.bpm && mediaDetailsBpm) {
+          enrichedTrack.bpm = mediaDetailsBpm;
+          console.log(`🎹 Track ${track.mediaId} BPM from ID3 TAGS (fallback): ${mediaDetailsBpm}`);
+        }
+
+        console.log(`📝 Track ${track.mediaId} enriched:`, {
+          title: enrichedTrack.title,
+          bpm: enrichedTrack.bpm,
+          key: enrichedTrack.key,
+        });
+
+        return enrichedTrack;
       }
 
       return track;
@@ -319,6 +440,94 @@ function hasTagWithName(tags: unknown[] | undefined, searchTerm: string): boolea
   );
 }
 
+// Helper function to extract BPM from text (URL, description, name)
+function extractBpmFromText(text: string | undefined): string {
+  if (!text) return "";
+  const patterns = [
+    /(\d{2,3})\s*bpm/i,
+    /bpm[:\s]*(\d{2,3})/i,
+    /_(\d{2,3})BPM_/i,
+    /(\d{2,3})BPM/i,
+    /tempo[:\s]*(\d{2,3})/i,
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (match?.[1]) {
+      const bpm = Number.parseInt(match[1], 10);
+      if (bpm >= 40 && bpm <= 300) return match[1];
+    }
+  }
+  return "";
+}
+
+// Helper function to normalize musical key format
+function normalizeKeyFormat(note: string, mode: string): string {
+  const upperNote = note.toUpperCase();
+  const lowerMode = mode.toLowerCase();
+
+  // Handle cases like "Fm" where note already includes 'm'
+  if (upperNote.endsWith("M")) {
+    return upperNote.slice(0, -1) + "m";
+  }
+
+  // Minor modes
+  if (lowerMode === "m" || lowerMode === "min" || lowerMode === "minor") {
+    return `${upperNote}m`;
+  }
+
+  // Major modes
+  if (lowerMode === "maj" || lowerMode === "major") {
+    return `${upperNote} Major`;
+  }
+
+  // Default: note with optional mode
+  return upperNote + (lowerMode ? ` ${lowerMode}` : "");
+}
+
+// Helper function to extract musical key from text
+function extractKeyFromText(text: string | undefined): string {
+  if (!text) return "";
+
+  const patterns = [
+    /\bkey[:\s]*([A-G][#b]?)\s*(maj(?:or)?|min(?:or)?|m)?\b/i,
+    /_([A-G][#b]?m)(?:in)?_/i,
+    /_([A-G][#b]?)min_/i,
+    /\b([A-G][#b]?)\s*(maj(?:or)?|min(?:or)?)\b/i,
+    /\b([A-G][#b]?m)\b/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (match?.[1]) {
+      return normalizeKeyFormat(match[1], match[2] || "");
+    }
+  }
+
+  return "";
+}
+
+// Helper function to extract mood from text
+function extractMoodFromText(text: string | undefined): string {
+  if (!text) return "";
+  const pattern =
+    /\b(dark|chill|upbeat|sad|happy|aggressive|energetic|mellow|dreamy|intense|smooth|hard|soft|emotional|epic|ambient)\b/i;
+  const match = pattern.exec(text);
+  if (match?.[1]) {
+    return match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+  }
+  return "";
+}
+
+// Helper function to strip HTML tags
+function stripHtml(html: string | undefined): string {
+  if (!html) return "";
+  return html
+    .replaceAll(/<[^>]*>/g, " ")
+    .replaceAll(/&[^;]+;/g, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+}
+
 // Helper function to map WooCommerce product to beat format
 async function mapProductToBeat(product: WooCommerceProduct) {
   const albTracklistMeta = product.meta_data?.find(
@@ -330,7 +539,7 @@ async function mapProductToBeat(product: WooCommerceProduct) {
 
   const rawTracks = extractAudioTracks(albTracklistMeta, audioUrlMeta, product.id);
 
-  // Enrich tracks with titles from WordPress media library
+  // Enrich tracks with titles AND descriptions from WordPress media library
   const audioTracks = await enrichTracksWithMediaTitles(rawTracks);
 
   // Preview URL for playback (30 sec preview)
@@ -346,6 +555,66 @@ async function mapProductToBeat(product: WooCommerceProduct) {
     `(${audioTracks.length} tracks)`
   );
 
+  // Build text sources with PRIORITY ORDER:
+  // 1. WordPress media DESCRIPTIONS (HIGHEST PRIORITY - contains actual BPM like "Elevate_(@treigua_130BPM_Cmin)")
+  // 2. Product meta_data fields
+  // 3. Product description
+  // 4. Audio URLs (contain filename)
+  // 5. Track titles
+  // 6. Product name (LAST - often contains wrong/marketing numbers)
+
+  // Media descriptions are the most reliable source (from WordPress media library)
+  const mediaDescriptions = audioTracks.map(t => t.mediaDescription || "").join(" ");
+  const trackTitles = audioTracks.map(t => t.title || "").join(" ");
+  const trackUrls = audioTracks.map(t => `${t.url || ""} ${t.downloadUrl || ""}`).join(" ");
+  const description = stripHtml(product.description);
+  const shortDescription = stripHtml(product.short_description);
+
+  // Priority 1: Media descriptions (most reliable - from WordPress media library details)
+  const highestPrioritySource = mediaDescriptions;
+  // Priority 2: Product descriptions and audio URLs
+  const mediumPrioritySource = `${description} ${shortDescription} ${trackUrls} ${audioUrl || ""} ${downloadUrl || ""}`;
+  // Priority 3: Track titles (filenames)
+  const lowPrioritySource = trackTitles;
+  // Priority 4: Product name (last resort - often wrong)
+  const fallbackSource = `${product.name || ""}`;
+
+  console.log(`🔍 Product ${product.id} - Text sources:`, {
+    mediaDescriptions: mediaDescriptions.substring(0, 100),
+    description: description.substring(0, 50),
+  });
+
+  // Extract BPM with priority order
+  const bpmFromMeta = safeString(findMetaValue(product.meta_data, "bpm"));
+  let bpm = bpmFromMeta;
+  if (!bpm) bpm = extractBpmFromText(highestPrioritySource);
+  if (!bpm) bpm = extractBpmFromText(mediumPrioritySource);
+  if (!bpm) bpm = extractBpmFromText(lowPrioritySource);
+  if (!bpm) bpm = extractBpmFromText(fallbackSource);
+
+  // Extract Key with priority order
+  const keyFromMeta = safeString(findMetaValue(product.meta_data, "key"));
+  let key = keyFromMeta;
+  if (!key) key = extractKeyFromText(highestPrioritySource);
+  if (!key) key = extractKeyFromText(mediumPrioritySource);
+  if (!key) key = extractKeyFromText(lowPrioritySource);
+  if (!key) key = extractKeyFromText(fallbackSource);
+
+  // Extract Mood with priority order
+  const moodFromMeta = safeString(findMetaValue(product.meta_data, "mood"));
+  let mood = moodFromMeta;
+  if (!mood) mood = extractMoodFromText(highestPrioritySource);
+  if (!mood) mood = extractMoodFromText(mediumPrioritySource);
+  if (!mood) mood = extractMoodFromText(lowPrioritySource);
+  if (!mood) mood = extractMoodFromText(fallbackSource);
+
+  console.log(`🎵 Product ${product.id} metadata:`, {
+    bpm,
+    key,
+    mood,
+    mediaDescriptions: mediaDescriptions.substring(0, 80),
+  });
+
   return {
     ...product,
     audio_url: audioUrl, // Preview URL for playback
@@ -356,9 +625,9 @@ async function mapProductToBeat(product: WooCommerceProduct) {
       hasTagWithName(product.tags, "vocals"),
     stems:
       findMetaValue(product.meta_data, "stems") === "yes" || hasTagWithName(product.tags, "stems"),
-    bpm: safeString(findMetaValue(product.meta_data, "bpm")),
-    key: safeString(findMetaValue(product.meta_data, "key")),
-    mood: safeString(findMetaValue(product.meta_data, "mood")),
+    bpm,
+    key,
+    mood,
     instruments: safeString(findMetaValue(product.meta_data, "instruments")),
     duration: safeString(findMetaValue(product.meta_data, "duration")),
     is_free: product.price === "0" || product.price === "",

@@ -82,6 +82,14 @@ function getMetaValue(metaData: MetaData[] | undefined, key: string): string | n
   return String(value);
 }
 
+// Helper to safely convert bpm to number
+function parseBpm(bpm: string | number | undefined | null): number | undefined {
+  if (bpm === undefined || bpm === null) return undefined;
+  if (typeof bpm === "number") return bpm;
+  const parsed = Number(bpm);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
 // License options configuration
 const LICENSE_OPTIONS: Array<{
   type: LicenseTypeEnum;
@@ -187,21 +195,29 @@ function handleDownloadError(
   error: unknown,
   toast: (options: { title: string; description: string; variant?: "destructive" }) => void
 ): void {
-  if (error instanceof Error && error.message === "AUTHENTICATION_REQUIRED") {
-    toast({
-      title: "Authentication Required",
-      description: "Please log in to download this beat.",
-      variant: "destructive",
-    });
-    setTimeout(() => {
-      globalThis.location.href = "/login";
-    }, 2000);
-    return;
+  // Check for authentication required error (by name or message)
+  if (error instanceof Error) {
+    if (
+      error.name === "AUTHENTICATION_REQUIRED" ||
+      error.message === "AUTHENTICATION_REQUIRED" ||
+      error.message.toLowerCase().includes("log in") ||
+      error.message.toLowerCase().includes("connecté")
+    ) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to download free beats. Redirecting to login...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        globalThis.location.href = "/login";
+      }, 2000);
+      return;
+    }
   }
 
   toast({
     title: "Download Error",
-    description: "There was an error processing your download.",
+    description: "There was an error processing your download. Please try again.",
     variant: "destructive",
   });
 }
@@ -506,7 +522,7 @@ export default function Product(): JSX.Element {
             <ProductArtworkPlayer
               imageSrc={product.images?.[0]?.src}
               productName={product.name}
-              audioUrl={product.audio_url}
+              audioUrl={product.audio_url ?? undefined}
               audioTracks={product.audio_tracks}
               productId={product.id}
             />
@@ -608,7 +624,7 @@ export default function Product(): JSX.Element {
                   title: product?.name || "",
                   price: typeof product?.price === "number" ? product.price : 0,
                   image: product?.images?.[0]?.src || "/api/placeholder/400/400",
-                  bpm: product?.bpm ?? undefined,
+                  bpm: parseBpm(product?.bpm),
                   genre: product?.categories?.[0]?.name || "Unknown",
                   mood: getMetaValue(product?.meta_data, "mood"),
                   key: getMetaValue(product?.meta_data, "key"),
@@ -620,7 +636,7 @@ export default function Product(): JSX.Element {
                     title: similarProduct.name,
                     price: typeof similarProduct.price === "number" ? similarProduct.price : 0,
                     image: similarProduct.images?.[0]?.src || "/api/placeholder/400/400",
-                    bpm: similarProduct.bpm ?? undefined,
+                    bpm: parseBpm(similarProduct.bpm),
                     genre: similarProduct.categories?.[0]?.name || "Unknown",
                     mood: getMetaValue(similarProduct.meta_data, "mood"),
                     key: getMetaValue(similarProduct.meta_data, "key"),

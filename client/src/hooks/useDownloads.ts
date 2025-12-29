@@ -57,7 +57,9 @@ export function useDownloads() {
 
   const logDownload = async (downloadData: DownloadData): Promise<DownloadRecord | null> => {
     if (!isAuthenticated) {
-      throw new Error("Vous devez être connecté pour télécharger");
+      const error = new Error("Please log in to download this beat.");
+      error.name = "AUTHENTICATION_REQUIRED";
+      throw error;
     }
 
     try {

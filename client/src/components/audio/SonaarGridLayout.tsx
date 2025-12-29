@@ -10,7 +10,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAudioStore } from "@/stores/useAudioStore";
-import { ChevronLeft, ChevronRight, Heart, Pause, Play, ShoppingCart } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Heart,
+  Pause,
+  Play,
+  ShoppingCart,
+} from "lucide-react";
 import { memo, useCallback, useState } from "react";
 
 /** Audio track for multi-track products */
@@ -69,6 +77,168 @@ function getTracks(beat: GridBeat): AudioTrack[] {
   return [];
 }
 
+// Helper component for play controls
+interface PlayControlsProps {
+  readonly hasMultipleTracks: boolean;
+  readonly isPlaying: boolean;
+  readonly onPrevious: (e: React.MouseEvent) => void;
+  readonly onNext: (e: React.MouseEvent) => void;
+  readonly onPlayPause: (e: React.MouseEvent) => void;
+}
+
+function PlayControls({
+  hasMultipleTracks,
+  isPlaying,
+  onPrevious,
+  onNext,
+  onPlayPause,
+}: PlayControlsProps): JSX.Element {
+  return (
+    <>
+      {hasMultipleTracks && (
+        <button
+          type="button"
+          onClick={onPrevious}
+          className={cn(
+            "w-12 h-12 rounded-full flex items-center justify-center",
+            "bg-black/50 hover:bg-black/70 text-white",
+            "transition-all duration-200 hover:scale-110 backdrop-blur-sm"
+          )}
+          aria-label="Previous track"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onPlayPause}
+        className={cn(
+          "w-14 h-14 rounded-full flex items-center justify-center",
+          "bg-[var(--accent-purple)] text-white border-2 border-white/30",
+          "transition-all duration-200 hover:scale-110 shadow-lg shadow-purple-500/30",
+          isPlaying && "bg-[var(--accent-cyan)] shadow-cyan-500/30"
+        )}
+        aria-label={isPlaying ? "Pause" : "Play"}
+      >
+        {isPlaying ? (
+          <Pause className="w-6 h-6" fill="currentColor" />
+        ) : (
+          <Play className="w-6 h-6 ml-1" fill="currentColor" />
+        )}
+      </button>
+      {hasMultipleTracks && (
+        <button
+          type="button"
+          onClick={onNext}
+          className={cn(
+            "w-12 h-12 rounded-full flex items-center justify-center",
+            "bg-black/50 hover:bg-black/70 text-white",
+            "transition-all duration-200 hover:scale-110 backdrop-blur-sm"
+          )}
+          aria-label="Next track"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      )}
+    </>
+  );
+}
+
+// Helper component for track dots navigation
+interface TrackDotsProps {
+  readonly beatId: number;
+  readonly tracks: AudioTrack[];
+  readonly currentTrackIndex: number;
+  readonly onTrackChange: (index: number) => void;
+}
+
+function TrackDots({
+  beatId,
+  tracks,
+  currentTrackIndex,
+  onTrackChange,
+}: TrackDotsProps): JSX.Element {
+  return (
+    <>
+      {tracks.map((_, index) => (
+        <button
+          key={`dot-${beatId}-${index}`}
+          type="button"
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            onTrackChange(index);
+          }}
+          className={cn(
+            "w-1.5 h-1.5 rounded-full transition-all duration-200",
+            index === currentTrackIndex
+              ? "bg-[var(--accent-purple)] w-3"
+              : "bg-white/50 hover:bg-white/80"
+          )}
+          aria-label={`Track ${index + 1}`}
+        />
+      ))}
+    </>
+  );
+}
+
+// Helper component for action buttons
+interface ActionButtonsProps {
+  readonly beat: GridBeat;
+  readonly onAddToCart?: () => void;
+  readonly onToggleFavorite?: () => void;
+  readonly isFavorite?: boolean;
+}
+
+function ActionButtons({
+  beat,
+  onAddToCart,
+  onToggleFavorite,
+  isFavorite,
+}: ActionButtonsProps): JSX.Element {
+  return (
+    <>
+      {onAddToCart && (
+        <Button
+          size="icon"
+          variant="secondary"
+          className={cn(
+            "w-8 h-8",
+            beat.isFree
+              ? "bg-[var(--accent-cyan)]/80 hover:bg-[var(--accent-cyan)]"
+              : "bg-black/60 hover:bg-[var(--accent-purple)]"
+          )}
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            onAddToCart();
+          }}
+          title={beat.isFree ? "Free Download" : "Add to Cart"}
+        >
+          {beat.isFree ? <Download className="w-4 h-4" /> : <ShoppingCart className="w-4 h-4" />}
+        </Button>
+      )}
+      {onToggleFavorite && (
+        <Button
+          size="icon"
+          variant="secondary"
+          className={cn(
+            "w-8 h-8 transition-all",
+            isFavorite
+              ? "bg-red-500 hover:bg-red-600 text-white"
+              : "bg-black/60 hover:bg-red-500 hover:text-white"
+          )}
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            onToggleFavorite();
+          }}
+          title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+        >
+          <Heart className={cn("w-4 h-4", isFavorite && "fill-current")} />
+        </Button>
+      )}
+    </>
+  );
+}
+
 const GridItem = memo(function GridItem({
   beat,
   isPlaying,
@@ -117,6 +287,8 @@ const GridItem = memo(function GridItem({
     [onPlay, currentTrackIndex]
   );
 
+  const showControls = isHovered || isPlaying;
+
   return (
     <Card
       className={cn(
@@ -154,122 +326,53 @@ const GridItem = memo(function GridItem({
                 "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
                 "flex items-center gap-2",
                 "transition-all duration-300",
-                isHovered || isPlaying ? "opacity-100 scale-100" : "opacity-0 scale-75"
+                showControls ? "opacity-100 scale-100" : "opacity-0 scale-75"
               )}
             >
-              {hasMultipleTracks && (
-                <button
-                  type="button"
-                  onClick={handlePrevious}
-                  className={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center",
-                    "bg-black/50 hover:bg-black/70 text-white",
-                    "transition-all duration-200 hover:scale-110 backdrop-blur-sm"
-                  )}
-                  aria-label="Previous track"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handlePlayPause}
-                className={cn(
-                  "w-14 h-14 rounded-full flex items-center justify-center",
-                  "bg-[var(--accent-purple)] text-white border-2 border-white/30",
-                  "transition-all duration-200 hover:scale-110 shadow-lg shadow-purple-500/30",
-                  isPlaying && "bg-[var(--accent-cyan)] shadow-cyan-500/30"
-                )}
-                aria-label={isPlaying ? "Pause" : "Play"}
-              >
-                {isPlaying ? (
-                  <Pause className="w-6 h-6" fill="currentColor" />
-                ) : (
-                  <Play className="w-6 h-6 ml-1" fill="currentColor" />
-                )}
-              </button>
-              {hasMultipleTracks && (
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className={cn(
-                    "w-12 h-12 rounded-full flex items-center justify-center",
-                    "bg-black/50 hover:bg-black/70 text-white",
-                    "transition-all duration-200 hover:scale-110 backdrop-blur-sm"
-                  )}
-                  aria-label="Next track"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              )}
+              <PlayControls
+                hasMultipleTracks={hasMultipleTracks}
+                isPlaying={isPlaying}
+                onPrevious={handlePrevious}
+                onNext={handleNext}
+                onPlayPause={handlePlayPause}
+              />
             </div>
           )}
+
+          {/* Track dots navigation */}
           {hasMultipleTracks && (
             <div
               className={cn(
                 "absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-1",
                 "transition-opacity duration-300",
-                isHovered || isPlaying ? "opacity-100" : "opacity-0"
+                showControls ? "opacity-100" : "opacity-0"
               )}
             >
-              {tracks.map((_, index) => (
-                <button
-                  key={`dot-${beat.id}-${index}`}
-                  type="button"
-                  onClick={(e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    onTrackChange(index);
-                  }}
-                  className={cn(
-                    "w-1.5 h-1.5 rounded-full transition-all duration-200",
-                    index === currentTrackIndex
-                      ? "bg-[var(--accent-purple)] w-3"
-                      : "bg-white/50 hover:bg-white/80"
-                  )}
-                  aria-label={`Track ${index + 1}`}
-                />
-              ))}
+              <TrackDots
+                beatId={beat.id}
+                tracks={tracks}
+                currentTrackIndex={currentTrackIndex}
+                onTrackChange={onTrackChange}
+              />
             </div>
           )}
+
+          {/* Action buttons */}
           <div
             className={cn(
               "absolute top-3 right-3 flex flex-col gap-2 transition-all duration-300",
               isHovered ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"
             )}
           >
-            {onAddToCart && (
-              <Button
-                size="icon"
-                variant="secondary"
-                className="w-8 h-8 bg-black/60 hover:bg-[var(--accent-purple)]"
-                onClick={(e: React.MouseEvent) => {
-                  e.stopPropagation();
-                  onAddToCart();
-                }}
-              >
-                <ShoppingCart className="w-4 h-4" />
-              </Button>
-            )}
-            {onToggleFavorite && (
-              <Button
-                size="icon"
-                variant="secondary"
-                className={cn(
-                  "w-8 h-8 transition-all",
-                  isFavorite
-                    ? "bg-red-500 hover:bg-red-600 text-white"
-                    : "bg-black/60 hover:bg-red-500 hover:text-white"
-                )}
-                onClick={(e: React.MouseEvent) => {
-                  e.stopPropagation();
-                  onToggleFavorite();
-                }}
-                title={isFavorite ? "Remove from favorites" : "Add to favorites"}
-              >
-                <Heart className={cn("w-4 h-4", isFavorite && "fill-current")} />
-              </Button>
-            )}
+            <ActionButtons
+              beat={beat}
+              onAddToCart={onAddToCart}
+              onToggleFavorite={onToggleFavorite}
+              isFavorite={isFavorite}
+            />
           </div>
+
+          {/* Price badge */}
           <Badge
             className={cn(
               "absolute bottom-3 left-3",
@@ -280,10 +383,14 @@ const GridItem = memo(function GridItem({
           >
             {formatPrice(beat.price)}
           </Badge>
+
+          {/* Duration/tracks info */}
           <span className="absolute bottom-3 right-3 text-xs text-white/80 bg-black/60 px-2 py-1 rounded">
             {hasMultipleTracks ? `${tracks.length} tracks` : beat.duration || ""}
           </span>
         </div>
+
+        {/* Beat info */}
         <button type="button" className="p-4 cursor-pointer w-full text-left" onClick={onSelect}>
           <h3 className="font-bold text-white truncate group-hover:text-[var(--accent-purple)] transition-colors">
             {beat.title}
