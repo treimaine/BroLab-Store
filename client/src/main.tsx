@@ -1,4 +1,5 @@
 import { ClerkProvider, useAuth } from "@clerk/clerk-react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { createRoot } from "react-dom/client";
@@ -84,6 +85,7 @@ if (hasConfigError) {
       <ClerkProvider publishableKey={clerkPublishableKey!} telemetry={false}>
         <ConvexProviderWithClerk client={convex!} useAuth={useAuth}>
           <App />
+          <SpeedInsights />
         </ConvexProviderWithClerk>
       </ClerkProvider>
     </ClerkErrorBoundary>
