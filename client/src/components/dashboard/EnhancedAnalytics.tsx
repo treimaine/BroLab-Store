@@ -15,6 +15,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAnalyticsData } from "@/hooks/useDashboardData";
 import { cn } from "@/lib/utils";
 import type { ChartDataPoint, TrendData } from "@shared/types/dashboard";
 import {
@@ -87,20 +88,30 @@ const formatPercent = (value: number): string => {
 };
 
 interface TrendCardProps {
-  title: string;
-  value: number;
-  trend: {
+  readonly title: string;
+  readonly value: number;
+  readonly trend: {
     value: number;
     change: number;
     changePercent: number;
     isPositive: boolean;
   };
-  icon: React.ReactNode;
-  color: string;
-  formatter?: (value: number) => string;
+  readonly icon: React.ReactNode;
+  readonly color: string;
+  readonly formatter?: (value: number) => string;
+  /** Indicates this shows total count, not limited data */
+  readonly showTotalIndicator?: boolean;
 }
 
-function TrendCard({ title, value, trend, icon, color, formatter = formatNumber }: TrendCardProps) {
+function TrendCard({
+  title,
+  value,
+  trend,
+  icon,
+  color,
+  formatter = formatNumber,
+  showTotalIndicator = true,
+}: TrendCardProps) {
   return (
     <Card className="bg-gray-900/50 border-gray-700/50 backdrop-blur-sm">
       <CardContent className="p-4 sm:p-6">
@@ -110,7 +121,14 @@ function TrendCard({ title, value, trend, icon, color, formatter = formatNumber 
               <div className="w-5 h-5 text-white">{icon}</div>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-400">{title}</p>
+              <div className="flex items-center space-x-2">
+                <p className="text-sm font-medium text-gray-400">{title}</p>
+                {showTotalIndicator && (
+                  <span className="text-xs text-gray-500 bg-gray-800/50 px-2 py-0.5 rounded">
+                    Total
+                  </span>
+                )}
+              </div>
               <p className="text-2xl font-bold text-white">{formatter(value)}</p>
             </div>
           </div>
@@ -141,7 +159,7 @@ function TrendCard({ title, value, trend, icon, color, formatter = formatNumber 
 }
 
 interface AdvancedMetricsProps {
-  metrics: {
+  readonly metrics: {
     conversionRates: {
       favoriteToDownload: number;
       downloadToOrder: number;
@@ -184,8 +202,8 @@ function AdvancedMetrics({ metrics }: AdvancedMetricsProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {conversionData.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
+            {conversionData.map(item => (
+              <div key={item.name} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
                   <span className="text-sm text-gray-300">{item.name}</span>
@@ -242,9 +260,9 @@ function AdvancedMetrics({ metrics }: AdvancedMetricsProps) {
 }
 
 interface EnhancedAnalyticsProps {
-  data?: ChartDataPoint[];
-  trends?: TrendData;
-  advancedMetrics?: {
+  readonly data?: ChartDataPoint[];
+  readonly trends?: TrendData;
+  readonly advancedMetrics?: {
     conversionRates: {
       favoriteToDownload: number;
       downloadToOrder: number;
@@ -259,8 +277,8 @@ interface EnhancedAnalyticsProps {
     totalRevenue: number;
     periodDays: number;
   };
-  isLoading?: boolean;
-  className?: string;
+  readonly isLoading?: boolean;
+  readonly className?: string;
 }
 
 export function EnhancedAnalytics({
@@ -273,30 +291,42 @@ export function EnhancedAnalytics({
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("30d");
   const [chartType, setChartType] = useState<"line" | "bar">("line");
 
-  // Filter data based on selected period
+  // Fetch analytics data for the selected period from backend
+  const { data: analyticsData, isLoading: isAnalyticsLoading } = useAnalyticsData(selectedPeriod);
+
+  // Use backend data for chart when available, otherwise fall back to props
+  const chartData = analyticsData?.chartData || data;
+  const displayTrends = analyticsData?.trends || trends;
+  const loading = isAnalyticsLoading || isLoading;
+
+  // Keep advancedMetrics from props only (don't show backend advancedMetrics)
+  const displayAdvancedMetrics = advancedMetrics;
+
+  // Filter data based on selected period (client-side filtering as backup)
   const filteredData = useMemo(() => {
-    if (!data.length) return [];
+    if (!chartData.length) return [];
 
-    const days =
-      selectedPeriod === "7d"
-        ? 7
-        : selectedPeriod === "30d"
-          ? 30
-          : selectedPeriod === "90d"
-            ? 90
-            : 365;
+    const getPeriodDays = (period: TimePeriod): number => {
+      switch (period) {
+        case "7d":
+          return 7;
+        case "30d":
+          return 30;
+        case "90d":
+          return 90;
+        case "1y":
+          return 365;
+        default:
+          return 30;
+      }
+    };
 
+    const days = getPeriodDays(selectedPeriod);
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
 
-    return data.filter(item => new Date(item.date) >= cutoffDate);
-  }, [data, selectedPeriod]);
-
-  // Use only real trends data - no defaults or fallbacks
-  const displayTrends = trends;
-
-  // Use only real advanced metrics - no defaults or fallbacks
-  const displayAdvancedMetrics = advancedMetrics;
+    return chartData.filter((item: ChartDataPoint) => new Date(item.date) >= cutoffDate);
+  }, [chartData, selectedPeriod]);
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -331,54 +361,68 @@ export function EnhancedAnalytics({
       </div>
 
       {/* Trend Cards */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-gray-800/50 rounded-lg p-6 animate-pulse">
-              <div className="h-4 bg-gray-700 rounded w-3/4 mb-2" />
-              <div className="h-8 bg-gray-700 rounded w-1/2" />
+      {(() => {
+        if (loading) {
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }, (_, i) => `trend-loading-${i}`).map(key => (
+                <div key={key} className="bg-gray-800/50 rounded-lg p-6 animate-pulse">
+                  <div className="h-4 bg-gray-700 rounded w-3/4 mb-2" />
+                  <div className="h-8 bg-gray-700 rounded w-1/2" />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      ) : displayTrends ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <TrendCard
-            title="Orders"
-            value={displayTrends.orders.value}
-            trend={displayTrends.orders}
-            icon={<ShoppingCart className="w-full h-full" />}
-            color="bg-blue-500/20"
-          />
-          <TrendCard
-            title="Downloads"
-            value={displayTrends.downloads.value}
-            trend={displayTrends.downloads}
-            icon={<Download className="w-full h-full" />}
-            color="bg-green-500/20"
-          />
-          <TrendCard
-            title="Revenue"
-            value={displayTrends.revenue.value}
-            trend={displayTrends.revenue}
-            icon={<DollarSign className="w-full h-full" />}
-            color="bg-yellow-500/20"
-            formatter={formatCurrency}
-          />
-          <TrendCard
-            title="Favorites"
-            value={displayTrends.favorites.value}
-            trend={displayTrends.favorites}
-            icon={<Heart className="w-full h-full" />}
-            color="bg-red-500/20"
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-gray-800/50 rounded-lg p-6">
-            <p className="text-gray-400 text-center">No trend data available</p>
+          );
+        }
+
+        if (displayTrends) {
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <TrendCard
+                title="Orders (30d)"
+                value={displayTrends.orders.value}
+                trend={displayTrends.orders}
+                icon={<ShoppingCart className="w-full h-full" />}
+                color="bg-blue-500/20"
+                showTotalIndicator={false}
+              />
+              <TrendCard
+                title="Downloads (30d)"
+                value={displayTrends.downloads.value}
+                trend={displayTrends.downloads}
+                icon={<Download className="w-full h-full" />}
+                color="bg-green-500/20"
+                showTotalIndicator={false}
+              />
+              <TrendCard
+                title="Revenue (30d)"
+                value={displayTrends.revenue.value}
+                trend={displayTrends.revenue}
+                icon={<DollarSign className="w-full h-full" />}
+                color="bg-yellow-500/20"
+                formatter={formatCurrency}
+                showTotalIndicator={false}
+              />
+              <TrendCard
+                title="Favorites (30d)"
+                value={displayTrends.favorites.value}
+                trend={displayTrends.favorites}
+                icon={<Heart className="w-full h-full" />}
+                color="bg-red-500/20"
+                showTotalIndicator={false}
+              />
+            </div>
+          );
+        }
+
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-gray-800/50 rounded-lg p-6">
+              <p className="text-gray-400 text-center">No trend data available</p>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Main Chart */}
       <Card className="bg-gray-900/50 border-gray-700/50 backdrop-blur-sm">
@@ -416,125 +460,137 @@ export function EnhancedAnalytics({
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="h-80 bg-gray-800/50 rounded animate-pulse" />
-          ) : filteredData.length === 0 ? (
-            <div className="h-80 flex items-center justify-center">
-              <div className="text-center">
-                <Activity className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400">No analytics data available for the selected period</p>
+          {(() => {
+            if (loading) {
+              return <div className="h-80 bg-gray-800/50 rounded animate-pulse" />;
+            }
+
+            if (filteredData.length === 0) {
+              return (
+                <div className="h-80 flex items-center justify-center">
+                  <div className="text-center">
+                    <Activity className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-400">
+                      No analytics data available for the selected period
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  {chartType === "line" ? (
+                    <LineChart data={filteredData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#9ca3af"
+                        fontSize={12}
+                        tickFormatter={value =>
+                          new Date(value).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        }
+                      />
+                      <YAxis stroke="#9ca3af" fontSize={12} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#1f2937",
+                          border: "1px solid #374151",
+                          borderRadius: "8px",
+                          color: "#fff",
+                        }}
+                        formatter={(value, name) => {
+                          if (name === "revenue")
+                            return [formatCurrency(value as number), "Revenue"];
+                          return [formatNumber(value as number), name];
+                        }}
+                        labelFormatter={label =>
+                          new Date(label).toLocaleDateString("en-US", {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                          })
+                        }
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="orders"
+                        stroke={CHART_COLORS.orders}
+                        strokeWidth={2}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="downloads"
+                        stroke={CHART_COLORS.downloads}
+                        strokeWidth={2}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="favorites"
+                        stroke={CHART_COLORS.favorites}
+                        strokeWidth={2}
+                      />
+                    </LineChart>
+                  ) : (
+                    <BarChart data={filteredData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#9ca3af"
+                        fontSize={12}
+                        tickFormatter={value =>
+                          new Date(value).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        }
+                      />
+                      <YAxis stroke="#9ca3af" fontSize={12} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#1f2937",
+                          border: "1px solid #374151",
+                          borderRadius: "8px",
+                          color: "#fff",
+                        }}
+                        formatter={(value, name) => {
+                          if (name === "revenue")
+                            return [formatCurrency(value as number), "Revenue"];
+                          return [formatNumber(value as number), name];
+                        }}
+                        labelFormatter={label =>
+                          new Date(label).toLocaleDateString("en-US", {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                          })
+                        }
+                      />
+                      <Bar dataKey="orders" fill={CHART_COLORS.orders} />
+                      <Bar dataKey="downloads" fill={CHART_COLORS.downloads} />
+                      <Bar dataKey="favorites" fill={CHART_COLORS.favorites} />
+                    </BarChart>
+                  )}
+                </ResponsiveContainer>
               </div>
-            </div>
-          ) : (
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                {chartType === "line" ? (
-                  <LineChart data={filteredData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis
-                      dataKey="date"
-                      stroke="#9ca3af"
-                      fontSize={12}
-                      tickFormatter={value =>
-                        new Date(value).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })
-                      }
-                    />
-                    <YAxis stroke="#9ca3af" fontSize={12} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#1f2937",
-                        border: "1px solid #374151",
-                        borderRadius: "8px",
-                        color: "#fff",
-                      }}
-                      formatter={(value, name) => {
-                        if (name === "revenue") return [formatCurrency(value as number), "Revenue"];
-                        return [formatNumber(value as number), name];
-                      }}
-                      labelFormatter={label =>
-                        new Date(label).toLocaleDateString("en-US", {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                        })
-                      }
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="orders"
-                      stroke={CHART_COLORS.orders}
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="downloads"
-                      stroke={CHART_COLORS.downloads}
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="favorites"
-                      stroke={CHART_COLORS.favorites}
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                ) : (
-                  <BarChart data={filteredData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis
-                      dataKey="date"
-                      stroke="#9ca3af"
-                      fontSize={12}
-                      tickFormatter={value =>
-                        new Date(value).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })
-                      }
-                    />
-                    <YAxis stroke="#9ca3af" fontSize={12} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#1f2937",
-                        border: "1px solid #374151",
-                        borderRadius: "8px",
-                        color: "#fff",
-                      }}
-                      formatter={(value, name) => {
-                        if (name === "revenue") return [formatCurrency(value as number), "Revenue"];
-                        return [formatNumber(value as number), name];
-                      }}
-                      labelFormatter={label =>
-                        new Date(label).toLocaleDateString("en-US", {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                        })
-                      }
-                    />
-                    <Bar dataKey="orders" fill={CHART_COLORS.orders} />
-                    <Bar dataKey="downloads" fill={CHART_COLORS.downloads} />
-                    <Bar dataKey="favorites" fill={CHART_COLORS.favorites} />
-                  </BarChart>
-                )}
-              </ResponsiveContainer>
-            </div>
-          )}
+            );
+          })()}
         </CardContent>
       </Card>
 
       {/* Advanced Metrics */}
-      {isLoading ? (
+      {loading ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {[...Array(2)].map((_, i) => (
-            <div key={i} className="bg-gray-900/50 rounded-lg p-6 animate-pulse">
+          {Array.from({ length: 2 }, (_, i) => `metrics-loading-${i}`).map(key => (
+            <div key={key} className="bg-gray-900/50 rounded-lg p-6 animate-pulse">
               <div className="h-6 bg-gray-700 rounded w-1/3 mb-4" />
               <div className="space-y-3">
-                {[...Array(4)].map((_, j) => (
-                  <div key={j} className="flex justify-between">
+                {Array.from({ length: 4 }, (_, j) => `metric-item-${j}`).map(itemKey => (
+                  <div key={itemKey} className="flex justify-between">
                     <div className="h-4 bg-gray-700 rounded w-1/2" />
                     <div className="h-4 bg-gray-700 rounded w-1/4" />
                   </div>

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
+import { optionalAuth, requireAuth } from "./lib/authHelpers";
 import { ValidationError, validateAndSanitizeOrder } from "./lib/validation";
 
 // Type definitions
@@ -38,12 +39,7 @@ export const createOrder = mutation({
   },
   handler: async (ctx, args) => {
     try {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
-        throw new Error("Not authenticated");
-      }
-
-      const clerkId = identity.subject;
+      const { clerkId, user: existingUser, identity } = await requireAuth(ctx);
 
       // Validation des données de commande
       const validatedOrder = validateAndSanitizeOrder({
@@ -54,10 +50,7 @@ export const createOrder = mutation({
       console.log(`🛒 Creating order for user: ${clerkId}`);
 
       // Récupérer ou créer l'utilisateur
-      let user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
-        .first();
+      let user = existingUser;
 
       if (!user) {
         // Créer l'utilisateur s'il n'existe pas
@@ -141,9 +134,9 @@ export const createOrder = mutation({
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       // Log de l'erreur
-      const identity = await ctx.auth.getUserIdentity();
+      const authResult = await optionalAuth(ctx);
       await ctx.db.insert("auditLogs", {
-        clerkId: identity?.subject,
+        clerkId: authResult?.clerkId,
         action: "order_creation_error",
         resource: "orders",
         details: {
@@ -201,10 +194,7 @@ export const createOrderIdempotent = mutation({
     idempotencyKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const clerkId = identity.subject;
+    const { clerkId, user: existingUser, identity } = await requireAuth(ctx);
 
     // Return existing order if idempotencyKey exists
     if (args.idempotencyKey) {
@@ -215,10 +205,7 @@ export const createOrderIdempotent = mutation({
       if (existing) return { orderId: existing._id, order: existing, idempotent: true } as const;
     }
 
-    let user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
-      .first();
+    let user = existingUser;
     if (!user) {
       const userId = await ctx.db.insert("users", {
         clerkId,
@@ -695,20 +682,10 @@ export const listOrders = query({
   },
   handler: async (ctx, args) => {
     try {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
-        throw new Error("Not authenticated");
-      }
-
-      const clerkId = identity.subject;
+      const { clerkId, user } = await requireAuth(ctx);
       const limit = Math.max(1, Math.min(args.limit || 20, 100));
 
       console.log(`📋 Listing orders for user: ${clerkId}`);
-
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
-        .first();
 
       if (!user) {
         console.log(`⚠️ User not found for clerkId: ${clerkId}`);
@@ -788,12 +765,7 @@ export const getOrderById = query({
   args: { orderId: v.id("orders") },
   handler: async (ctx, { orderId }) => {
     try {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
-        throw new Error("Not authenticated");
-      }
-
-      const clerkId = identity.subject;
+      const { clerkId, user } = await requireAuth(ctx);
       console.log(`🔍 Getting order ${orderId} for user: ${clerkId}`);
 
       const order = await ctx.db.get(orderId);
@@ -802,11 +774,6 @@ export const getOrderById = query({
       }
 
       // Vérifier que l'utilisateur a le droit d'accéder à cette commande
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
-        .first();
-
       if (!user) {
         throw new Error("User not found");
       }
@@ -837,12 +804,7 @@ export const updateOrderStatus = mutation({
   },
   handler: async (ctx, args) => {
     try {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
-        throw new Error("Not authenticated");
-      }
-
-      const clerkId = identity.subject;
+      const { clerkId, user } = await requireAuth(ctx);
       console.log(`🔄 Updating order ${args.orderId} status to: ${args.status}`);
 
       // Validation du statut
@@ -857,11 +819,6 @@ export const updateOrderStatus = mutation({
       }
 
       // Vérifier que l'utilisateur a le droit de modifier cette commande
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
-        .first();
-
       if (!user) {
         throw new Error("User not found");
       }
@@ -947,9 +904,9 @@ export const updateOrderStatus = mutation({
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       // Log de l'erreur
-      const identity = await ctx.auth.getUserIdentity();
+      const authResult = await optionalAuth(ctx);
       await ctx.db.insert("auditLogs", {
-        clerkId: identity?.subject,
+        clerkId: authResult?.clerkId,
         action: "update_order_status_error",
         resource: "orders",
         details: {
@@ -1125,10 +1082,7 @@ export const regenerateDownloadsFromOrders = mutation({
     userId: v.optional(v.id("users")), // If provided, only process this user
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
+    const { user: currentUser } = await requireAuth(ctx);
 
     console.log("🔄 Regenerating downloads from paid orders...");
 
@@ -1144,18 +1098,13 @@ export const regenerateDownloadsFromOrders = mutation({
           .collect();
       } else {
         // Process current user only
-        const user = await ctx.db
-          .query("users")
-          .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-          .first();
-
-        if (!user) {
+        if (!currentUser) {
           throw new Error("User not found");
         }
 
         ordersToProcess = await ctx.db
           .query("orders")
-          .withIndex("by_user", q => q.eq("userId", user._id))
+          .withIndex("by_user", q => q.eq("userId", currentUser._id))
           .filter(q => q.eq(q.field("status"), "paid"))
           .collect();
       }

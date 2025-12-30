@@ -177,6 +177,7 @@ export class ErrorLoggingService {
   private userId?: string;
   private remoteQueue: LogEntry[] = [];
   private flushTimer?: NodeJS.Timeout;
+  private cleanupInterval?: NodeJS.Timeout;
   private isDestroyed = false;
 
   constructor(config: Partial<ErrorLoggingConfig> = {}) {
@@ -549,6 +550,12 @@ export class ErrorLoggingService {
 
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
+      this.flushTimer = undefined;
+    }
+
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
     }
 
     // Flush any pending remote logs
@@ -577,7 +584,7 @@ export class ErrorLoggingService {
     }
 
     // Set up periodic cleanup
-    setInterval(() => {
+    this.cleanupInterval = setInterval(() => {
       this.cleanupOldLogs();
     }, 60000); // Clean up every minute
   }

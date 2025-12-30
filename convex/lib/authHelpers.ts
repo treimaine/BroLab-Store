@@ -45,6 +45,22 @@ export interface AuthResult {
   userId: Id<"users">;
   /** Clerk user ID (same as identity.subject) */
   clerkId: string;
+  /** Full user document from Convex database (null if user not yet synced) */
+  user: {
+    _id: Id<"users">;
+    clerkId: string;
+    email: string;
+    username?: string;
+    firstName?: string;
+    lastName?: string;
+    imageUrl?: string;
+    role?: string;
+    isActive?: boolean;
+    lastLoginAt?: number;
+    preferences?: Record<string, unknown>;
+    createdAt: number;
+    updatedAt: number;
+  } | null;
 }
 
 /**
@@ -112,13 +128,34 @@ export async function requireAuth(ctx: QueryCtx | MutationCtx): Promise<AuthResu
     .first();
 
   if (!user) {
-    throw new UserNotFoundError(identity.subject);
+    // Return with null user - caller can create user if needed
+    return {
+      identity: identity as UserIdentity,
+      userId: "" as Id<"users">, // Placeholder - user doesn't exist yet
+      clerkId: identity.subject,
+      user: null,
+    };
   }
 
   return {
     identity: identity as UserIdentity,
     userId: user._id,
     clerkId: identity.subject,
+    user: {
+      _id: user._id,
+      clerkId: user.clerkId,
+      email: user.email,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      imageUrl: user.imageUrl,
+      role: user.role,
+      isActive: user.isActive,
+      lastLoginAt: user.lastLoginAt,
+      preferences: user.preferences as Record<string, unknown> | undefined,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    },
   };
 }
 
@@ -163,15 +200,34 @@ export async function optionalAuth(ctx: QueryCtx | MutationCtx): Promise<AuthRes
     .first();
 
   if (!user) {
-    // User exists in Clerk but not in Convex - return null instead of throwing
-    // This can happen during initial sync or if sync failed
-    return null;
+    // User exists in Clerk but not in Convex - return with null user
+    return {
+      identity: identity as UserIdentity,
+      userId: "" as Id<"users">, // Placeholder
+      clerkId: identity.subject,
+      user: null,
+    };
   }
 
   return {
     identity: identity as UserIdentity,
     userId: user._id,
     clerkId: identity.subject,
+    user: {
+      _id: user._id,
+      clerkId: user.clerkId,
+      email: user.email,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      imageUrl: user.imageUrl,
+      role: user.role,
+      isActive: user.isActive,
+      lastLoginAt: user.lastLoginAt,
+      preferences: user.preferences as Record<string, unknown> | undefined,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    },
   };
 }
 
@@ -240,10 +296,9 @@ export async function resolveUserId(
  */
 export async function hasRole(ctx: QueryCtx | MutationCtx, requiredRole: string): Promise<boolean> {
   const auth = await optionalAuth(ctx);
-  if (!auth) return false;
+  if (!auth || !auth.user) return false;
 
-  const user = await ctx.db.get(auth.userId);
-  return user?.role === requiredRole;
+  return auth.user.role === requiredRole;
 }
 
 /**
@@ -273,8 +328,7 @@ export async function requireRole(
 ): Promise<AuthResult> {
   const auth = await requireAuth(ctx);
 
-  const user = await ctx.db.get(auth.userId);
-  if (user?.role !== requiredRole) {
+  if (!auth.user || auth.user.role !== requiredRole) {
     throw new Error(`Role '${requiredRole}' required`);
   }
 

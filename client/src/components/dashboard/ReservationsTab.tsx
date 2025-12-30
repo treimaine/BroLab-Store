@@ -21,6 +21,10 @@ interface ReservationsTabProps {
   reservations?: Reservation[];
   isLoading?: boolean;
   error?: string | null;
+  /** Total number of reservations for the user (for display purposes) */
+  totalReservations?: number;
+  /** Limit of reservations being displayed */
+  reservationsLimit?: number;
 }
 
 export default function ReservationsTab({

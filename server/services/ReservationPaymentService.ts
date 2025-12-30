@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { getConvex } from "../lib/convex";
+import { logger } from "../lib/logger";
 import {
   PaymentData,
   ReservationEmailData,
@@ -110,7 +111,12 @@ export class ReservationPaymentService {
       });
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.error(`❌ Error processing reservation payment success after ${duration}ms:`, error);
+      logger.error("Error processing reservation payment success", {
+        duration,
+        reservationIds,
+        paymentIntentId: paymentData.paymentIntentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       // Log error to audit
       await this.logToAudit({
@@ -193,7 +199,12 @@ export class ReservationPaymentService {
       });
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.error(`❌ Error processing reservation payment failure after ${duration}ms:`, error);
+      logger.error("Error processing reservation payment failure", {
+        duration,
+        reservationIds,
+        paymentIntentId: paymentData.paymentIntentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       // Log error to audit
       await this.logToAudit({
@@ -237,7 +248,11 @@ export class ReservationPaymentService {
 
       console.log(`✅ Updated reservation ${reservationId} to status: ${status}`);
     } catch (error) {
-      console.error(`❌ Error updating reservation ${reservationId} status:`, error);
+      logger.error("Error updating reservation status", {
+        reservationId,
+        status,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw new Error(
         `Failed to update reservation status: ${error instanceof Error ? error.message : "Unknown error"}`
       );
@@ -266,7 +281,11 @@ export class ReservationPaymentService {
 
       return { success: true };
     } catch (error) {
-      console.error(`❌ Error sending confirmation email to ${userEmail}:`, error);
+      logger.error("Error sending confirmation email", {
+        userEmail,
+        reservationCount: reservations.length,
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       // Log error but don't throw - email failure shouldn't break payment processing
       await this.logToAudit({
@@ -310,7 +329,11 @@ export class ReservationPaymentService {
 
       return { success: true };
     } catch (error) {
-      console.error(`❌ Error sending payment failure email to ${userEmail}:`, error);
+      logger.error("Error sending payment failure email", {
+        userEmail,
+        reservationIds,
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       // Log error but don't throw - email failure shouldn't break payment processing
       await this.logToAudit({
@@ -382,7 +405,10 @@ export class ReservationPaymentService {
 
       return reservations;
     } catch (error) {
-      console.error("❌ Error fetching reservation details:", error);
+      logger.error("Error fetching reservation details", {
+        reservationIds,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw new Error(
         `Failed to fetch reservation details: ${error instanceof Error ? error.message : "Unknown error"}`
       );
@@ -408,7 +434,11 @@ export class ReservationPaymentService {
         details: entry.details,
       });
     } catch (error) {
-      console.error("❌ Failed to log to audit:", error);
+      logger.error("Failed to log to audit", {
+        action: entry.action,
+        resource: entry.resource,
+        error: error instanceof Error ? error.message : String(error),
+      });
       // Don't throw - logging failure shouldn't break payment processing
     }
   }

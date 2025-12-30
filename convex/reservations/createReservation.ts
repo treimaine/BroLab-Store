@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { mutation } from "../_generated/server";
+import { requireAuth } from "../lib/authHelpers";
 
 interface UserDetails {
   name?: string;
@@ -113,28 +114,16 @@ async function createNewUser(
 
 async function handleClientSideAuth(ctx: MutationCtx): Promise<Id<"users">> {
   console.log(`🔍 Convex: Using client-side authentication`);
-  const identity = await ctx.auth.getUserIdentity();
+  const { user, clerkId } = await requireAuth(ctx);
 
-  if (!identity) {
-    console.error("❌ Convex: No identity found for client-side call");
-    throw new Error("Authentication required: Please log in to create a reservation.");
+  if (!user) {
+    const clerkIdPreview = clerkId.substring(0, 8) + "...";
+    console.error(`❌ Convex: User not found for identity: ${clerkIdPreview}`);
+    throw new Error("User account not found: Please ensure your account is properly set up.");
   }
 
-  const identityPreview = identity.subject.substring(0, 8) + "...";
-  console.log(`🔍 Convex: Looking up user with identity subject: ${identityPreview}`);
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-    .first();
-
-  if (user) {
-    console.log(`✅ Convex: Found user via identity with ID: ${user._id}`);
-    return user._id;
-  }
-
-  console.error(`❌ Convex: User not found for identity: ${identityPreview}`);
-  throw new Error("User account not found: Please ensure your account is properly set up.");
+  console.log(`✅ Convex: Found user via identity with ID: ${user._id}`);
+  return user._id;
 }
 
 async function createReservationRecord(

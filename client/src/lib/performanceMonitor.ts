@@ -51,6 +51,7 @@ class PerformanceMonitor {
   private readonly timers: Map<string, number> = new Map();
   private observers: PerformanceObserver[] = [];
   private readonly maxMetrics = 1000;
+  private memoryInterval?: NodeJS.Timeout;
 
   private constructor() {
     this.initializePerformanceMonitoring();
@@ -273,7 +274,7 @@ class PerformanceMonitor {
 
     // Track memory usage every 30 seconds
     trackMemory();
-    setInterval(trackMemory, 30000);
+    this.memoryInterval = setInterval(trackMemory, 30000);
   }
 
   private trackPageLoadMetrics(): void {
@@ -547,6 +548,12 @@ class PerformanceMonitor {
   }
 
   public destroy(): void {
+    // Clean up memory interval
+    if (this.memoryInterval) {
+      clearInterval(this.memoryInterval);
+      this.memoryInterval = undefined;
+    }
+
     // Clean up observers
     this.observers.forEach(observer => observer.disconnect());
     this.observers = [];

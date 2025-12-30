@@ -206,6 +206,7 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
   private retryQueueProcessing = false;
   private readonly sessionId: string;
   private isDestroyed = false;
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(config: Partial<ErrorHandlingConfig> = {}) {
     super();
@@ -700,6 +701,10 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
    */
   public destroy(): void {
     this.isDestroyed = true;
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
     this.clearErrorHistory();
     this.removeAllListeners();
   }
@@ -1454,7 +1459,7 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
 
   private setupCleanupInterval(): void {
     // Clean up old errors and recovery attempts every 10 minutes
-    setInterval(
+    this.cleanupInterval = setInterval(
       () => {
         if (this.isDestroyed) return;
 

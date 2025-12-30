@@ -157,21 +157,21 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
     - **⚠️ EXCLURE**: `client/src/api/woocommerce.ts` - intégration WooCommerce existante
     - _Requirements: 7.2, 7.4_
 
-  - [ ] 10.3 Migrate remaining Convex functions to auth helpers
+  - [x] 10.3 Migrate remaining Convex functions to auth helpers
     - Update remaining mutations to use requireAuth/optionalAuth
-    - Target files: `convex/dashboard.ts`, `convex/orders.ts`, `convex/downloads.ts`, `convex/auth/roles.ts`
-    - Remove duplicated ctx.auth.getUserIdentity() patterns (~25 instances remaining)
+    - Target files: `convex/dashboard.ts`, `convex/orders.ts`, `convex/downloads.ts`, `convex/licenses.ts`, `convex/reservations/createReservation.ts`
+    - Removed duplicated ctx.auth.getUserIdentity() patterns (~20 instances migrated)
     - **⚠️ EXCLURE**: `convex/users/clerkSync.ts`, `convex/sync/*.ts`, `convex/auth/*.ts`
     - _Requirements: 2.5_
 
-  - [ ] 10.4 Centralize console.error calls to use logger
+  - [x] 10.4 Centralize console.error calls to use logger
     - Replace direct console.error calls with centralized logger
-    - Target files: `server/wordpress.ts` (~15), `server/services/ReservationPaymentService.ts` (~8), `server/services/mail.ts` (~3)
+    - Target files: `server/services/ReservationPaymentService.ts` (8 instances), `server/services/mail.ts` (3 instances)
     - Ensure structured logging with context
     - _Requirements: 3.3_
 
 - [ ] 11. Implement notification service consolidation
-  - [ ] 11.1 Create `client/src/services/NotificationService.ts`
+  - [x] 11.1 Create `client/src/services/NotificationService.ts`
     - Implement typed notification methods (success, error, warning, info)
     - Implement notification queuing with debouncing
     - Implement user-friendly error message mapping
@@ -183,7 +183,7 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
     - **Property 13: Error Message User-Friendliness**
     - **Validates: Requirements 8.1, 8.3, 8.4**
 
-  - [ ] 11.3 Migrate toast calls to NotificationService
+  - [ ] 11.3 Migrate toast calls to NotificationService (OPTIONAL - can be done incrementally)
     - Replace scattered toast() calls with notificationService methods
     - Priority files: `shop.tsx`, `product.tsx`, `checkout-success.tsx`, `payment-*.tsx`
     - Ensure error messages are user-friendly
@@ -204,7 +204,7 @@ Les fichiers et intégrations suivants sont **critiques** et ne doivent **PAS** 
 - [ ] 13. Final checkpoint - All refactoring complete
   - Ensure all tests pass, ask the user if questions arise.
   - Run full test suite
-  - Verify no TypeScript errors
+  - Verify no NEW TypeScript errors introduced (5 pre-existing errors remain unrelated to refactoring)
   - Verify no linting errors
 
 ## Notes

@@ -1,10 +1,13 @@
 import Stripe from "stripe";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import { LicenseType } from "../../shared/types/Beat";
 import { getConvex } from "../lib/convex";
 import { PaymentError, PaymentErrorCode } from "../utils/errorHandling";
 import { adminNotificationService } from "./AdminNotificationService";
 import { getInvoiceService } from "./InvoiceService";
+import { sendLicenseEmail } from "./LicenseEmailService";
+import { getLicensePdfService } from "./LicensePdfService";
 import { ReservationPaymentService } from "./ReservationPaymentService";
 import PayPalService from "./paypal";
 
@@ -419,6 +422,123 @@ export class PaymentService {
   }
 
   /**
+   * Generate and send license PDFs for order items (beat purchases)
+   */
+  private async generateOrderLicenses(
+    session: Stripe.Checkout.Session,
+    orderId: Id<"orders">
+  ): Promise<void> {
+    try {
+      const order = await convex.query(api.orders.getOrder, { orderId });
+      if (
+        !order ||
+        typeof order !== "object" ||
+        !("items" in order) ||
+        !Array.isArray(order.items)
+      ) {
+        return;
+      }
+
+      const buyerEmail = "email" in order && typeof order.email === "string" ? order.email : "";
+      const buyerName = session.customer_details?.name || buyerEmail.split("@")[0] || "Customer";
+      const buyerUserId =
+        "userId" in order && typeof order.userId === "string" ? order.userId : undefined;
+
+      if (!buyerEmail) {
+        console.warn("⚠️ No buyer email found, skipping license generation");
+        return;
+      }
+
+      const licensePdfService = getLicensePdfService();
+      const currency = (session.currency || "usd").toUpperCase();
+
+      // Process each beat item in the order
+      for (let i = 0; i < order.items.length; i++) {
+        const item = order.items[i] as {
+          productId?: number;
+          title?: string;
+          name?: string;
+          license?: string;
+          price?: number;
+          type?: string;
+        };
+
+        // Skip non-beat items (subscriptions, services)
+        if (item.type && item.type !== "beat") {
+          continue;
+        }
+
+        // Validate license type
+        const licenseType = this.validateLicenseType(item.license);
+        if (!licenseType) {
+          console.warn(`⚠️ Invalid license type for item ${i}: ${item.license}`);
+          continue;
+        }
+
+        try {
+          // Generate license PDF
+          const licenseResult = await licensePdfService.generateLicense({
+            orderId: String(orderId),
+            itemId: String(i),
+            beat: {
+              id: item.productId || 0,
+              title: item.title || item.name || `Beat ${item.productId}`,
+              producer: "BroLab Entertainment",
+            },
+            licenseType,
+            buyer: {
+              name: buyerName,
+              email: buyerEmail,
+              userId: buyerUserId,
+            },
+            purchaseDate: new Date(),
+            price: (item.price || 0) / 100, // Convert cents to dollars
+            currency,
+          });
+
+          console.log(`✅ License generated: ${licenseResult.licenseNumber}`);
+
+          // Send license email
+          await sendLicenseEmail({
+            buyerEmail,
+            buyerName,
+            beatTitle: item.title || item.name || `Beat ${item.productId}`,
+            licenseType,
+            licenseNumber: licenseResult.licenseNumber,
+            licenseUrl: licenseResult.licenseUrl,
+            orderId: String(orderId),
+            purchaseDate: new Date(),
+            price: (item.price || 0) / 100,
+            currency,
+          });
+
+          console.log(`✅ License email sent for: ${item.title || item.name}`);
+        } catch (itemError) {
+          console.error(`⚠️ Failed to generate license for item ${i}:`, itemError);
+          // Continue with other items
+        }
+      }
+    } catch (licenseError) {
+      console.error("⚠️ Failed to generate/send licenses:", licenseError);
+      // Don't fail the webhook if license generation fails
+    }
+  }
+
+  /**
+   * Validate and convert license type string to LicenseType enum
+   */
+  private validateLicenseType(license?: string): LicenseType | null {
+    if (!license) return null;
+
+    const normalized = license.toLowerCase();
+    if (normalized === "basic") return LicenseType.BASIC;
+    if (normalized === "premium") return LicenseType.PREMIUM;
+    if (normalized === "unlimited") return LicenseType.UNLIMITED;
+
+    return null;
+  }
+
+  /**
    * Handle checkout.session.completed event
    * Routes to reservation handler if metadata.type === "reservation_payment"
    * Requirements: 4.2, 5.1, 5.2
@@ -452,6 +572,7 @@ export class PaymentService {
 
       await this.processOrderPayment(session, orderId);
       await this.generateOrderInvoice(session, orderId);
+      await this.generateOrderLicenses(session, orderId);
 
       console.log(`✅ Order payment processed successfully: ${orderId}`);
 

@@ -254,6 +254,32 @@ export default defineSchema({
     .index("by_order", ["orderId"])
     .index("by_number", ["number"]),
 
+  // Licenses (PDF certificates for beat purchases)
+  licenses: defineTable({
+    orderId: v.string(), // Order ID (string for flexibility)
+    itemId: v.string(), // Order item identifier
+    beatId: v.number(), // Beat/product ID
+    beatTitle: v.string(), // Beat title for display
+    licenseType: v.string(), // 'basic', 'premium', 'unlimited'
+    licenseNumber: v.string(), // Unique license reference (LICENSE-XXX-XXX-XXX)
+    buyerEmail: v.string(), // Buyer email
+    buyerName: v.string(), // Buyer name
+    buyerUserId: v.optional(v.string()), // Clerk user ID if authenticated
+    price: v.number(), // Price paid (cents)
+    currency: v.string(), // Currency code
+    pdfStorageId: v.string(), // Convex storage ID for PDF
+    pdfUrl: v.string(), // Public URL to PDF
+    purchaseDate: v.number(), // Purchase timestamp
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_order", ["orderId"])
+    .index("by_order_item", ["orderId", "itemId"])
+    .index("by_license_number", ["licenseNumber"])
+    .index("by_buyer_email", ["buyerEmail"])
+    .index("by_buyer_user_id", ["buyerUserId"])
+    .index("by_beat", ["beatId"]),
+
   // Counters (atomiques par nom)
   counters: defineTable({
     name: v.string(),

@@ -589,3 +589,23 @@
 .animate-shimmer {
   animation: shimmer 2s ease-in-out infinite;
 }
+
+/* =============================================================================
+ * CLERK DRAWER FIX
+ * =============================================================================
+ * When Clerk drawer is open, lower navbar z-index so drawer content is visible
+ * The drawer uses position:fixed top:0, which conflicts with our fixed navbar
+ */
+
+/* When Clerk drawer is present, reduce navbar z-index */
+body:has([class*="cl-drawer"]) nav.fixed,
+body:has([class*="cl-modalBackdrop"]) nav.fixed {
+  z-index: 40 !important;
+}
+
+/* Ensure Clerk drawer and backdrop are above the lowered navbar */
+[class*="cl-drawer"],
+[class*="cl-drawerRoot"],
+[class*="cl-modalBackdrop"] {
+  z-index: 50 !important;
+}

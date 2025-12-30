@@ -14,6 +14,7 @@ import {
   paymentRateLimiter,
 } from "./middleware/security";
 import activityRouter from "./routes/activity";
+import reconciliationRouter from "./routes/admin/reconciliation";
 import avatarRouter from "./routes/avatar";
 import beatsRouter from "./routes/beats";
 import categoriesRouter from "./routes/categories";
@@ -118,6 +119,9 @@ app.use("/api/wp", apiRateLimiter, wpRouter);
 app.use("/api/sync", apiRateLimiter, syncRouter);
 app.use("/api/categories", apiRateLimiter, categoriesRouter);
 app.use("/api/reservations", apiRateLimiter, reservationsRouter);
+
+// Admin routes (protected, rate limited)
+app.use("/api/admin/reconciliation", apiRateLimiter, reconciliationRouter);
 
 // WooCommerce routes - canonical path: /api/woocommerce
 app.use("/api/woocommerce", apiRateLimiter, wooRouter);

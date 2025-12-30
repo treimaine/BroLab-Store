@@ -49,6 +49,32 @@ const OrdersTab = memo<OrdersTabProps>(
       [onOrderClick]
     );
 
+    const getStatusColor = useCallback((status: string): string => {
+      switch (status) {
+        case "completed":
+          return "bg-green-500";
+        case "processing":
+          return "bg-yellow-500";
+        case "cancelled":
+          return "bg-red-500";
+        default:
+          return "bg-gray-500";
+      }
+    }, []);
+
+    const getStatusLabel = useCallback((status: string): string => {
+      switch (status) {
+        case "completed":
+          return "Completed";
+        case "processing":
+          return "Processing";
+        case "cancelled":
+          return "Cancelled";
+        default:
+          return status;
+      }
+    }, []);
+
     if (ordersLoading && displayOrders.length === 0) {
       return (
         <div className="space-y-4 sm:space-y-6">
@@ -58,8 +84,8 @@ const OrdersTab = memo<OrdersTabProps>(
               Your Orders
             </h2>
             <div className="space-y-3 sm:space-y-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={`orders-loading-${i}`} className="animate-pulse">
+              {Array.from({ length: 3 }, (_, i) => `loading-${i}`).map(key => (
+                <div key={key} className="animate-pulse">
                   <div className="h-16 sm:h-20 bg-[var(--dark-gray)] rounded-lg" />
                 </div>
               ))}
@@ -95,9 +121,10 @@ const OrdersTab = memo<OrdersTabProps>(
           {displayOrders && displayOrders.length > 0 ? (
             <div className="space-y-3 sm:space-y-4">
               {displayOrders.map((order: Order) => (
-                <div
+                <button
                   key={order.id}
-                  className="p-3 sm:p-4 bg-gray-900/20 backdrop-blur-sm border border-gray-700/30 rounded-lg hover:bg-gray-900/30 transition-colors cursor-pointer"
+                  type="button"
+                  className="w-full p-3 sm:p-4 bg-gray-900/20 backdrop-blur-sm border border-gray-700/30 rounded-lg hover:bg-gray-900/30 transition-colors cursor-pointer text-left"
                   onClick={() => handleOrderClick(order)}
                 >
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-4">
@@ -119,29 +146,15 @@ const OrdersTab = memo<OrdersTabProps>(
                       </p>
                       <div className="flex items-center gap-2">
                         <span
-                          className={`inline-block w-2 h-2 rounded-full ${
-                            order.status === "completed"
-                              ? "bg-green-500"
-                              : order.status === "processing"
-                                ? "bg-yellow-500"
-                                : order.status === "cancelled"
-                                  ? "bg-red-500"
-                                  : "bg-gray-500"
-                          }`}
+                          className={`inline-block w-2 h-2 rounded-full ${getStatusColor(order.status)}`}
                         />
                         <p className="text-gray-400 text-xs sm:text-sm capitalize">
-                          {order.status === "completed"
-                            ? "Completed"
-                            : order.status === "processing"
-                              ? "Processing"
-                              : order.status === "cancelled"
-                                ? "Cancelled"
-                                : order.status}
+                          {getStatusLabel(order.status)}
                         </p>
                       </div>
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
 
               {ordersData?.hasMore && (

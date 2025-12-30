@@ -114,6 +114,23 @@ export class DateCalculator {
     const buckets: string[] = [];
     const current = new Date(start);
 
+    // Align start date to bucket boundary
+    switch (granularity) {
+      case "week": {
+        // Align to Monday of the week
+        const dayOfWeek = current.getDay();
+        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        current.setDate(current.getDate() + daysToMonday);
+        break;
+      }
+      case "month": {
+        // Align to first day of month
+        current.setDate(1);
+        break;
+      }
+      // "day" doesn't need alignment
+    }
+
     while (current < end) {
       buckets.push(current.toISOString().split("T")[0]);
 

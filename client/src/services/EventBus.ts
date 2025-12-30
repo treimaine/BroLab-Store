@@ -75,6 +75,7 @@ export class EventBus extends BrowserEventEmitter {
   };
   private processingTimes: number[] = [];
   private readonly maxProcessingTimeHistory = 100;
+  private metricsInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     super();
@@ -330,6 +331,10 @@ export class EventBus extends BrowserEventEmitter {
    * Clear all event listeners and reset state
    */
   public clear(): void {
+    if (this.metricsInterval) {
+      clearInterval(this.metricsInterval);
+      this.metricsInterval = null;
+    }
     this.removeAllListeners();
     this.eventHistory = [];
     this.duplicateFilter.clear();
@@ -564,7 +569,7 @@ export class EventBus extends BrowserEventEmitter {
 
   private startMetricsCollection(): void {
     // Update metrics every 5 seconds
-    setInterval(() => {
+    this.metricsInterval = setInterval(() => {
       this.updateMetrics();
       this.cleanupDuplicateFilter();
     }, 5000);

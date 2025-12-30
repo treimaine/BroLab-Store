@@ -18,6 +18,7 @@ import { api } from "@convex/_generated/api";
 interface UseDashboardDataOptions {
   includeChartData?: boolean;
   includeTrends?: boolean;
+  period?: "7d" | "30d" | "90d" | "1y";
   activityLimit?: number;
   ordersLimit?: number;
   downloadsLimit?: number;
@@ -33,6 +34,7 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
   const {
     includeChartData = true,
     includeTrends = true,
+    period = "30d",
     activityLimit = 20,
     ordersLimit = 20,
     downloadsLimit = 50,
@@ -52,6 +54,7 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
   const dashboardData = useQuery(api.dashboard.getDashboardData, {
     includeChartData,
     includeTrends,
+    period,
     activityLimit,
     ordersLimit,
     downloadsLimit,

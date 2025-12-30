@@ -31,6 +31,7 @@ class CodeSplittingMonitor {
   private static instance: CodeSplittingMonitor;
   private readonly metrics: CodeSplittingMetrics;
   private performanceObserver?: PerformanceObserver;
+  private reportInterval?: NodeJS.Timeout;
 
   private constructor() {
     this.metrics = {
@@ -78,7 +79,7 @@ class CodeSplittingMonitor {
     });
 
     // Report metrics periodically
-    setInterval(() => {
+    this.reportInterval = setInterval(() => {
       this.reportMetrics();
     }, 30000); // Every 30 seconds
   }
@@ -152,6 +153,10 @@ class CodeSplittingMonitor {
   }
 
   destroy(): void {
+    if (this.reportInterval) {
+      clearInterval(this.reportInterval);
+      this.reportInterval = undefined;
+    }
     this.performanceObserver?.disconnect();
   }
 }

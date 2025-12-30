@@ -5,6 +5,10 @@ import { insertDownloadSchema } from "../../shared/schema";
 import { getCurrentUser, isAuthenticated } from "../auth";
 import { createValidationMiddleware } from "../lib/validation";
 import { getCurrentClerkUser } from "../middleware/clerkAuth";
+import {
+  requireDownloadAccess,
+  type DownloadAuthorizedRequest,
+} from "../middleware/requireDownloadAccess";
 import { handleRouteError } from "../types/routes";
 
 // Audio track interface for ZIP downloads
@@ -37,11 +41,16 @@ const convex = getConvex();
 const router = express.Router();
 
 // POST /api/downloads - Log a download using Convex
+// SECURITY: Requires download entitlement verification
 router.post(
   "/",
   isAuthenticated,
   createValidationMiddleware(insertDownloadSchema),
+  requireDownloadAccess,
   async (req, res): Promise<void> => {
+    // Cast to DownloadAuthorizedRequest for entitlement info
+    const downloadReq = req as DownloadAuthorizedRequest;
+
     try {
       const user = await getCurrentUser(req);
       if (!user) {
@@ -56,15 +65,27 @@ router.post(
         return;
       }
 
-      const { productId, license, price, productName } = req.body;
+      // Type the body after validation middleware
+      const body = req.body as {
+        productId: number;
+        license: string;
+        price?: number;
+        productName?: string;
+      };
+      const { productId, license, price, productName } = body;
+
+      // Use entitlement info from middleware if available
+      const entitlement = downloadReq.downloadEntitlement;
+      const effectiveLicense = entitlement?.licenseType || license;
 
       console.log(`🔧 Download request received:`, {
         userId: user.id,
         clerkId: clerkUser.id,
         productId,
-        license,
+        license: effectiveLicense,
         price,
         productName,
+        entitlementSource: entitlement?.source,
       });
 
       // Log download with Convex (use string literal to avoid deep type instantiation)
@@ -73,7 +94,7 @@ router.post(
       };
       const download = await convexClient.mutation("downloads:recordDownload", {
         beatId: Number(productId),
-        licenseType: String(license),
+        licenseType: String(effectiveLicense),
         downloadUrl: undefined,
       });
 
@@ -85,7 +106,7 @@ router.post(
             id: download,
             userId: user.id,
             productId,
-            license,
+            license: effectiveLicense,
             timestamp: Date.now(),
           },
         });

@@ -69,6 +69,7 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
   private readonly timeouts = new Map<string, NodeJS.Timeout>();
   private readonly retryCounters = new Map<string, number>();
   private isDestroyed = false;
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(config: Partial<OptimisticUpdateConfig> = {}) {
     super();
@@ -437,6 +438,10 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
    */
   public destroy(): void {
     this.isDestroyed = true;
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
     this.clearAllUpdates();
     this.removeAllListeners();
     this.log("OptimisticUpdateManager destroyed");
@@ -582,7 +587,7 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
 
   private setupCleanupInterval(): void {
     // Clean up old confirmed updates every 5 minutes
-    setInterval(
+    this.cleanupInterval = setInterval(
       () => {
         if (this.isDestroyed) return;
 

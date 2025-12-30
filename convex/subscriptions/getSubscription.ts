@@ -74,3 +74,20 @@ export const getCurrentUserSubscription = query({
     };
   },
 });
+
+/**
+ * Get subscription by Clerk subscription ID (for reconciliation)
+ */
+export const getByClerkId = query({
+  args: {
+    clerkSubscriptionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_clerk_id", q => q.eq("clerkSubscriptionId", args.clerkSubscriptionId))
+      .first();
+
+    return subscription;
+  },
+});

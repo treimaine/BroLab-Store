@@ -100,6 +100,7 @@ class NotificationServiceImpl {
   private readonly recentFingerprints: Map<string, number> = new Map();
   private isProcessing = false;
   private notificationCount = 0;
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(config: Partial<NotificationServiceConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -363,7 +364,7 @@ class NotificationServiceImpl {
    * Start cleanup interval for expired fingerprints
    */
   private startCleanupInterval(): void {
-    setInterval(() => {
+    this.cleanupInterval = setInterval(() => {
       const now = Date.now();
       for (const [fingerprint, timestamp] of this.recentFingerprints.entries()) {
         if (now - timestamp > this.config.deduplicationWindow * 2) {
@@ -412,6 +413,19 @@ class NotificationServiceImpl {
    */
   public configure(config: Partial<NotificationServiceConfig>): void {
     this.config = { ...this.config, ...config };
+  }
+
+  /**
+   * Destroy the notification service and clean up resources
+   */
+  public destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.queue = [];
+    this.activeNotifications.clear();
+    this.recentFingerprints.clear();
   }
 }
 

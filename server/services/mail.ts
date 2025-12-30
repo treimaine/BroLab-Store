@@ -1,4 +1,5 @@
 import nodemailer, { Transporter } from "nodemailer";
+import { logger } from "../lib/logger";
 
 export interface MailPayload {
   to: string | string[];
@@ -58,9 +59,9 @@ const createTransporter = (): Transporter => {
     smtpUser === "your_email@gmail.com" ||
     smtpPass === "your_app_password_here"
   ) {
-    console.error(
-      "❌ SMTP credentials not configured. Please set SMTP_USER and SMTP_PASS in .env or use RESEND_API_KEY"
-    );
+    logger.error("SMTP credentials not configured", {
+      hint: "Please set SMTP_USER and SMTP_PASS in .env or use RESEND_API_KEY",
+    });
     throw new Error("Email service not configured. Please contact administrator.");
   }
 
@@ -87,7 +88,9 @@ const getTransporter = (): Transporter => {
     try {
       transporter = createTransporter();
     } catch (error) {
-      console.error("❌ Failed to create email transporter:", error);
+      logger.error("Failed to create email transporter", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -183,7 +186,12 @@ export async function sendMail(
 
   // All attempts failed
   const errorMessage = lastError?.message || "Unknown error";
-  console.error("❌ All email sending attempts failed:", errorMessage);
+  logger.error("All email sending attempts failed", {
+    to: payload.to,
+    subject: payload.subject,
+    maxRetries: options.maxRetries,
+    error: errorMessage,
+  });
   throw new Error(`Email sending failed after ${options.maxRetries} attempts: ${errorMessage}`);
 }
 

@@ -52,6 +52,7 @@ import type * as lib_dashboardConfig from "../lib/dashboardConfig.js";
 import type * as lib_dashboardValidation from "../lib/dashboardValidation.js";
 import type * as lib_statisticsCalculator from "../lib/statisticsCalculator.js";
 import type * as lib_validation from "../lib/validation.js";
+import type * as licenses from "../licenses.js";
 import type * as migrations_archive_cleanOrders from "../migrations/archive/cleanOrders.js";
 import type * as migrations_archive_cleanupGenericDownloads from "../migrations/archive/cleanupGenericDownloads.js";
 import type * as migrations_archive_cleanupSupabase from "../migrations/archive/cleanupSupabase.js";
@@ -60,8 +61,10 @@ import type * as migrations_archive_fixReservationPrices from "../migrations/arc
 import type * as migrations_archive_markSpecificFreeBeats from "../migrations/archive/markSpecificFreeBeats.js";
 import type * as orders from "../orders.js";
 import type * as orders_confirmPayment from "../orders/confirmPayment.js";
+import type * as orders_getOrdersByEmail from "../orders/getOrdersByEmail.js";
 import type * as orders_listOrderItems from "../orders/listOrderItems.js";
 import type * as orders_listUserOrders from "../orders/listUserOrders.js";
+import type * as orders_reconciliation from "../orders/reconciliation.js";
 import type * as orders_updateOrder from "../orders/updateOrder.js";
 import type * as passwordResets from "../passwordResets.js";
 import type * as products from "../products.js";
@@ -154,6 +157,7 @@ declare const fullApi: ApiFromModules<{
   "lib/dashboardValidation": typeof lib_dashboardValidation;
   "lib/statisticsCalculator": typeof lib_statisticsCalculator;
   "lib/validation": typeof lib_validation;
+  licenses: typeof licenses;
   "migrations/archive/cleanOrders": typeof migrations_archive_cleanOrders;
   "migrations/archive/cleanupGenericDownloads": typeof migrations_archive_cleanupGenericDownloads;
   "migrations/archive/cleanupSupabase": typeof migrations_archive_cleanupSupabase;
@@ -162,8 +166,10 @@ declare const fullApi: ApiFromModules<{
   "migrations/archive/markSpecificFreeBeats": typeof migrations_archive_markSpecificFreeBeats;
   orders: typeof orders;
   "orders/confirmPayment": typeof orders_confirmPayment;
+  "orders/getOrdersByEmail": typeof orders_getOrdersByEmail;
   "orders/listOrderItems": typeof orders_listOrderItems;
   "orders/listUserOrders": typeof orders_listUserOrders;
+  "orders/reconciliation": typeof orders_reconciliation;
   "orders/updateOrder": typeof orders_updateOrder;
   passwordResets: typeof passwordResets;
   products: typeof products;

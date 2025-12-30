@@ -15,6 +15,7 @@ import type {
 } from "../shared/types/dashboard";
 import type { QueryCtx } from "./_generated/server";
 import { query } from "./_generated/server";
+import { requireAuth } from "./lib/authHelpers";
 import {
   CurrencyCalculator,
   DateCalculator,
@@ -84,6 +85,9 @@ export const getDashboardData = query({
   args: {
     includeChartData: v.optional(v.boolean()),
     includeTrends: v.optional(v.boolean()),
+    period: v.optional(
+      v.union(v.literal("7d"), v.literal("30d"), v.literal("90d"), v.literal("1y"))
+    ),
     activityLimit: v.optional(v.number()),
     ordersLimit: v.optional(v.number()),
     downloadsLimit: v.optional(v.number()),
@@ -92,12 +96,7 @@ export const getDashboardData = query({
   },
   handler: async (ctx, args): Promise<DashboardData> => {
     return executeDashboardQuery(async () => {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
-        throw new DashboardError("Not authenticated", "auth_error", false);
-      }
-
-      const clerkId = identity.subject;
+      const { clerkId, user, identity } = await requireAuth(ctx);
 
       // Sanitize query limits
       const limits = sanitizeDashboardLimits({
@@ -107,12 +106,6 @@ export const getDashboardData = query({
         favoritesLimit: args.favoritesLimit,
         reservationsLimit: args.reservationsLimit,
       });
-
-      // Get or create user with single query
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
-        .first();
 
       if (!user) {
         // Return empty dashboard data for users not yet in database
@@ -236,7 +229,7 @@ export const getDashboardData = query({
         role: user.role,
         isActive: user.isActive,
         lastLoginAt: user.lastLoginAt,
-        preferences: user.preferences,
+        preferences: user.preferences as DashboardUser["preferences"],
         subscription: subscription
           ? {
               id: subscription._id,
@@ -393,21 +386,24 @@ export const getDashboardData = query({
           "info",
       }));
 
-      // Generate chart data if requested (default to 30 days)
+      // Get period from args or default to 30 days
+      const period: TimePeriod = args.period || "30d";
+
+      // Generate chart data if requested
       let chartData: ChartDataPoint[] = [];
       if (args.includeChartData) {
-        chartData = await generateChartData(ctx, user._id, "30d");
+        chartData = await generateChartData(ctx, user._id, period);
       }
 
-      // Generate trends if requested (default to 30 days)
+      // Generate trends if requested
       let trends: TrendData = {
-        orders: { period: "30d", value: 0, change: 0, changePercent: 0, isPositive: true },
-        downloads: { period: "30d", value: 0, change: 0, changePercent: 0, isPositive: true },
-        revenue: { period: "30d", value: 0, change: 0, changePercent: 0, isPositive: true },
-        favorites: { period: "30d", value: 0, change: 0, changePercent: 0, isPositive: true },
+        orders: { period, value: 0, change: 0, changePercent: 0, isPositive: true },
+        downloads: { period, value: 0, change: 0, changePercent: 0, isPositive: true },
+        revenue: { period, value: 0, change: 0, changePercent: 0, isPositive: true },
+        favorites: { period, value: 0, change: 0, changePercent: 0, isPositive: true },
       };
       if (args.includeTrends) {
-        trends = await generateTrends(ctx, user._id, "30d");
+        trends = await generateTrends(ctx, user._id, period);
       }
 
       return {
@@ -646,15 +642,7 @@ export const getAnalyticsData = query({
     };
   }> => {
     return executeDashboardQuery(async () => {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
-        throw new DashboardError("Not authenticated", "auth_error", false);
-      }
-
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-        .first();
+      const { user } = await requireAuth(ctx);
 
       if (!user) {
         return {
@@ -779,15 +767,7 @@ export const getAnalyticsData = query({
 export const getDashboardStats = query({
   args: {},
   handler: async (ctx): Promise<UserStats> => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", identity.subject))
-      .first();
+    const { user } = await requireAuth(ctx);
 
     if (!user) {
       return {

@@ -220,18 +220,7 @@ export const getUserByClerkId = query({
   },
 });
 
-/**
- * Get a user by their email
- */
-export const getUserByEmail = query({
-  args: { email: v.string() },
-  handler: async (ctx, { email }) => {
-    return await ctx.db
-      .query("users")
-      .withIndex("by_email", q => q.eq("email", email))
-      .first();
-  },
-});
+// NOTE: getUserByEmail is available in convex/users.ts - use that instead to avoid duplication
 
 /**
  * Delete a user (when deleted from Clerk) with secure handling

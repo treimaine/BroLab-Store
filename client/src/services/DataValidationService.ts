@@ -3966,7 +3966,8 @@ export class DataValidationService {
     const inconsistencies: Inconsistency[] = [];
     const now = Date.now();
 
-    // Check favorites count consistency
+    // Check favorites count consistency - FIXED: Account for intentional limits
+    // Only flag as inconsistency if array has MORE items than stats (impossible scenario)
     if (data.favorites.length > stats.totalFavorites) {
       inconsistencies.push({
         type: "calculation",
@@ -3980,7 +3981,8 @@ export class DataValidationService {
       });
     }
 
-    // Check downloads count consistency
+    // Check downloads count consistency - FIXED: Account for intentional limits
+    // Only flag as inconsistency if array has MORE items than stats (impossible scenario)
     if (data.downloads.length > stats.totalDownloads) {
       inconsistencies.push({
         type: "calculation",
@@ -3994,7 +3996,9 @@ export class DataValidationService {
       });
     }
 
-    // Check orders count consistency
+    // Check orders count consistency - FIXED: Account for intentional limits
+    // Only flag as inconsistency if array has MORE items than stats (impossible scenario)
+    // Arrays can legitimately have FEWER items due to pagination/limits
     if (data.orders.length > stats.totalOrders) {
       inconsistencies.push({
         type: "calculation",
@@ -4007,6 +4011,9 @@ export class DataValidationService {
         actualValue: stats.totalOrders,
       });
     }
+
+    // NOTE: data.orders.length < stats.totalOrders is EXPECTED due to pagination limits
+    // This is not an inconsistency - it's intentional architectural design
 
     return inconsistencies;
   }

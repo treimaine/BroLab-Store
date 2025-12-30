@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { optionalAuth, requireAuth } from "./lib/authHelpers";
 
 // Log a download event (idempotent: increments count if already exists)
 export const logDownload = mutation({
@@ -11,12 +12,7 @@ export const logDownload = mutation({
   },
   handler: async (ctx, args) => {
     try {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
-        throw new Error("Vous devez être connecté pour télécharger");
-      }
-
-      const clerkId = identity.subject;
+      const { clerkId, user: existingUser, identity } = await requireAuth(ctx);
 
       console.log(
         "🔧 Logging download for user:",
@@ -27,23 +23,18 @@ export const logDownload = mutation({
         args.license
       );
 
-      // Get user by Clerk ID
-      let user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
-        .first();
+      let user = existingUser;
 
       if (!user) {
         // Créer l'utilisateur s'il n'existe pas
-        const email =
-          (identity.emailAddresses as Array<{ emailAddress: string }>)?.[0]?.emailAddress || "";
+        const email = identity.email || "";
         const username =
           (identity.username as string) ||
           email.split("@")[0] ||
           `user_${identity.subject.slice(-8)}`;
-        const firstName = (identity.firstName as string) || undefined;
-        const lastName = (identity.lastName as string) || undefined;
-        const imageUrl = (identity.imageUrl as string) || undefined;
+        const firstName = identity.givenName || undefined;
+        const lastName = identity.familyName || undefined;
+        const imageUrl = identity.pictureUrl || undefined;
 
         const userId = await ctx.db.insert("users", {
           clerkId: identity.subject,
@@ -103,18 +94,13 @@ export const getUserDownloads = query({
   args: {},
   handler: async ctx => {
     try {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
+      const authResult = await optionalAuth(ctx);
+      if (!authResult) {
         // Retourner un tableau vide au lieu de lever une erreur
         return [];
       }
 
-      const clerkId = identity.subject;
-
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
-        .first();
+      const { user } = authResult;
 
       if (!user) {
         return [];
@@ -135,34 +121,5 @@ export const getUserDownloads = query({
   },
 });
 
-// Check download quota for user
-export const checkDownloadQuota = query({
-  args: {},
-  handler: async ctx => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return { canDownload: false, reason: "Not authenticated" };
-    }
-
-    const clerkId = identity.subject;
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", q => q.eq("clerkId", clerkId))
-      .first();
-
-    if (!user) {
-      return { canDownload: false, reason: "User not found" };
-    }
-
-    // Get user's subscription status (for future quota implementation)
-    const _subscription = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_user", q => q.eq("userId", user._id))
-      .first();
-
-    // For now, allow unlimited downloads
-    // You can implement quota logic based on subscription plan
-    return { canDownload: true, quota: "unlimited" };
-  },
-});
+// NOTE: checkDownloadQuota has been moved to convex/subscriptions/checkDownloadQuota.ts
+// Use that version for proper quota checking with subscription support
