@@ -149,13 +149,14 @@ export const helmetMiddleware: RequestHandler = (
         scriptSrcAttr: ["'none'"], // Block inline event handlers (onclick, etc.)
         styleSrc: [
           "'self'",
-          `'nonce-${nonce}'`,
-          // Keep 'unsafe-inline' as fallback for:
+          // IMPORTANT: Do NOT use nonce for styles because:
+          // - React inline styles (style={{...}}) cannot receive nonce attributes
+          // - Modern browsers ignore 'unsafe-inline' when nonce is present
+          // - This breaks 100+ components using dynamic inline styles
+          // Keep 'unsafe-inline' for:
           // - Vite HMR in development (injects styles dynamically)
-          // - Third-party libraries that inject inline styles (Radix UI, Framer Motion)
-          // - React inline styles (style={{...}}) which cannot use nonces
-          // Note: Modern browsers with nonce support will ignore 'unsafe-inline'
-          // when a nonce is present, providing security while maintaining compatibility
+          // - Third-party libraries (Radix UI, Framer Motion, Recharts)
+          // - React inline styles for dynamic values (progress bars, colors, dimensions)
           "'unsafe-inline'",
           ...TRUSTED_STYLE_SOURCES,
         ],
