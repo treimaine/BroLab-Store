@@ -4,6 +4,7 @@ import { ErrorMessages } from "../../shared/constants/ErrorMessages";
 import monitoring from "../lib/monitoring";
 import { apiRateLimit } from "../middleware/rateLimiter";
 import { handleRouteError } from "../types/routes";
+import { isAdmin } from "../utils/authz";
 
 const router = Router();
 
@@ -79,9 +80,8 @@ router.get("/metrics", apiRateLimit, async (req, res): Promise<void> => {
 
     // Simple admin check - in production, use proper role-based access
     const user = req.user!;
-    const isAdmin = user.email === "admin@brolabentertainment.com" || user.username === "admin";
 
-    if (!isAdmin) {
+    if (!isAdmin(user)) {
       res.status(403).json({ error: ErrorMessages.AUTH.FORBIDDEN });
       return;
     }
@@ -128,9 +128,8 @@ router.post("/health/check", apiRateLimit, async (req, res): Promise<void> => {
     }
 
     const user = req.user!;
-    const isAdmin = user.email === "admin@brolabentertainment.com" || user.username === "admin";
 
-    if (!isAdmin) {
+    if (!isAdmin(user)) {
       res.status(403).json({ error: ErrorMessages.AUTH.FORBIDDEN });
       return;
     }

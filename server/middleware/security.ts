@@ -5,6 +5,12 @@ import helmet from "helmet";
 import { generateCspNonce } from "../utils/cspNonce";
 
 /**
+ * Environment detection for CSP configuration
+ * Development mode includes Replit domains for local development
+ */
+const isDevelopment = process.env.NODE_ENV === "development";
+
+/**
  * Custom key generator for rate limiting behind proxies (Vercel, etc.)
  * Uses X-Forwarded-For header when available, falls back to req.ip
  * Handles IPv6 addresses properly by normalizing them
@@ -39,6 +45,30 @@ function normalizeIp(ip: string): string {
  * Implements helmet with CSP nonces, compression, body-size limits, and rate limiting
  */
 
+// =============================================================================
+// REPLIT DOMAINS (Development Only)
+// =============================================================================
+// These domains are only included in development mode for Replit compatibility
+// In production, they are excluded to minimize attack surface
+
+const REPLIT_SCRIPT_SOURCES = isDevelopment
+  ? ["https://replit.com", "https://*.replit.com", "https://*.replit.app", "https://*.repl.co"]
+  : [];
+
+const REPLIT_STYLE_SOURCES = isDevelopment ? ["https://*.replit.com", "https://*.replit.app"] : [];
+
+const REPLIT_IMG_SOURCES = isDevelopment ? ["https://*.replit.com", "https://*.replit.app"] : [];
+
+const REPLIT_CONNECT_SOURCES = isDevelopment
+  ? ["https://*.replit.com", "https://*.replit.app", "wss://*.replit.com", "wss://*.replit.app"]
+  : [];
+
+const REPLIT_FRAME_SOURCES = isDevelopment ? ["https://*.replit.com", "https://*.replit.app"] : [];
+
+// =============================================================================
+// CORE TRUSTED SOURCES (Always Included)
+// =============================================================================
+
 /**
  * Trusted script sources for CSP.
  * These external domains are allowed to load scripts.
@@ -47,26 +77,25 @@ const TRUSTED_SCRIPT_SOURCES = [
   "https://cdn.jsdelivr.net",
   "https://*.clerk.accounts.dev",
   "https://*.clerk.com",
-  "https://replit.com",
-  "https://*.replit.com",
-  "https://*.replit.app",
-  "https://*.repl.co",
   "https://js.stripe.com",
   "https://challenges.cloudflare.com",
+  ...REPLIT_SCRIPT_SOURCES,
 ];
 
 /**
  * Trusted style sources for CSP.
- * Note: 'unsafe-inline' is required for Tailwind CSS and React inline styles.
- * This is a known limitation - style nonces would require build-time integration.
  */
 const TRUSTED_STYLE_SOURCES = [
   "https://fonts.googleapis.com",
   "https://*.clerk.accounts.dev",
   "https://*.clerk.com",
-  "https://*.replit.com",
-  "https://*.replit.app",
+  ...REPLIT_STYLE_SOURCES,
 ];
+
+/**
+ * WordPress/WooCommerce API domain for backend integration
+ */
+const WORDPRESS_SOURCES = ["https://wp.brolabentertainment.com"];
 
 /**
  * SHA-256 hashes for known inline scripts that cannot use nonces.
@@ -120,8 +149,13 @@ export const helmetMiddleware: RequestHandler = (
         scriptSrcAttr: ["'none'"], // Block inline event handlers (onclick, etc.)
         styleSrc: [
           "'self'",
-          // Note: 'unsafe-inline' is still required for Tailwind CSS and React
-          // Style nonces require build-time CSS extraction which is complex with Vite
+          `'nonce-${nonce}'`,
+          // Keep 'unsafe-inline' as fallback for:
+          // - Vite HMR in development (injects styles dynamically)
+          // - Third-party libraries that inject inline styles (Radix UI, Framer Motion)
+          // - React inline styles (style={{...}}) which cannot use nonces
+          // Note: Modern browsers with nonce support will ignore 'unsafe-inline'
+          // when a nonce is present, providing security while maintaining compatibility
           "'unsafe-inline'",
           ...TRUSTED_STYLE_SOURCES,
         ],
@@ -133,23 +167,24 @@ export const helmetMiddleware: RequestHandler = (
           "blob:",
           "https://*.clerk.accounts.dev",
           "https://*.clerk.com",
-          "https://*.replit.com",
-          "https://*.replit.app",
+          ...REPLIT_IMG_SOURCES,
         ],
         connectSrc: [
           "'self'",
           "https:",
           "wss:",
+          // Clerk authentication
           "https://*.clerk.accounts.dev",
           "https://*.clerk.com",
           "https://api.clerk.com",
           "https://api.clerk.dev",
+          // Convex real-time database
           "https://*.convex.cloud",
           "wss://*.convex.cloud",
-          "https://*.replit.com",
-          "https://*.replit.app",
-          "wss://*.replit.com",
-          "wss://*.replit.app",
+          // WordPress/WooCommerce API
+          ...WORDPRESS_SOURCES,
+          // Replit (development only)
+          ...REPLIT_CONNECT_SOURCES,
         ],
         mediaSrc: ["'self'", "https:", "blob:"],
         objectSrc: ["'none'"],
@@ -161,10 +196,9 @@ export const helmetMiddleware: RequestHandler = (
           "https:",
           "https://*.clerk.accounts.dev",
           "https://*.clerk.com",
-          "https://*.replit.com",
-          "https://*.replit.app",
           "https://js.stripe.com",
           "https://challenges.cloudflare.com",
+          ...REPLIT_FRAME_SOURCES,
         ],
         workerSrc: ["'self'", "blob:"],
         childSrc: ["'self'", "blob:"],
@@ -181,7 +215,6 @@ export const helmetMiddleware: RequestHandler = (
       preload: true,
     },
     noSniff: true,
-    xssFilter: true,
     hidePoweredBy: true,
   });
 

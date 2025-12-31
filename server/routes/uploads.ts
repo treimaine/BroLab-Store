@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { createApiError } from "../../shared/validation/index";
 import { isAuthenticated } from "../auth";
-import { uploadToSupabase, validateFile } from "../lib/upload";
+import { uploadToStorage, validateFile } from "../lib/upload";
 import { enhancedFileUploadSecurity, fileUploadRateLimit } from "../middleware/fileUploadSecurity";
 import { uploadRateLimit } from "../middleware/rateLimiter";
 import { validateFileUpload } from "../middleware/validation";
@@ -15,7 +15,7 @@ const router = Router();
 // Configuration multer pour stockage en mémoire
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max (harmonisé avec validateFileUpload)
 });
 
 // Enhanced secure upload route
@@ -84,8 +84,8 @@ router.post(
       const extension = req.file.originalname.split(".").pop();
       const filePath = `${userId}/${timestamp}.${extension}`;
 
-      // Upload vers Supabase
-      const { path, url } = await uploadToSupabase(req.file, filePath);
+      // Upload vers Convex Storage
+      const { path, url } = await uploadToStorage(req.file, filePath);
 
       // Include security information in response
       const securityInfo = (req as AuthenticatedRequest).fileSecurity || {};

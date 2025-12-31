@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { LicenseType } from "../../shared/types/Beat";
+import { centsToDollars } from "../../shared/utils/currency";
 import { getConvex } from "../lib/convex";
 import { PaymentError, PaymentErrorCode } from "../utils/errorHandling";
 import { adminNotificationService } from "./AdminNotificationService";
@@ -39,14 +40,31 @@ export interface PaymentData {
  * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.5, 5.1, 5.2, 5.3, 5.4, 5.5, 7.1, 7.2, 7.3, 7.4, 7.5
  */
 
-// Initialize Stripe client
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error("STRIPE_SECRET_KEY environment variable is required");
-}
+// Lazy initialization of Stripe client
+// Aligned with server/lib/env.ts which makes STRIPE_SECRET_KEY optional outside production
+let stripeClient: Stripe | null = null;
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-08-27.basil",
-});
+/**
+ * Get Stripe client with lazy initialization
+ * Only throws when Stripe is actually needed, not at module load time
+ * This allows the app to start without STRIPE_SECRET_KEY in dev/test environments
+ */
+function getStripeClient(): Stripe {
+  if (!stripeClient) {
+    const secretKey = process.env.STRIPE_SECRET_KEY;
+    if (!secretKey) {
+      throw new PaymentError(
+        "STRIPE_SECRET_KEY is required for payment operations",
+        PaymentErrorCode.MISSING_CONFIGURATION,
+        { service: "stripe", missingConfig: "STRIPE_SECRET_KEY" }
+      );
+    }
+    stripeClient = new Stripe(secretKey, {
+      apiVersion: "2025-08-27.basil",
+    });
+  }
+  return stripeClient;
+}
 
 // Initialize Convex client
 // SECURITY: Use lazy initialization with proper validation
@@ -120,7 +138,7 @@ export class PaymentService {
       const idempotencyKey = order.idempotencyKey || `order_${order._id}_${Date.now()}`;
 
       // Create payment intent with Stripe
-      const paymentIntent = await stripe.paymentIntents.create(
+      const paymentIntent = await getStripeClient().paymentIntents.create(
         {
           amount: Math.round(order.total), // Amount in cents
           currency: (order.currency || "USD").toLowerCase(),
@@ -184,7 +202,7 @@ export class PaymentService {
    * Routes events to appropriate handlers based on metadata
    * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 5.1, 5.2, 5.3, 5.4, 5.5
    */
-  async handleStripeWebhook(payload: string | Buffer, signature: string): Promise<WebhookResult> {
+  async handleStripeWebhook(payload: Buffer, signature: string): Promise<WebhookResult> {
     const startTime = Date.now();
 
     try {
@@ -492,7 +510,7 @@ export class PaymentService {
               userId: buyerUserId,
             },
             purchaseDate: new Date(),
-            price: (item.price || 0) / 100, // Convert cents to dollars
+            price: centsToDollars(item.price || 0),
             currency,
           });
 
@@ -508,7 +526,7 @@ export class PaymentService {
             licenseUrl: licenseResult.licenseUrl,
             orderId: String(orderId),
             purchaseDate: new Date(),
-            price: (item.price || 0) / 100,
+            price: centsToDollars(item.price || 0),
             currency,
           });
 
@@ -593,7 +611,7 @@ export class PaymentService {
    * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 5.1, 5.2, 5.3, 5.4, 5.5
    */
   async handlePayPalWebhook(
-    payload: string | Buffer,
+    payload: Buffer,
     headers: Record<string, string>
   ): Promise<WebhookResult> {
     const startTime = Date.now();
@@ -617,8 +635,7 @@ export class PaymentService {
         };
       }
 
-      const event =
-        typeof payload === "string" ? JSON.parse(payload) : JSON.parse(payload.toString());
+      const event = JSON.parse(payload.toString());
 
       console.log(`📨 PayPal webhook received: ${event.event_type} (${event.id})`);
 
@@ -682,8 +699,7 @@ export class PaymentService {
       let eventType = "unknown";
       let eventId = "unknown";
       try {
-        const event =
-          typeof payload === "string" ? JSON.parse(payload) : JSON.parse(payload.toString());
+        const event = JSON.parse(payload.toString());
         eventType = event.event_type || "unknown";
         eventId = event.id || "unknown";
       } catch {
@@ -746,10 +762,7 @@ export class PaymentService {
    * Verify Stripe webhook signature
    * Requirements: 3.1, 3.2, 3.3, 8.3, 8.4
    */
-  private async verifyStripeSignature(
-    payload: string | Buffer,
-    signature: string
-  ): Promise<Stripe.Event> {
+  private async verifyStripeSignature(payload: Buffer, signature: string): Promise<Stripe.Event> {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
@@ -768,7 +781,7 @@ export class PaymentService {
     }
 
     try {
-      const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+      const event = getStripeClient().webhooks.constructEvent(payload, signature, webhookSecret);
       console.log(`✅ Stripe signature verified: ${event.id}`);
       return event;
     } catch (error) {
@@ -802,7 +815,7 @@ export class PaymentService {
    * Requirements: 2.3, 2.4, 3.2, 3.3, 3.5, 8.3, 8.4
    */
   private async verifyPayPalSignature(
-    payload: string | Buffer,
+    payload: Buffer,
     headers: Record<string, string>
   ): Promise<boolean> {
     const webhookId = process.env.PAYPAL_WEBHOOK_ID;
@@ -832,7 +845,7 @@ export class PaymentService {
     }
 
     try {
-      const body = typeof payload === "string" ? payload : payload.toString();
+      const body = payload.toString();
 
       // Use PayPal SDK to verify signature
       const isValid = await PayPalService.verifyWebhookSignature(

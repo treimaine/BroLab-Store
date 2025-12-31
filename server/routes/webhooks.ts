@@ -1,5 +1,6 @@
 import { Request, Response, Router } from "express";
 import { randomUUID } from "node:crypto";
+import { logger } from "../lib/logger";
 import { paymentService } from "../services/PaymentService";
 import {
   PaymentError,
@@ -22,10 +23,10 @@ router.post("/stripe", async (req: Request, res: Response): Promise<void> => {
   try {
     const signature = req.headers["stripe-signature"];
 
-    console.log(`📨 [${requestId}] Processing Stripe webhook...`);
+    logger.info("Processing Stripe webhook", { requestId });
 
     if (!signature || typeof signature !== "string") {
-      console.error(`❌ [${requestId}] Missing Stripe signature`);
+      logger.warn("Missing Stripe signature", { requestId });
       const errorResponse = createErrorResponse(
         "Missing signature",
         PaymentErrorCode.STRIPE_MISSING_SIGNATURE,
@@ -36,8 +37,8 @@ router.post("/stripe", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Get raw body (Express should be configured with express.raw() for webhooks)
-    const payload = req.body;
+    // Get raw body (Buffer from express.raw() middleware)
+    const payload = req.body as Buffer;
 
     // Handle webhook with retry logic
     const result = await paymentService.retryWebhookProcessing(
@@ -46,7 +47,11 @@ router.post("/stripe", async (req: Request, res: Response): Promise<void> => {
     );
 
     if (result.success) {
-      console.log(`✅ [${requestId}] Stripe webhook processed: ${result.message}`);
+      logger.info("Stripe webhook processed", {
+        requestId,
+        message: result.message,
+        orderId: result.orderId,
+      });
       res.status(200).json({
         received: true,
         message: result.message,
@@ -56,7 +61,7 @@ router.post("/stripe", async (req: Request, res: Response): Promise<void> => {
         timestamp: new Date().toISOString(),
       });
     } else {
-      console.error(`❌ [${requestId}] Stripe webhook failed: ${result.message}`);
+      logger.error("Stripe webhook failed", { requestId, message: result.message });
       const errorResponse = createErrorResponse(
         result.message,
         PaymentErrorCode.WEBHOOK_PROCESSING_ERROR,
@@ -66,7 +71,7 @@ router.post("/stripe", async (req: Request, res: Response): Promise<void> => {
       res.status(400).json(errorResponse);
     }
   } catch (error) {
-    console.error(`❌ [${requestId}] Error processing Stripe webhook:`, error);
+    logger.error("Error processing Stripe webhook", { requestId, error });
 
     // Handle PaymentError with proper error code
     if (error instanceof PaymentError) {
@@ -99,8 +104,8 @@ router.post("/paypal", async (req: Request, res: Response): Promise<void> => {
   const requestId = randomUUID();
 
   try {
-    // Get raw body and headers
-    const payload = req.body;
+    // Get raw body (Buffer from express.raw() middleware) and headers
+    const payload = req.body as Buffer;
     const headers: Record<string, string> = {};
 
     // Extract PayPal headers
@@ -119,12 +124,12 @@ router.post("/paypal", async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    console.log(`📨 [${requestId}] Processing PayPal webhook...`);
+    logger.info("Processing PayPal webhook", { requestId });
 
     // Validate required headers
     const missingHeaders = relevantHeaders.filter(h => !headers[h]);
     if (missingHeaders.length > 0) {
-      console.error(`❌ [${requestId}] Missing PayPal headers: ${missingHeaders.join(", ")}`);
+      logger.warn("Missing PayPal headers", { requestId, missingHeaders });
       const errorResponse = createErrorResponse(
         "Missing required headers",
         PaymentErrorCode.PAYPAL_MISSING_HEADERS,
@@ -143,7 +148,11 @@ router.post("/paypal", async (req: Request, res: Response): Promise<void> => {
     );
 
     if (result.success) {
-      console.log(`✅ [${requestId}] PayPal webhook processed: ${result.message}`);
+      logger.info("PayPal webhook processed", {
+        requestId,
+        message: result.message,
+        orderId: result.orderId,
+      });
       res.status(200).json({
         received: true,
         message: result.message,
@@ -153,7 +162,7 @@ router.post("/paypal", async (req: Request, res: Response): Promise<void> => {
         timestamp: new Date().toISOString(),
       });
     } else {
-      console.error(`❌ [${requestId}] PayPal webhook failed: ${result.message}`);
+      logger.error("PayPal webhook failed", { requestId, message: result.message });
       const errorResponse = createErrorResponse(
         result.message,
         PaymentErrorCode.WEBHOOK_PROCESSING_ERROR,
@@ -163,7 +172,7 @@ router.post("/paypal", async (req: Request, res: Response): Promise<void> => {
       res.status(400).json(errorResponse);
     }
   } catch (error) {
-    console.error(`❌ [${requestId}] Error processing PayPal webhook:`, error);
+    logger.error("Error processing PayPal webhook", { requestId, error });
 
     // Handle PaymentError with proper error code
     if (error instanceof PaymentError) {
@@ -245,11 +254,11 @@ router.get("/health", (_req: Request, res: Response): void => {
 
     const statusCode = allConfigured ? 200 : 503;
 
-    console.log(`🏥 [${requestId}] Health check: ${healthStatus.status}`);
+    logger.info("Health check completed", { requestId, status: healthStatus.status });
 
     res.status(statusCode).json(healthStatus);
   } catch (error) {
-    console.error(`❌ [${requestId}] Health check error:`, error);
+    logger.error("Health check error", { requestId, error });
     const errorResponse = createErrorResponse(
       "Health check failed",
       "HEALTH_CHECK_ERROR",

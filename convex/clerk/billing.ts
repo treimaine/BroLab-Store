@@ -2,6 +2,47 @@ import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 
 /**
+ * Extract and validate user ID from webhook data with fallbacks
+ * Clerk Billing uses different field names depending on the event type:
+ * - subscription events: payer.user_id, payer.external_id (the actual Clerk user ID)
+ * - invoice events: user_id, customer_id
+ *
+ * IMPORTANT: payer_id (cpayer_xxx) is NOT the same as the Clerk user ID (user_xxx)
+ * We need to extract the user_id from the payer object
+ */
+function extractAndValidateUserId(data: Record<string, unknown>, eventType: string): string {
+  // Extract payer object if present
+  const payer = data.payer as
+    | {
+        user_id?: string;
+        external_id?: string;
+        id?: string;
+        clerk_user_id?: string;
+      }
+    | undefined;
+
+  // Try multiple possible field names for user ID
+  // Priority: payer.user_id > payer.external_id > payer.clerk_user_id > direct user_id > customer_id
+  const clerkUserId: string | undefined =
+    payer?.user_id ||
+    payer?.external_id ||
+    payer?.clerk_user_id ||
+    (data.user_id as string) ||
+    (data.customer_id as string) ||
+    (data.customer as { id?: string })?.id;
+
+  if (!clerkUserId || clerkUserId === "undefined") {
+    // Log available payer fields for debugging
+    const payerKeys = payer ? Object.keys(payer).join(", ") : "no payer object";
+    throw new Error(
+      `Missing user_id in ${eventType} webhook data. Available keys: ${Object.keys(data).join(", ")}. Payer keys: ${payerKeys}`
+    );
+  }
+
+  return clerkUserId;
+}
+
+/**
  * Handle subscription.created event from Clerk Billing
  * Ensures idempotent creation - won't duplicate if called multiple times
  */
@@ -11,7 +52,7 @@ export const handleSubscriptionCreated = mutation({
     const now = Date.now();
 
     const clerkSubscriptionId: string = data.id || data.subscription_id;
-    const clerkUserId: string = data.user_id;
+    const clerkUserId: string = extractAndValidateUserId(data, "subscription.created");
     const planId: string = (data.plan_id || data.plan?.name || "basic").toLowerCase();
     const status: string = data.status || "active";
 
@@ -144,6 +185,7 @@ export const handleSubscriptionUpdated = mutation({
     const now = Date.now();
 
     const clerkSubscriptionId: string = data.id || data.subscription_id;
+    const clerkUserId: string = extractAndValidateUserId(data, "subscription.updated");
     const planId: string = (data.plan_id || data.plan?.name || "basic").toLowerCase();
     const status: string = data.status || "active";
     const cancelAtPeriodEnd: boolean = data.cancel_at_period_end || false;
@@ -166,18 +208,86 @@ export const handleSubscriptionUpdated = mutation({
       .first();
 
     if (!subscription) {
-      // Log missing subscription for debugging
+      // Subscription doesn't exist - create it (upsert pattern)
+      // This handles race conditions where updated arrives before created
+      console.log(`Subscription ${clerkSubscriptionId} not found, creating via upsert`);
+
+      // Find user by Clerk ID (clerkUserId already validated above)
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", q => q.eq("clerkId", clerkUserId))
+        .first();
+
+      if (!user) {
+        await ctx.db.insert("auditLogs", {
+          clerkId: clerkUserId,
+          action: "subscription_updated_user_missing",
+          resource: "subscriptions",
+          details: {
+            clerkSubscriptionId,
+            error: "User not found for Clerk ID during upsert",
+          },
+          timestamp: now,
+        });
+        throw new Error(`User not found for Clerk ID: ${clerkUserId}`);
+      }
+
+      // Determine quota based on plan
+      let downloadQuota = 5;
+      if (planId === "ultimate_pass") {
+        downloadQuota = -1;
+      } else if (planId === "artist") {
+        downloadQuota = 20;
+      } else if (planId === "free_user") {
+        downloadQuota = 1;
+      }
+
+      // Create subscription
+      const subscriptionId = await ctx.db.insert("subscriptions", {
+        userId: user._id,
+        clerkSubscriptionId,
+        planId,
+        status,
+        currentPeriodStart,
+        currentPeriodEnd,
+        cancelAtPeriodEnd,
+        features: [],
+        downloadQuota,
+        downloadUsed: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Create quota for downloads
+      await ctx.db.insert("quotas", {
+        userId: user._id,
+        subscriptionId: subscriptionId,
+        quotaType: "downloads",
+        limit: downloadQuota,
+        used: 0,
+        resetAt: currentPeriodEnd,
+        resetPeriod: "monthly",
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Log audit trail
       await ctx.db.insert("auditLogs", {
-        clerkId: data.user_id,
-        action: "subscription_updated_not_found",
+        userId: user._id,
+        clerkId: clerkUserId,
+        action: "subscription_created_via_update",
         resource: "subscriptions",
         details: {
           clerkSubscriptionId,
-          error: "Subscription not found for update",
+          planId,
+          status,
+          downloadQuota,
         },
         timestamp: now,
       });
-      throw new Error(`Subscription not found: ${clerkSubscriptionId}`);
+
+      return { success: true, subscriptionId, createdViaUpsert: true };
     }
 
     // Track changes for audit
@@ -273,6 +383,7 @@ export const handleSubscriptionDeleted = mutation({
     const now = Date.now();
 
     const clerkSubscriptionId: string = data.id || data.subscription_id;
+    const clerkUserId: string = extractAndValidateUserId(data, "subscription.deleted");
     const cancellationReason: string | undefined = data.cancellation_reason;
 
     // Find existing subscription
@@ -284,7 +395,7 @@ export const handleSubscriptionDeleted = mutation({
     if (!subscription) {
       // Log for debugging but don't throw - subscription may have been deleted already
       await ctx.db.insert("auditLogs", {
-        clerkId: data.user_id,
+        clerkId: clerkUserId,
         action: "subscription_deleted_not_found",
         resource: "subscriptions",
         details: {
@@ -365,6 +476,7 @@ export const handleInvoiceCreated = mutation({
     const now = Date.now();
 
     const clerkInvoiceId: string = data.id || data.invoice_id;
+    const clerkUserId: string = extractAndValidateUserId(data, "invoice.created");
     const clerkSubscriptionId: string = data.subscription_id;
     const amount: number = data.amount || data.amount_due || 0;
     const currency: string = (data.currency || "eur").toLowerCase();
@@ -391,7 +503,7 @@ export const handleInvoiceCreated = mutation({
 
     if (!subscription) {
       await ctx.db.insert("auditLogs", {
-        clerkId: data.user_id,
+        clerkId: clerkUserId,
         action: "invoice_created_subscription_missing",
         resource: "invoices",
         details: {
@@ -445,6 +557,7 @@ export const handleInvoicePaid = mutation({
     const now = Date.now();
 
     const clerkInvoiceId: string = data.id || data.invoice_id;
+    const clerkUserId: string = extractAndValidateUserId(data, "invoice.paid");
     const paidAt: number = data.paid_at ? Number(data.paid_at) * 1000 : now;
 
     // Find invoice
@@ -456,7 +569,7 @@ export const handleInvoicePaid = mutation({
     if (!invoice) {
       // Log for debugging - invoice may not exist yet if events arrive out of order
       await ctx.db.insert("auditLogs", {
-        clerkId: data.user_id,
+        clerkId: clerkUserId,
         action: "invoice_paid_not_found",
         resource: "invoices",
         details: {
@@ -554,9 +667,9 @@ export const handleInvoicePaymentFailed = mutation({
     const now = Date.now();
 
     const clerkInvoiceId: string = data.id || data.invoice_id;
+    const clerkUserId: string = extractAndValidateUserId(data, "invoice.payment_failed");
+    const failureReason: string = data.failure_reason || "Unknown failure";
     const attemptCount: number = data.attempt_count || 1;
-    const failureReason: string | undefined =
-      data.failure_reason || data.last_payment_error?.message;
     const nextPaymentAttempt: number | undefined = data.next_payment_attempt
       ? Number(data.next_payment_attempt) * 1000
       : undefined;
@@ -570,7 +683,7 @@ export const handleInvoicePaymentFailed = mutation({
     if (!invoice) {
       // Log for debugging
       await ctx.db.insert("auditLogs", {
-        clerkId: data.user_id,
+        clerkId: clerkUserId,
         action: "invoice_payment_failed_not_found",
         resource: "invoices",
         details: {

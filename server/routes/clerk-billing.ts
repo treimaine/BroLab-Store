@@ -1,5 +1,6 @@
 import { Request, Response, Router } from "express";
 import { randomUUID } from "node:crypto";
+import { logger } from "../lib/logger";
 import {
   getWebhookAuditLogger,
   type WebhookAuditEntry,
@@ -85,7 +86,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
   let syncStatus: boolean | undefined;
 
   try {
-    console.log(`📨 [${requestId}] Processing Clerk Billing webhook...`);
+    logger.info("Processing Clerk Billing webhook", { requestId });
 
     // Verify environment configuration
     const config = validateEnvironmentConfig(requestId);
@@ -110,7 +111,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
     if (!svixHeaders) {
       outcome = "rejected";
       rejectionReason = "Missing required Svix headers";
-      console.warn(`⚠️ [${requestId}] ${rejectionReason}`);
+      logger.warn("Missing required Svix headers", { requestId });
       logAuditEntry({
         requestId,
         startTime,
@@ -136,7 +137,7 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
     if (!timestampValidation.valid) {
       outcome = "rejected";
       rejectionReason = timestampValidation.reason;
-      console.warn(`⚠️ [${requestId}] Timestamp validation failed: ${rejectionReason}`);
+      logger.warn("Timestamp validation failed", { requestId, reason: rejectionReason });
       logAuditEntry({
         requestId,
         startTime,
@@ -161,9 +162,11 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
     const idempotencyResult = securityService.checkIdempotency(svixId);
     if (idempotencyResult.isDuplicate) {
       outcome = "duplicate";
-      console.log(
-        `ℹ️ [${requestId}] Duplicate webhook detected: ${svixId} (originally processed at ${new Date(idempotencyResult.originalProcessedAt).toISOString()})`
-      );
+      logger.info("Duplicate webhook detected", {
+        requestId,
+        svixId,
+        originalProcessedAt: new Date(idempotencyResult.originalProcessedAt).toISOString(),
+      });
       logAuditEntry({
         requestId,
         startTime,
@@ -202,9 +205,11 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
       if (securityService.shouldWarnAboutIP(sourceIp)) {
         const failureCount = securityService.getFailureCount(sourceIp);
         auditLogger.logSecurityWarning(sourceIp, failureCount);
-        console.warn(
-          `🚨 [${requestId}] Security warning: ${failureCount} signature failures from IP ${sourceIp}`
-        );
+        logger.warn("Security warning: multiple signature failures from IP", {
+          requestId,
+          sourceIp,
+          failureCount,
+        });
       }
 
       logAuditEntry({
@@ -360,7 +365,7 @@ function validateEnvironmentConfig(requestId: string): {
 
   // Check webhook secret in production
   if (!webhookSecret && isProd) {
-    console.error(`❌ [${requestId}] CLERK_WEBHOOK_SECRET not configured in production`);
+    logger.error("CLERK_WEBHOOK_SECRET not configured in production", { requestId });
     return {
       isValid: false,
       isProd,
@@ -375,14 +380,14 @@ function validateEnvironmentConfig(requestId: string): {
   }
 
   if (!webhookSecret) {
-    console.warn(`⚠️ [${requestId}] CLERK_WEBHOOK_SECRET not set; using raw body in dev`);
+    logger.warn("CLERK_WEBHOOK_SECRET not set; using raw body in dev", { requestId });
   }
 
   // Check Convex URL
   if (!convexUrl) {
-    console.warn(
-      `⚠️ [${requestId}] VITE_CONVEX_URL not set; webhook will be acknowledged but not synced`
-    );
+    logger.warn("VITE_CONVEX_URL not set; webhook will be acknowledged but not synced", {
+      requestId,
+    });
   }
 
   return {
@@ -424,16 +429,16 @@ async function verifyWebhookSignature(
     const bodyToVerify = rawBody ? rawBody.toString("utf8") : JSON.stringify(req.body);
 
     if (!rawBody) {
-      console.warn(`⚠️ [${requestId}] Raw body not available, using JSON.stringify fallback`);
+      logger.warn("Raw body not available, using JSON.stringify fallback", { requestId });
     }
 
     // Verify signature
     const payload = svix.verify(bodyToVerify, svixHeaders) as WebhookPayload;
-    console.log(`✅ [${requestId}] Webhook signature verified`);
+    logger.info("Webhook signature verified", { requestId });
     return payload;
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error(`❌ [${requestId}] Webhook signature verification failed:`, errorMessage);
+    logger.error("Webhook signature verification failed", { requestId, error: errorMessage });
 
     // In production, reject invalid signatures
     if (isProd) {
@@ -441,7 +446,7 @@ async function verifyWebhookSignature(
     }
 
     // In development, allow fallback to raw body
-    console.warn(`⚠️ [${requestId}] Svix verification failed; using raw body in dev`);
+    logger.warn("Svix verification failed; using raw body in dev", { requestId });
     return req.body;
   }
 }
@@ -474,7 +479,7 @@ async function processWebhookEvent(
   requestId: string
 ): Promise<WebhookResponse> {
   const { type: eventType, data: eventData } = payload;
-  console.log(`📋 [${requestId}] Event type: ${eventType}`);
+  logger.info("Processing webhook event", { requestId, eventType });
 
   // If Convex URL not configured, acknowledge but don't sync
   if (!convexUrl) {
@@ -541,7 +546,7 @@ async function processWebhookEvent(
   }
 
   // Unknown event type
-  console.log(`ℹ️ [${requestId}] Unhandled event type: ${eventType}`);
+  logger.info("Unhandled event type", { requestId, eventType });
   return {
     received: true,
     synced: false,
@@ -563,11 +568,11 @@ async function handleEventWithMutation(
   const mutationName = mutationMap[eventType];
 
   if (!mutationName) {
-    console.log(`ℹ️ [${requestId}] No mutation defined for event: ${eventType}`);
+    logger.info("No mutation defined for event", { requestId, eventType });
     return;
   }
 
-  console.log(`🔔 [${requestId}] Handling event: ${eventType}`);
+  logger.info("Handling event", { requestId, eventType });
   logEventDetails(eventType, data, requestId);
 
   await callConvexMutation(mutationName, data, convexUrl, requestId);
@@ -582,16 +587,16 @@ function logEventDetails(
   requestId: string
 ): void {
   if (eventType.startsWith("subscription.")) {
-    console.log(`📊 [${requestId}] Subscription details:`, {
+    logger.info("Subscription details", {
+      requestId,
       subscriptionId: data.id,
-      userId: data.user_id,
       planId: data.plan_id,
       status: data.status,
     });
   } else if (eventType.startsWith("invoice.")) {
-    console.log(`📊 [${requestId}] Invoice details:`, {
+    logger.info("Invoice details", {
+      requestId,
       invoiceId: data.id,
-      userId: data.user_id,
       amount: data.amount,
       status: data.status,
     });
@@ -607,7 +612,7 @@ async function handleUserEvent(
   convexUrl: string,
   requestId: string
 ): Promise<void> {
-  console.log(`👤 [${requestId}] Handling user event: ${eventType}`);
+  logger.info("Handling user event", { requestId, eventType });
 
   try {
     // Extract user data from event
@@ -618,13 +623,7 @@ async function handleUserEvent(
     const lastName = (data.last_name as string) || undefined;
 
     // Log extracted data for debugging
-    console.log(`📊 [${requestId}] User data extracted:`, {
-      clerkId: userId,
-      email,
-      username: data.username,
-      firstName,
-      lastName,
-    });
+    logger.info("User data extracted", { requestId, clerkId: userId });
 
     // Use the existing upsertUser function from server/lib/convex.ts
     // which properly uses ConvexHttpClient
@@ -639,7 +638,8 @@ async function handleUserEvent(
       imageUrl: (data.image_url as string) || undefined,
     });
 
-    console.log(`✅ [${requestId}] User synced successfully:`, {
+    logger.info("User synced successfully", {
+      requestId,
       userId,
       result: result ? "success" : "failed",
     });
@@ -658,17 +658,14 @@ async function handleUserEvent(
           firstName,
           lastName,
         });
-        console.log(
-          `📧 [${requestId}] Resend contact sync:`,
-          syncResult.success ? "success" : syncResult.error
-        );
+        logger.info("Resend contact sync", { requestId, success: syncResult.success });
       } catch (resendError) {
         // Don't fail the webhook if Resend sync fails
-        console.warn(`⚠️ [${requestId}] Resend contact sync failed (non-blocking):`, resendError);
+        logger.warn("Resend contact sync failed (non-blocking)", { requestId, error: resendError });
       }
     }
   } catch (error) {
-    console.error(`❌ [${requestId}] Error syncing user:`, error);
+    logger.error("Error syncing user", { requestId, error });
     throw error;
   }
 }
@@ -690,15 +687,15 @@ async function callConvexMutation(
 
     // For billing mutations, we need to call them dynamically
     // The mutation name format is "clerk/billing:handleSubscriptionCreated"
-    console.log(`🔔 [${requestId}] Calling Convex mutation: ${mutationName}`);
+    logger.info("Calling Convex mutation", { requestId, mutationName });
 
     // Use the string-based mutation call to avoid type instantiation issues
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (convex as any).mutation(mutationName as any, { data });
 
-    console.log(`✅ [${requestId}] Convex mutation completed: ${mutationName}`);
+    logger.info("Convex mutation completed", { requestId, mutationName });
   } catch (error) {
-    console.error(`❌ [${requestId}] Error calling Convex mutation:`, error);
+    logger.error("Error calling Convex mutation", { requestId, mutationName, error });
     throw error;
   }
 }
@@ -707,7 +704,7 @@ async function callConvexMutation(
  * Handle webhook processing errors
  */
 function handleWebhookError(error: unknown, requestId: string, res: Response): void {
-  console.error(`❌ [${requestId}] Error processing Clerk Billing webhook:`, error);
+  logger.error("Error processing Clerk Billing webhook", { requestId, error });
 
   if (error instanceof PaymentError) {
     const errorResponse = error.toErrorResponse(requestId);

@@ -11,6 +11,7 @@
 
 import { ConvexHttpClient } from "convex/browser";
 import Stripe from "stripe";
+import { centsToDollars } from "../../shared/utils/currency";
 
 /**
  * Typed Convex client interface for string-based function calls
@@ -346,14 +347,14 @@ export class ReconciliationService {
     const items = lineItems.map((item, index) => ({
       productId: index,
       name: item.description || `Item ${index + 1}`,
-      price: (item.amount_total || 0) / 100,
+      price: centsToDollars(item.amount_total || 0),
       quantity: item.quantity || 1,
       license: (session.metadata?.licenseType as string) || "basic",
     }));
 
     const result = await this.convex.mutation<{ orderId: string } | string>("orders:createOrder", {
       email,
-      total: (session.amount_total || 0) / 100,
+      total: centsToDollars(session.amount_total || 0),
       items,
       status: "paid",
       sessionId: session.id,

@@ -11,6 +11,7 @@ import {
   validateParams,
 } from "../../shared/validation/index";
 import { isAuthenticated as requireAuth } from "../auth";
+import { logger } from "../lib/logger";
 import { createValidationMiddleware as validateRequest } from "../lib/validation";
 import { sendMail } from "../services/mail";
 import { storage } from "../storage";
@@ -109,7 +110,9 @@ async function sendConfirmationEmail(
   try {
     // Validate email before attempting to send
     if (!userEmail || userEmail.trim() === "") {
-      console.warn("⚠️ Cannot send confirmation email: No recipient email provided");
+      logger.warn("Cannot send confirmation email: No recipient email provided", {
+        reservationId: reservation.id,
+      });
       return;
     }
 
@@ -119,9 +122,12 @@ async function sendConfirmationEmail(
       subject: "BroLab Reservation Confirmation",
       html: emailContent,
     });
-    console.log("📧 Confirmation email sent successfully to:", userEmail);
+    logger.info("Confirmation email sent", { reservationId: reservation.id });
   } catch (emailError) {
-    console.error("⚠️ Failed to send confirmation email:", emailError);
+    logger.error("Failed to send confirmation email", {
+      reservationId: reservation.id,
+      error: emailError,
+    });
   }
 }
 
@@ -171,9 +177,12 @@ async function sendAdminNotification(
     };
 
     await sendAdminReservationNotification(adminUser, reservationData);
-    console.log("📧 Admin notification sent successfully");
+    logger.info("Admin notification sent", { reservationId: reservation.id });
   } catch (adminEmailError) {
-    console.error("⚠️ Failed to send admin notification:", adminEmailError);
+    logger.error("Failed to send admin notification", {
+      reservationId: reservation.id,
+      error: adminEmailError,
+    });
   }
 }
 
@@ -311,24 +320,14 @@ router.post(
 
       const body = req.body;
 
-      console.log("🚀 Creating reservation with authentication");
-      console.log("👤 Authenticated user:", {
-        id: user.id,
-        clerkId:
-          user.clerkId && typeof user.clerkId === "string"
-            ? `${user.clerkId.substring(0, 8)}...`
-            : "undefined",
-        email: user.email,
-      });
-      console.log("📝 Request body:", {
+      logger.info("Creating reservation with authentication", {
+        userId: user.id,
         serviceType: body.serviceType,
-        preferredDate: body.preferredDate,
-        clientInfo: body.clientInfo,
       });
 
       // Validate that we have the required clerkId
       if (!user.clerkId || typeof user.clerkId !== "string") {
-        console.error("❌ Missing or invalid clerkId in authenticated user");
+        logger.error("Missing or invalid clerkId in authenticated user", { userId: user.id });
         res.status(400).json({
           error: "Authentication error: Missing user identifier. Please log out and log back in.",
         });
@@ -366,19 +365,16 @@ router.post(
         notes: body.notes || null,
       };
 
-      console.log("🔄 Creating reservation with data:", {
-        ...reservationData,
-        clerkId:
-          typeof reservationData.clerkId === "string"
-            ? `${reservationData.clerkId.substring(0, 8)}...`
-            : "invalid",
+      logger.info("Creating reservation with data", {
+        userId: user.id,
+        serviceType: reservationData.service_type,
       });
 
       // Create the reservation with the authenticated user
       const reservation = await storage.createReservation(reservationData);
 
-      console.log("✅ Reservation created successfully:", {
-        id: reservation.id,
+      logger.info("Reservation created successfully", {
+        reservationId: reservation.id,
         serviceType: reservation.service_type,
         status: reservation.status,
       });
@@ -392,13 +388,15 @@ router.post(
       if (confirmationEmail) {
         void sendConfirmationEmail(confirmationEmail, reservation, user);
       } else {
-        console.warn("⚠️ No email available for confirmation - skipping user email");
+        logger.warn("No email available for confirmation - skipping user email", {
+          reservationId: reservation.id,
+        });
       }
       void sendAdminNotification(user, reservation, body.clientInfo?.phone, body.notes);
 
       res.status(201).json(reservation);
     } catch (error: unknown) {
-      console.error("❌ Reservation creation failed:", error);
+      logger.error("Reservation creation failed", { error });
 
       if (handleReservationError(error, res)) {
         return;

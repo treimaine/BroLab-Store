@@ -1,6 +1,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { LicenseTypeEnum } from "../../shared/schema";
+import { centsToDollars } from "../../shared/utils/currency";
 import { BrandConfig, buildInvoicePdfStreamAsync } from "../lib/pdf";
 import { sendMail } from "./mail";
 
@@ -113,7 +114,7 @@ export class InvoiceService {
               ? item.productId
               : Number.parseInt(String(item.productId || "0")) || 0,
           license_type: licenseType,
-          price: (item.totalPrice || item.unitPrice || 0) / 100,
+          price: centsToDollars(item.totalPrice || item.unitPrice || 0),
           quantity: item.qty || 1,
           created_at: new Date().toISOString(),
           session_id: null,

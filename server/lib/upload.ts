@@ -7,9 +7,9 @@ const ALLOWED_MIME_TYPES = {
   document: ["application/pdf"],
 };
 
-// Configuration des limites de taille
+// Configuration des limites de taille (harmonisé avec multer et validateFileUpload)
 const SIZE_LIMITS = {
-  audio: 50 * 1024 * 1024, // 50MB
+  audio: 100 * 1024 * 1024, // 100MB - fichiers audio professionnels (WAV 24-bit, FLAC)
   image: 5 * 1024 * 1024, // 5MB
   document: 10 * 1024 * 1024, // 10MB
 };
@@ -49,17 +49,12 @@ export async function validateFile(
   if (category === "audio") {
     // Basic audio quality validation based on file size and type
     const minAudioSize = 100 * 1024; // 100KB minimum for valid audio
-    const maxAudioSize = 500 * 1024 * 1024; // 500MB maximum
 
     if (file.size < minAudioSize) {
       errors.push("Audio file too small - may be corrupted or low quality");
     }
 
-    if (file.size > maxAudioSize) {
-      errors.push("Audio file exceeds maximum size of 500MB");
-    }
-
-    // Validate audio MIME types
+    // Validate audio MIME types using detected MIME (not client-provided)
     const validAudioTypes = [
       "audio/mpeg",
       "audio/mp3",
@@ -74,9 +69,9 @@ export async function validateFile(
       "audio/aac",
     ];
 
-    if (!validAudioTypes.includes(file.mimetype)) {
+    if (!validAudioTypes.includes(detectedMime)) {
       errors.push(
-        `Invalid audio format: ${file.mimetype}. Supported: MP3, WAV, AIFF, FLAC, OGG, AAC`
+        `Invalid audio format: ${detectedMime}. Supported: MP3, WAV, AIFF, FLAC, OGG, AAC`
       );
     }
   }
@@ -301,8 +296,12 @@ function isExpectedExecutable(fileName: string, mimeType?: string): boolean {
   return hasExecutableExtension || hasExecutableMimeType;
 }
 
-// Upload to Convex Storage
-export async function uploadToSupabase(
+/**
+ * Upload to Convex Storage
+ * Note: Function renamed from uploadToSupabase - Convex is the current storage backend
+ * Supabase is legacy and should not be extended (see steering rules)
+ */
+export async function uploadToStorage(
   file: Express.Multer.File,
   path: string,
   options: { contentType?: string; cacheControl?: string } = {}
@@ -360,7 +359,7 @@ export async function uploadToSupabase(
 export default {
   validateFile,
   scanFile,
-  uploadToSupabase,
+  uploadToStorage,
   ALLOWED_MIME_TYPES,
   SIZE_LIMITS,
 };

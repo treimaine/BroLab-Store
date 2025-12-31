@@ -37,6 +37,7 @@ import stripeRouter from "./routes/stripe";
 import subscriptionRouter from "./routes/subscription";
 import syncRouter from "./routes/sync";
 import uploadsRouter from "./routes/uploads";
+import webhooksRouter from "./routes/webhooks";
 import wishlistRouter from "./routes/wishlist";
 import wooRouter from "./routes/woo";
 import wpRouter from "./routes/wp";
@@ -55,7 +56,12 @@ app.use(helmetMiddleware);
 app.use(compressionMiddleware);
 app.use(bodySizeLimits);
 
-// Capture raw body for webhook signature verification (Svix/Clerk, Stripe)
+// Configure raw body middleware for webhook routes BEFORE express.json()
+// This ensures webhook signature verification works with raw Buffer data
+app.use("/api/webhooks/stripe", express.raw({ type: "application/json", limit: "10mb" }));
+app.use("/api/webhooks/paypal", express.raw({ type: "application/json", limit: "10mb" }));
+
+// Capture raw body for other webhook signature verification (Svix/Clerk)
 // Must be before express.json() middleware
 app.use(
   express.json({
@@ -104,6 +110,9 @@ app.use("/api/payment/paypal", paymentRateLimiter, paypalRouter);
 app.use("/api/payment/stripe", paymentRateLimiter, stripeRouter);
 app.use("/api/clerk", apiRateLimiter, clerkRouter); // Use general API limiter (1000/15min) for Clerk
 app.use("/api/payments", paymentRateLimiter, paymentsRouter);
+
+// Webhook routes (no rate limit for webhooks)
+app.use("/api/webhooks", webhooksRouter);
 
 // Clerk Billing webhook - handles subscription and invoice events (no rate limit for webhooks)
 app.use("/api/webhooks/clerk-billing", clerkBillingRouter);

@@ -22,6 +22,7 @@ import type {
   GetOrderHandler,
 } from "../types/ApiTypes";
 import { handleRouteError } from "../types/routes";
+import { canAccessResource } from "../utils/authz";
 
 // Interface for Convex order creation
 interface CreateOrderIdempotentArgs {
@@ -173,15 +174,9 @@ const getOrder: GetOrderHandler = async (req, res) => {
     const id = req.params.id;
     const data = await getOrderWithRelations({ orderId: id });
 
-    const user = req.user;
-    const isAdmin =
-      user?.role === "admin" ||
-      user?.email === "admin@brolabentertainment.com" ||
-      user?.username === "admin";
     const orderUserId = data?.order?.userId as string | undefined;
-    const isOwner = orderUserId && orderUserId === String(user?.id);
 
-    if (!isAdmin && !isOwner) {
+    if (!canAccessResource(req.user, orderUserId)) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
@@ -213,14 +208,9 @@ const getInvoice: GetInvoiceHandler = async (req, res) => {
     const id = req.params.id;
     const data = await getOrderWithRelations({ orderId: id });
 
-    const user = req.user;
-    const isAdmin =
-      user?.role === "admin" ||
-      user?.email === "admin@brolabentertainment.com" ||
-      user?.username === "admin";
     const orderUserId = data?.order?.userId as string | undefined;
-    const isOwner = orderUserId && orderUserId === String(user?.id);
-    if (!isAdmin && !isOwner) {
+
+    if (!canAccessResource(req.user, orderUserId)) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
@@ -246,14 +236,9 @@ ordersRouter.get("/:id/invoice/download", validateParams(CommonParams.id), async
     const id = req.params.id;
     const data = await getOrderWithRelations({ orderId: id });
 
-    const user = req.user;
-    const isAdmin =
-      user?.role === "admin" ||
-      user?.email === "admin@brolabentertainment.com" ||
-      user?.username === "admin";
     const orderUserId = data?.order?.userId as string | undefined;
-    const isOwner = orderUserId && orderUserId === String(user?.id);
-    if (!isAdmin && !isOwner) {
+
+    if (!canAccessResource(req.user, orderUserId)) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }

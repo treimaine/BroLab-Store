@@ -151,14 +151,16 @@ export async function fetchWooProducts(
 
     // Get raw text first to handle HTML error pages
     const responseText = await response.text();
-    
+
     // Check if response is HTML (error page) instead of JSON
-    if (responseText.trim().startsWith('<!') || responseText.trim().startsWith('<html')) {
+    if (responseText.trim().startsWith("<!") || responseText.trim().startsWith("<html")) {
       console.error("❌ WooCommerce API returned HTML instead of JSON. This usually means:");
       console.error("   1. Invalid API credentials (consumer key/secret)");
       console.error("   2. WooCommerce REST API is not enabled on the site");
       console.error("   3. The site requires HTTPS for API access");
-      console.error("   Check WOOCOMMERCE_CONSUMER_KEY and WOOCOMMERCE_CONSUMER_SECRET in your environment variables");
+      console.error(
+        "   Check WOOCOMMERCE_CONSUMER_KEY and WOOCOMMERCE_CONSUMER_SECRET in your environment variables"
+      );
       return [];
     }
 
@@ -169,11 +171,15 @@ export async function fetchWooProducts(
     let rawData;
     try {
       rawData = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error("Failed to parse WooCommerce response as JSON:", responseText.substring(0, 500));
+    } catch (error) {
+      console.error(
+        "Failed to parse WooCommerce response as JSON:",
+        responseText.substring(0, 500)
+      );
+      console.error("Parse error:", error);
       return [];
     }
-    
+
     const products = extractArrayFromResponse(rawData);
 
     if (products.length === 0 && rawData && typeof rawData === "object") {
@@ -267,8 +273,8 @@ export async function fetchWooCategories(
     });
 
     const responseText = await response.text();
-    
-    if (responseText.trim().startsWith('<!') || responseText.trim().startsWith('<html')) {
+
+    if (responseText.trim().startsWith("<!") || responseText.trim().startsWith("<html")) {
       console.error("❌ WooCommerce Categories API returned HTML - check API credentials");
       return [];
     }
@@ -284,7 +290,7 @@ export async function fetchWooCategories(
       console.error("Failed to parse WooCommerce categories response");
       return [];
     }
-    
+
     const categories = Array.isArray(rawData) ? rawData : [];
 
     return validateCategories(categories);
@@ -329,8 +335,8 @@ export async function getWooCommerceOrders(
     });
 
     const responseText = await response.text();
-    
-    if (responseText.trim().startsWith('<!') || responseText.trim().startsWith('<html')) {
+
+    if (responseText.trim().startsWith("<!") || responseText.trim().startsWith("<html")) {
       console.error("❌ WooCommerce Orders API returned HTML - check API credentials");
       return [];
     }
@@ -346,7 +352,7 @@ export async function getWooCommerceOrders(
       console.error("Failed to parse WooCommerce orders response");
       return [];
     }
-    
+
     const orders = extractArrayFromResponse(rawData);
 
     if (orders.length === 0 && rawData) {

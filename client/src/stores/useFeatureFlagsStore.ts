@@ -2,6 +2,9 @@
  * Feature Flags Store
  * Zustand store for reactive feature flags with localStorage persistence
  * Replaces the mutable object pattern to ensure React components re-render on flag changes
+ *
+ * Priority order: env variables > localStorage (user overrides) > defaults
+ * Namespace is versioned and environment-specific to avoid conflicts
  */
 
 import { create } from "zustand";
@@ -129,13 +132,39 @@ interface FeatureFlagsActions {
 }
 
 /**
+ * Storage namespace version - increment when FeatureFlags structure changes
+ * This ensures old persisted data doesn't conflict with new schema
+ */
+const STORAGE_VERSION = 1;
+
+/**
+ * Get environment-specific storage key
+ * Separates dev/staging/production to avoid cross-environment conflicts
+ */
+function getStorageKey(): string {
+  const mode = globalThis.window === undefined ? "server" : import.meta.env.MODE;
+  return `feature-flags-v${STORAGE_VERSION}-${mode}`;
+}
+
+/**
+ * Get the list of flag keys controlled by environment variables
+ * These should NOT be persisted to localStorage
+ */
+function getEnvControlledKeys(): Set<string> {
+  const envFlags = loadEnvFlags();
+  return new Set(Object.keys(envFlags));
+}
+
+/**
  * Feature Flags Zustand Store
  * Provides reactive state management for feature flags with automatic persistence
+ *
+ * Priority: env variables > localStorage (user overrides) > defaults
  */
 export const useFeatureFlagsStore = create<FeatureFlagsState & FeatureFlagsActions>()(
   persist(
     (set, get) => ({
-      // Initial state: merge defaults with env overrides
+      // Initial state: defaults + env (localStorage merged via persist.merge)
       flags: {
         ...defaultFeatureFlags,
         ...loadEnvFlags(),
@@ -148,7 +177,7 @@ export const useFeatureFlagsStore = create<FeatureFlagsState & FeatureFlagsActio
         }));
       },
 
-      // Reset to defaults
+      // Reset to defaults (respects env overrides)
       resetFlags: () => {
         set({
           flags: {
@@ -164,9 +193,38 @@ export const useFeatureFlagsStore = create<FeatureFlagsState & FeatureFlagsActio
       },
     }),
     {
-      name: "feature-flags",
-      // Only persist user-modified flags, not env-based ones
-      partialize: state => ({ flags: state.flags }),
+      name: getStorageKey(),
+
+      // Only persist flags NOT controlled by env variables
+      // This prevents localStorage from overriding env-based configuration
+      partialize: (
+        state: FeatureFlagsState & FeatureFlagsActions
+      ): { flags: Partial<FeatureFlags> } => {
+        const envControlledKeys = getEnvControlledKeys();
+        const userOverridableFlags = Object.fromEntries(
+          Object.entries(state.flags).filter(([key]) => !envControlledKeys.has(key))
+        ) as Partial<FeatureFlags>;
+        return { flags: userOverridableFlags };
+      },
+
+      // Merge strategy: env > localStorage > defaults
+      // This ensures environment variables always take precedence
+      merge: (
+        persistedState: unknown,
+        currentState: FeatureFlagsState & FeatureFlagsActions
+      ): FeatureFlagsState & FeatureFlagsActions => {
+        const persisted = persistedState as { flags?: Partial<FeatureFlags> } | undefined;
+        const envFlags = loadEnvFlags();
+
+        return {
+          ...currentState,
+          flags: {
+            ...defaultFeatureFlags, // 1. Base defaults
+            ...(persisted?.flags ?? {}), // 2. User overrides from localStorage
+            ...envFlags, // 3. Env variables (highest priority)
+          },
+        };
+      },
     }
   )
 );

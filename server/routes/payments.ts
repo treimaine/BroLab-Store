@@ -8,6 +8,7 @@ import type {
 } from "../../shared/types/apiEndpoints";
 import { centsToDollars } from "../../shared/utils/currency";
 import { createPaymentSessionRequestSchema, validateBody } from "../../shared/validation/index";
+import { logger } from "../lib/logger";
 import PayPalService from "../services/paypal";
 import type { CreatePaymentSessionHandler } from "../types/ApiTypes";
 import { handleRouteError } from "../types/routes";
@@ -15,187 +16,20 @@ import { generateSecureRequestId } from "../utils/requestId";
 
 const router = Router();
 
-/**
- * Handle subscription webhook events from Clerk Billing
- * Events: subscription.created, subscription.updated, subscription.deleted
- */
-async function handleSubscriptionWebhook(
-  eventType: string,
-  payload: PaymentWebhookRequest,
-  convexUrl: string
-): Promise<void> {
-  console.log(`📦 Processing subscription webhook: ${eventType}`);
-
-  const convex = new ConvexHttpClient(convexUrl);
-  const webhookData = payload.data as Record<string, unknown> | undefined;
-
-  if (!webhookData) {
-    throw new Error("Missing webhook data");
-  }
-
-  const subscriptionId = (webhookData.id as string) || "";
-  const userId = (webhookData.user_id as string) || (webhookData.userId as string) || "";
-  const planId = (webhookData.plan_id as string) || (webhookData.planId as string) || "basic";
-  const status = (webhookData.status as string) || "active";
-  const currentPeriodStart =
-    (webhookData.current_period_start as number) ||
-    (webhookData.currentPeriodStart as number) ||
-    Date.now();
-  const currentPeriodEnd =
-    (webhookData.current_period_end as number) ||
-    (webhookData.currentPeriodEnd as number) ||
-    Date.now() + 30 * 24 * 60 * 60 * 1000;
-
-  // Map plan to download quota - Synced with Clerk Billing Dashboard
-  const quotaMap: Record<string, number> = {
-    free_user: 1,
-    basic: 5,
-    artist: 20,
-    ultimate_pass: 999999,
-    ultimate: 999999, // Legacy alias
-  };
-  const downloadQuota = quotaMap[planId] || 5;
-
-  try {
-    // Find user by Clerk ID
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const users = await (convex as any).query("users:getUserByClerkId", { clerkId: userId });
-    if (!users) {
-      console.warn(`⚠️ User not found for Clerk ID: ${userId}`);
-      return;
-    }
-
-    const userDoc = users as { _id: Id<"users"> };
-
-    // Check if subscription already exists
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const existingSubscriptions = await (convex as any).query("subscriptions:getByClerkId", {
-      clerkSubscriptionId: subscriptionId,
-    });
-
-    if (eventType === "subscription.created" || !existingSubscriptions) {
-      // Create new subscription
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (convex as any).mutation("subscriptions:create", {
-        userId: userDoc._id,
-        clerkSubscriptionId: subscriptionId,
-        planId,
-        status,
-        currentPeriodStart,
-        currentPeriodEnd,
-        downloadQuota,
-        downloadUsed: 0,
-        features: [],
-      });
-      console.log(`✅ Subscription created: ${subscriptionId}`);
-    } else if (eventType === "subscription.updated") {
-      // Update existing subscription
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (convex as any).mutation("subscriptions:update", {
-        clerkSubscriptionId: subscriptionId,
-        status,
-        currentPeriodStart,
-        currentPeriodEnd,
-        downloadQuota,
-      });
-      console.log(`✅ Subscription updated: ${subscriptionId}`);
-    } else if (eventType === "subscription.deleted") {
-      // Cancel subscription
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (convex as any).mutation("subscriptions:cancel", {
-        clerkSubscriptionId: subscriptionId,
-      });
-      console.log(`✅ Subscription cancelled: ${subscriptionId}`);
-    }
-  } catch (error) {
-    console.error(`❌ Error processing subscription webhook:`, error);
-    throw error;
-  }
-}
-
-/**
- * Handle invoice webhook events from Clerk Billing
- * Events: invoice.created, invoice.paid, invoice.payment_failed
- */
-async function handleInvoiceWebhook(
-  eventType: string,
-  payload: PaymentWebhookRequest,
-  convexUrl: string
-): Promise<void> {
-  console.log(`📄 Processing invoice webhook: ${eventType}`);
-
-  const convex = new ConvexHttpClient(convexUrl);
-  const webhookData = payload.data as Record<string, unknown> | undefined;
-
-  if (!webhookData) {
-    throw new Error("Missing webhook data");
-  }
-
-  const invoiceId = (webhookData.id as string) || "";
-  const subscriptionId =
-    (webhookData.subscription_id as string) || (webhookData.subscriptionId as string) || "";
-  const amount = (webhookData.amount as number) || 0;
-  const currency = (webhookData.currency as string) || "USD";
-  const status = (webhookData.status as string) || "open";
-  const dueDate = (webhookData.due_date as number) || (webhookData.dueDate as number) || Date.now();
-
-  try {
-    // Find subscription by Clerk ID
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const subscription = await (convex as any).query("subscriptions:getByClerkId", {
-      clerkSubscriptionId: subscriptionId,
-    });
-
-    if (!subscription) {
-      console.warn(`⚠️ Subscription not found for invoice: ${subscriptionId}`);
-      return;
-    }
-
-    const subscriptionDoc = subscription as { _id: Id<"subscriptions"> };
-
-    // Check if invoice already exists
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const existingInvoice = await (convex as any).query("invoices:getByClerkId", {
-      clerkInvoiceId: invoiceId,
-    });
-
-    if (eventType === "invoice.created" || !existingInvoice) {
-      // Create new invoice
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (convex as any).mutation("invoices:create", {
-        subscriptionId: subscriptionDoc._id,
-        clerkInvoiceId: invoiceId,
-        amount,
-        currency,
-        status,
-        dueDate,
-      });
-      console.log(`✅ Invoice created: ${invoiceId}`);
-    } else if (eventType === "invoice.paid") {
-      // Mark invoice as paid
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (convex as any).mutation("invoices:markPaid", {
-        clerkInvoiceId: invoiceId,
-        paidAt: Date.now(),
-      });
-      console.log(`✅ Invoice paid: ${invoiceId}`);
-    } else if (eventType === "invoice.payment_failed") {
-      // Mark invoice as failed
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (convex as any).mutation("invoices:markFailed", {
-        clerkInvoiceId: invoiceId,
-      });
-      console.log(`⚠️ Invoice payment failed: ${invoiceId}`);
-    }
-  } catch (error) {
-    console.error(`❌ Error processing invoice webhook:`, error);
-    throw error;
-  }
-}
+// NOTE: Clerk Billing webhooks (subscription.*, invoice.*) are handled by
+// server/routes/clerk-billing.ts which provides:
+// - Svix signature verification
+// - Replay attack protection
+// - Idempotency checking
+// - Structured audit logging
+// This file only handles order payment webhooks.
 
 /**
  * Handle order webhook events (one-time purchases)
  * Updates order status and confirms payment
+ *
+ * NOTE: This handler is for order payments only.
+ * Clerk Billing webhooks (subscriptions/invoices) are handled by clerk-billing.ts
  */
 async function handleOrderWebhook(
   normalized: {
@@ -207,10 +41,8 @@ async function handleOrderWebhook(
   mapped: { status: string; paymentStatus: string },
   convexUrl: string
 ): Promise<void> {
-  console.log("💳 Processing order webhook with data:", {
-    email: normalized.email,
+  logger.info("Processing order webhook", {
     sessionId: normalized.sessionId,
-    paymentId: normalized.paymentId,
     status: mapped.status,
     paymentStatus: mapped.paymentStatus,
   });
@@ -251,7 +83,7 @@ async function handleOrderWebhook(
   }
 
   if (!orderId) {
-    console.warn(`⚠️ Order not found for session/payment ID`);
+    logger.warn("Order not found for session/payment ID", { sessionId: normalized.sessionId });
     return;
   }
 
@@ -276,7 +108,7 @@ async function handleOrderWebhook(
       status: "succeeded",
       provider: "stripe",
     });
-    console.log(`✅ Order payment confirmed: ${orderId}`);
+    logger.info("Order payment confirmed", { orderId });
   }
 }
 
@@ -315,7 +147,7 @@ const createPaymentSession: CreatePaymentSessionHandler = async (req, res) => {
     // Determine payment provider from metadata or default to Stripe
     const paymentProvider = (metadata?.paymentProvider as string) || "stripe";
 
-    console.log(`💳 Creating ${paymentProvider} payment session for reservation: ${reservationId}`);
+    logger.info("Creating payment session", { provider: paymentProvider, reservationId });
 
     if (paymentProvider === "paypal") {
       // Create PayPal order
@@ -347,14 +179,14 @@ const createPaymentSession: CreatePaymentSessionHandler = async (req, res) => {
         metadata: { ...metadata, provider: "paypal" },
       };
 
-      console.log(`✅ PayPal payment session created: ${paypalResult.orderId}`);
+      logger.info("PayPal payment session created", { sessionId: paypalResult.orderId });
       res.json(response);
       return;
     }
 
     // Default: Create Stripe checkout session
     if (!stripeClient) {
-      console.error("❌ Stripe client not initialized - STRIPE_SECRET_KEY missing");
+      logger.error("Stripe client not initialized", { reason: "STRIPE_SECRET_KEY missing" });
       res.status(500).json({
         error: "Payment service unavailable",
         message: "Stripe is not configured. Please contact support.",
@@ -414,10 +246,10 @@ const createPaymentSession: CreatePaymentSessionHandler = async (req, res) => {
       metadata: { ...metadata, provider: "stripe" },
     };
 
-    console.log(`✅ Stripe checkout session created: ${session.id}`);
+    logger.info("Stripe checkout session created", { sessionId: session.id });
     res.json(response);
   } catch (error: unknown) {
-    console.error("❌ Error creating payment session:", error);
+    logger.error("Error creating payment session", { error });
     handleRouteError(error, res, "Failed to create payment session");
   }
 };
@@ -443,7 +275,8 @@ async function verifyWebhookSignature(
 }
 
 /**
- * Get verified webhook payload
+ * Get verified webhook payload for order payments
+ * NOTE: Clerk Billing webhooks use clerk-billing.ts with enhanced security
  */
 async function getWebhookPayload(
   req: Request,
@@ -454,11 +287,11 @@ async function getWebhookPayload(
 
   if (!WEBHOOK_SECRET) {
     if (isProd) {
-      console.error("CLERK_WEBHOOK_SECRET not set in production");
+      logger.error("CLERK_WEBHOOK_SECRET not set in production");
       res.status(500).json({ error: "Webhook secret not configured" });
       return null;
     }
-    console.warn("⚠️ Missing CLERK_WEBHOOK_SECRET; using raw body in dev.");
+    logger.warn("Missing CLERK_WEBHOOK_SECRET; using raw body in dev");
     return req.body;
   }
 
@@ -471,37 +304,13 @@ async function getWebhookPayload(
   } catch (err: unknown) {
     if (isProd) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error("Webhook signature verification failed:", errorMessage);
+      logger.error("Webhook signature verification failed", { error: errorMessage });
       res.status(400).json({ error: "invalid_signature" });
       return null;
     }
-    console.warn("⚠️ Svix not available or verification failed; using raw body in dev.");
+    logger.warn("Svix not available or verification failed; using raw body in dev");
     return req.body;
   }
-}
-
-/**
- * Handle Clerk Billing events (subscriptions/invoices)
- */
-async function handleClerkBillingEvent(
-  eventType: string,
-  payload: PaymentWebhookRequest,
-  convexUrl: string,
-  res: Response
-): Promise<boolean> {
-  if (eventType.startsWith("subscription.")) {
-    await handleSubscriptionWebhook(eventType, payload, convexUrl);
-    res.json({ received: true, synced: true, handled: "subscription" });
-    return true;
-  }
-
-  if (eventType.startsWith("invoice.")) {
-    await handleInvoiceWebhook(eventType, payload, convexUrl);
-    res.json({ received: true, synced: true, handled: "invoice" });
-    return true;
-  }
-
-  return false;
 }
 
 /**
@@ -545,6 +354,7 @@ function mapWebhookStatus(status: string | undefined): { status: string; payment
 
 /**
  * Handle order payment webhook
+ * NOTE: Clerk Billing events (subscription.*, invoice.*) are handled by clerk-billing.ts
  */
 async function handleOrderPaymentWebhook(
   payload: PaymentWebhookRequest,
@@ -564,36 +374,49 @@ async function handleOrderPaymentWebhook(
   });
 }
 
-// Payment webhook handler
+/**
+ * Check if event type is a Clerk Billing event (handled by clerk-billing.ts)
+ */
+function isClerkBillingEvent(eventType: string): boolean {
+  return eventType.startsWith("subscription.") || eventType.startsWith("invoice.");
+}
+
+// Payment webhook handler - handles order payments only
+// Clerk Billing webhooks (subscriptions/invoices) are routed to /api/webhooks/clerk-billing
 const paymentWebhook = async (req: Request, res: Response) => {
   try {
     const payload = await getWebhookPayload(req, res);
     if (!payload) return;
 
-    console.log("Payment webhook received:", payload?.type || "unknown", payload);
+    const eventType: string = (payload?.type || "").toString();
+    logger.info("Payment webhook received", { eventType });
 
-    const convexUrl = process.env.VITE_CONVEX_URL;
-    if (!convexUrl) {
-      console.warn("VITE_CONVEX_URL not set; skipping Convex sync for webhook");
-      res.json({ received: true, synced: false });
+    // Skip Clerk Billing events - they should be sent to /api/webhooks/clerk-billing
+    if (isClerkBillingEvent(eventType)) {
+      logger.info("Clerk Billing event received on wrong endpoint", {
+        eventType,
+        correctEndpoint: "/api/webhooks/clerk-billing",
+      });
+      res.json({
+        received: true,
+        synced: false,
+        message: `Event ${eventType} should be sent to /api/webhooks/clerk-billing`,
+      });
       return;
     }
 
-    const eventType: string = (payload?.type || "").toString();
-
-    try {
-      const handled = await handleClerkBillingEvent(eventType, payload, convexUrl, res);
-      if (handled) return;
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error("❌ Failed to sync subscription/invoice webhook:", errorMessage);
+    const convexUrl = process.env.VITE_CONVEX_URL;
+    if (!convexUrl) {
+      logger.warn("VITE_CONVEX_URL not set; skipping Convex sync for webhook");
+      res.json({ received: true, synced: false });
+      return;
     }
 
     try {
       await handleOrderPaymentWebhook(payload, convexUrl, res);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error("Failed to sync webhook to Convex:", errorMessage);
+      logger.error("Failed to sync webhook to Convex", { error: errorMessage });
       res.status(500).json({ received: true, synced: false, error: errorMessage });
     }
   } catch (error: unknown) {

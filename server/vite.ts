@@ -26,7 +26,7 @@ export function log(message: string, source = "express") {
  * @param nonce - The CSP nonce to inject
  * @returns HTML with nonce attributes added to script tags
  */
-function injectNonceIntoHtml(html: string, nonce: string): string {
+function injectNonceIntoScripts(html: string, nonce: string): string {
   // Add nonce to inline script tags (type="module" and regular scripts)
   // Matches: <script>, <script type="module">, <script type="text/javascript">
   return html.replaceAll(
@@ -40,6 +40,40 @@ function injectNonceIntoHtml(html: string, nonce: string): string {
       return `<script nonce="${nonce}"${attributes}>`;
     }
   );
+}
+
+/**
+ * Injects CSP nonce into HTML style tags.
+ * Adds nonce attribute to all inline style tags for CSP compliance.
+ *
+ * @param html - The HTML content to process
+ * @param nonce - The CSP nonce to inject
+ * @returns HTML with nonce attributes added to style tags
+ */
+function injectNonceIntoStyles(html: string, nonce: string): string {
+  // Add nonce to inline style tags
+  return html.replaceAll(/<style([^>]*)>/gi, (match, attributes: string) => {
+    // Don't add nonce if already present
+    if (attributes.includes("nonce=")) {
+      return match;
+    }
+    // Add nonce attribute
+    return `<style nonce="${nonce}"${attributes}>`;
+  });
+}
+
+/**
+ * Injects CSP nonce into HTML for both scripts and styles.
+ * Combines script and style nonce injection for CSP compliance.
+ *
+ * @param html - The HTML content to process
+ * @param nonce - The CSP nonce to inject
+ * @returns HTML with nonce attributes added to script and style tags
+ */
+function injectNonceIntoHtml(html: string, nonce: string): string {
+  let result = injectNonceIntoScripts(html, nonce);
+  result = injectNonceIntoStyles(result, nonce);
+  return result;
 }
 
 export async function setupVite(app: Express, server: Server): Promise<void> {

@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { createApiError } from "../../shared/validation/index";
+import { logger } from "../lib/logger";
 import { scanFile, validateFile } from "../lib/upload";
 import { AuthenticatedRequest } from "../types/express";
 import { generateSecureRequestId } from "../utils/requestId";
@@ -49,12 +50,11 @@ export const enhancedFileUploadSecurity = (
         return next(); // No file to validate
       }
 
-      console.log(`🔍 Starting enhanced security scan for file: ${file.originalname}`, {
+      logger.info("Starting enhanced security scan", {
         requestId,
+        fileName: file.originalname,
         fileSize: file.size,
         mimeType: file.mimetype,
-        enableAntivirusScanning,
-        enableContentAnalysis,
       });
 
       // 1. Basic file validation
@@ -84,23 +84,21 @@ export const enhancedFileUploadSecurity = (
         const scanResult = await scanFile(file);
 
         if (!scanResult.safe) {
-          console.warn(`🚨 Security threats detected in file: ${file.originalname}`, {
+          logger.warn("Security threats detected in file", {
             requestId,
+            fileName: file.originalname,
             threats: scanResult.threats,
             scanTime: scanResult.scanTime,
           });
 
           // Log security incident
-          console.error("SECURITY_INCIDENT", {
+          logger.error("SECURITY_INCIDENT: Malicious file upload", {
             type: "MALICIOUS_FILE_UPLOAD",
             requestId,
             fileName: file.originalname,
             fileSize: file.size,
             mimeType: file.mimetype,
             threats: scanResult.threats,
-            userAgent: req.headers["user-agent"],
-            ip: req.ip,
-            timestamp: new Date().toISOString(),
           });
 
           const errorResponse = createApiError(
@@ -120,8 +118,9 @@ export const enhancedFileUploadSecurity = (
           return res.status(400).json(errorResponse);
         }
 
-        console.log(`✅ File passed security scan: ${file.originalname}`, {
+        logger.info("File passed security scan", {
           requestId,
+          fileName: file.originalname,
           scanTime: scanResult.scanTime,
         });
       }
@@ -131,9 +130,11 @@ export const enhancedFileUploadSecurity = (
         const contentAnalysis = await analyzeFileContent(file);
 
         if (contentAnalysis.suspicious) {
-          console.warn(`⚠️ Suspicious content detected in file: ${file.originalname}`, {
+          logger.warn("Suspicious content detected in file", {
             requestId,
+            fileName: file.originalname,
             suspiciousFeatures: contentAnalysis.features,
+            riskLevel: contentAnalysis.riskLevel,
           });
 
           // For suspicious content, we might allow upload but flag it
@@ -153,15 +154,16 @@ export const enhancedFileUploadSecurity = (
         fileHash: await generateFileHash(file),
       };
 
-      console.log(`✅ Enhanced security check completed for: ${file.originalname}`, {
+      logger.info("Enhanced security check completed", {
         requestId,
+        fileName: file.originalname,
         fileSize: file.size,
         securityStatus: "PASSED",
       });
 
       next();
     } catch (error) {
-      console.error("Enhanced file upload security error:", error);
+      logger.error("Enhanced file upload security error", { error });
 
       const requestId = (req as AuthenticatedRequest).requestId || generateSecureRequestId();
       const errorResponse = createApiError("security_check_failed", "Security check failed", {
@@ -274,7 +276,7 @@ async function analyzeFileContent(file: Express.Multer.File): Promise<ContentAna
       riskLevel = getHigherRiskLevel(riskLevel, "medium");
     }
   } catch (error) {
-    console.error("Content analysis error:", error);
+    logger.error("Content analysis error", { error });
     features.push("ANALYSIS_ERROR");
     riskLevel = "medium";
   }

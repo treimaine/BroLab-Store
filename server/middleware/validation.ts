@@ -226,7 +226,7 @@ export const validateFileUpload = (
   } = {}
 ) => {
   const {
-    maxSize = 50 * 1024 * 1024, // 50MB default
+    maxSize = 100 * 1024 * 1024, // 100MB default (harmonisé avec multer)
     allowedTypes = [
       "audio/mpeg",
       "audio/wav",

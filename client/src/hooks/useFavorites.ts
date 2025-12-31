@@ -60,7 +60,7 @@ export function useFavorites() {
     if (!isAuthenticated) {
       throw new Error("User must be authenticated to add favorites");
     }
-     
+
     await addToFavoritesMutation({
       beatId,
       beatTitle: metadata?.title,
@@ -69,7 +69,7 @@ export function useFavorites() {
       beatAudioUrl: metadata?.audioUrl,
       beatPrice: metadata?.price,
       beatBpm: metadata?.bpm,
-    } as any);
+    });
   };
 
   /**
