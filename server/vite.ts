@@ -46,11 +46,15 @@ function injectNonceIntoScripts(html: string, nonce: string): string {
  * Injects CSP nonce into HTML style tags.
  * Adds nonce attribute to all inline style tags for CSP compliance.
  *
+ * NOTE: Currently unused because React inline styles (style={{...}})
+ * cannot receive nonces, and having nonces on <style> tags triggers
+ * strict mode that blocks all inline styles.
+ *
  * @param html - The HTML content to process
  * @param nonce - The CSP nonce to inject
  * @returns HTML with nonce attributes added to style tags
  */
-function injectNonceIntoStyles(html: string, nonce: string): string {
+function _injectNonceIntoStyles(html: string, nonce: string): string {
   // Add nonce to inline style tags
   return html.replaceAll(/<style([^>]*)>/gi, (match, attributes: string) => {
     // Don't add nonce if already present
@@ -63,17 +67,20 @@ function injectNonceIntoStyles(html: string, nonce: string): string {
 }
 
 /**
- * Injects CSP nonce into HTML for both scripts and styles.
- * Combines script and style nonce injection for CSP compliance.
+ * Injects CSP nonce into HTML for scripts only.
+ *
+ * IMPORTANT: Do NOT inject nonces into <style> tags because:
+ * - React inline styles (style={{...}}) cannot receive nonce attributes
+ * - When nonce is present on ANY style tag, browsers ignore 'unsafe-inline'
+ * - This breaks 100+ components using dynamic inline styles
  *
  * @param html - The HTML content to process
  * @param nonce - The CSP nonce to inject
- * @returns HTML with nonce attributes added to script and style tags
+ * @returns HTML with nonce attributes added to script tags only
  */
 function injectNonceIntoHtml(html: string, nonce: string): string {
-  let result = injectNonceIntoScripts(html, nonce);
-  result = injectNonceIntoStyles(result, nonce);
-  return result;
+  // Only inject nonces into scripts, NOT styles
+  return injectNonceIntoScripts(html, nonce);
 }
 
 export async function setupVite(app: Express, server: Server): Promise<void> {
