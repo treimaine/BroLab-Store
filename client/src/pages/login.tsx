@@ -1,13 +1,38 @@
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
-import { SignIn, SignUp } from "@clerk/clerk-react";
+import { SignIn, SignUp, useUser } from "@clerk/clerk-react";
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 
 export default function Login() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const isSignup = location === "/signup";
+  const { isSignedIn, isLoaded } = useUser();
 
   // Scroll to top when component mounts
   useScrollToTop();
+
+  // Redirect if already signed in to prevent infinite loop
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      const urlParams = new URLSearchParams(globalThis.location.search);
+      const returnTo = urlParams.get("returnTo");
+      setLocation(returnTo || "/dashboard");
+    }
+  }, [isLoaded, isSignedIn, setLocation]);
+
+  // Show loading while checking auth state
+  if (!isLoaded) {
+    return (
+      <div className="pt-16 bg-[var(--dark-gray)] min-h-screen flex items-center justify-center">
+        <div className="text-white">Chargement...</div>
+      </div>
+    );
+  }
+
+  // Don't render auth components if already signed in
+  if (isSignedIn) {
+    return null;
+  }
 
   // Determine the redirect URL
   const getFallbackRedirectUrl = () => {

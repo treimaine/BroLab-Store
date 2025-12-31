@@ -82,7 +82,14 @@ if (hasConfigError) {
   // Normal app rendering with all providers
   createRoot(rootElement).render(
     <ClerkErrorBoundary>
-      <ClerkProvider publishableKey={clerkPublishableKey!} telemetry={false}>
+      <ClerkProvider 
+        publishableKey={clerkPublishableKey!} 
+        telemetry={false}
+        afterSignInUrl="/"
+        afterSignUpUrl="/"
+        signInUrl="/login"
+        signUpUrl="/login"
+      >
         <ConvexProviderWithClerk client={convex!} useAuth={useAuth}>
           <App />
           <SpeedInsights />
