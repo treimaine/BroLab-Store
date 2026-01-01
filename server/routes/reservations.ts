@@ -505,41 +505,46 @@ router.patch(
 );
 
 // Get reservation ICS file
-router.get("/:id/calendar", requireAuth, async (req, res): Promise<void> => {
-  try {
-    const user = extractUserFromRequest(req);
-    if (!user) {
-      res.status(401).json({ error: "Authentication required" });
-      return;
-    }
+router.get(
+  "/:id/calendar",
+  requireAuth,
+  validateParams(CommonParams.id),
+  async (req, res): Promise<void> => {
+    try {
+      const user = extractUserFromRequest(req);
+      if (!user) {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
 
-    const reservation = await storage.getReservation(req.params.id);
-    if (!reservation) {
-      res.status(404).json({ error: "Reservation not found" });
-      return;
-    }
-    if (!hasReservationAccess(reservation.user_id, user)) {
-      res.status(403).json({ error: "Unauthorized" });
-      return;
-    }
+      const reservation = await storage.getReservation(req.params.id);
+      if (!reservation) {
+        res.status(404).json({ error: "Reservation not found" });
+        return;
+      }
+      if (!hasReservationAccess(reservation.user_id, user)) {
+        res.status(403).json({ error: "Unauthorized" });
+        return;
+      }
 
-    const icsContent = generateICS({
-      summary: `BroLab - ${reservation.service_type}`,
-      description: reservation.notes || "",
-      startTime: new Date(reservation.preferred_date),
-      durationMinutes: reservation.duration_minutes,
-    });
+      const icsContent = generateICS({
+        summary: `BroLab - ${reservation.service_type}`,
+        description: reservation.notes || "",
+        startTime: new Date(reservation.preferred_date),
+        durationMinutes: reservation.duration_minutes,
+      });
 
-    res.setHeader("Content-Type", "text/calendar");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="reservation-${reservation.id}.ics"`
-    );
-    res.send(icsContent);
-  } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to generate calendar file");
+      res.setHeader("Content-Type", "text/calendar");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="reservation-${reservation.id}.ics"`
+      );
+      res.send(icsContent);
+    } catch (error: unknown) {
+      handleRouteError(error, res, "Failed to generate calendar file");
+    }
   }
-});
+);
 
 // Get reservations by date range (admin only)
 router.get("/range/:start/:end", requireAuth, async (req, res): Promise<void> => {

@@ -407,7 +407,10 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
   }, [calculateBackoffDelay, handleOperationSuccess, handleOperationFailure]);
 
   // Manage periodic timers based on tab visibility (with staggered resume)
+  // FIX: Stagger operations to prevent "thundering herd" freeze on tab return
   useEffect(() => {
+    const staggeredTimers: ReturnType<typeof setTimeout>[] = [];
+
     // Clear existing timeouts when tab becomes hidden
     const clearTimeouts = (): void => {
       if (metricsTimeoutRef.current) {
@@ -418,6 +421,9 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
         clearTimeout(optimizationTimeoutRef.current);
         optimizationTimeoutRef.current = null;
       }
+      // Clear staggered timers
+      staggeredTimers.forEach(clearTimeout);
+      staggeredTimers.length = 0;
     };
 
     if (!isTabVisible) {
@@ -430,13 +436,23 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
       return;
     }
 
-    // Tab is visible and ready - start scheduled operations
-    // Run metrics update once when tab becomes visible
-    updateMetrics();
-
-    // Schedule periodic updates with backoff support
-    scheduleMetricsUpdate();
-    scheduleOptimization();
+    // Tab is visible and ready - start scheduled operations with STAGGERED delays
+    // This prevents the "thundering herd" problem that causes freezes
+    // Use spread operator to batch push calls (SonarQube S7778)
+    staggeredTimers.push(
+      // Step 1: Update metrics after 100ms (lightweight operation first)
+      setTimeout(() => {
+        updateMetrics();
+      }, 100),
+      // Step 2: Schedule periodic metrics after 600ms
+      setTimeout(() => {
+        scheduleMetricsUpdate();
+      }, 600),
+      // Step 3: Schedule optimization after 1200ms (heaviest operation last)
+      setTimeout(() => {
+        scheduleOptimization();
+      }, 1200)
+    );
 
     return clearTimeouts;
     // Only re-run when visibility/ready state changes

@@ -173,12 +173,24 @@ import { z } from "zod";
  * Common parameter validation schemas
  */
 export const CommonParams = {
+  /** Generic string ID - use when ID format is flexible */
   id: z.object({
     id: z.string().min(1, "ID is required"),
   }),
 
+  /** Numeric ID - for WooCommerce products, beats, etc. */
   numericId: z.object({
     id: z.string().regex(/^\d+$/, "ID must be numeric").transform(Number),
+  }),
+
+  /** Stripe Payment Intent ID - format: pi_xxx */
+  stripePaymentIntentId: z.object({
+    id: z.string().regex(/^pi_[a-zA-Z0-9]+$/, "Invalid Stripe payment intent ID"),
+  }),
+
+  /** Stripe Checkout Session ID - format: cs_xxx or cs_test_xxx */
+  stripeSessionId: z.object({
+    id: z.string().regex(/^cs_(test_)?[a-zA-Z0-9]+$/, "Invalid Stripe checkout session ID"),
   }),
 
   slug: z.object({

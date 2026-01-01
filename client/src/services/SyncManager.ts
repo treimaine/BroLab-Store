@@ -107,9 +107,22 @@ export class SyncManager extends BrowserEventEmitter {
       ? `${wsProtocol}//${globalThis.window.location.host}/ws`
       : "ws://localhost:3001/ws";
 
-    // Disable WebSocket on Vercel (serverless doesn't support persistent connections)
-    // Vercel deployments use *.vercel.app or custom domains without WebSocket support
-    this.useWebSocket = !isProduction || config.websocketUrl !== undefined;
+    // FIX: Properly detect Vercel/serverless and disable WebSocket
+    // Vercel serverless doesn't support persistent WebSocket connections
+    const isVercelOrServerless =
+      globalThis.window !== undefined &&
+      (globalThis.window.location.hostname.includes("vercel.app") ||
+        globalThis.window.location.hostname === "brolabentertainment.com" ||
+        globalThis.window.location.hostname.includes("brolabentertainment"));
+
+    // Check environment variable override
+    const disableWebSocketEnv =
+      import.meta !== undefined &&
+      (import.meta as unknown as { env?: { VITE_DISABLE_WEBSOCKET?: string } }).env
+        ?.VITE_DISABLE_WEBSOCKET === "true";
+
+    // Disable WebSocket on Vercel or if explicitly disabled via env
+    this.useWebSocket = !isVercelOrServerless && !disableWebSocketEnv && !isProduction;
 
     this.config = {
       websocketUrl: config.websocketUrl || defaultWsUrl,

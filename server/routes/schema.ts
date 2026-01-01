@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { CommonParams, validateParams } from "../../shared/validation/index";
 import {
   generateBeatSchemaMarkup,
   generateBeatsListSchemaMarkup,
@@ -11,9 +12,9 @@ const router = Router();
 
 // Helper functions for type-safe metadata extraction
 const getBpmFromProduct = (product: WooCommerceApiProduct): number | undefined => {
-  if (product.bpm) return parseInt(product.bpm.toString());
+  if (product.bpm) return Number.parseInt(product.bpm.toString(), 10);
   const bpmMeta = product.meta_data?.find((meta: WooCommerceMetaData) => meta.key === "bpm");
-  return bpmMeta?.value ? parseInt(bpmMeta.value.toString()) : undefined;
+  return bpmMeta?.value ? Number.parseInt(bpmMeta.value.toString(), 10) : undefined;
 };
 
 const getKeyFromProduct = (product: WooCommerceApiProduct): string | null => {
@@ -35,7 +36,7 @@ const getMoodFromProduct = (product: WooCommerceApiProduct): string | null => {
 };
 
 const getDurationFromProduct = (product: WooCommerceApiProduct): number | undefined => {
-  return product.duration ? parseFloat(product.duration.toString()) : undefined;
+  return product.duration ? Number.parseFloat(product.duration.toString()) : undefined;
 };
 
 const getTagsFromProduct = (product: WooCommerceApiProduct): string[] => {
@@ -95,7 +96,7 @@ const BASE_URL = process.env.FRONTEND_URL || "https://brolabentertainment.com";
  * GET /api/schema/beat/:id
  * Génère le Schema markup JSON-LD pour un beat spécifique
  */
-router.get("/beat/:id", async (req, res): Promise<void> => {
+router.get("/beat/:id", validateParams(CommonParams.numericId), async (req, res): Promise<void> => {
   try {
     const beatId = req.params.id;
 
@@ -126,7 +127,7 @@ router.get("/beat/:id", async (req, res): Promise<void> => {
       bpm: getBpmFromProduct(product),
       key: getKeyFromProduct(product),
       mood: getMoodFromProduct(product),
-      price: parseFloat(product.price) || 0,
+      price: Number.parseFloat(product.price) || 0,
       image_url: product.images?.[0]?.src,
       image: product.images?.[0]?.src, // Alias for compatibility
       images: product.images,
@@ -177,7 +178,7 @@ router.get("/beats-list", async (req, res): Promise<void> => {
       bpm: getBpmFromProduct(product),
       key: getKeyFromProduct(product),
       mood: getMoodFromProduct(product),
-      price: parseFloat(product.price) || 0,
+      price: Number.parseFloat(product.price) || 0,
       image_url: product.images?.[0]?.src,
       image: product.images?.[0]?.src, // Alias for compatibility
       images: product.images,

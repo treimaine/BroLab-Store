@@ -1,5 +1,6 @@
 // server/routes/woo.ts
 import { Request, Response, Router } from "express";
+import { CommonParams, validateParams } from "../../shared/validation/index";
 import { fetchWooCategories, fetchWooProduct, fetchWooProducts } from "../services/woo";
 import { handleRouteError } from "../types/routes";
 import { WooCommerceMetaData, WooCommerceProduct } from "../types/woocommerce";
@@ -734,60 +735,64 @@ router.get("/products", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/products/:id", async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!isWooCommerceConfigured()) {
-      console.log("⚠️ WooCommerce not configured, returning sample product");
+router.get(
+  "/products/:id",
+  validateParams(CommonParams.numericId),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (!isWooCommerceConfigured()) {
+        console.log("⚠️ WooCommerce not configured, returning sample product");
 
-      const sampleProduct = {
-        id: Number.parseInt(req.params.id, 10),
-        name: "Sample Beat",
-        price: "29.99",
-        regular_price: "39.99",
-        sale_price: "29.99",
-        description: "A sample beat for testing",
-        short_description: "Sample beat",
-        images: [{ src: "/api/placeholder/300/300" }],
-        categories: [{ name: "Hip Hop" }],
-        meta_data: [
-          { key: "bpm", value: "140" },
-          { key: "key", value: "C" },
-          { key: "mood", value: "Energetic" },
-          { key: "instruments", value: "Drums, Bass, Synth" },
-          { key: "duration", value: "3:45" },
-          { key: "has_vocals", value: "no" },
-          { key: "stems", value: "yes" },
-        ],
-        tags: [],
-        total_sales: 0,
-        hasVocals: false,
-        stems: true,
-        bpm: "140",
-        key: "C",
-        mood: "Energetic",
-        instruments: "Drums, Bass, Synth",
-        duration: "3:45",
-        is_free: false,
-        audio_url: null,
-      };
+        const sampleProduct = {
+          id: Number.parseInt(req.params.id, 10),
+          name: "Sample Beat",
+          price: "29.99",
+          regular_price: "39.99",
+          sale_price: "29.99",
+          description: "A sample beat for testing",
+          short_description: "Sample beat",
+          images: [{ src: "/api/placeholder/300/300" }],
+          categories: [{ name: "Hip Hop" }],
+          meta_data: [
+            { key: "bpm", value: "140" },
+            { key: "key", value: "C" },
+            { key: "mood", value: "Energetic" },
+            { key: "instruments", value: "Drums, Bass, Synth" },
+            { key: "duration", value: "3:45" },
+            { key: "has_vocals", value: "no" },
+            { key: "stems", value: "yes" },
+          ],
+          tags: [],
+          total_sales: 0,
+          hasVocals: false,
+          stems: true,
+          bpm: "140",
+          key: "C",
+          mood: "Energetic",
+          instruments: "Drums, Bass, Synth",
+          duration: "3:45",
+          is_free: false,
+          audio_url: null,
+        };
 
-      res.json({ beat: sampleProduct });
-      return;
+        res.json({ beat: sampleProduct });
+        return;
+      }
+
+      const product = await fetchWooProduct(req.params.id);
+
+      if (!product) {
+        res.status(404).json({ error: "Product not found" });
+        return;
+      }
+
+      const beat = await mapProductToBeat(product);
+      res.json(beat);
+    } catch (error: unknown) {
+      handleRouteError(error, res, "Failed to fetch product");
     }
-
-    const product = await fetchWooProduct(req.params.id);
-
-    if (!product) {
-      res.status(404).json({ error: "Product not found" });
-      return;
-    }
-
-    const beat = await mapProductToBeat(product);
-    res.json(beat);
-  } catch (error: unknown) {
-    handleRouteError(error, res, "Failed to fetch product");
   }
-});
+);
 
 router.get("/categories", async (_req: Request, res: Response) => {
   try {

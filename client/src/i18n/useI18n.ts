@@ -45,6 +45,15 @@ function interpolate(text: string, values: Record<string, string | number>): str
 }
 
 /**
+ * Log missing translation keys in development mode
+ */
+function logMissingKey(key: string, language: string): void {
+  if (import.meta.env.DEV) {
+    console.warn(`[i18n] Missing translation key "${key}" for language "${language}"`);
+  }
+}
+
+/**
  * Get plural form based on count and language rules
  */
 function getPluralForm(count: number, language: Language): keyof PluralRules {

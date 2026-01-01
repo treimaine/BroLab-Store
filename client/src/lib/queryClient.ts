@@ -1010,52 +1010,52 @@ export const warmCache = async (signal?: AbortSignal): Promise<void> => {
   }
 
   try {
-    // Stagger requests to prevent main thread freeze
-    // Each request waits for the previous one + small delay
-    const staggerDelay = (ms: number): Promise<void> =>
-      new Promise(resolve => setTimeout(resolve, ms));
+    // FIX: Parallelize requests instead of sequential to reduce total time
+    // Use Promise.allSettled to not fail if one request fails
+    const queries = [
+      // Static data - subscription plans (24h cache)
+      queryClient.prefetchQuery({
+        queryKey: ["/api/subscription/plans"],
+        staleTime: CACHE_CONFIG.STATIC.staleTime,
+        queryFn: async () => {
+          if (signal?.aborted) return null;
+          const response = await fetch("/api/subscription/plans", { signal });
+          if (!response.ok) throw new Error("Failed to fetch subscription plans");
+          return response.json();
+        },
+      }),
 
-    // Static data - subscription plans (24h cache)
-    await queryClient.prefetchQuery({
-      queryKey: ["/api/subscription/plans"],
-      staleTime: CACHE_CONFIG.STATIC.staleTime,
-      queryFn: async () => {
-        if (signal?.aborted) return null;
-        const response = await fetch("/api/subscription/plans", { signal });
-        if (!response.ok) throw new Error("Failed to fetch subscription plans");
-        return response.json();
-      },
-    });
+      // Featured beats for homepage (10min cache)
+      queryClient.prefetchQuery({
+        queryKey: ["/api/beats/featured"],
+        staleTime: CACHE_CONFIG.BEATS_FEATURED.staleTime,
+        queryFn: async () => {
+          if (signal?.aborted) return null;
+          const response = await fetch("/api/beats/featured", { signal });
+          if (!response.ok) throw new Error("Failed to fetch featured beats");
+          return response.json();
+        },
+      }),
 
-    if (signal?.aborted) return;
-    await staggerDelay(150); // Small delay between requests
+      // Static data - genres and moods (24h cache)
+      queryClient.prefetchQuery({
+        queryKey: ["/api/beats/filters"],
+        staleTime: CACHE_CONFIG.STATIC.staleTime,
+        queryFn: async () => {
+          if (signal?.aborted) return null;
+          const response = await fetch("/api/beats/filters", { signal });
+          if (!response.ok) throw new Error("Failed to fetch beat filters");
+          return response.json();
+        },
+      }),
+    ];
 
-    // Featured beats for homepage (10min cache)
-    await queryClient.prefetchQuery({
-      queryKey: ["/api/beats/featured"],
-      staleTime: CACHE_CONFIG.BEATS_FEATURED.staleTime,
-      queryFn: async () => {
-        if (signal?.aborted) return null;
-        const response = await fetch("/api/beats/featured", { signal });
-        if (!response.ok) throw new Error("Failed to fetch featured beats");
-        return response.json();
-      },
-    });
-
-    if (signal?.aborted) return;
-    await staggerDelay(150);
-
-    // Static data - genres and moods (24h cache)
-    await queryClient.prefetchQuery({
-      queryKey: ["/api/beats/filters"],
-      staleTime: CACHE_CONFIG.STATIC.staleTime,
-      queryFn: async () => {
-        if (signal?.aborted) return null;
-        const response = await fetch("/api/beats/filters", { signal });
-        if (!response.ok) throw new Error("Failed to fetch beat filters");
-        return response.json();
-      },
-    });
+    // Run all queries in parallel with a global timeout of 5 seconds
+    // This prevents cache warming from blocking the app for too long
+    await Promise.race([
+      Promise.allSettled(queries),
+      new Promise<void>(resolve => setTimeout(resolve, 5000)),
+    ]);
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return;

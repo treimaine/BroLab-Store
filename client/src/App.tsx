@@ -14,6 +14,18 @@ import { HelmetProvider } from "react-helmet-async";
 import { Route, Switch, useLocation } from "wouter";
 import { clearUserCache, queryClient, warmCache } from "./lib/queryClient";
 
+// Import cleanup functions for singleton services
+import { destroyConnectionManager } from "@/services/ConnectionManager";
+import { destroyDataFreshnessMonitor } from "@/services/DataFreshnessMonitor";
+import { destroyErrorHandlingManager } from "@/services/ErrorHandlingManager";
+import { destroyErrorLoggingService } from "@/services/ErrorLoggingService";
+import { destroyEventBus } from "@/services/EventBus";
+import { destroyNotificationService } from "@/services/NotificationService";
+import { destroyOptimisticUpdateManager } from "@/services/OptimisticUpdateManager";
+import { destroySyncManager } from "@/services/SyncManager";
+// Import performance monitoring cleanup
+import { stopMemoryMonitoring } from "@/lib/performanceMonitoring";
+
 // Critical components - loaded immediately for core UX
 import { Navbar } from "@/components/layout/navbar";
 
@@ -249,13 +261,63 @@ function App() {
   // Use interaction-based preloading
   useInteractionPreloader();
 
-  // Initialize performance optimizations (non-auth dependent)
+  // FIX: Cleanup singleton services on app unmount to prevent memory leaks
   useEffect(() => {
-    // Preload critical components after initial render
-    bundleOptimization.preloadCriticalComponents();
+    return () => {
+      // Cleanup all singleton services that have timers/intervals
+      // Order matters: destroy dependent services first
+      destroyEventBus();
+      destroySyncManager();
+      destroyDataFreshnessMonitor();
+      destroyConnectionManager();
+      destroyErrorHandlingManager();
+      destroyErrorLoggingService();
+      destroyOptimisticUpdateManager();
+      destroyNotificationService();
 
-    // Setup user interaction-based preloading
-    bundleOptimization.preloadOnUserInteraction();
+      // Stop performance monitoring intervals
+      stopMemoryMonitoring();
+
+      if (import.meta.env.DEV) {
+        console.log("✅ All singleton services cleaned up on app unmount");
+      }
+    };
+  }, []);
+
+  // Initialize performance optimizations (non-auth dependent)
+  // FIX: Use requestIdleCallback to defer non-critical initialization
+  useEffect(() => {
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const initOptimizations = (): void => {
+      // Preload critical components after initial render
+      bundleOptimization.preloadCriticalComponents();
+      // Setup user interaction-based preloading
+      bundleOptimization.preloadOnUserInteraction();
+    };
+
+    // Use requestIdleCallback if available, otherwise defer with setTimeout
+    const win = globalThis as typeof globalThis & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (win.requestIdleCallback) {
+      idleId = win.requestIdleCallback(initOptimizations, { timeout: 5000 });
+    } else {
+      // Fallback: delay by 2 seconds to let critical content render first
+      timeoutId = setTimeout(initOptimizations, 2000);
+    }
+
+    return () => {
+      if (idleId !== undefined && win.cancelIdleCallback) {
+        win.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   // Network-aware preloading for audio components

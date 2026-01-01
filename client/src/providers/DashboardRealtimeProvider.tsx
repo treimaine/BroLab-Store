@@ -49,11 +49,18 @@ class RealtimeConnectionManager {
     }
 
     this.userId = userId;
+
+    // FIX: Check if WebSocket is disabled before attempting connection
+    const url = wsUrl || this.getWebSocketUrl();
+    if (!url) {
+      console.log("[DashboardRealtime] WebSocket disabled, skipping connection");
+      this.onStatusChange("disconnected");
+      return;
+    }
+
     this.onStatusChange("connecting");
 
     try {
-      // Use Convex WebSocket URL or fallback to development WebSocket
-      const url = wsUrl || this.getWebSocketUrl();
       this.ws = new WebSocket(url);
 
       this.ws.onopen = this.handleOpen.bind(this);
@@ -255,13 +262,28 @@ class RealtimeConnectionManager {
   }
 
   private getWebSocketUrl(): string {
+    // FIX: Detect Vercel/serverless and return empty to prevent connection attempts
+    const isVercelOrServerless =
+      globalThis.window !== undefined &&
+      (globalThis.window.location.hostname.includes("vercel.app") ||
+        globalThis.window.location.hostname === "brolabentertainment.com" ||
+        globalThis.window.location.hostname.includes("brolabentertainment"));
+
+    // Check environment variable override
+    const disableWebSocket = import.meta.env.VITE_DISABLE_WEBSOCKET === "true";
+
+    if (isVercelOrServerless || disableWebSocket) {
+      // Return empty string - WebSocket will not be used
+      console.log("[DashboardRealtime] WebSocket disabled on serverless platform");
+      return "";
+    }
+
     // In development, use a mock WebSocket server
     if (process.env.NODE_ENV === "development") {
       return "ws://localhost:3001/ws";
     }
 
-    // In production, this would be the actual Convex WebSocket URL
-    // For now, we'll use a placeholder
+    // In production with WebSocket support, use the actual URL
     return process.env.VITE_CONVEX_WS_URL || "wss://api.brolab.com/ws";
   }
 }

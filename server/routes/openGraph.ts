@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { CommonParams, validateParams } from "../../shared/validation/index";
 import {
   generateBeatOpenGraph,
   generateHomeOpenGraph,
@@ -84,7 +85,7 @@ const openGraphConfig: OpenGraphConfig = {
  * GET /api/opengraph/beat/:id
  * Génère les meta tags Open Graph pour un beat spécifique
  */
-router.get("/beat/:id", async (req, res): Promise<void> => {
+router.get("/beat/:id", validateParams(CommonParams.numericId), async (req, res): Promise<void> => {
   try {
     const beatId = req.params.id;
 

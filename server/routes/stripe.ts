@@ -5,6 +5,7 @@ import type {
   CreatePaymentIntentRequest,
   CreatePaymentIntentResponse,
 } from "../../shared/types/apiEndpoints";
+import { CommonParams, validateParams } from "../../shared/validation/index";
 import { handleRouteError } from "../types/routes";
 
 /**
@@ -232,20 +233,24 @@ router.post("/create-payment-intent", createPaymentIntent);
  * Get payment intent status
  * This route retrieves the current status of a payment intent
  */
-router.get("/payment-intent/:id", async (req, res): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const paymentIntent = await stripeClient.paymentIntents.retrieve(id);
+router.get(
+  "/payment-intent/:id",
+  validateParams(CommonParams.stripePaymentIntentId),
+  async (req, res): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const paymentIntent = await stripeClient.paymentIntents.retrieve(id);
 
-    res.json({
-      status: paymentIntent.status,
-      amount: paymentIntent.amount,
-      currency: paymentIntent.currency,
-      metadata: paymentIntent.metadata,
-    });
-  } catch (error: unknown) {
-    handleRouteError(error, res, "Error retrieving payment intent");
+      res.json({
+        status: paymentIntent.status,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        metadata: paymentIntent.metadata,
+      });
+    } catch (error: unknown) {
+      handleRouteError(error, res, "Error retrieving payment intent");
+    }
   }
-});
+);
 
 export default router;

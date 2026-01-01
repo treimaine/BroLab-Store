@@ -123,12 +123,19 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
   constructor(config: Partial<CrossTabSyncConfig> = {}, userId: string = "anonymous") {
     super();
 
+    // FIX: Increase intervals in production to reduce CPU usage
+    const isProduction =
+      globalThis.window !== undefined && globalThis.window.location.hostname !== "localhost";
+
     this.config = {
       channelName: config.channelName || "brolab-dashboard-sync",
       storagePrefix: config.storagePrefix || "brolab_sync_",
-      heartbeatInterval: config.heartbeatInterval || 30000,
-      tabTimeout: config.tabTimeout || 60000,
-      deduplicationWindow: config.deduplicationWindow || 5000,
+      // Increase heartbeat interval in production (60s vs 30s)
+      heartbeatInterval: config.heartbeatInterval || (isProduction ? 60000 : 30000),
+      // Increase tab timeout in production (120s vs 60s)
+      tabTimeout: config.tabTimeout || (isProduction ? 120000 : 60000),
+      // Increase deduplication window in production (10s vs 5s)
+      deduplicationWindow: config.deduplicationWindow || (isProduction ? 10000 : 5000),
       maxStoredMessages: config.maxStoredMessages || 100,
       conflictResolutionTimeout: config.conflictResolutionTimeout || 10000,
       debug: config.debug || false,

@@ -1,6 +1,7 @@
 import { Response, Router } from "express";
 import Stripe from "stripe";
 import { centsToDollars } from "../../shared/utils/currency";
+import { CommonParams, validateParams } from "../../shared/validation/index";
 import { urls } from "../config/urls";
 import { handleRouteError } from "../types/routes";
 import { generateSecureRequestId } from "../utils/requestId";
@@ -444,76 +445,80 @@ router.post("/create-checkout-session", async (req, res): Promise<void> => {
 // Get checkout session status
 // Note: Stripe payment webhooks are handled in server/routes/webhooks.ts
 // This route only retrieves session status for client-side polling
-router.get("/checkout-session/:id", async (req, res): Promise<void> => {
-  const requestId = `get_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+router.get(
+  "/checkout-session/:id",
+  validateParams(CommonParams.stripeSessionId),
+  async (req, res): Promise<void> => {
+    const requestId = `get_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
-  try {
-    const { id } = req.params;
+    try {
+      const { id } = req.params;
 
-    if (!id || typeof id !== "string") {
-      const errorResponse = createErrorResponse(
-        "Validation Error",
-        "Valid session ID is required",
-        "id"
-      );
+      if (!id || typeof id !== "string") {
+        const errorResponse = createErrorResponse(
+          "Validation Error",
+          "Valid session ID is required",
+          "id"
+        );
 
-      logPaymentEvent("warn", "session_retrieval_invalid_id", {
+        logPaymentEvent("warn", "session_retrieval_invalid_id", {
+          requestId,
+          providedId: id,
+        });
+
+        res.status(400).json(errorResponse);
+        return;
+      }
+
+      logPaymentEvent("info", "session_retrieval_start", {
         requestId,
-        providedId: id,
+        sessionId: id,
       });
 
-      res.status(400).json(errorResponse);
-      return;
+      const session = await stripe.checkout.sessions.retrieve(id);
+
+      logPaymentEvent("info", "session_retrieved", {
+        requestId,
+        sessionId: session.id,
+        status: session.status,
+        amount: session.amount_total,
+        currency: session.currency,
+        paymentType: session.metadata?.type || "unknown",
+      });
+
+      res.json({
+        success: true,
+        id: session.id,
+        status: session.status,
+        amount: session.amount_total,
+        currency: session.currency,
+        metadata: session.metadata,
+        customerEmail: session.customer_email,
+        createdAt: session.created * 1000, // Convert to milliseconds
+        expiresAt: session.expires_at * 1000, // Convert to milliseconds
+      });
+    } catch (error: unknown) {
+      logPaymentEvent("error", "session_retrieval_failed", {
+        requestId,
+        sessionId: req.params.id,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+
+      if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+        const errorResponse = createErrorResponse(
+          "Not Found",
+          "Checkout session not found",
+          "id",
+          "session_not_found"
+        );
+
+        res.status(404).json(errorResponse);
+        return;
+      }
+
+      handleRouteError(error, res, "Failed to retrieve checkout session");
     }
-
-    logPaymentEvent("info", "session_retrieval_start", {
-      requestId,
-      sessionId: id,
-    });
-
-    const session = await stripe.checkout.sessions.retrieve(id);
-
-    logPaymentEvent("info", "session_retrieved", {
-      requestId,
-      sessionId: session.id,
-      status: session.status,
-      amount: session.amount_total,
-      currency: session.currency,
-      paymentType: session.metadata?.type || "unknown",
-    });
-
-    res.json({
-      success: true,
-      id: session.id,
-      status: session.status,
-      amount: session.amount_total,
-      currency: session.currency,
-      metadata: session.metadata,
-      customerEmail: session.customer_email,
-      createdAt: session.created * 1000, // Convert to milliseconds
-      expiresAt: session.expires_at * 1000, // Convert to milliseconds
-    });
-  } catch (error: unknown) {
-    logPaymentEvent("error", "session_retrieval_failed", {
-      requestId,
-      sessionId: req.params.id,
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
-
-    if (error instanceof Stripe.errors.StripeInvalidRequestError) {
-      const errorResponse = createErrorResponse(
-        "Not Found",
-        "Checkout session not found",
-        "id",
-        "session_not_found"
-      );
-
-      res.status(404).json(errorResponse);
-      return;
-    }
-
-    handleRouteError(error, res, "Failed to retrieve checkout session");
   }
-});
+);
 
 export default router;

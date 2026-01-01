@@ -444,6 +444,16 @@ export function getNotificationService(): NotificationServiceImpl {
 }
 
 /**
+ * Destroy the NotificationService instance (for cleanup on app unmount)
+ */
+export function destroyNotificationService(): void {
+  if (notificationServiceInstance) {
+    notificationServiceInstance.destroy();
+    notificationServiceInstance = null;
+  }
+}
+
+/**
  * Singleton notification service instance for direct import
  */
 export const notificationService = getNotificationService();
