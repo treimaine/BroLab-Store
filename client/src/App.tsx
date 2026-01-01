@@ -285,6 +285,7 @@ function App() {
   }, [isGlobalAudioEnabled, shouldAutoPreload, hasPreloaded, triggerPreload]);
 
   // Cache warming with proper cleanup on auth state changes
+  // DEFERRED: Wait for initial render to complete before warming cache
   useEffect(() => {
     // Wait for auth to be loaded before doing anything
     if (!isLoaded) {
@@ -294,18 +295,40 @@ function App() {
     // Create abort controller for cleanup
     const abortController = new AbortController();
     let isActive = true;
+    let warmingTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     if (isSignedIn) {
-      // User signed in - warm the cache
-      warmCache(abortController.signal).catch(error => {
-        // Ignore abort errors or if effect was cleaned up
-        if (error?.name === "AbortError" || !isActive) {
-          return;
-        }
-        if (import.meta.env.DEV) {
-          console.error("Cache warming failed:", error);
-        }
-      });
+      // User signed in - warm the cache AFTER a delay to prevent freeze
+      // Use requestIdleCallback if available for better performance
+      const win = globalThis as typeof globalThis & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+        cancelIdleCallback?: (id: number) => void;
+      };
+
+      const startWarming = (): void => {
+        if (!isActive) return;
+        warmCache(abortController.signal).catch(error => {
+          // Ignore abort errors or if effect was cleaned up
+          if (error?.name === "AbortError" || !isActive) {
+            return;
+          }
+          if (import.meta.env.DEV) {
+            console.error("Cache warming failed:", error);
+          }
+        });
+      };
+
+      if (win.requestIdleCallback) {
+        const idleId = win.requestIdleCallback(startWarming, { timeout: 5000 });
+        return () => {
+          isActive = false;
+          abortController.abort();
+          win.cancelIdleCallback?.(idleId);
+        };
+      }
+
+      // Fallback: delay by 2 seconds to let critical content render first
+      warmingTimeoutId = setTimeout(startWarming, 2000);
     } else {
       // User signed out - clear user-specific cache to prevent stale data
       clearUserCache();
@@ -315,6 +338,7 @@ function App() {
     return () => {
       isActive = false;
       abortController.abort();
+      if (warmingTimeoutId) clearTimeout(warmingTimeoutId);
     };
   }, [isLoaded, isSignedIn]);
 

@@ -289,32 +289,43 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
   }, [handleOperationSuccess, handleOperationFailure]);
 
   // Use centralized tab visibility manager with staggered resume
-  // This prevents the "thundering herd" problem when tab becomes visible
+  // Increased delays to prevent the "thundering herd" problem when tab becomes visible
   const { isVisible: isTabVisible, isReady: isTabReady } = useStaggeredResume({
-    baseDelay: 100,
-    staggerRange: 400,
-    minVisibleTime: 200,
+    baseDelay: 500,
+    staggerRange: 1000,
+    minVisibleTime: 800,
   });
   const metricsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optimizationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Initialize cache on mount (runs once)
+  // Initialize cache on mount (runs once) - DEFERRED to prevent freeze
   useEffect(() => {
     let isMounted = true;
+    let initTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const initializeCache = async (): Promise<void> => {
       try {
         setIsWarming(true);
 
-        // Initialize service worker cache
-        await cachingStrategy.initialize();
+        // Initialize service worker cache (non-blocking)
+        // Don't await - let it initialize in background
+        cachingStrategy.initialize().catch(err => {
+          console.warn("Service worker cache init failed (non-critical):", err);
+        });
 
-        // Preload critical data
+        // Small delay to let the main thread breathe
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        if (!isMounted) return;
+
+        // Preload critical data with staggered requests to prevent freeze
         await cachingStrategy.preloadCriticalData();
 
         if (isMounted) {
           setIsInitialized(true);
-          console.log("✅ Cache provider initialized successfully");
+          if (import.meta.env.DEV) {
+            console.log("✅ Cache provider initialized successfully");
+          }
         }
       } catch (error) {
         console.error("❌ Failed to initialize cache provider:", error);
@@ -325,10 +336,28 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
       }
     };
 
-    initializeCache();
+    // Defer initialization to prevent blocking initial render
+    // Use requestIdleCallback if available, otherwise setTimeout
+    const win = globalThis as typeof globalThis & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    };
+
+    if (win.requestIdleCallback) {
+      const idleId = win.requestIdleCallback(() => initializeCache(), { timeout: 3000 });
+      return () => {
+        isMounted = false;
+        (
+          globalThis as typeof globalThis & { cancelIdleCallback?: (id: number) => void }
+        ).cancelIdleCallback?.(idleId);
+      };
+    }
+
+    // Fallback: delay by 1 second to let critical content render first
+    initTimeoutId = setTimeout(initializeCache, 1000);
 
     return () => {
       isMounted = false;
+      if (initTimeoutId) clearTimeout(initTimeoutId);
     };
   }, []); // Empty deps - run only once on mount
 

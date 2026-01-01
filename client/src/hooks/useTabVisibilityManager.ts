@@ -75,7 +75,7 @@ export function useTimeSinceVisibilityChange(): number {
 }
 
 interface StaggeredResumeOptions {
-  /** Base delay before resuming (ms) */
+  /** Base delay before resuming (ms) - increased default to prevent freeze */
   baseDelay?: number;
   /** Additional random delay to stagger multiple consumers (ms) */
   staggerRange?: number;
@@ -108,7 +108,8 @@ export function useStaggeredResume(options: StaggeredResumeOptions = {}): {
   isVisible: boolean;
   scheduleResume: (callback: () => void) => void;
 } {
-  const { baseDelay = 50, staggerRange = 300, minVisibleTime = 100, onResume, onHide } = options;
+  // Increased defaults to prevent "thundering herd" freeze on tab return
+  const { baseDelay = 300, staggerRange = 800, minVisibleTime = 500, onResume, onHide } = options;
 
   const isVisible = useTabVisible();
   const isReadyRef = useRef(isVisible);

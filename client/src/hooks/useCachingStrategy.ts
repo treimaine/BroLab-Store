@@ -310,6 +310,7 @@ export function useCacheMetrics() {
 
 /**
  * Hook for cache warming on component mount
+ * Uses sequential requests with staggered delays to prevent main thread freeze
  */
 export function useCacheWarming(
   warmingData: Array<{
@@ -320,39 +321,62 @@ export function useCacheWarming(
   }>
 ) {
   useEffect(() => {
-    const warmCache = async () => {
+    // Skip if no data to warm
+    if (warmingData.length === 0) return;
+
+    let isCancelled = false;
+
+    const warmCache = async (): Promise<void> => {
       // Sort by priority using toSorted to avoid mutation
       const sortedData = [...warmingData].toSorted((a, b) => {
         const priorityOrder = { high: 0, medium: 1, low: 2 };
         return priorityOrder[a.priority || "medium"] - priorityOrder[b.priority || "medium"];
       });
 
-      // Warm cache in batches to avoid overwhelming the system
-      const batchSize = 3;
-      for (let i = 0; i < sortedData.length; i += batchSize) {
-        const batch = sortedData.slice(i, i + batchSize);
+      // Process sequentially with delays to prevent freeze
+      // This is slower but prevents main thread blocking
+      for (const { key, dataType, fetcher } of sortedData) {
+        if (isCancelled) break;
 
-        await Promise.allSettled(
-          batch.map(async ({ key, dataType, fetcher }) => {
-            try {
-              const data = await fetcher();
-              await cachingStrategy.cacheData(key, data, dataType);
-            } catch (error) {
-              console.warn(`Failed to warm cache for ${key}:`, error);
-            }
-          })
-        );
+        try {
+          const data = await fetcher();
+          if (!isCancelled) {
+            await cachingStrategy.cacheData(key, data, dataType);
+          }
+        } catch (error) {
+          if (import.meta.env.DEV) {
+            console.warn(`Failed to warm cache for ${key}:`, error);
+          }
+        }
 
-        // Small delay between batches
-        if (i + batchSize < sortedData.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Small delay between requests to let main thread breathe
+        if (!isCancelled) {
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
     };
 
-    // Start warming after a short delay to not block initial render
-    const timer = setTimeout(warmCache, 500);
-    return () => clearTimeout(timer);
+    // Start warming after a longer delay to not block initial render
+    // Use requestIdleCallback if available for better performance
+    const win = globalThis as typeof globalThis & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (win.requestIdleCallback) {
+      const idleId = win.requestIdleCallback(() => warmCache(), { timeout: 5000 });
+      return () => {
+        isCancelled = true;
+        win.cancelIdleCallback?.(idleId);
+      };
+    }
+
+    // Fallback: delay by 1.5 seconds
+    const timer = setTimeout(warmCache, 1500);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
   }, [warmingData]);
 }
 

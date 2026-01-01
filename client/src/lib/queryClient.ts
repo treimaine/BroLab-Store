@@ -615,32 +615,160 @@ export const getQueryFn: <T>(options: QueryFnOptions) => QueryFunction<T> =
     return await res.json();
   };
 
-// Cache configuration for different data types
+// =============================================================================
+// CACHE CONFIGURATION - BroLab Entertainment (brolabentertainment.com)
+// =============================================================================
+// Each data type has specific staleTime based on update frequency and criticality.
+// See docs/CACHE_STRATEGY.md for detailed documentation.
+
+/** Time constants in milliseconds */
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+
+/**
+ * Cache configuration by data type for TanStack Query.
+ * - staleTime: How long data is considered fresh (no refetch)
+ * - gcTime: How long inactive data stays in cache before garbage collection
+ */
 export const CACHE_CONFIG = {
-  // Static data that rarely changes
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STATIC DATA - Rarely changes, safe to cache long-term
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** License tiers, subscription plans, genres, moods, tags */
   STATIC: {
-    staleTime: 24 * 60 * 60 * 1000, // 24 hours
-    gcTime: 48 * 60 * 60 * 1000, // 48 hours
+    staleTime: 24 * HOUR,
+    gcTime: 48 * HOUR,
   },
-  // User-specific data
-  USER_DATA: {
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // BEATS CATALOG - Core product data
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Beat listings, search results, filtered lists */
+  BEATS: {
+    staleTime: 5 * MINUTE,
+    gcTime: 30 * MINUTE,
   },
-  // Frequently changing data
-  DYNAMIC: {
-    staleTime: 1 * 60 * 1000, // 1 minute
-    gcTime: 5 * 60 * 1000, // 5 minutes
+
+  /** Individual beat details (metadata, waveform, licenses) */
+  BEAT_DETAILS: {
+    staleTime: 15 * MINUTE,
+    gcTime: 1 * HOUR,
   },
-  // Real-time data
-  REALTIME: {
-    staleTime: 0, // Always stale
-    gcTime: 1 * 60 * 1000, // 1 minute
+
+  /** Featured beats, recommendations, trending */
+  BEATS_FEATURED: {
+    staleTime: 10 * MINUTE,
+    gcTime: 30 * MINUTE,
   },
-  // Audio/media data
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // USER DATA - Personal data requiring freshness
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** User profile, preferences, metadata */
+  USER_PROFILE: {
+    staleTime: 5 * MINUTE,
+    gcTime: 30 * MINUTE,
+  },
+
+  /** User favorites/wishlist - changes frequently */
+  FAVORITES: {
+    staleTime: 1 * MINUTE,
+    gcTime: 10 * MINUTE,
+  },
+
+  /** Download history and available downloads */
+  DOWNLOADS: {
+    staleTime: 3 * MINUTE,
+    gcTime: 20 * MINUTE,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // COMMERCE DATA - Transactional, requires high freshness
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Order history and order details */
+  ORDERS: {
+    staleTime: 2 * MINUTE,
+    gcTime: 15 * MINUTE,
+  },
+
+  /** Shopping cart - real-time, always refetch */
+  CART: {
+    staleTime: 0,
+    gcTime: 5 * MINUTE,
+  },
+
+  /** User subscription status and quotas */
+  SUBSCRIPTIONS: {
+    staleTime: 10 * MINUTE,
+    gcTime: 1 * HOUR,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SERVICES DATA - Reservations and bookings
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Service reservations (mixing, mastering, recording) */
+  RESERVATIONS: {
+    staleTime: 1 * MINUTE,
+    gcTime: 10 * MINUTE,
+  },
+
+  /** Available time slots for booking */
+  AVAILABILITY: {
+    staleTime: 30 * 1000, // 30 seconds - critical for booking
+    gcTime: 2 * MINUTE,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // DASHBOARD & ANALYTICS
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Dashboard stats, aggregations, summaries */
+  DASHBOARD: {
+    staleTime: 5 * MINUTE,
+    gcTime: 30 * MINUTE,
+  },
+
+  /** Notifications and alerts */
+  NOTIFICATIONS: {
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * MINUTE,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MEDIA & AUDIO
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Audio files, waveform data, preview URLs */
   MEDIA: {
-    staleTime: 60 * 60 * 1000, // 1 hour
-    gcTime: 24 * 60 * 60 * 1000, // 24 hours
+    staleTime: 1 * HOUR,
+    gcTime: 24 * HOUR,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // LEGACY ALIASES (backward compatibility)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** @deprecated Use specific config (BEATS, ORDERS, etc.) instead */
+  USER_DATA: {
+    staleTime: 5 * MINUTE,
+    gcTime: 30 * MINUTE,
+  },
+
+  /** @deprecated Use specific config instead */
+  DYNAMIC: {
+    staleTime: 1 * MINUTE,
+    gcTime: 5 * MINUTE,
+  },
+
+  /** @deprecated Use CART or NOTIFICATIONS instead */
+  REALTIME: {
+    staleTime: 0,
+    gcTime: 1 * MINUTE,
   },
 } as const;
 
@@ -699,8 +827,8 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: CACHE_CONFIG.USER_DATA.staleTime, // Default to user data config
-      gcTime: CACHE_CONFIG.USER_DATA.gcTime,
+      staleTime: CACHE_CONFIG.USER_PROFILE.staleTime, // Default: 5 minutes
+      gcTime: CACHE_CONFIG.USER_PROFILE.gcTime, // Default: 30 minutes
       retry: (failureCount, error: unknown) => {
         // Don't retry on 4xx errors except 408, 429
         const errorWithStatus = error as { status?: number };
@@ -786,78 +914,156 @@ export const cacheInvalidation = {
   },
 };
 
-// Prefetching utilities for better UX
+// =============================================================================
+// PREFETCHING UTILITIES - Optimized for BroLab Entertainment UX
+// =============================================================================
+
 export const prefetchUtils = {
-  // Prefetch user dashboard data
-  prefetchDashboard: async (userId: string) => {
+  /**
+   * Prefetch user dashboard data on login or navigation
+   * Uses DASHBOARD, FAVORITES, and DOWNLOADS configs
+   */
+  prefetchDashboard: async (userId: string): Promise<void> => {
     await Promise.all([
       queryClient.prefetchQuery({
         queryKey: ["dashboard", "stats", userId],
-        staleTime: CACHE_CONFIG.USER_DATA.staleTime,
+        staleTime: CACHE_CONFIG.DASHBOARD.staleTime,
       }),
       queryClient.prefetchQuery({
         queryKey: ["user", "favorites", userId],
-        staleTime: CACHE_CONFIG.USER_DATA.staleTime,
+        staleTime: CACHE_CONFIG.FAVORITES.staleTime,
       }),
       queryClient.prefetchQuery({
         queryKey: ["user", "downloads", userId],
-        staleTime: CACHE_CONFIG.USER_DATA.staleTime,
+        staleTime: CACHE_CONFIG.DOWNLOADS.staleTime,
+      }),
+      queryClient.prefetchQuery({
+        queryKey: ["user", "orders", userId],
+        staleTime: CACHE_CONFIG.ORDERS.staleTime,
       }),
     ]);
   },
 
-  // Prefetch beats list
-  prefetchBeats: async (filters?: Record<string, unknown>) => {
+  /**
+   * Prefetch beats catalog for browse/search pages
+   * Uses BEATS config for list data
+   */
+  prefetchBeats: async (filters?: Record<string, unknown>): Promise<void> => {
     await queryClient.prefetchQuery({
       queryKey: ["beats", "list", filters],
-      staleTime: CACHE_CONFIG.DYNAMIC.staleTime,
+      staleTime: CACHE_CONFIG.BEATS.staleTime,
     });
   },
 
-  // Prefetch beat details
-  prefetchBeatDetails: async (beatId: string) => {
+  /**
+   * Prefetch individual beat details on hover
+   * Uses BEAT_DETAILS config for stable metadata
+   */
+  prefetchBeatDetails: async (beatId: string): Promise<void> => {
     await queryClient.prefetchQuery({
       queryKey: ["beats", "details", beatId],
-      staleTime: CACHE_CONFIG.MEDIA.staleTime,
+      staleTime: CACHE_CONFIG.BEAT_DETAILS.staleTime,
+    });
+  },
+
+  /**
+   * Prefetch featured beats for homepage
+   * Uses BEATS_FEATURED config
+   */
+  prefetchFeaturedBeats: async (): Promise<void> => {
+    await queryClient.prefetchQuery({
+      queryKey: ["beats", "featured"],
+      staleTime: CACHE_CONFIG.BEATS_FEATURED.staleTime,
+    });
+  },
+
+  /**
+   * Prefetch user subscription and quota data
+   * Uses SUBSCRIPTIONS config
+   */
+  prefetchSubscription: async (userId: string): Promise<void> => {
+    await queryClient.prefetchQuery({
+      queryKey: ["user", "subscription", userId],
+      staleTime: CACHE_CONFIG.SUBSCRIPTIONS.staleTime,
+    });
+  },
+
+  /**
+   * Prefetch reservation availability for booking page
+   * Uses AVAILABILITY config (short staleTime for accuracy)
+   */
+  prefetchAvailability: async (serviceType: string, date: string): Promise<void> => {
+    await queryClient.prefetchQuery({
+      queryKey: ["reservations", "availability", serviceType, date],
+      staleTime: CACHE_CONFIG.AVAILABILITY.staleTime,
     });
   },
 };
 
-// Cache warming for critical data with abort support
+// =============================================================================
+// CACHE WARMING - Preload critical data on app init
+// =============================================================================
+
 export const warmCache = async (signal?: AbortSignal): Promise<void> => {
-  // Check if already aborted before starting
   if (signal?.aborted) {
     return;
   }
 
   try {
-    // Warm cache with static data that's commonly accessed
-    await Promise.all([
-      queryClient.prefetchQuery({
-        queryKey: ["/api/subscription/plans"],
-        staleTime: CACHE_CONFIG.STATIC.staleTime,
-        queryFn: async () => {
-          const response = await fetch("/api/subscription/plans", { signal });
-          if (!response.ok) throw new Error("Failed to fetch subscription plans");
-          return response.json();
-        },
-      }),
-      queryClient.prefetchQuery({
-        queryKey: ["/api/beats/featured"],
-        staleTime: CACHE_CONFIG.DYNAMIC.staleTime,
-        queryFn: async () => {
-          const response = await fetch("/api/beats/featured", { signal });
-          if (!response.ok) throw new Error("Failed to fetch featured beats");
-          return response.json();
-        },
-      }),
-    ]);
+    // Stagger requests to prevent main thread freeze
+    // Each request waits for the previous one + small delay
+    const staggerDelay = (ms: number): Promise<void> =>
+      new Promise(resolve => setTimeout(resolve, ms));
+
+    // Static data - subscription plans (24h cache)
+    await queryClient.prefetchQuery({
+      queryKey: ["/api/subscription/plans"],
+      staleTime: CACHE_CONFIG.STATIC.staleTime,
+      queryFn: async () => {
+        if (signal?.aborted) return null;
+        const response = await fetch("/api/subscription/plans", { signal });
+        if (!response.ok) throw new Error("Failed to fetch subscription plans");
+        return response.json();
+      },
+    });
+
+    if (signal?.aborted) return;
+    await staggerDelay(150); // Small delay between requests
+
+    // Featured beats for homepage (10min cache)
+    await queryClient.prefetchQuery({
+      queryKey: ["/api/beats/featured"],
+      staleTime: CACHE_CONFIG.BEATS_FEATURED.staleTime,
+      queryFn: async () => {
+        if (signal?.aborted) return null;
+        const response = await fetch("/api/beats/featured", { signal });
+        if (!response.ok) throw new Error("Failed to fetch featured beats");
+        return response.json();
+      },
+    });
+
+    if (signal?.aborted) return;
+    await staggerDelay(150);
+
+    // Static data - genres and moods (24h cache)
+    await queryClient.prefetchQuery({
+      queryKey: ["/api/beats/filters"],
+      staleTime: CACHE_CONFIG.STATIC.staleTime,
+      queryFn: async () => {
+        if (signal?.aborted) return null;
+        const response = await fetch("/api/beats/filters", { signal });
+        if (!response.ok) throw new Error("Failed to fetch beat filters");
+        return response.json();
+      },
+    });
   } catch (error) {
-    // Silently ignore abort errors
     if (error instanceof Error && error.name === "AbortError") {
       return;
     }
-    console.warn("Cache warming failed:", error);
+    // Silent fail in production, warn in dev
+    if (import.meta.env.DEV) {
+      console.warn("Cache warming failed:", error);
+    }
   }
 };
 
