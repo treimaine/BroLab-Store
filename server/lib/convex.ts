@@ -7,6 +7,244 @@ import {
 } from "../../shared/types/ConvexIntegration";
 import type { ConvexUser, ConvexUserInput } from "../../shared/types/ConvexUser";
 
+// ============================================================================
+// RETRY WRAPPER FOR CRITICAL OPERATIONS
+// ============================================================================
+
+/**
+ * Configuration options for retry behavior
+ */
+export interface RetryOptions {
+  /** Maximum number of retry attempts (default: 3) */
+  maxRetries?: number;
+  /** Base delay in milliseconds for exponential backoff (default: 1000) */
+  baseDelayMs?: number;
+  /** Maximum delay cap in milliseconds (default: 10000) */
+  maxDelayMs?: number;
+  /** Operation name for logging */
+  operationName?: string;
+  /** Whether to retry on this specific error (default: checks for retryable errors) */
+  shouldRetry?: (error: Error) => boolean;
+}
+
+/**
+ * Default retry options
+ */
+const DEFAULT_RETRY_OPTIONS: Required<Omit<RetryOptions, "shouldRetry">> = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 10000,
+  operationName: "operation",
+};
+
+/**
+ * Error codes that are safe to retry (transient errors)
+ */
+const RETRYABLE_ERROR_PATTERNS = [
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "EPIPE",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "fetch failed",
+  "network error",
+  "timeout",
+  "socket hang up",
+  "503",
+  "502",
+  "504",
+  "429", // Rate limiting
+  "service unavailable",
+  "bad gateway",
+  "gateway timeout",
+];
+
+/**
+ * Error codes that should NOT be retried (permanent errors)
+ */
+const NON_RETRYABLE_ERROR_PATTERNS = [
+  "400", // Bad request - validation error
+  "401", // Unauthorized
+  "403", // Forbidden
+  "404", // Not found
+  "422", // Unprocessable entity
+  "invalid argument",
+  "validation error",
+  "unauthorized",
+  "forbidden",
+  "not found",
+];
+
+/**
+ * Checks if error string matches any pattern in the given list
+ */
+function matchesAnyPattern(errorString: string, patterns: readonly string[]): boolean {
+  return patterns.some(pattern => errorString.includes(pattern.toLowerCase()));
+}
+
+/**
+ * Determines if an error is retryable based on error message/code
+ */
+function isRetryableError(error: Error): boolean {
+  const errorString =
+    `${error.message} ${error.name} ${(error as NodeJS.ErrnoException).code || ""}`.toLowerCase();
+
+  // Non-retryable errors take precedence
+  if (matchesAnyPattern(errorString, NON_RETRYABLE_ERROR_PATTERNS)) {
+    return false;
+  }
+
+  // Check if it matches retryable patterns
+  return matchesAnyPattern(errorString, RETRYABLE_ERROR_PATTERNS);
+}
+
+/**
+ * Calculates delay with exponential backoff and jitter
+ */
+function calculateDelay(attempt: number, baseDelayMs: number, maxDelayMs: number): number {
+  // Exponential backoff: baseDelay * 2^attempt
+  const exponentialDelay = baseDelayMs * Math.pow(2, attempt);
+  // Add jitter (±25%) to prevent thundering herd
+  const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1);
+  const delay = Math.min(exponentialDelay + jitter, maxDelayMs);
+  return Math.round(delay);
+}
+
+/**
+ * Sleep for specified milliseconds
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Executes an async operation with retry logic and exponential backoff
+ *
+ * @param operation - The async function to execute
+ * @param options - Retry configuration options
+ * @returns The result of the operation
+ * @throws The last error if all retries fail
+ *
+ * @example
+ * const result = await withRetry(
+ *   () => convex.mutation(api.orders.recordPayment, args),
+ *   { operationName: "recordPayment", maxRetries: 3 }
+ * );
+ */
+/**
+ * Logs retry success message
+ */
+function logRetrySuccess(operationName: string, attempt: number): void {
+  if (attempt > 0) {
+    console.log(`✅ ${operationName} succeeded after ${attempt} retry(ies)`);
+  }
+}
+
+/**
+ * Logs retry warning message before retrying
+ */
+function logRetryWarning(
+  operationName: string,
+  attempt: number,
+  maxRetries: number,
+  delay: number,
+  errorMessage: string
+): void {
+  console.warn(
+    `⚠️ ${operationName} failed (attempt ${attempt + 1}/${maxRetries + 1}), ` +
+      `retrying in ${delay}ms: ${errorMessage}`
+  );
+}
+
+/**
+ * Logs final failure message after all retries exhausted
+ */
+function logFinalFailure(operationName: string, attempt: number, errorMessage: string): void {
+  if (attempt > 0) {
+    console.error(`❌ ${operationName} failed after ${attempt + 1} attempt(s): ${errorMessage}`);
+  }
+}
+
+/**
+ * Normalizes an error to an Error instance
+ */
+function normalizeError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+/**
+ * Handles retry logic for a failed attempt
+ * @returns true if should continue retrying, false if should stop
+ */
+async function handleRetryAttempt(
+  error: Error,
+  attempt: number,
+  config: Required<Omit<RetryOptions, "shouldRetry">>,
+  shouldRetry: (error: Error) => boolean
+): Promise<boolean> {
+  const canRetry = attempt < config.maxRetries && shouldRetry(error);
+
+  if (canRetry) {
+    const delay = calculateDelay(attempt, config.baseDelayMs, config.maxDelayMs);
+    logRetryWarning(config.operationName, attempt, config.maxRetries, delay, error.message);
+    await sleep(delay);
+    return true;
+  }
+
+  logFinalFailure(config.operationName, attempt, error.message);
+  return false;
+}
+
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  options?: RetryOptions
+): Promise<T> {
+  const config = { ...DEFAULT_RETRY_OPTIONS, ...options };
+  const shouldRetry = options?.shouldRetry ?? isRetryableError;
+
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    try {
+      const result = await operation();
+      logRetrySuccess(config.operationName, attempt);
+      return result;
+    } catch (error) {
+      lastError = normalizeError(error);
+      const shouldContinue = await handleRetryAttempt(lastError, attempt, config, shouldRetry);
+      if (!shouldContinue) {
+        break;
+      }
+    }
+  }
+
+  throw lastError || new Error(`${config.operationName} failed after retries`);
+}
+
+/**
+ * Creates a retry-wrapped version of a Convex mutation
+ * Useful for critical operations like payment processing
+ *
+ * @param mutationFn - The Convex mutation function reference
+ * @param operationName - Name for logging purposes
+ * @param customOptions - Optional custom retry configuration
+ * @returns A function that executes the mutation with retry logic
+ */
+export function createRetryableMutation<TArgs, TResult>(
+  mutationFn: (args: TArgs) => Promise<TResult>,
+  operationName: string,
+  customOptions?: Partial<RetryOptions>
+): (args: TArgs) => Promise<TResult> {
+  return (args: TArgs) =>
+    withRetry(() => mutationFn(args), {
+      operationName,
+      ...customOptions,
+    });
+}
+
 // Module-level variables for lazy initialization
 let convexClient: ConvexHttpClient | null = null;
 let initializationError: Error | null = null;
@@ -696,6 +934,178 @@ export async function getReservationsByDateRange(
   } catch (error) {
     console.error("getReservationsByDateRange failed:", error);
     return [];
+  }
+}
+
+// ============================================================================
+// CRITICAL PAYMENT MUTATIONS WITH RETRY LOGIC
+// ============================================================================
+
+/**
+ * Arguments for recordPayment mutation
+ */
+export interface RecordPaymentArgs {
+  orderId: Id<"orders">;
+  provider: string;
+  status: string;
+  amount: number;
+  currency: string;
+  stripeEventId?: string;
+  stripePaymentIntentId?: string;
+  stripeChargeId?: string;
+  paypalTransactionId?: string;
+}
+
+/**
+ * Arguments for confirmPayment mutation
+ */
+export interface ConfirmPaymentArgs {
+  orderId: Id<"orders">;
+  paymentIntentId: string;
+  status: string;
+}
+
+/**
+ * Arguments for markProcessedEvent mutation
+ */
+export interface MarkProcessedEventArgs {
+  provider: string;
+  eventId: string;
+}
+
+/**
+ * Arguments for saveStripeCheckoutSession mutation
+ */
+export interface SaveStripeCheckoutSessionArgs {
+  orderId: Id<"orders">;
+  checkoutSessionId: string;
+  paymentIntentId: string;
+}
+
+/**
+ * Arguments for audit log mutation
+ */
+export interface AuditLogArgs {
+  action: string;
+  resource: string;
+  userId?: string;
+  details?: Record<string, unknown>;
+}
+
+/**
+ * Record payment with automatic retry on transient failures
+ * Critical for webhook processing - ensures payment is recorded even with network issues
+ */
+export async function recordPaymentWithRetry(
+  args: RecordPaymentArgs
+): Promise<{ success: boolean }> {
+  const client = getConvexClient();
+  // Dynamic import to avoid circular dependency and type instantiation issues
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore - Convex API deep type instantiation limitation
+  const { api } = await import("../../convex/_generated/api");
+
+  return withRetry(
+    async () => {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - Convex API deep type instantiation limitation
+      const result = await client.mutation(api.orders.recordPayment, args);
+      return result as { success: boolean };
+    },
+    { operationName: `recordPayment(${args.orderId})`, maxRetries: 3 }
+  );
+}
+
+/**
+ * Confirm payment with automatic retry on transient failures
+ * Critical for granting download access after successful payment
+ */
+export async function confirmPaymentWithRetry(
+  args: ConfirmPaymentArgs
+): Promise<{ success: boolean }> {
+  const client = getConvexClient();
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore - Convex API deep type instantiation limitation
+  const { api } = await import("../../convex/_generated/api");
+
+  return withRetry(
+    async () => {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - Convex API deep type instantiation limitation
+      const result = await client.mutation(api.orders.confirmPayment.confirmPayment, args);
+      return result as { success: boolean };
+    },
+    { operationName: `confirmPayment(${args.orderId})`, maxRetries: 3 }
+  );
+}
+
+/**
+ * Mark event as processed with automatic retry (idempotency check)
+ * Important for preventing duplicate webhook processing
+ */
+export async function markProcessedEventWithRetry(
+  args: MarkProcessedEventArgs
+): Promise<{ alreadyProcessed: boolean } | null> {
+  const client = getConvexClient();
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore - Convex API deep type instantiation limitation
+  const { api } = await import("../../convex/_generated/api");
+
+  return withRetry(
+    async () => {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - Convex API deep type instantiation limitation
+      const result = await client.mutation(api.orders.markProcessedEvent, args);
+      return result as { alreadyProcessed: boolean } | null;
+    },
+    { operationName: `markProcessedEvent(${args.eventId})`, maxRetries: 3 }
+  );
+}
+
+/**
+ * Save Stripe checkout session with automatic retry
+ * Important for linking payment intent to order
+ */
+export async function saveStripeCheckoutSessionWithRetry(
+  args: SaveStripeCheckoutSessionArgs
+): Promise<void> {
+  const client = getConvexClient();
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore - Convex API deep type instantiation limitation
+  const { api } = await import("../../convex/_generated/api");
+
+  return withRetry(
+    async () => {
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - Convex API deep type instantiation limitation
+      await client.mutation(api.orders.saveStripeCheckoutSession, args);
+    },
+    { operationName: `saveStripeCheckoutSession(${args.orderId})`, maxRetries: 3 }
+  );
+}
+
+/**
+ * Log to audit trail with automatic retry
+ * Non-critical but important for compliance and debugging
+ */
+export async function logAuditWithRetry(args: AuditLogArgs): Promise<void> {
+  const client = getConvexClient();
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore - Convex API deep type instantiation limitation
+  const { api } = await import("../../convex/_generated/api");
+
+  try {
+    await withRetry(
+      async () => {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore - Convex API deep type instantiation limitation
+        await client.mutation(api.audit.log, args);
+      },
+      { operationName: `auditLog(${args.action})`, maxRetries: 2 }
+    );
+  } catch (error) {
+    // Don't throw - audit logging failure shouldn't break main operations
+    console.error("❌ Audit logging failed after retries:", error);
   }
 }
 

@@ -19,6 +19,10 @@ optimizeScrolling();
 if (import.meta.env.DEV) {
   const { initializePerformanceMonitoring } = await import("./lib/performanceMonitoring");
   initializePerformanceMonitoring();
+
+  // Run i18n translation validation report
+  const { runValidationReport } = await import("./i18n/translationValidator");
+  runValidationReport();
 }
 
 // Register service worker for offline functionality
@@ -82,11 +86,11 @@ if (hasConfigError) {
   // Normal app rendering with all providers
   createRoot(rootElement).render(
     <ClerkErrorBoundary>
-      <ClerkProvider 
-        publishableKey={clerkPublishableKey!} 
+      <ClerkProvider
+        publishableKey={clerkPublishableKey!}
         telemetry={false}
-        afterSignInUrl="/"
-        afterSignUpUrl="/"
+        signInFallbackRedirectUrl="/"
+        signUpFallbackRedirectUrl="/"
         signInUrl="/login"
         signUpUrl="/login"
       >

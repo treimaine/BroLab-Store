@@ -101,11 +101,17 @@ export function useI18n() {
 
       // Fallback to English if translation not found
       if (translation === undefined) {
+        // Log missing key in dev mode
+        if (currentLanguage !== "en") {
+          logMissingKey(key, currentLanguage);
+        }
         translation = getNestedValue(translations.en, key);
       }
 
       // Use default value if still not found
       if (translation === undefined) {
+        // Key doesn't exist in any language
+        logMissingKey(key, "en");
         return defaultValue || key;
       }
 

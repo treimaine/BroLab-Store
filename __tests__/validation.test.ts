@@ -10,7 +10,7 @@ import {
   validateMimeType,
   validatePhoneNumber,
   validateUUID,
-} from "../shared/validation";
+} from "../shared/validation/index";
 
 describe("Validation System Tests", () => {
   describe("File Upload Validation", () => {

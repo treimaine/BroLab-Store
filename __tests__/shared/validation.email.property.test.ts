@@ -17,7 +17,7 @@ import * as fc from "fast-check";
 // Import validateEmail from all three locations to verify consistency
 import { validateEmail as validateEmailConvex } from "../../convex/lib/validation";
 import { validateEmail as validateEmailServer } from "../../server/lib/validation";
-import { validateEmail as validateEmailShared } from "../../shared/validation";
+import { validateEmail as validateEmailShared } from "../../shared/validation/index";
 
 // ============================================================================
 // Helper Functions for Arbitraries

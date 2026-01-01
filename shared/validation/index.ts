@@ -49,7 +49,6 @@ export {
   // UUID validation
   validateUUID,
   validateUserRole,
-  type FileUploadInput,
   type FileUploadValidationResult,
   type OrderStatus,
   // Types
@@ -57,6 +56,7 @@ export {
   type ReservationStatus,
   type ServiceType,
   type UserRole,
+  type FileUploadInput as ValidatorFileUploadInput,
 } from "./validators";
 
 // ================================
@@ -76,6 +76,71 @@ export {
 } from "./sanitizers";
 
 // ================================
+// AUTHENTICATION VALIDATION SCHEMAS
+// ================================
+
+export {
+  enhancedRegisterSchema,
+  loginSchema,
+  registerSchema,
+  serverRegisterSchema,
+  updateProfileSchema,
+  type EnhancedRegisterInput,
+  type LoginInput,
+  type RegisterInput,
+  type ServerRegisterInput,
+  type UpdateProfileInput,
+} from "./AuthValidation";
+
+// ================================
+// PAYMENT VALIDATION SCHEMAS
+// ================================
+
+export {
+  PAYPAL_SUPPORTED_CURRENCIES,
+  auditLogSchema,
+  createSubscriptionSchema,
+  enhancedPaymentIntentSchema,
+  paymentIntentSchema,
+  paypalCreateOrderSchema,
+  rateLimitSchema,
+  serverCreateSubscriptionSchema,
+  stripeWebhookSchema,
+  type AuditLogInput,
+  type CreateSubscriptionInput,
+  type EnhancedPaymentIntentInput,
+  type PayPalCreateOrderInput,
+  type PayPalCurrency,
+  type PaymentIntentInput,
+  type RateLimitInput,
+  type ServerCreateSubscriptionInput,
+  type StripeWebhookInput,
+} from "./PaymentValidation";
+
+// ================================
+// FILE VALIDATION SCHEMAS
+// ================================
+
+export {
+  customBeatFileValidation,
+  customBeatRequestSchema,
+  fileFilterValidation,
+  fileUploadValidation,
+  mixingMasteringFormSchema,
+  mixingMasteringSubmissionSchema,
+  serviceOrderValidation,
+  serviceSelectionSchema,
+  type CustomBeatFileInput,
+  type CustomBeatRequestInput,
+  type FileFilterInput,
+  type FileUploadInput,
+  type MixingMasteringFormInput,
+  type MixingMasteringSubmissionInput,
+  type ServiceOrderInput,
+  type ServiceSelectionInput,
+} from "./FileValidation";
+
+// ================================
 // DOMAIN-SPECIFIC VALIDATION SCHEMAS
 // ================================
 
@@ -85,66 +150,6 @@ export * from "./OrderValidation";
 export * from "./ReservationValidation";
 export * from "./UserValidation";
 export * from "./sync";
-
-// ================================
-// ZOD SCHEMAS (from main validation file)
-// ================================
-
-export {
-  PAYPAL_SUPPORTED_CURRENCIES,
-  // Audit
-  auditLogSchema,
-  // Subscription schemas
-  createSubscriptionSchema,
-  customBeatFileValidation,
-  customBeatRequestSchema,
-  enhancedPaymentIntentSchema,
-  enhancedRegisterSchema,
-  fileFilterValidation,
-  // File schemas
-  fileUploadValidation,
-  loginSchema,
-  mixingMasteringFormSchema,
-  mixingMasteringSubmissionSchema,
-  // Payment schemas
-  paymentIntentSchema,
-  // PayPal schemas
-  paypalCreateOrderSchema,
-  // Rate limiting
-  rateLimitSchema,
-  // User schemas
-  registerSchema,
-  serverCreateSubscriptionSchema,
-  serverRegisterSchema,
-  // Service schemas
-  serviceOrderValidation,
-  serviceSelectionSchema,
-  // Webhook schemas
-  stripeWebhookSchema,
-  updateProfileSchema,
-  type AuditLogInput,
-  type CreateSubscriptionInput,
-  type CustomBeatFileInput,
-  type CustomBeatRequestInput,
-  type EnhancedPaymentIntentInput,
-  type EnhancedRegisterInput,
-  type FileFilterInput,
-  type LoginInput,
-  type MixingMasteringFormInput,
-  type MixingMasteringSubmissionInput,
-  type PayPalCreateOrderInput,
-  type PayPalCurrency,
-  type PaymentIntentInput,
-  type RateLimitInput,
-  // Types
-  type RegisterInput,
-  type ServerCreateSubscriptionInput,
-  type ServiceOrderInput,
-  type ServiceSelectionInput,
-  type StripeWebhookInput,
-  type UpdateProfileInput,
-  type FileUploadInput as ZodFileUploadInput,
-} from "../validation";
 
 // ================================
 // ERROR UTILITIES
@@ -250,7 +255,6 @@ export const validateBody = <T extends z.ZodSchema>(schema: T) => {
         return res.status(400).json(errorResponse);
       }
 
-      // Replace req.body with validated data
       req.body = result.data;
       next();
     } catch (error) {
@@ -290,7 +294,6 @@ export const validateQuery = <T extends z.ZodSchema>(schema: T) => {
         return res.status(400).json(errorResponse);
       }
 
-      // Replace req.query with validated data
       req.query = result.data as Record<string, string>;
       next();
     } catch (error) {
@@ -330,7 +333,6 @@ export const validateParams = <T extends z.ZodSchema>(schema: T) => {
         return res.status(400).json(errorResponse);
       }
 
-      // Replace req.params with validated data
       req.params = result.data;
       next();
     } catch (error) {
@@ -405,7 +407,7 @@ export const extractValidationErrors = (error: z.ZodError) => {
     field: err.path.join("."),
     message: err.message,
     code: err.code,
-    value: undefined, // Simplified to avoid type issues
+    value: undefined,
   }));
 };
 

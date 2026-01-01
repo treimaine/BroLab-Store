@@ -3,7 +3,14 @@ import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { LicenseType } from "../../shared/types/Beat";
 import { centsToDollars } from "../../shared/utils/currency";
-import { getConvex } from "../lib/convex";
+import {
+  confirmPaymentWithRetry,
+  getConvex,
+  logAuditWithRetry,
+  markProcessedEventWithRetry,
+  recordPaymentWithRetry,
+  saveStripeCheckoutSessionWithRetry,
+} from "../lib/convex";
 import { PaymentError, PaymentErrorCode } from "../utils/errorHandling";
 import { adminNotificationService } from "./AdminNotificationService";
 import { getInvoiceService } from "./InvoiceService";
@@ -157,10 +164,8 @@ export class PaymentService {
         }
       );
 
-      // Update order with payment intent ID
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore - Convex API deep type instantiation limitation
-      await convex.mutation(api.orders.saveStripeCheckoutSession, {
+      // Update order with payment intent ID (with retry)
+      await saveStripeCheckoutSessionWithRetry({
         orderId: order._id,
         checkoutSessionId: paymentIntent.id,
         paymentIntentId: paymentIntent.id,
@@ -211,18 +216,13 @@ export class PaymentService {
 
       console.log(`📨 Stripe webhook received: ${event.type} (${event.id})`);
 
-      // Check if event already processed (idempotency)
-      const idempotencyResult = await convex.mutation(api.orders.markProcessedEvent, {
+      // Check if event already processed (idempotency) - with retry
+      const idempotencyResult = await markProcessedEventWithRetry({
         provider: "stripe",
         eventId: event.id,
       });
 
-      if (
-        idempotencyResult &&
-        typeof idempotencyResult === "object" &&
-        "alreadyProcessed" in idempotencyResult &&
-        idempotencyResult.alreadyProcessed
-      ) {
+      if (idempotencyResult?.alreadyProcessed) {
         console.log(`ℹ️ Event ${event.id} already processed, skipping`);
         return {
           success: true,
@@ -359,7 +359,8 @@ export class PaymentService {
     session: Stripe.Checkout.Session,
     orderId: Id<"orders">
   ): Promise<void> {
-    await convex.mutation(api.orders.recordPayment, {
+    // Record payment with retry for resilience
+    await recordPaymentWithRetry({
       orderId,
       provider: "stripe",
       status: "succeeded",
@@ -370,7 +371,8 @@ export class PaymentService {
         typeof session.payment_intent === "string" ? session.payment_intent : undefined,
     });
 
-    await convex.mutation(api.orders.confirmPayment.confirmPayment, {
+    // Confirm payment and grant downloads with retry
+    await confirmPaymentWithRetry({
       orderId,
       paymentIntentId:
         typeof session.payment_intent === "string" ? session.payment_intent : session.id,
@@ -639,18 +641,13 @@ export class PaymentService {
 
       console.log(`📨 PayPal webhook received: ${event.event_type} (${event.id})`);
 
-      // Check if event already processed (idempotency)
-      const idempotencyResult = await convex.mutation(api.orders.markProcessedEvent, {
+      // Check if event already processed (idempotency) - with retry
+      const idempotencyResult = await markProcessedEventWithRetry({
         provider: "paypal",
         eventId: event.id,
       });
 
-      if (
-        idempotencyResult &&
-        typeof idempotencyResult === "object" &&
-        "alreadyProcessed" in idempotencyResult &&
-        idempotencyResult.alreadyProcessed
-      ) {
+      if (idempotencyResult?.alreadyProcessed) {
         console.log(`ℹ️ Event ${event.id} already processed, skipping`);
         return {
           success: true,
@@ -916,8 +913,8 @@ export class PaymentService {
     }
 
     try {
-      // Record payment
-      await convex.mutation(api.orders.recordPayment, {
+      // Record payment with retry
+      await recordPaymentWithRetry({
         orderId,
         provider: "stripe",
         status: "succeeded",
@@ -929,8 +926,8 @@ export class PaymentService {
           typeof paymentIntent.latest_charge === "string" ? paymentIntent.latest_charge : undefined,
       });
 
-      // Confirm payment and grant downloads
-      await convex.mutation(api.orders.confirmPayment.confirmPayment, {
+      // Confirm payment and grant downloads with retry
+      await confirmPaymentWithRetry({
         orderId,
         paymentIntentId: paymentIntent.id,
         status: "succeeded",
@@ -969,8 +966,8 @@ export class PaymentService {
       const failureCode = paymentIntent.last_payment_error?.code;
       const declineCode = paymentIntent.last_payment_error?.decline_code;
 
-      // Record failed payment
-      await convex.mutation(api.orders.recordPayment, {
+      // Record failed payment with retry
+      await recordPaymentWithRetry({
         orderId,
         provider: "stripe",
         status: "failed",
@@ -1057,8 +1054,8 @@ export class PaymentService {
         };
       }
 
-      // Record refund
-      await convex.mutation(api.orders.recordPayment, {
+      // Record refund with retry
+      await recordPaymentWithRetry({
         orderId: order._id,
         provider: "stripe",
         status: "refunded",
@@ -1170,8 +1167,8 @@ export class PaymentService {
       // Handle regular order payment
       const orderId = customId as Id<"orders">;
 
-      // Record payment
-      await convex.mutation(api.orders.recordPayment, {
+      // Record payment with retry
+      await recordPaymentWithRetry({
         orderId,
         provider: "paypal",
         status: "succeeded",
@@ -1180,8 +1177,8 @@ export class PaymentService {
         paypalTransactionId: transactionId,
       });
 
-      // Confirm payment and grant downloads
-      await convex.mutation(api.orders.confirmPayment.confirmPayment, {
+      // Confirm payment and grant downloads with retry
+      await confirmPaymentWithRetry({
         orderId,
         paymentIntentId: transactionId,
         status: "succeeded",
@@ -1267,8 +1264,8 @@ export class PaymentService {
       // Handle regular order payment failure
       const orderId = customId as Id<"orders">;
 
-      // Record failed payment
-      await convex.mutation(api.orders.recordPayment, {
+      // Record failed payment with retry
+      await recordPaymentWithRetry({
         orderId,
         provider: "paypal",
         status: "failed",
@@ -1333,8 +1330,8 @@ export class PaymentService {
       // For now, only handle order refunds (not reservation refunds)
       const orderId = customId as Id<"orders">;
 
-      // Record refund
-      await convex.mutation(api.orders.recordPayment, {
+      // Record refund with retry
+      await recordPaymentWithRetry({
         orderId,
         provider: "paypal",
         status: "refunded",
@@ -1365,16 +1362,12 @@ export class PaymentService {
     resource: string;
     details?: Record<string, unknown>;
   }): Promise<void> {
-    try {
-      await convex.mutation(api.audit.log, {
-        action: entry.action,
-        resource: entry.resource,
-        details: entry.details,
-      });
-    } catch (error) {
-      console.error("❌ Failed to log to audit:", error);
-      // Don't throw - logging failure shouldn't break payment processing
-    }
+    // Use the retry wrapper for audit logging
+    await logAuditWithRetry({
+      action: entry.action,
+      resource: entry.resource,
+      details: entry.details,
+    });
   }
 
   /**

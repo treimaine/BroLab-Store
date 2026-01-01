@@ -9,7 +9,7 @@
  */
 
 import { Request, Response, Router } from "express";
-import { paypalCreateOrderSchema } from "../../shared/validation";
+import { paypalCreateOrderSchema } from "../../shared/validation/index";
 import { isAuthenticated as requireAuth } from "../auth";
 import { urls } from "../config/urls";
 import { secureLogger } from "../lib/secureLogger";

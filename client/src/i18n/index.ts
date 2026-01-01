@@ -12,6 +12,12 @@ export {
   getLocale,
   useFormatters,
 } from "./formatters";
+export {
+  findMissingKeys,
+  logMissingKey,
+  runValidationReport,
+  validateAllTranslations,
+} from "./translationValidator";
 export { translations, type Language, type TranslationKey } from "./translations";
 export { useI18n } from "./useI18n";
 export { useLocale } from "./useLocale";
