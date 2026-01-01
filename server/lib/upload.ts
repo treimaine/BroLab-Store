@@ -1,4 +1,71 @@
+import AdmZip from "adm-zip";
 import { fileTypeFromBuffer } from "file-type";
+
+// ============================================================================
+// ZIP STRUCTURE VALIDATION LIMITS
+// ============================================================================
+// These limits protect against malicious ZIP files (zip bombs, malware)
+//
+// ZIP_LIMITS.maxFiles        - Maximum number of files allowed in a ZIP archive
+// ZIP_LIMITS.maxTotalSize    - Maximum total decompressed size (prevents zip bombs)
+// ZIP_LIMITS.maxCompressionRatio - Maximum compression ratio (detects zip bombs)
+//
+// FORBIDDEN_EXTENSIONS_IN_ZIP - File extensions that are never allowed inside ZIPs
+// ============================================================================
+
+const ZIP_LIMITS = {
+  maxFiles: 100, // Max 100 files per archive
+  maxTotalSize: 500 * 1024 * 1024, // 500MB max decompressed size
+  maxCompressionRatio: 100, // 100:1 max compression ratio (zip bomb detection)
+};
+
+const FORBIDDEN_EXTENSIONS_IN_ZIP = [
+  ".exe",
+  ".bat",
+  ".cmd",
+  ".scr",
+  ".com",
+  ".pif",
+  ".vbs",
+  ".vbe",
+  ".js",
+  ".jse",
+  ".ws",
+  ".wsf",
+  ".wsc",
+  ".wsh",
+  ".ps1",
+  ".ps1xml",
+  ".ps2",
+  ".ps2xml",
+  ".psc1",
+  ".psc2",
+  ".msh",
+  ".msh1",
+  ".msh2",
+  ".mshxml",
+  ".msh1xml",
+  ".msh2xml",
+  ".scf",
+  ".lnk",
+  ".inf",
+  ".reg",
+  ".jar",
+  ".dll",
+  ".msi",
+  ".msp",
+  ".mst",
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".csh",
+  ".app",
+  ".deb",
+  ".rpm",
+  ".dmg",
+  ".pkg",
+  ".iso",
+];
 
 // Configuration of allowed file types
 const ALLOWED_MIME_TYPES = {
@@ -107,6 +174,19 @@ export async function scanFile(file: Express.Multer.File): Promise<{
     // 4. Content analysis for specific file types
     const contentThreats = await scanFileContent(file);
     threats.push(...contentThreats);
+
+    // 5. ZIP structure analysis (if applicable)
+    const isZipFile =
+      file.mimetype === "application/zip" ||
+      file.mimetype === "application/x-zip-compressed" ||
+      file.originalname.toLowerCase().endsWith(".zip");
+
+    if (isZipFile) {
+      const zipResult = await scanZipStructure(file);
+      if (!zipResult.valid) {
+        threats.push(...zipResult.errors);
+      }
+    }
 
     // Simulate scanning delay
     await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500));
@@ -218,7 +298,7 @@ function scanFileName(fileName: string): string[] {
 // Scan file size for anomalies
 function scanFileSize(file: Express.Multer.File): string[] {
   const threats: string[] = [];
-  const { size, originalname, mimetype } = file;
+  const { size, mimetype } = file;
 
   // Check for suspiciously small files that claim to be media
   if (mimetype?.startsWith("audio/") && size < 1000) {
@@ -227,11 +307,6 @@ function scanFileSize(file: Express.Multer.File): string[] {
 
   if (mimetype?.startsWith("video/") && size < 10000) {
     threats.push("SUSPICIOUS_SIZE: Video file is suspiciously small");
-  }
-
-  // Check for zip bombs (very small zip files)
-  if ((mimetype?.includes("zip") || originalname.toLowerCase().endsWith(".zip")) && size < 100) {
-    threats.push("POTENTIAL_ZIP_BOMB: Zip file is suspiciously small");
   }
 
   return threats;
@@ -297,6 +372,177 @@ function isExpectedExecutable(fileName: string, mimeType?: string): boolean {
 }
 
 /**
+ * Scan ZIP archive structure for security threats
+ *
+ * Validates:
+ * - Number of files (max: ZIP_LIMITS.maxFiles)
+ * - Total decompressed size (max: ZIP_LIMITS.maxTotalSize)
+ * - Compression ratio (max: ZIP_LIMITS.maxCompressionRatio) - detects zip bombs
+ * - Forbidden file extensions inside the archive
+ * - Nested ZIP files (potential bypass attempts)
+ *
+ * @param file - The uploaded ZIP file to scan
+ * @returns Validation result with errors and statistics
+ */
+export async function scanZipStructure(file: Express.Multer.File): Promise<{
+  valid: boolean;
+  errors: string[];
+  stats: {
+    fileCount: number;
+    totalCompressedSize: number;
+    totalDecompressedSize: number;
+    compressionRatio: number;
+    forbiddenFiles: string[];
+    nestedZips: string[];
+  };
+}> {
+  const errors: string[] = [];
+  const stats = {
+    fileCount: 0,
+    totalCompressedSize: file.size,
+    totalDecompressedSize: 0,
+    compressionRatio: 0,
+    forbiddenFiles: [] as string[],
+    nestedZips: [] as string[],
+  };
+
+  try {
+    // Parse ZIP without extracting
+    const zip = new AdmZip(file.buffer);
+    const entries = zip.getEntries();
+
+    stats.fileCount = entries.filter(entry => !entry.isDirectory).length;
+
+    // Check max files limit
+    if (stats.fileCount > ZIP_LIMITS.maxFiles) {
+      errors.push(
+        `ZIP_TOO_MANY_FILES: Archive contains ${stats.fileCount} files (max: ${ZIP_LIMITS.maxFiles})`
+      );
+    }
+
+    // Analyze each entry
+    analyzeZipEntries(entries, stats);
+
+    // Calculate compression ratio
+    if (stats.totalCompressedSize > 0) {
+      stats.compressionRatio = stats.totalDecompressedSize / stats.totalCompressedSize;
+    }
+
+    // Validate limits and collect errors
+    collectZipErrors(errors, stats);
+
+    logZipScanResult(file.originalname, stats, errors.length === 0);
+
+    return { valid: errors.length === 0, errors, stats };
+  } catch (error) {
+    console.error(`ZIP scan error for ${file.originalname}:`, error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return {
+      valid: false,
+      errors: [`ZIP_SCAN_ERROR: Unable to parse ZIP structure - ${errorMessage}`],
+      stats,
+    };
+  }
+}
+
+// Helper: Analyze ZIP entries for forbidden files and nested archives
+function analyzeZipEntries(
+  entries: AdmZip.IZipEntry[],
+  stats: { totalDecompressedSize: number; forbiddenFiles: string[]; nestedZips: string[] }
+): void {
+  for (const entry of entries) {
+    if (entry.isDirectory) continue;
+
+    const fileName = entry.entryName.toLowerCase();
+    stats.totalDecompressedSize += entry.header.size;
+
+    // Check for forbidden extensions
+    const hasForbiddenExt = FORBIDDEN_EXTENSIONS_IN_ZIP.some(ext => fileName.endsWith(ext));
+    if (hasForbiddenExt) {
+      stats.forbiddenFiles.push(entry.entryName);
+    }
+
+    // Check for nested archives
+    if (fileName.endsWith(".zip") || fileName.endsWith(".7z") || fileName.endsWith(".rar")) {
+      stats.nestedZips.push(entry.entryName);
+    }
+  }
+}
+
+// Helper: Collect validation errors based on stats
+function collectZipErrors(
+  errors: string[],
+  stats: {
+    totalDecompressedSize: number;
+    compressionRatio: number;
+    forbiddenFiles: string[];
+    nestedZips: string[];
+  }
+): void {
+  // Check total decompressed size
+  if (stats.totalDecompressedSize > ZIP_LIMITS.maxTotalSize) {
+    const maxSizeMB = ZIP_LIMITS.maxTotalSize / (1024 * 1024);
+    const actualSizeMB = (stats.totalDecompressedSize / (1024 * 1024)).toFixed(2);
+    errors.push(
+      `ZIP_TOO_LARGE: Decompressed size ${actualSizeMB}MB exceeds limit of ${maxSizeMB}MB`
+    );
+  }
+
+  // Check compression ratio (zip bomb detection)
+  if (stats.compressionRatio > ZIP_LIMITS.maxCompressionRatio) {
+    const ratio = stats.compressionRatio.toFixed(1);
+    errors.push(
+      `ZIP_BOMB_DETECTED: Suspicious compression ratio ${ratio}:1 (max: ${ZIP_LIMITS.maxCompressionRatio}:1)`
+    );
+  }
+
+  // Report forbidden files
+  if (stats.forbiddenFiles.length > 0) {
+    const fileList = formatFileList(stats.forbiddenFiles, 5);
+    errors.push(`ZIP_FORBIDDEN_FILES: Archive contains forbidden file types: ${fileList}`);
+  }
+
+  // Warn about nested archives
+  if (stats.nestedZips.length > 0) {
+    const fileList = formatFileList(stats.nestedZips, 3);
+    errors.push(
+      `ZIP_NESTED_ARCHIVE: Archive contains nested archives which cannot be scanned: ${fileList}`
+    );
+  }
+}
+
+// Helper: Format file list with truncation
+function formatFileList(files: string[], maxShow: number): string {
+  const shown = files.slice(0, maxShow).join(", ");
+  const remaining = files.length - maxShow;
+  return remaining > 0 ? `${shown} and ${remaining} more` : shown;
+}
+
+// Helper: Log ZIP scan result
+function logZipScanResult(
+  filename: string,
+  stats: {
+    fileCount: number;
+    totalCompressedSize: number;
+    totalDecompressedSize: number;
+    compressionRatio: number;
+    forbiddenFiles: string[];
+    nestedZips: string[];
+  },
+  valid: boolean
+): void {
+  console.log(`ZIP structure scan completed for ${filename}:`, {
+    fileCount: stats.fileCount,
+    compressedSize: `${(stats.totalCompressedSize / 1024).toFixed(2)}KB`,
+    decompressedSize: `${(stats.totalDecompressedSize / (1024 * 1024)).toFixed(2)}MB`,
+    compressionRatio: `${stats.compressionRatio.toFixed(1)}:1`,
+    forbiddenFiles: stats.forbiddenFiles.length,
+    nestedZips: stats.nestedZips.length,
+    valid,
+  });
+}
+
+/**
  * Upload to Convex Storage
  * Note: Function renamed from uploadToSupabase - Convex is the current storage backend
  * Supabase is legacy and should not be extended (see steering rules)
@@ -359,7 +605,10 @@ export async function uploadToStorage(
 export default {
   validateFile,
   scanFile,
+  scanZipStructure,
   uploadToStorage,
   ALLOWED_MIME_TYPES,
   SIZE_LIMITS,
+  ZIP_LIMITS,
+  FORBIDDEN_EXTENSIONS_IN_ZIP,
 };

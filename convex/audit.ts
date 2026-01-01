@@ -232,3 +232,189 @@ export const logAuthenticationError = mutation({
     });
   },
 });
+
+// ============================================================================
+// SPECIALIZED AUDIT MUTATIONS
+// ============================================================================
+
+/**
+ * Log payment-related events (Stripe, PayPal webhooks, payment confirmations)
+ * Use for: webhook processing, payment success/failure, refunds
+ */
+export const logPaymentEvent = mutation({
+  args: {
+    action: v.string(), // 'payment_succeeded', 'payment_failed', 'refund_processed', 'webhook_received'
+    provider: v.string(), // 'stripe', 'paypal'
+    orderId: v.optional(v.string()),
+    amount: v.optional(v.number()),
+    currency: v.optional(v.string()),
+    eventId: v.optional(v.string()),
+    paymentIntentId: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.insert("auditLogs", {
+      userId: undefined,
+      clerkId: undefined,
+      action: args.action,
+      resource: "payments",
+      details: {
+        provider: args.provider,
+        orderId: args.orderId,
+        amount: args.amount,
+        currency: args.currency,
+        eventId: args.eventId,
+        paymentIntentId: args.paymentIntentId,
+        errorMessage: args.errorMessage,
+        ...args.metadata,
+      },
+      ipAddress: undefined,
+      userAgent: undefined,
+      timestamp: Date.now(),
+    });
+  },
+});
+
+/**
+ * Log admin actions (role changes, data cleanup, user management)
+ * Use for: admin operations that modify data or user permissions
+ */
+export const logAdminAction = mutation({
+  args: {
+    adminClerkId: v.string(), // Clerk ID of admin performing action
+    action: v.string(), // 'subscription_cleanup', 'role_change', 'user_delete', etc.
+    targetResource: v.string(), // 'subscriptions', 'users', 'orders'
+    targetId: v.optional(v.string()), // ID of affected resource
+    details: v.optional(v.any()), // Additional context
+    result: v.optional(
+      v.object({
+        success: v.boolean(),
+        affectedCount: v.optional(v.number()),
+        message: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    // Get admin user for proper userId reference
+    const adminUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", q => q.eq("clerkId", args.adminClerkId))
+      .first();
+
+    return await ctx.db.insert("auditLogs", {
+      userId: adminUser?._id || undefined,
+      clerkId: args.adminClerkId,
+      action: `admin_${args.action}`,
+      resource: args.targetResource,
+      details: {
+        targetId: args.targetId,
+        result: args.result,
+        ...args.details,
+      },
+      ipAddress: undefined,
+      userAgent: undefined,
+      timestamp: Date.now(),
+    });
+  },
+});
+
+/**
+ * Log subscription-related events
+ * Use for: subscription creation, updates, cancellations, quota changes
+ */
+export const logSubscriptionEvent = mutation({
+  args: {
+    userId: v.optional(v.string()), // Clerk ID
+    action: v.string(), // 'created', 'updated', 'cancelled', 'quota_reset'
+    subscriptionId: v.optional(v.string()),
+    planId: v.optional(v.string()),
+    previousPlan: v.optional(v.string()),
+    details: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    let user = null;
+    if (args.userId) {
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", q => q.eq("clerkId", args.userId!))
+        .first();
+    }
+
+    return await ctx.db.insert("auditLogs", {
+      userId: user?._id || undefined,
+      clerkId: args.userId || undefined,
+      action: `subscription_${args.action}`,
+      resource: "subscriptions",
+      details: {
+        subscriptionId: args.subscriptionId,
+        planId: args.planId,
+        previousPlan: args.previousPlan,
+        ...args.details,
+      },
+      ipAddress: undefined,
+      userAgent: undefined,
+      timestamp: Date.now(),
+    });
+  },
+});
+
+// ============================================================================
+// ADMIN AUDIT QUERIES
+// ============================================================================
+
+/**
+ * Get all admin actions (for admin dashboard)
+ */
+export const getAdminActions = query({
+  args: {
+    limit: v.optional(v.number()),
+    adminClerkId: v.optional(v.string()),
+  },
+  handler: async (ctx, { limit = 100, adminClerkId }) => {
+    let logsQuery = ctx.db
+      .query("auditLogs")
+      .withIndex("by_action")
+      .filter(q => q.gte(q.field("action"), "admin_"));
+
+    if (adminClerkId) {
+      logsQuery = ctx.db
+        .query("auditLogs")
+        .withIndex("by_clerk_id", q => q.eq("clerkId", adminClerkId))
+        .filter(q => q.gte(q.field("action"), "admin_"));
+    }
+
+    const logs = await logsQuery.order("desc").take(limit);
+
+    return logs;
+  },
+});
+
+/**
+ * Get payment audit trail
+ */
+export const getPaymentAuditTrail = query({
+  args: {
+    orderId: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { orderId, limit = 50 }) => {
+    const logs = await ctx.db
+      .query("auditLogs")
+      .filter(q => q.eq(q.field("resource"), "payments"))
+      .order("desc")
+      .take(limit);
+
+    if (orderId) {
+      return logs.filter(
+        log =>
+          log.details &&
+          typeof log.details === "object" &&
+          "orderId" in log.details &&
+          log.details.orderId === orderId
+      );
+    }
+
+    return logs;
+  },
+});

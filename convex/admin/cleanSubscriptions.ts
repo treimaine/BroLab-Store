@@ -1,3 +1,4 @@
+import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 
 /**
@@ -5,7 +6,10 @@ import { mutation } from "../_generated/server";
  * À exécuter via: npx convex run admin/cleanSubscriptions:cleanTestSubscriptions
  */
 export const cleanTestSubscriptions = mutation({
-  handler: async ctx => {
+  args: {
+    adminClerkId: v.optional(v.string()), // Clerk ID of admin performing action
+  },
+  handler: async (ctx, args) => {
     const now = Date.now();
 
     // Trouver toutes les souscriptions avec des dates dans le futur (plus de 24h)
@@ -32,6 +36,19 @@ export const cleanTestSubscriptions = mutation({
       );
     }
 
+    // Audit log for admin action
+    await ctx.db.insert("auditLogs", {
+      clerkId: args.adminClerkId || undefined,
+      action: "admin_clean_test_subscriptions",
+      resource: "subscriptions",
+      details: {
+        deletedCount: futureSubscriptions.length,
+        deletedIds: deleted.map(d => d.id),
+        reason: "future_dates_cleanup",
+      },
+      timestamp: Date.now(),
+    });
+
     return {
       success: true,
       deleted: futureSubscriptions.length,
@@ -46,7 +63,10 @@ export const cleanTestSubscriptions = mutation({
  * ATTENTION: Utiliser uniquement en développement!
  */
 export const resetAllToFree = mutation({
-  handler: async ctx => {
+  args: {
+    adminClerkId: v.optional(v.string()), // Clerk ID of admin performing action
+  },
+  handler: async (ctx, args) => {
     const allSubscriptions = await ctx.db.query("subscriptions").collect();
 
     console.log(`🔄 Resetting ${allSubscriptions.length} subscriptions to Free`);
@@ -62,6 +82,19 @@ export const resetAllToFree = mutation({
       console.log(`🔄 Deleted subscription ${sub._id} (was ${sub.planId})`);
     }
 
+    // Audit log for admin action
+    await ctx.db.insert("auditLogs", {
+      clerkId: args.adminClerkId || undefined,
+      action: "admin_reset_all_subscriptions",
+      resource: "subscriptions",
+      details: {
+        resetCount: allSubscriptions.length,
+        affectedPlans: updated.map(u => u.oldPlan),
+        warning: "ALL_SUBSCRIPTIONS_RESET_TO_FREE",
+      },
+      timestamp: Date.now(),
+    });
+
     return {
       success: true,
       reset: allSubscriptions.length,
@@ -75,7 +108,10 @@ export const resetAllToFree = mutation({
  * Supprime les souscriptions en double pour un utilisateur
  */
 export const removeDuplicateSubscriptions = mutation({
-  handler: async ctx => {
+  args: {
+    adminClerkId: v.optional(v.string()), // Clerk ID of admin performing action
+  },
+  handler: async (ctx, args) => {
     const allSubscriptions = await ctx.db.query("subscriptions").collect();
 
     // Grouper par userId
@@ -110,6 +146,19 @@ export const removeDuplicateSubscriptions = mutation({
         }
       }
     }
+
+    // Audit log for admin action
+    await ctx.db.insert("auditLogs", {
+      clerkId: args.adminClerkId || undefined,
+      action: "admin_remove_duplicate_subscriptions",
+      resource: "subscriptions",
+      details: {
+        duplicatesRemoved: duplicates.length,
+        affectedUsers: [...new Set(duplicates.map(d => d.userId))],
+        details: duplicates,
+      },
+      timestamp: Date.now(),
+    });
 
     return {
       success: true,

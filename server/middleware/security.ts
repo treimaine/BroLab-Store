@@ -1,7 +1,9 @@
+import { getAuth } from "@clerk/express";
 import compression from "compression";
 import { NextFunction, Request, RequestHandler, Response } from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import { logger } from "../lib/logger";
 import { generateCspNonce } from "../utils/cspNonce";
 
 /**
@@ -38,6 +40,147 @@ function normalizeIp(ip: string): string {
     return ip.substring(7);
   }
   return ip;
+}
+
+/**
+ * Smart key generator for rate limiting
+ * Prioritizes user ID for authenticated users, falls back to IP for anonymous
+ * This provides better UX for authenticated users sharing IPs (NAT, VPN, corporate)
+ */
+function getSmartRateLimitKey(req: Request): string {
+  try {
+    const auth = getAuth(req);
+    if (auth?.userId) {
+      return `user:${auth.userId}`;
+    }
+  } catch {
+    // getAuth may throw if Clerk middleware hasn't run yet - fall back to IP
+  }
+  return `ip:${getClientIp(req)}`;
+}
+
+/**
+ * Check if the current request is from an authenticated user
+ */
+function isAuthenticatedRequest(req: Request): boolean {
+  try {
+    const auth = getAuth(req);
+    return !!auth?.userId;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Configuration for smart rate limiter with differentiated limits
+ */
+interface SmartRateLimitConfig {
+  name: string;
+  windowMs: number;
+  maxAuthenticated: number;
+  maxAnonymous: number;
+  message: string;
+  code: string;
+}
+
+/**
+ * Log rate limit exceeded event with key type information
+ */
+function logRateLimitExceeded(
+  req: Request,
+  config: SmartRateLimitConfig,
+  key: string,
+  limit: number
+): void {
+  const keyType = key.startsWith("user:") ? "USER" : "IP";
+  const identifier = key.startsWith("user:") ? key.substring(5) : key.substring(3);
+
+  logger.warn(`[RATE_LIMIT] ${config.name} exceeded`, {
+    keyType,
+    identifier,
+    limit,
+    path: req.path,
+    method: req.method,
+    userAgent: req.headers["user-agent"],
+  });
+}
+
+/**
+ * Create a smart rate limiter with differentiated limits for authenticated vs anonymous users
+ * Authenticated users get higher limits for better UX
+ * Anonymous users are rate limited by IP
+ */
+function createSmartRateLimiter(config: SmartRateLimitConfig): RequestHandler {
+  // Create two rate limiters: one for authenticated, one for anonymous
+  const authenticatedLimiter = rateLimit({
+    windowMs: config.windowMs,
+    max: config.maxAuthenticated,
+    message: {
+      error: config.message,
+      code: config.code,
+      limit: config.maxAuthenticated,
+      type: "authenticated",
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: getSmartRateLimitKey,
+    skip: req => shouldSkipRateLimit(req.path) || !isAuthenticatedRequest(req),
+    handler: (req, res) => {
+      const key = getSmartRateLimitKey(req);
+      logRateLimitExceeded(req, config, key, config.maxAuthenticated);
+      res.status(429).json({
+        error: config.message,
+        code: config.code,
+        limit: config.maxAuthenticated,
+        type: "authenticated",
+      });
+    },
+    validate: {
+      xForwardedForHeader: false,
+      trustProxy: false,
+      default: true,
+    },
+  });
+
+  const anonymousLimiter = rateLimit({
+    windowMs: config.windowMs,
+    max: config.maxAnonymous,
+    message: {
+      error: config.message,
+      code: config.code,
+      limit: config.maxAnonymous,
+      type: "anonymous",
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: getSmartRateLimitKey,
+    skip: req => shouldSkipRateLimit(req.path) || isAuthenticatedRequest(req),
+    handler: (req, res) => {
+      const key = getSmartRateLimitKey(req);
+      logRateLimitExceeded(req, config, key, config.maxAnonymous);
+      res.status(429).json({
+        error: config.message,
+        code: config.code,
+        limit: config.maxAnonymous,
+        type: "anonymous",
+      });
+    },
+    validate: {
+      xForwardedForHeader: false,
+      trustProxy: false,
+      default: true,
+    },
+  });
+
+  // Return a combined middleware that applies both limiters
+  return (req: Request, res: Response, next: NextFunction) => {
+    // Apply authenticated limiter first (will skip if not authenticated)
+    authenticatedLimiter(req, res, (err?: unknown) => {
+      if (err) return next(err);
+      // Then apply anonymous limiter (will skip if authenticated)
+      anonymousLimiter(req, res, next);
+    });
+  };
 }
 
 /**
@@ -323,81 +466,50 @@ function shouldSkipRateLimit(path: string): boolean {
   return RATE_LIMIT_SKIP_PREFIXES.some(prefix => path.startsWith(prefix));
 }
 
-// Rate limiting for API endpoints
-export const apiRateLimiter = rateLimit({
+// Rate limiting for API endpoints - Smart rate limiting with user-based keys
+// Authenticated users: 2000 requests per 15 minutes
+// Anonymous users: 1000 requests per 15 minutes
+export const apiRateLimiter = createSmartRateLimiter({
+  name: "API",
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Limit each IP to 1000 requests per windowMs
-  message: {
-    error: "Too many requests from this IP, please try again later",
-    code: "RATE_LIMIT_EXCEEDED",
-  },
-  standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
-  legacyHeaders: false, // Disable `X-RateLimit-*` headers
-  keyGenerator: getClientIp, // Custom key generator for proxy environments
-  skip: req => shouldSkipRateLimit(req.path),
-  // Disable validation for proxy environments (Replit, Vercel, etc.)
-  // We handle IP extraction and IPv6 normalization ourselves via getClientIp
-  validate: {
-    xForwardedForHeader: false,
-    trustProxy: false,
-    default: true,
-    keyGeneratorIpFallback: false,
-  },
+  maxAuthenticated: 2000,
+  maxAnonymous: 1000,
+  message: "Too many requests, please try again later",
+  code: "RATE_LIMIT_EXCEEDED",
 });
 
 // Stricter rate limiting for authentication endpoints
-export const authRateLimiter = rateLimit({
+// Authenticated users: 40 requests per 15 minutes
+// Anonymous users: 20 requests per 15 minutes
+export const authRateLimiter = createSmartRateLimiter({
+  name: "AUTH",
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // Limit each IP to 20 auth requests per windowMs
-  message: {
-    error: "Too many authentication attempts, please try again later",
-    code: "AUTH_RATE_LIMIT_EXCEEDED",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getClientIp,
-  validate: {
-    xForwardedForHeader: false,
-    trustProxy: false,
-    default: true,
-    keyGeneratorIpFallback: false,
-  },
+  maxAuthenticated: 40,
+  maxAnonymous: 20,
+  message: "Too many authentication attempts, please try again later",
+  code: "AUTH_RATE_LIMIT_EXCEEDED",
 });
 
 // Stricter rate limiting for payment endpoints
-export const paymentRateLimiter = rateLimit({
+// Authenticated users: 100 requests per 15 minutes
+// Anonymous users: 50 requests per 15 minutes
+export const paymentRateLimiter = createSmartRateLimiter({
+  name: "PAYMENT",
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50, // Limit each IP to 50 payment requests per windowMs
-  message: {
-    error: "Too many payment requests, please try again later",
-    code: "PAYMENT_RATE_LIMIT_EXCEEDED",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getClientIp,
-  validate: {
-    xForwardedForHeader: false,
-    trustProxy: false,
-    default: true,
-    keyGeneratorIpFallback: false,
-  },
+  maxAuthenticated: 100,
+  maxAnonymous: 50,
+  message: "Too many payment requests, please try again later",
+  code: "PAYMENT_RATE_LIMIT_EXCEEDED",
 });
 
 // Stricter rate limiting for download endpoints
-export const downloadRateLimiter = rateLimit({
+// Authenticated users: 200 downloads per hour
+// Anonymous users: 100 downloads per hour
+export const downloadRateLimiter = createSmartRateLimiter({
+  name: "DOWNLOAD",
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 100, // Limit each IP to 100 downloads per hour
-  message: {
-    error: "Too many download requests, please try again later",
-    code: "DOWNLOAD_RATE_LIMIT_EXCEEDED",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: getClientIp,
-  validate: {
-    xForwardedForHeader: false,
-    trustProxy: false,
-    default: true,
-    keyGeneratorIpFallback: false,
-  },
+  maxAuthenticated: 200,
+  maxAnonymous: 100,
+  message: "Too many download requests, please try again later",
+  code: "DOWNLOAD_RATE_LIMIT_EXCEEDED",
 });
