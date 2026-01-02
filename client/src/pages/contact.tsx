@@ -145,6 +145,20 @@ export default function Contact() {
                   />
                 </div>
                 <div>
+                  <label htmlFor="subject" className="block text-sm font-medium mb-2 text-gray-300">
+                    Subject (optional)
+                  </label>
+                  <Input
+                    id="subject"
+                    type="text"
+                    name="subject"
+                    value={formData.subject}
+                    onChange={handleChange}
+                    className="w-full bg-[var(--deep-black)] border-[var(--medium-gray)] focus:border-[var(--accent-purple)] text-white py-2 text-sm"
+                    placeholder="What is this about?"
+                  />
+                </div>
+                <div>
                   <label htmlFor="message" className="block text-sm font-medium mb-2 text-gray-300">
                     Message
                   </label>

@@ -20,6 +20,7 @@ import beatsRouter from "./routes/beats";
 import categoriesRouter from "./routes/categories";
 import clerkRouter from "./routes/clerk";
 import clerkBillingRouter from "./routes/clerk-billing";
+import contactRouter from "./routes/contact";
 import downloadsRouter from "./routes/downloads";
 import emailRouter from "./routes/email";
 import monitoringRouter from "./routes/monitoring";
@@ -101,6 +102,7 @@ app.use((_req, res, next) => {
 app.use("/api/activity", apiRateLimiter, activityRouter);
 app.use("/api/avatar", apiRateLimiter, avatarRouter);
 app.use("/api/beats", apiRateLimiter, beatsRouter);
+app.use("/api/contact", authRateLimiter, contactRouter);
 app.use("/api/downloads", downloadRateLimiter, downloadsRouter);
 app.use("/api/email", authRateLimiter, emailRouter);
 app.use("/api/monitoring", monitoringRouter); // No rate limit for monitoring

@@ -128,25 +128,25 @@ export const emailTemplates = {
    * Email verification template
    */
   verifyEmail: (verificationLink: string, username: string) => ({
-    subject: "Vérifiez votre adresse email - BroLab Entertainment",
+    subject: "Verify your email address - BroLab Entertainment",
     html: generateEmailWrapper(
       "BroLab Entertainment",
-      "Vérifiez votre compte",
+      "Verify your account",
       `
-        <h2 style="color: #333; margin: 0 0 20px 0;">Salut ${username} ! 👋</h2>
+        <h2 style="color: #333; margin: 0 0 20px 0;">Hey ${username}! 👋</h2>
         <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
-          Bienvenue sur BroLab Entertainment ! Pour terminer votre inscription et accéder à votre compte, veuillez vérifier votre adresse email.
+          Welcome to BroLab Entertainment! To complete your registration and access your account, please verify your email address.
         </p>
         <div style="text-align: center; margin: 30px 0;">
           <a href="${verificationLink}" style="${EMAIL_STYLES.button}">
-            Vérifier mon email
+            Verify my email
           </a>
         </div>
         <p style="color: #999; font-size: 14px; margin-top: 30px;">
-          Ce lien expirera dans 24 heures. Si vous n'avez pas créé de compte, ignorez cet email.
+          This link will expire in 24 hours. If you didn't create an account, please ignore this email.
         </p>
       `,
-      "Votre destination pour les beats de qualité"
+      "Your destination for quality beats"
     ),
   }),
 
@@ -154,25 +154,25 @@ export const emailTemplates = {
    * Password reset template
    */
   resetPassword: (resetLink: string, username: string) => ({
-    subject: "Réinitialisation de votre mot de passe - BroLab Entertainment",
+    subject: "Reset your password - BroLab Entertainment",
     html: generateEmailWrapper(
       "BroLab Entertainment",
-      "Réinitialisation du mot de passe",
+      "Password Reset",
       `
-        <h2 style="color: #333; margin: 0 0 20px 0;">Réinitialisation du mot de passe</h2>
+        <h2 style="color: #333; margin: 0 0 20px 0;">Password Reset</h2>
         <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
-          Salut ${username}, vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour créer un nouveau mot de passe.
+          Hey ${username}, you requested to reset your password. Click the button below to create a new password.
         </p>
         <div style="text-align: center; margin: 30px 0;">
           <a href="${resetLink}" style="background: #EF4444; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-            Réinitialiser mon mot de passe
+            Reset my password
           </a>
         </div>
         <p style="color: #999; font-size: 14px; margin-top: 30px;">
-          Ce lien expirera dans 15 minutes. Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.
+          This link will expire in 15 minutes. If you didn't request this reset, please ignore this email.
         </p>
       `,
-      "Sécurité de votre compte"
+      "Account Security"
     ),
   }),
 
@@ -186,28 +186,28 @@ export const emailTemplates = {
     total: number;
     downloadLink?: string;
   }) => ({
-    subject: `Commande confirmée #${orderDetails.orderNumber} - BroLab Entertainment`,
+    subject: `Order Confirmed #${orderDetails.orderNumber} - BroLab Entertainment`,
     html: generateEmailWrapper(
-      "Commande confirmée ! 🎉",
-      "Votre achat a été traité avec succès",
+      "Order Confirmed! 🎉",
+      "Your purchase has been processed successfully",
       `
         <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
-          Merci ${orderDetails.customerName} pour votre achat ! Votre commande a été traitée avec succès.
+          Thank you ${orderDetails.customerName} for your purchase! Your order has been processed successfully.
         </p>
         <div style="${EMAIL_STYLES.infoBox}">
-          <p style="margin: 0;"><strong>Numéro de commande :</strong> ${orderDetails.orderNumber}</p>
-          <p style="margin: 10px 0 0 0;"><strong>Total :</strong> ${orderDetails.total}€</p>
+          <p style="margin: 0;"><strong>Order Number:</strong> ${orderDetails.orderNumber}</p>
+          <p style="margin: 10px 0 0 0;"><strong>Total:</strong> $${orderDetails.total}</p>
         </div>
         <p style="color: #666; line-height: 1.6;">
-          Vos fichiers sont maintenant disponibles dans votre compte. Connectez-vous pour les télécharger.
+          Your files are now available in your account. Log in to download them.
         </p>
         <div style="text-align: center; margin: 30px 0;">
-          <a href="https://brolabentertainment.com/dashboard" style="${EMAIL_STYLES.button}">
-            Accéder à mes téléchargements
+          <a href="${process.env.FRONTEND_URL || "https://www.brolabentertainment.com"}/dashboard" style="${EMAIL_STYLES.button}">
+            Access my downloads
           </a>
         </div>
       `,
-      "Merci pour votre confiance"
+      "Thank you for your trust"
     ),
   }),
 
@@ -221,29 +221,29 @@ export const emailTemplates = {
     nextBillingDate: string;
     features: string[];
   }) => ({
-    subject: `Abonnement activé - ${subscriptionDetails.planName} - BroLab Entertainment`,
+    subject: `Subscription Activated - ${subscriptionDetails.planName} - BroLab Entertainment`,
     html: generateEmailWrapper(
-      "Abonnement activé ! ⭐",
-      "Votre plan est maintenant actif",
+      "Subscription Activated! ⭐",
+      "Your plan is now active",
       `
         <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
-          Félicitations ${subscriptionDetails.customerName} ! Votre abonnement ${subscriptionDetails.planName} est maintenant actif.
+          Congratulations ${subscriptionDetails.customerName}! Your ${subscriptionDetails.planName} subscription is now active.
         </p>
         <div style="${EMAIL_STYLES.infoBox}">
-          <p style="margin: 0;"><strong>Plan :</strong> ${subscriptionDetails.planName}</p>
-          <p style="margin: 10px 0 0 0;"><strong>Cycle :</strong> ${subscriptionDetails.billingCycle}</p>
-          <p style="margin: 10px 0 0 0;"><strong>Prochaine facture :</strong> ${subscriptionDetails.nextBillingDate}</p>
+          <p style="margin: 0;"><strong>Plan:</strong> ${subscriptionDetails.planName}</p>
+          <p style="margin: 10px 0 0 0;"><strong>Billing Cycle:</strong> ${subscriptionDetails.billingCycle}</p>
+          <p style="margin: 10px 0 0 0;"><strong>Next Billing Date:</strong> ${subscriptionDetails.nextBillingDate}</p>
         </div>
         <p style="color: #666; line-height: 1.6;">
-          Profitez de tous les avantages de votre abonnement dès maintenant !
+          Enjoy all the benefits of your subscription starting now!
         </p>
         <div style="text-align: center; margin: 30px 0;">
-          <a href="https://brolabentertainment.com/membership" style="background: #F59E0B; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-            Gérer mon abonnement
+          <a href="${process.env.FRONTEND_URL || "https://www.brolabentertainment.com"}/membership" style="background: #F59E0B; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            Manage my subscription
           </a>
         </div>
       `,
-      "Votre partenaire musical"
+      "Your musical partner"
     ),
   }),
 };
@@ -369,7 +369,7 @@ export const generatePaymentFailureEmail = (
       </div>
       
       <div style="text-align: center; margin: 30px 0;">
-        <a href="${process.env.FRONTEND_URL || "https://brolabentertainment.com"}/checkout" 
+        <a href="${process.env.FRONTEND_URL || "https://www.brolabentertainment.com"}/checkout" 
            style="${EMAIL_STYLES.button}">
           Try Payment Again
         </a>
@@ -503,7 +503,7 @@ export const generateAdminNotificationEmail = (
       </div>
       
       <div style="text-align: center; margin-top: 30px;">
-        <a href="${process.env.FRONTEND_URL || "https://brolabentertainment.com"}/admin/reservations/${reservation.id}" 
+        <a href="${process.env.FRONTEND_URL || "https://www.brolabentertainment.com"}/admin/reservations/${reservation.id}" 
            style="${EMAIL_STYLES.button}">
           View Reservation
         </a>
