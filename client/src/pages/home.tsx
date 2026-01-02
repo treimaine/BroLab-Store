@@ -172,13 +172,13 @@ export default function Home() {
                   Browse Beats
                 </Button>
               </Link>
-              <Link href="/about">
+              <Link href="/membership">
                 <Button
                   variant="outline"
                   className="text-lg px-8 py-4 border-2 border-[var(--accent-purple)] text-[var(--accent-purple)] hover:bg-[var(--accent-purple)] hover:text-white"
                 >
                   <Info className="w-5 h-5 mr-2" />
-                  Learn More
+                  Start Free
                 </Button>
               </Link>
             </div>

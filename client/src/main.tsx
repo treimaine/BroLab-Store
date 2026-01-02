@@ -93,6 +93,41 @@ if (hasConfigError) {
         signUpFallbackRedirectUrl="/"
         signInUrl="/login"
         signUpUrl="/login"
+        appearance={{
+          variables: {
+            colorPrimary: "#8b5cf6",
+            colorBackground: "#ffffff",
+            colorInputBackground: "#f9fafb",
+            colorText: "#111827",
+            colorTextSecondary: "#4b5563",
+            colorInputText: "#111827",
+            colorNeutral: "#111827",
+            borderRadius: "8px",
+          },
+          elements: {
+            card: "bg-white shadow-xl",
+            headerTitle: "!text-gray-900",
+            headerSubtitle: "!text-gray-600",
+            formFieldHintText: "!hidden",
+            formButtonPrimary: "bg-[#8b5cf6] hover:bg-[#7c3aed]",
+            socialButtonsBlockButton: "bg-white border border-gray-300 hover:bg-gray-50",
+            socialButtonsBlockButtonText: "!text-gray-700",
+            formFieldLabel: "!text-gray-700",
+            formFieldInput: "bg-gray-50 border-gray-300 !text-gray-900",
+            formFieldInputShowPasswordButton: "!text-gray-500",
+            identityPreviewText: "!text-gray-900",
+            identityPreviewEditButton: "!text-[#8b5cf6]",
+            formFieldAction: "!text-[#8b5cf6]",
+            footerActionText: "!text-gray-600",
+            footerActionLink: "!text-[#8b5cf6] hover:!text-[#7c3aed]",
+            dividerText: "!text-gray-400",
+            dividerLine: "bg-gray-200",
+            otpCodeFieldInput: "!text-gray-900 border-gray-300",
+            formResendCodeLink: "!text-[#8b5cf6]",
+            alert: "!text-gray-700",
+            alertText: "!text-gray-700",
+          },
+        }}
       >
         <ConvexProviderWithClerk client={convex!} useAuth={useAuth}>
           <App />
