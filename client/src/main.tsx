@@ -109,23 +109,38 @@ if (hasConfigError) {
             headerTitle: "!text-gray-900",
             headerSubtitle: "!text-gray-600",
             formFieldHintText: "!hidden",
-            formButtonPrimary: "bg-[#8b5cf6] hover:bg-[#7c3aed]",
-            socialButtonsBlockButton: "bg-white border border-gray-300 hover:bg-gray-50",
-            socialButtonsBlockButtonText: "!text-gray-700",
+            // Bouton principal (Continue, Sign in, Sign up, etc.)
+            formButtonPrimary:
+              "!bg-[#8b5cf6] hover:!bg-[#7c3aed] !text-white !border-none !shadow-md",
+            // Boutons sociaux (Google, etc.)
+            socialButtonsBlockButton:
+              "!bg-white !border !border-gray-300 hover:!bg-gray-50 !text-gray-700",
+            socialButtonsBlockButtonText: "!text-gray-700 !font-medium",
+            socialButtonsBlockButtonArrow: "!text-gray-500",
+            // Labels et inputs
             formFieldLabel: "!text-gray-700",
-            formFieldInput: "bg-gray-50 border-gray-300 !text-gray-900",
+            formFieldInput: "!bg-gray-50 !border-gray-300 !text-gray-900",
             formFieldInputShowPasswordButton: "!text-gray-500",
+            // Identité preview
             identityPreviewText: "!text-gray-900",
             identityPreviewEditButton: "!text-[#8b5cf6]",
+            // Actions et liens
             formFieldAction: "!text-[#8b5cf6]",
             footerActionText: "!text-gray-600",
             footerActionLink: "!text-[#8b5cf6] hover:!text-[#7c3aed]",
+            // Dividers
             dividerText: "!text-gray-400",
-            dividerLine: "bg-gray-200",
-            otpCodeFieldInput: "!text-gray-900 border-gray-300",
+            dividerLine: "!bg-gray-200",
+            // OTP
+            otpCodeFieldInput: "!text-gray-900 !border-gray-300",
             formResendCodeLink: "!text-[#8b5cf6]",
+            // Alerts
             alert: "!text-gray-700",
             alertText: "!text-gray-700",
+            // Bouton secondaire / outline
+            buttonArrowIcon: "!text-gray-500",
+            // Active states
+            formButtonPrimaryActive: "!bg-[#7c3aed]",
           },
         }}
       >
