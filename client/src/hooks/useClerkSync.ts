@@ -16,7 +16,7 @@ export function useClerkSync() {
   const syncInProgress = useRef(false);
   const hasAttemptedSync = useRef(false);
 
-  // @ts-expect-error - Convex type instantiation depth issue with complex mutations
+  // @ts-ignore - Convex type instantiation depth issue with complex mutations
   const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser);
 
   const syncUser = useCallback(async () => {

@@ -25,35 +25,11 @@ try {
 
 // Use the configured app from app.ts
 
-// Security middleware removed - using Convex for security
-// Rate limiting only for API routes, not for static assets/frontend
-app.use("/api", (req, res, next): void => {
-  // Simple rate limiting - 1000 requests per 15 minutes for API only
-  const clientIp = req.ip || req.socket.remoteAddress;
-  const now = Date.now();
-  const windowMs = 15 * 60 * 1000; // 15 minutes
-  const maxRequests = 1000;
+// Convex-based distributed rate limiting for API routes
+// Replaces in-memory Map with persistent storage that works across instances
+import { globalRateLimiter } from "./middleware/rateLimitMiddleware";
 
-  // Simple in-memory rate limiting (for development)
-  interface GlobalWithRateLimit {
-    rateLimitStore?: Map<string, number>;
-  }
-
-  const globalWithRateLimit = globalThis as typeof globalThis & GlobalWithRateLimit;
-
-  globalWithRateLimit.rateLimitStore ??= new Map();
-
-  const key = `${clientIp}-${Math.floor(now / windowMs)}`;
-  const currentCount = globalWithRateLimit.rateLimitStore.get(key) || 0;
-
-  if (currentCount >= maxRequests) {
-    res.status(429).json({ error: "Too many requests" });
-    return;
-  }
-
-  globalWithRateLimit.rateLimitStore.set(key, currentCount + 1);
-  next();
-});
+app.use("/api", globalRateLimiter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

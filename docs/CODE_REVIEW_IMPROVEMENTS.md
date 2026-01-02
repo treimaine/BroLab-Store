@@ -13,6 +13,7 @@ Cette analyse a été **vérifiée et corrigée** pour ne contenir que des probl
 **Résultat de la validation:**
 
 - 25 points initiaux → **15 points confirmés** (10 faux positifs/déjà corrigés supprimés)
+- Points résolus: Rate Limiting (critique), Validation Uploads (haute)
 - Confiance: >90%
 
 ---
@@ -70,32 +71,32 @@ console.log(JSON.stringify({ level: "info", time: time(), message, ...fields }))
 
 ---
 
-## 🔴 PRIORITÉ CRITIQUE (3 corrections confirmées)
+## 🔴 PRIORITÉ CRITIQUE (3 corrections confirmées - 1 résolue)
 
-### 1. **Rate Limiting In-Memory Non Persistant**
+### 1. ~~**Rate Limiting In-Memory Non Persistant**~~ ✅ RÉSOLU
 
-**Problème CONFIRMÉ**: Le rate limiting dans `server/index.ts` (lignes 30-56) utilise un Map en mémoire.
+**Problème RÉSOLU**: Le rate limiting dans `server/index.ts` utilisait un Map en mémoire.
 
-**Fichier**: `server/index.ts`
+**Solution implémentée** (2 janvier 2026):
 
-**Impact**:
+- Créé `server/services/RateLimitService.ts` - Service singleton avec backend Convex
+- Créé `server/middleware/rateLimitMiddleware.ts` - Middleware Express configurable
+- Mis à jour `server/index.ts` pour utiliser le nouveau middleware
 
-- Perdu au redémarrage du serveur
-- Ne fonctionne pas en environnement multi-instance/cluster
-- Acceptable en développement, problématique en production
+**Fichiers créés/modifiés**:
 
-**Code actuel**:
+- `server/services/RateLimitService.ts` - Service de rate limiting distribué
+- `server/middleware/rateLimitMiddleware.ts` - Middlewares pré-configurés
+- `server/index.ts` - Intégration du nouveau middleware
 
-```typescript
-globalWithRateLimit.rateLimitStore ??= new Map();
-const key = `${clientIp}-${Math.floor(now / windowMs)}`;
-```
+**Fonctionnalités**:
 
-**Recommandation**:
-
-- Utiliser la table `rateLimits` de Convex déjà définie dans `convex/schema.ts`
-- Ou implémenter Redis pour le rate limiting distribué
-- **Priorité**: Moyenne (acceptable si single-instance)
+- Persistance dans la table Convex `rateLimits`
+- Support multi-instance/cluster
+- Configurations par tier: global, strict, payment, upload, auth
+- Headers HTTP standard (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
+- Fail-open/fail-closed configurable
+- Analytics et cleanup automatique
 
 ---
 
@@ -162,7 +163,7 @@ const apiRef: any = api;
 
 ---
 
-## 🟠 PRIORITÉ HAUTE (5 améliorations confirmées)
+## 🟠 PRIORITÉ HAUTE (5 améliorations confirmées - 2 résolues)
 
 ### 4. **Error Boundaries - Gestion d'Erreurs Redondante**
 
@@ -218,14 +219,26 @@ const apiRef: any = api;
 
 ---
 
-### 7. **Sécurité - Validation des Uploads de Fichiers**
+### 7. ~~**Sécurité - Validation des Uploads de Fichiers**~~ ✅ VÉRIFIÉ
 
-**Fichier confirmé**: `server/middleware/fileUploadSecurity.ts`
+**Fichiers**: `server/middleware/fileUploadSecurity.ts`, `server/lib/upload.ts`
 
-**Recommandation**:
+**Statut**: ✅ DÉJÀ IMPLÉMENTÉ CORRECTEMENT
 
-- Vérifier la validation des types MIME réels (pas seulement extension)
-- Confirmer que l'antivirus est actif
+**Validation des types MIME réels** - Confirmé :
+
+- Utilisation de `file-type` library avec `fileTypeFromBuffer()` pour détecter le vrai type MIME via magic bytes
+- Comparaison du type détecté vs types autorisés (pas seulement l'extension client)
+- Validation des headers audio (MP3, WAV, FLAC) via signatures binaires
+
+**Antivirus actif** - Confirmé :
+
+- `scanFile()` effectue 5 couches de vérification :
+  - Signatures malware (PE, ELF, Mach-O executables)
+  - Noms de fichiers dangereux
+  - Tailles suspectes
+  - Contenu malveillant (scripts, eval, etc.)
+  - Structure ZIP (zip bombs, extensions interdites, archives imbriquées)
 
 ---
 

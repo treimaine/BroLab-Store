@@ -553,7 +553,7 @@ export async function uploadToStorage(
   options: { contentType?: string; cacheControl?: string } = {}
 ): Promise<{ path: string; url: string }> {
   try {
-    // @ts-expect-error - Convex API type depth issue (known limitation)
+    // @ts-ignore - Convex API type depth issue (known limitation)
     const { api } = await import("../../convex/_generated/api");
     const { getConvex } = await import("./convex");
 

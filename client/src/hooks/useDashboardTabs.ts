@@ -10,7 +10,7 @@
 
 import { useTabVisible } from "@/hooks/useTabVisibilityManager";
 import { RealtimeContext, type RealtimeEventType } from "@/providers/DashboardRealtimeProvider";
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState, useSyncExternalStore } from "react";
 
 // Local hook to access RealtimeContext
 function useRealtimeContext(): { setActiveTab: (tab: string) => void } {
@@ -195,29 +195,53 @@ export function useTabPolling(tab: DashboardTab, callback: () => void, enabled: 
   }, [callback, config.refreshInterval, enabled]);
 }
 
+// Singleton state for window focus (prevents duplicate event listeners)
+let isWindowFocused = document === undefined ? true : document.hasFocus();
+const focusListeners = new Set<() => void>();
+
+// Initialize the global focus listener (runs once)
+if (globalThis.window !== undefined) {
+  globalThis.window.addEventListener(
+    "focus",
+    () => {
+      if (!isWindowFocused) {
+        isWindowFocused = true;
+        focusListeners.forEach(listener => listener());
+      }
+    },
+    { passive: true }
+  );
+  globalThis.window.addEventListener(
+    "blur",
+    () => {
+      if (isWindowFocused) {
+        isWindowFocused = false;
+        focusListeners.forEach(listener => listener());
+      }
+    },
+    { passive: true }
+  );
+}
+
+// Subscribe function for useSyncExternalStore
+function subscribeFocus(callback: () => void): () => void {
+  focusListeners.add(callback);
+  return () => focusListeners.delete(callback);
+}
+
+function getFocusSnapshot(): boolean {
+  return isWindowFocused;
+}
+
+function getServerFocusSnapshot(): boolean {
+  return true;
+}
+
 // Hook for managing tab visibility and focus
-// Uses centralized TabVisibilityManager to prevent duplicate event listeners
+// Uses centralized singleton pattern to prevent duplicate event listeners
 export function useTabVisibility() {
   const isVisible = useTabVisible();
-  const [isFocused, setIsFocused] = useState(() => document.hasFocus());
-
-  useEffect(() => {
-    const handleFocus = () => {
-      setIsFocused(true);
-    };
-
-    const handleBlur = () => {
-      setIsFocused(false);
-    };
-
-    window.addEventListener("focus", handleFocus);
-    window.addEventListener("blur", handleBlur);
-
-    return () => {
-      window.removeEventListener("focus", handleFocus);
-      window.removeEventListener("blur", handleBlur);
-    };
-  }, []);
+  const isFocused = useSyncExternalStore(subscribeFocus, getFocusSnapshot, getServerFocusSnapshot);
 
   return {
     isVisible,

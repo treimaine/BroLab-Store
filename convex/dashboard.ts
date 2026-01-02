@@ -151,71 +151,83 @@ export const getDashboardData = query({
       }
 
       // Parallel data fetching with optimized queries
-      const [
-        favorites,
-        orders,
-        downloads,
-        reservations,
-        activityLog,
-        subscription,
-        quotas,
-        beats, // For enriching favorites and downloads
-      ] = await Promise.all([
-        // Favorites with limit
-        ctx.db
-          .query("favorites")
-          .withIndex("by_user_created", q => q.eq("userId", user._id))
-          .order("desc")
-          .take(limits.favoritesLimit),
+      const [favorites, orders, downloads, reservations, activityLog, subscription, quotas] =
+        await Promise.all([
+          // Favorites with limit
+          ctx.db
+            .query("favorites")
+            .withIndex("by_user_created", q => q.eq("userId", user._id))
+            .order("desc")
+            .take(limits.favoritesLimit),
 
-        // Orders with limit
-        ctx.db
-          .query("orders")
-          .withIndex("by_user", q => q.eq("userId", user._id))
-          .order("desc")
-          .take(limits.ordersLimit),
+          // Orders with limit
+          ctx.db
+            .query("orders")
+            .withIndex("by_user", q => q.eq("userId", user._id))
+            .order("desc")
+            .take(limits.ordersLimit),
 
-        // Downloads with limit
-        ctx.db
-          .query("downloads")
-          .withIndex("by_user_timestamp", q => q.eq("userId", user._id))
-          .order("desc")
-          .take(limits.downloadsLimit),
+          // Downloads with limit
+          ctx.db
+            .query("downloads")
+            .withIndex("by_user_timestamp", q => q.eq("userId", user._id))
+            .order("desc")
+            .take(limits.downloadsLimit),
 
-        // Reservations with limit
-        ctx.db
-          .query("reservations")
-          .withIndex("by_user", q => q.eq("userId", user._id))
-          .order("desc")
-          .take(limits.reservationsLimit),
+          // Reservations with limit
+          ctx.db
+            .query("reservations")
+            .withIndex("by_user", q => q.eq("userId", user._id))
+            .order("desc")
+            .take(limits.reservationsLimit),
 
-        // Recent activity with limit
-        ctx.db
-          .query("activityLog")
-          .withIndex("by_user_timestamp", q => q.eq("userId", user._id))
-          .order("desc")
-          .take(limits.activityLimit),
+          // Recent activity with limit
+          ctx.db
+            .query("activityLog")
+            .withIndex("by_user_timestamp", q => q.eq("userId", user._id))
+            .order("desc")
+            .take(limits.activityLimit),
 
-        // Current subscription
-        ctx.db
-          .query("subscriptions")
-          .withIndex("by_user", q => q.eq("userId", user._id))
-          .filter(q => q.eq(q.field("status"), "active"))
-          .first(),
+          // Current subscription
+          ctx.db
+            .query("subscriptions")
+            .withIndex("by_user", q => q.eq("userId", user._id))
+            .filter(q => q.eq(q.field("status"), "active"))
+            .first(),
 
-        // User quotas
-        ctx.db
-          .query("quotas")
-          .withIndex("by_user", q => q.eq("userId", user._id))
-          .filter(q => q.eq(q.field("isActive"), true))
-          .collect(),
+          // User quotas
+          ctx.db
+            .query("quotas")
+            .withIndex("by_user", q => q.eq("userId", user._id))
+            .filter(q => q.eq(q.field("isActive"), true))
+            .collect(),
+        ]);
 
-        // Beats for enrichment (get unique beat IDs from favorites and downloads)
-        ctx.db.query("beats").collect(),
+      // Extract unique beat IDs from favorites and downloads for targeted loading
+      const beatIds = new Set<number>([
+        ...favorites.map(f => f.beatId),
+        ...downloads.map(d => d.beatId),
       ]);
 
-      // Create beat lookup map for efficient joins
-      const beatMap = new Map(beats.map(beat => [beat.wordpressId, beat]));
+      // Load only the beats we need (instead of all beats)
+      const beats =
+        beatIds.size > 0
+          ? await Promise.all(
+              Array.from(beatIds).map(beatId =>
+                ctx.db
+                  .query("beats")
+                  .withIndex("by_wordpress_id", q => q.eq("wordpressId", beatId))
+                  .first()
+              )
+            )
+          : [];
+
+      // Create beat lookup map for efficient joins (filter out null results)
+      const beatMap = new Map(
+        beats
+          .filter((beat): beat is NonNullable<typeof beat> => beat !== null)
+          .map(beat => [beat.wordpressId, beat])
+      );
 
       // Transform user data
       const dashboardUser: DashboardUser = {
@@ -245,43 +257,15 @@ export const getDashboardData = query({
           : undefined,
       };
 
-      // Calculate comprehensive statistics with REAL totals (not limited arrays)
-      const [totalFavoritesCount, totalDownloadsCount, totalOrdersCount] = await Promise.all([
-        // Count ALL favorites (not limited)
-        ctx.db
-          .query("favorites")
-          .withIndex("by_user_created", q => q.eq("userId", user._id))
-          .collect()
-          .then(results => results.length),
-
-        // Count ALL downloads (not limited)
-        ctx.db
-          .query("downloads")
-          .withIndex("by_user_timestamp", q => q.eq("userId", user._id))
-          .collect()
-          .then(results => results.length),
-
-        // Count ALL orders (not limited)
-        ctx.db
-          .query("orders")
-          .withIndex("by_user", q => q.eq("userId", user._id))
-          .collect()
-          .then(results => results.length),
-      ]);
-
-      // Calculate statistics with real totals - no mock arrays
+      // Calculate statistics using already loaded data (no redundant queries)
+      // Use the limited arrays for display, orders for revenue calculation
       const stats: UserStats = StatisticsCalculator.calculateUserStats({
-        favorites: new Array(totalFavoritesCount).fill({}), // Array with correct length for counting
-        downloads: new Array(totalDownloadsCount).fill({}), // Array with correct length for counting
-        orders: orders, // Use real orders for revenue calculation
+        favorites,
+        downloads,
+        orders,
         quotas,
         activityLog,
       });
-
-      // Override with real totals
-      stats.totalFavorites = totalFavoritesCount;
-      stats.totalDownloads = totalDownloadsCount;
-      stats.totalOrders = totalOrdersCount;
 
       // Transform favorites with beat enrichment
       const enrichedFavorites: Favorite[] = favorites.map(fav => {

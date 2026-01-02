@@ -359,11 +359,11 @@ export const ErrorNotificationList: React.FC<ErrorNotificationListProps> = ({
 
       // Take the most recent error from each group
       filteredErrors = Array.from(errorGroups.values()).map(
-        group => group.sort((a, b) => b.timestamp - a.timestamp)[0]
+        group => group.toSorted((a, b) => b.timestamp - a.timestamp)[0]
       );
     }
 
-    return filteredErrors.sort((a, b) => b.timestamp - a.timestamp).slice(0, maxErrors);
+    return filteredErrors.toSorted((a, b) => b.timestamp - a.timestamp).slice(0, maxErrors);
   }, [errors, dismissedErrors, groupSimilarErrors, maxErrors]);
 
   if (processedErrors.length === 0) {
@@ -389,7 +389,7 @@ export const ErrorNotificationList: React.FC<ErrorNotificationListProps> = ({
         <Card className="border-gray-200 bg-gray-50">
           <CardContent className="p-3">
             <p className="text-xs text-muted-foreground text-center">
-              {errors.length - maxErrors} more error{errors.length - maxErrors !== 1 ? "s" : ""} not
+              {errors.length - maxErrors} more error{errors.length - maxErrors === 1 ? "" : "s"} not
               shown
             </p>
           </CardContent>
@@ -439,7 +439,7 @@ export const ErrorSummary: React.FC<ErrorSummaryProps> = ({
   const getHealthStatus = () => {
     if (isHealthy) return "All systems operational";
     if (activeRecoveries > 0)
-      return `${activeRecoveries} recovery${activeRecoveries !== 1 ? "ies" : ""} in progress`;
+      return `${activeRecoveries} recovery${activeRecoveries === 1 ? "" : "ies"} in progress`;
     return "Sync issues detected";
   };
 
@@ -452,7 +452,7 @@ export const ErrorSummary: React.FC<ErrorSummaryProps> = ({
             <div>
               <p className="text-sm font-medium">{getHealthStatus()}</p>
               <p className="text-xs text-muted-foreground">
-                {totalErrors} total error{totalErrors !== 1 ? "s" : ""} • {successRate.toFixed(1)}%
+                {totalErrors} total error{totalErrors === 1 ? "" : "s"} • {successRate.toFixed(1)}%
                 recovery rate
               </p>
             </div>

@@ -114,13 +114,15 @@ export function Footer(): JSX.Element {
               >
                 <InstagramIcon className="w-5 h-5 text-white" />
               </a>
-              <button
-                type="button"
+              <a
+                href="https://x.com/Treigua"
+                target="_blank"
+                rel="noopener noreferrer"
                 aria-label="Follow us on X"
                 className="w-10 h-10 bg-[var(--medium-gray)] hover:bg-[var(--accent-purple)] rounded-full flex items-center justify-center transition-colors"
               >
                 <XIcon className="w-5 h-5 text-white" />
-              </button>
+              </a>
               <a
                 href="https://www.youtube.com/@TreiguawiththeMix"
                 target="_blank"

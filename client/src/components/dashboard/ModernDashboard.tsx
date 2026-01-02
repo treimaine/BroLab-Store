@@ -23,7 +23,7 @@ import { useClerk, useUser } from "@clerk/clerk-react";
 import type { Download, Favorite } from "@shared/types/dashboard";
 import { motion } from "framer-motion";
 import { Music, Star } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 
 // Import dashboard components (no lazy loading for better performance and simpler architecture)
@@ -303,15 +303,40 @@ export const ModernDashboard = memo(() => {
     return stats;
   }, [stats, favorites?.length, orders?.length, downloads?.length]);
 
-  // Handle tab changes - update both state and URL
+  // Handle tab changes - update both state and URL with debouncing to prevent rapid clicks
+  const pendingTabRef = useRef<string | null>(null);
+  const tabChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleTabChange = useCallback(
     (tab: string) => {
+      // Prevent rapid tab switching - debounce with 100ms
+      if (pendingTabRef.current === tab) return;
+
+      pendingTabRef.current = tab;
       setActiveTab(tab);
-      // Update URL without full page reload
-      setLocation(`/dashboard?tab=${tab}`, { replace: true });
+
+      // Debounce URL update to prevent excessive history entries
+      if (tabChangeTimeoutRef.current) {
+        clearTimeout(tabChangeTimeoutRef.current);
+      }
+
+      tabChangeTimeoutRef.current = setTimeout(() => {
+        // Update URL without full page reload
+        setLocation(`/dashboard?tab=${tab}`, { replace: true });
+        pendingTabRef.current = null;
+      }, 100);
     },
     [setLocation]
   );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tabChangeTimeoutRef.current) {
+        clearTimeout(tabChangeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle refresh using unified hook
   const handleRefresh = useCallback(async () => {
