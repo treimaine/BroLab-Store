@@ -289,11 +289,11 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
   }, [handleOperationSuccess, handleOperationFailure]);
 
   // Use centralized tab visibility manager with staggered resume
-  // Increased delays to prevent the "thundering herd" problem when tab becomes visible
+  // FIX: Increased delays significantly to prevent the "thundering herd" problem when tab becomes visible
   const { isVisible: isTabVisible, isReady: isTabReady } = useStaggeredResume({
-    baseDelay: 500,
-    staggerRange: 1000,
-    minVisibleTime: 800,
+    baseDelay: 800,
+    staggerRange: 1500,
+    minVisibleTime: 1200,
   });
   const metricsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optimizationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

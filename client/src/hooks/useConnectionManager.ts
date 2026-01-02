@@ -156,8 +156,9 @@ export const useConnectionManager = (
       });
     }
 
-    // Update metrics periodically
-    const metricsInterval = setInterval(handleMetricsUpdate, 1000);
+    // Update metrics periodically - REDUCED frequency to prevent performance issues
+    // 10 seconds is sufficient for metrics display, 1 second was causing freezes
+    const metricsInterval = setInterval(handleMetricsUpdate, 10000);
 
     return () => {
       statusUnsubscribe();
@@ -381,8 +382,9 @@ export const useConnectionMessaging = () => {
 
 /**
  * Hook for connection metrics monitoring
+ * FIX: Reduced default update interval from 1s to 5s to prevent performance issues
  */
-export const useConnectionMetrics = (updateInterval = 1000) => {
+export const useConnectionMetrics = (updateInterval = 5000) => {
   const { metrics } = useConnectionManager();
   const [history, setHistory] = useState<ConnectionMetrics[]>([]);
 
@@ -390,8 +392,8 @@ export const useConnectionMetrics = (updateInterval = 1000) => {
     const interval = setInterval(() => {
       setHistory(prev => {
         const newHistory = [...prev, metrics];
-        // Keep only last 100 entries
-        return newHistory.slice(-100);
+        // Keep only last 50 entries (reduced from 100 to save memory)
+        return newHistory.slice(-50);
       });
     }, updateInterval);
 

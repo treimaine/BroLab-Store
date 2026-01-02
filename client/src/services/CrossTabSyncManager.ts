@@ -403,16 +403,22 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
 
   /**
    * Setup focus detection
+   * FIX: Increased focus check interval from 5s to 10s (15s in production)
+   * to reduce CPU usage and prevent browser freezes
    */
   private setupFocusDetection(): void {
     globalThis.addEventListener("focus", this.handleFocus);
     globalThis.addEventListener("blur", this.handleBlur);
     globalThis.addEventListener("beforeunload", this.handleBeforeUnload);
 
-    // Check focus state periodically
+    // Check focus state periodically - use longer interval in production
+    const isProduction =
+      globalThis.window !== undefined && globalThis.window.location.hostname !== "localhost";
+    const focusCheckInterval = isProduction ? 15000 : 10000;
+
     this.focusCheckTimer = setInterval(() => {
       this.updateTabActivity();
-    }, 5000);
+    }, focusCheckInterval);
   }
 
   /**

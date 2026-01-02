@@ -188,8 +188,10 @@ export const useMultipleEventSubscription = <T>(
 
 /**
  * Hook for monitoring EventBus metrics
+ * FIX: Default interval increased from 1s to 5s to prevent performance issues
+ * 1 second intervals were causing browser freezes due to excessive re-renders
  */
-export const useEventBusMetrics = (updateInterval = 1000) => {
+export const useEventBusMetrics = (updateInterval = 5000) => {
   const eventBus = getEventBus();
   const [metrics, setMetrics] = React.useState<EventMetrics>(() => eventBus.getMetrics());
 
@@ -206,6 +208,8 @@ export const useEventBusMetrics = (updateInterval = 1000) => {
 
 /**
  * Hook for debugging events - provides event history and real-time monitoring
+ * FIX: Increased update interval from 500ms to 2s to prevent performance issues
+ * Fast intervals were causing browser freezes during debugging
  */
 export const useEventBusDebug = () => {
   const eventBus = getEventBus();
@@ -216,11 +220,11 @@ export const useEventBusDebug = () => {
     // Enable debug mode
     eventBus.enableDebugMode(true);
 
-    // Update history and metrics periodically
+    // Update history and metrics periodically - 2s is sufficient for debugging
     const interval = setInterval(() => {
       setEventHistory([...eventBus.getEventHistory()]);
       setMetrics(eventBus.getMetrics());
-    }, 500);
+    }, 2000);
 
     return () => {
       clearInterval(interval);

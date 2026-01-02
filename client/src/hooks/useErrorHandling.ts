@@ -388,7 +388,9 @@ export const useErrorHandling = (
 
   useEffect(() => {
     // Update recovery statuses periodically
-    const updateRecoveryStatuses = () => {
+    // FIX: Reduced frequency from 1s to 5s to prevent performance issues
+    // 1 second intervals were causing browser freezes due to excessive state updates
+    const updateRecoveryStatuses = (): void => {
       const newRecoveryStatuses: ErrorHandlingState["recoveryStatuses"] = {};
       let hasActiveRecoveries = false;
 
@@ -408,7 +410,8 @@ export const useErrorHandling = (
       }));
     };
 
-    const interval = setInterval(updateRecoveryStatuses, 1000);
+    // 5 seconds is sufficient for recovery status updates - prevents freeze
+    const interval = setInterval(updateRecoveryStatuses, 5000);
     return () => clearInterval(interval);
   }, [state.errors]);
 

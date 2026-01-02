@@ -462,6 +462,7 @@ export function EnhancedGlobalAudioPlayer() {
   };
 
   // Waveform animation - visibility-aware to prevent freeze on tab switch
+  // FIX: Added throttling and better cleanup to prevent accumulation
   useEffect(() => {
     const analyser = analyserRef.current;
     const dataArray = dataArrayRef.current;
@@ -471,9 +472,27 @@ export function EnhancedGlobalAudioPlayer() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const animate = (): void => {
-      // Stop animation loop if tab is hidden to prevent accumulation
-      if (!TabVisibilityManager.isVisible() || !analyser || !dataArray) return;
+    let isAnimating = true;
+    let lastFrameTime = 0;
+    const targetFPS = 30; // Limit to 30 FPS to reduce CPU usage
+    const frameInterval = 1000 / targetFPS;
+
+    const animate = (currentTime: number): void => {
+      // Stop animation loop if tab is hidden or component unmounted
+      if (!isAnimating || !TabVisibilityManager.isVisible()) {
+        return;
+      }
+
+      // Throttle to target FPS
+      const elapsed = currentTime - lastFrameTime;
+      if (elapsed < frameInterval) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      lastFrameTime = currentTime - (elapsed % frameInterval);
+
+      // Safety check for analyser and dataArray
+      if (!analyser || !dataArray) return;
 
       analyser.getByteFrequencyData(dataArray);
 
@@ -496,28 +515,32 @@ export function EnhancedGlobalAudioPlayer() {
     };
 
     const handleVisibilityChange = (): void => {
-      if (TabVisibilityManager.isVisible() && isPlaying) {
-        // Cancel any pending frame and restart cleanly with staggered delay
+      if (TabVisibilityManager.isVisible() && isPlaying && isAnimating) {
+        // Cancel any pending frame first
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current);
+          animationRef.current = undefined;
         }
-        // Stagger restart to prevent thundering herd
-        const staggerDelay = Math.random() * 200 + 150;
+        // Stagger restart with longer delay to prevent thundering herd
+        const staggerDelay = Math.random() * 500 + 300;
         setTimeout(() => {
-          if (TabVisibilityManager.isVisible() && isPlaying) {
-            animate();
+          if (TabVisibilityManager.isVisible() && isPlaying && isAnimating) {
+            lastFrameTime = 0; // Reset frame timing
+            animationRef.current = requestAnimationFrame(animate);
           }
         }, staggerDelay);
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    animate();
+    animationRef.current = requestAnimationFrame(animate);
 
     return () => {
+      isAnimating = false;
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = undefined;
       }
     };
   }, [isPlaying]);
