@@ -1,4 +1,4 @@
-import { MixingMasteringErrorBoundary } from "@/components/MixingMasteringErrorBoundary";
+import { MixingMasteringErrorBoundary } from "@/components/errors/MixingMasteringErrorBoundary";
 import { render, screen } from "@testing-library/react";
 
 // Mock child component that can throw errors

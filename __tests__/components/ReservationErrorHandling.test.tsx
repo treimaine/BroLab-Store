@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { act, useState } from "react";
-import { ReservationErrorBoundary } from "../../client/src/components/ReservationErrorBoundary";
+import { ReservationErrorBoundary } from "../../client/src/components/reservations/ReservationErrorBoundary";
 import { useEnhancedFormSubmission } from "../../client/src/hooks/useEnhancedFormSubmission";
 import { useReservationErrorHandling } from "../../client/src/hooks/useReservationErrorHandling";
 

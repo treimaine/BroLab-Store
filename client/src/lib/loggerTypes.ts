@@ -24,7 +24,14 @@ export interface LogContext {
  * Extended context for error logging
  */
 export interface ErrorContext extends LogContext {
-  errorType: "authentication" | "api" | "validation" | "file_upload" | "network" | "critical";
+  errorType:
+    | "authentication"
+    | "api"
+    | "validation"
+    | "file_upload"
+    | "network"
+    | "critical"
+    | "general";
   errorCode?: string | number;
   stack?: string;
   recoverable?: boolean;
