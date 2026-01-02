@@ -473,6 +473,20 @@ export class SyncManager extends BrowserEventEmitter {
   }
 
   private scheduleReconnect(): void {
+    // FIX: Don't reconnect in production (Vercel serverless) or if tab is hidden
+    if (!this.useWebSocket) {
+      this.log("WebSocket disabled, falling back to polling instead of reconnecting");
+      this.startPolling();
+      return;
+    }
+
+    // Don't reconnect if tab is hidden to prevent background resource usage
+    if (typeof document !== "undefined" && document.hidden) {
+      this.log("Tab hidden, deferring reconnect");
+      this.updateStatus({ connectionType: "offline" });
+      return;
+    }
+
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
       this.log("Max reconnect attempts reached, falling back to polling");
       this.startPolling();

@@ -10,6 +10,9 @@ var __export = (target, all) => {
 
 // shared/types/ConvexUser.ts
 function convexUserToUser(convexUser) {
+  if (!convexUser?._id) {
+    throw new Error("convexUserToUser received invalid user object: missing _id");
+  }
   const numericId = extractNumericId(convexUser._id);
   return {
     id: numericId,
@@ -32,23 +35,18 @@ function convexUserToUser(convexUser) {
     // Default free tier quota
   };
 }
-function userToConvexUserInput(user) {
-  return {
-    clerkId: user.clerkId,
-    email: user.email || "",
-    username: user.username,
-    firstName: void 0,
-    // Not available in shared User type
-    lastName: void 0,
-    // Not available in shared User type
-    imageUrl: user.avatar || void 0
-  };
-}
 function extractNumericId(convexId) {
+  if (!convexId) {
+    console.warn("extractNumericId received undefined/null convexId, returning fallback");
+    return Math.floor(Math.random() * 1e6);
+  }
   const idString = convexId.toString();
   const numericPart = idString.slice(-8);
   const parsed = Number.parseInt(numericPart, 16);
   return parsed || Math.floor(Math.random() * 1e6);
+}
+function createConvexUserId(numericId) {
+  return `users:${numericId.toString().padStart(8, "0")}`;
 }
 var init_ConvexUser = __esm({
   "shared/types/ConvexUser.ts"() {
@@ -60,15 +58,17 @@ var init_ConvexUser = __esm({
 var api_exports = {};
 __export(api_exports, {
   api: () => api,
+  components: () => components,
   internal: () => internal
 });
-import { anyApi } from "convex/server";
-var api, internal;
+import { anyApi, componentsGeneric } from "convex/server";
+var api, internal, components;
 var init_api = __esm({
   "convex/_generated/api.js"() {
     "use strict";
     api = anyApi;
     internal = anyApi;
+    components = componentsGeneric();
   }
 });
 
@@ -112,7 +112,7 @@ var init_ConvexIntegration = __esm({
     CONVEX_FUNCTIONS = {
       // User management
       GET_USER_BY_CLERK_ID: "users/clerkSync:getUserByClerkId",
-      UPSERT_USER: "users/clerkSync:upsertUser",
+      UPSERT_USER: "users/clerkSync:syncClerkUser",
       UPDATE_USER_AVATAR: "users/clerkSync:updateUserAvatar",
       // Downloads
       LOG_DOWNLOAD: "downloads/record:logDownload",
@@ -183,18 +183,118 @@ var init_ConvexIntegration = __esm({
 // server/lib/convex.ts
 var convex_exports = {};
 __export(convex_exports, {
+  confirmPaymentWithRetry: () => confirmPaymentWithRetry,
   convex: () => convex,
   convexWrapper: () => convexWrapper,
+  createFileRecord: () => createFileRecord,
   createOrder: () => createOrder,
   createReservation: () => createReservation,
+  createRetryableMutation: () => createRetryableMutation,
+  deleteFileRecord: () => deleteFileRecord,
+  generateInvoiceNumber: () => generateInvoiceNumber,
   getConvex: () => getConvex,
+  getFileById: () => getFileById,
+  getOrderInvoiceData: () => getOrderInvoiceData,
+  getReservationById: () => getReservationById,
+  getReservationsByDateRange: () => getReservationsByDateRange,
+  getSubscription: () => getSubscription,
+  getSubscriptionStatus: () => getSubscriptionStatus,
   getUserByClerkId: () => getUserByClerkId,
+  getUserByEmail: () => getUserByEmail,
+  getUserById: () => getUserById,
+  getUserByUsername: () => getUserByUsername,
+  getUserReservations: () => getUserReservations,
+  listDownloads: () => listDownloads,
+  listOrderItems: () => listOrderItems,
+  listUserFiles: () => listUserFiles,
+  listUserOrders: () => listUserOrders,
   logActivity: () => logActivity,
+  logAuditWithRetry: () => logAuditWithRetry,
   logDownload: () => logDownload,
+  markProcessedEventWithRetry: () => markProcessedEventWithRetry,
+  recordPaymentWithRetry: () => recordPaymentWithRetry,
+  saveInvoiceUrl: () => saveInvoiceUrl,
+  saveStripeCheckoutSessionWithRetry: () => saveStripeCheckoutSessionWithRetry,
+  updateReservationStatus: () => updateReservationStatus,
+  updateUserAvatar: () => updateUserAvatar,
   upsertSubscription: () => upsertSubscription,
-  upsertUser: () => upsertUser
+  upsertUser: () => upsertUser,
+  withRetry: () => withRetry2
 });
 import { ConvexHttpClient } from "convex/browser";
+function matchesAnyPattern(errorString, patterns) {
+  return patterns.some((pattern) => errorString.includes(pattern.toLowerCase()));
+}
+function isRetryableError(error) {
+  const errorString = `${error.message} ${error.name} ${error.code || ""}`.toLowerCase();
+  if (matchesAnyPattern(errorString, NON_RETRYABLE_ERROR_PATTERNS)) {
+    return false;
+  }
+  return matchesAnyPattern(errorString, RETRYABLE_ERROR_PATTERNS);
+}
+function calculateDelay(attempt, baseDelayMs, maxDelayMs) {
+  const exponentialDelay = baseDelayMs * Math.pow(2, attempt);
+  const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1);
+  const delay = Math.min(exponentialDelay + jitter, maxDelayMs);
+  return Math.round(delay);
+}
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+function logRetrySuccess(operationName, attempt) {
+  if (attempt > 0) {
+    console.log(`\u2705 ${operationName} succeeded after ${attempt} retry(ies)`);
+  }
+}
+function logRetryWarning(operationName, attempt, maxRetries, delay, errorMessage) {
+  console.warn(
+    `\u26A0\uFE0F ${operationName} failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delay}ms: ${errorMessage}`
+  );
+}
+function logFinalFailure(operationName, attempt, errorMessage) {
+  if (attempt > 0) {
+    console.error(`\u274C ${operationName} failed after ${attempt + 1} attempt(s): ${errorMessage}`);
+  }
+}
+function normalizeError(error) {
+  return error instanceof Error ? error : new Error(String(error));
+}
+async function handleRetryAttempt(error, attempt, config, shouldRetry) {
+  const canRetry = attempt < config.maxRetries && shouldRetry(error);
+  if (canRetry) {
+    const delay = calculateDelay(attempt, config.baseDelayMs, config.maxDelayMs);
+    logRetryWarning(config.operationName, attempt, config.maxRetries, delay, error.message);
+    await sleep(delay);
+    return true;
+  }
+  logFinalFailure(config.operationName, attempt, error.message);
+  return false;
+}
+async function withRetry2(operation, options) {
+  const config = { ...DEFAULT_RETRY_OPTIONS2, ...options };
+  const shouldRetry = options?.shouldRetry ?? isRetryableError;
+  let lastError;
+  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    try {
+      const result = await operation();
+      logRetrySuccess(config.operationName, attempt);
+      return result;
+    } catch (error) {
+      lastError = normalizeError(error);
+      const shouldContinue = await handleRetryAttempt(lastError, attempt, config, shouldRetry);
+      if (!shouldContinue) {
+        break;
+      }
+    }
+  }
+  throw lastError || new Error(`${config.operationName} failed after retries`);
+}
+function createRetryableMutation(mutationFn, operationName, customOptions) {
+  return (args) => withRetry2(() => mutationFn(args), {
+    operationName,
+    ...customOptions
+  });
+}
 function createMockConvexClient() {
   const mockClient = {
     query: async () => null,
@@ -242,8 +342,11 @@ async function getUserByClerkId(clerkId) {
 }
 async function upsertUser(userData) {
   try {
-    const result = await convexWrapper.mutation(CONVEX_FUNCTIONS.UPSERT_USER, userData);
-    return result.data || null;
+    const result = await convexWrapper.mutation(
+      CONVEX_FUNCTIONS.UPSERT_USER,
+      userData
+    );
+    return result.data?.user || null;
   } catch (error) {
     console.error("upsertUser failed:", error);
     return null;
@@ -306,11 +409,336 @@ async function logActivity(activityData) {
     return null;
   }
 }
-var convexClient, initializationError, convex, convexWrapper, getConvex;
+async function getUserByEmail(email) {
+  try {
+    const result = await convexWrapper.query("users:getUserByEmail", { email });
+    return result.data || null;
+  } catch (error) {
+    console.error("getUserByEmail failed:", error);
+    return null;
+  }
+}
+async function getUserByUsername(username) {
+  try {
+    const result = await convexWrapper.query("users:getUserByUsername", { username });
+    return result.data || null;
+  } catch (error) {
+    console.error("getUserByUsername failed:", error);
+    return null;
+  }
+}
+async function getUserById(userId) {
+  try {
+    const result = await convexWrapper.query("users:getUserById", { id: userId });
+    return result.data || null;
+  } catch (error) {
+    console.error("getUserById failed:", error);
+    return null;
+  }
+}
+async function updateUserAvatar(clerkId, avatarUrl) {
+  try {
+    const result = await convexWrapper.mutation("users:updateUserAvatar", {
+      clerkId,
+      avatarUrl
+    });
+    return result.data || null;
+  } catch (error) {
+    console.error("updateUserAvatar failed:", error);
+    return null;
+  }
+}
+async function listDownloads(userId) {
+  try {
+    const result = await convexWrapper.query(
+      "downloads/listDownloads:listDownloadsServer",
+      { userId }
+    );
+    return result.data || [];
+  } catch (error) {
+    console.error("listDownloads failed:", error);
+    return [];
+  }
+}
+async function getSubscription(userId) {
+  try {
+    const result = await convexWrapper.query(
+      "subscriptions/getSubscription:getSubscription",
+      { userId }
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("getSubscription failed:", error);
+    return null;
+  }
+}
+async function getSubscriptionStatus(userId) {
+  try {
+    const subscription = await getSubscription(userId);
+    return subscription?.status || "none";
+  } catch (error) {
+    console.error("getSubscriptionStatus failed:", error);
+    return "none";
+  }
+}
+async function createFileRecord(fileData) {
+  try {
+    const result = await convexWrapper.mutation("files/createFile:createFile", fileData);
+    return result.data || null;
+  } catch (error) {
+    console.error("createFileRecord failed:", error);
+    return null;
+  }
+}
+async function getFileById(fileId, clerkId) {
+  try {
+    const result = await convexWrapper.query("files/getFile:getFile", {
+      fileId,
+      clerkId
+    });
+    return result.data || null;
+  } catch (error) {
+    console.error("getFileById failed:", error);
+    return null;
+  }
+}
+async function listUserFiles(clerkId, filters) {
+  try {
+    const result = await convexWrapper.query("files/listFiles:listFiles", {
+      clerkId,
+      ...filters
+    });
+    return result.data || [];
+  } catch (error) {
+    console.error("listUserFiles failed:", error);
+    return [];
+  }
+}
+async function deleteFileRecord(fileId, clerkId) {
+  try {
+    await convexWrapper.mutation("files/deleteFile:deleteFile", { fileId, clerkId });
+    return true;
+  } catch (error) {
+    console.error("deleteFileRecord failed:", error);
+    return false;
+  }
+}
+async function saveInvoiceUrl(orderId, invoiceUrl) {
+  try {
+    await convexWrapper.mutation("invoices/updateInvoiceUrl:saveInvoiceUrl", {
+      orderId,
+      invoiceUrl
+    });
+    return true;
+  } catch (error) {
+    console.error("saveInvoiceUrl failed:", error);
+    return false;
+  }
+}
+async function generateInvoiceNumber(orderId) {
+  try {
+    const result = await convexWrapper.mutation(
+      "invoices/generateInvoiceNumber:generateInvoiceNumber",
+      { orderId }
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("generateInvoiceNumber failed:", error);
+    return null;
+  }
+}
+async function getOrderInvoiceData(orderId) {
+  try {
+    const result = await convexWrapper.mutation(
+      "invoices/updateInvoiceUrl:getOrderInvoiceData",
+      { orderId }
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("getOrderInvoiceData failed:", error);
+    return null;
+  }
+}
+async function listUserOrders(userId) {
+  try {
+    const result = await convexWrapper.query(
+      "orders/listUserOrders:listUserOrders",
+      { userId }
+    );
+    return result.data || [];
+  } catch (error) {
+    console.error("listUserOrders failed:", error);
+    return [];
+  }
+}
+async function listOrderItems(orderId) {
+  try {
+    const result = await convexWrapper.query(
+      "orders/listOrderItems:listOrderItems",
+      { orderId }
+    );
+    return result.data || [];
+  } catch (error) {
+    console.error("listOrderItems failed:", error);
+    return [];
+  }
+}
+async function getReservationById(reservationId, skipAuth = true) {
+  try {
+    const result = await convexWrapper.query(
+      "reservations/getReservationById:getReservationById",
+      { reservationId, skipAuth }
+    );
+    return result.data || null;
+  } catch (error) {
+    console.error("getReservationById failed:", error);
+    return null;
+  }
+}
+async function getUserReservations(_clerkId) {
+  try {
+    const result = await convexWrapper.query(
+      "reservations/listReservations:getUserReservations",
+      {}
+    );
+    return result.data || [];
+  } catch (error) {
+    console.error("getUserReservations failed:", error);
+    return [];
+  }
+}
+async function updateReservationStatus(reservationId, status, notes) {
+  try {
+    const result = await convexWrapper.mutation("reservations/updateReservationStatus:updateReservationStatus", {
+      reservationId,
+      status,
+      notes
+    });
+    return result.data || null;
+  } catch (error) {
+    console.error("updateReservationStatus failed:", error);
+    return null;
+  }
+}
+async function getReservationsByDateRange(startDate, endDate, status) {
+  try {
+    const result = await convexWrapper.query(
+      "reservations/getByDateRange:getByDateRange",
+      { startDate, endDate, status }
+    );
+    return result.data || [];
+  } catch (error) {
+    console.error("getReservationsByDateRange failed:", error);
+    return [];
+  }
+}
+async function recordPaymentWithRetry(args) {
+  const client = getConvexClient();
+  const { api: api2 } = await Promise.resolve().then(() => (init_api(), api_exports));
+  return withRetry2(
+    async () => {
+      const result = await client.mutation(api2.orders.recordPayment, args);
+      return result;
+    },
+    { operationName: `recordPayment(${args.orderId})`, maxRetries: 3 }
+  );
+}
+async function confirmPaymentWithRetry(args) {
+  const client = getConvexClient();
+  const { api: api2 } = await Promise.resolve().then(() => (init_api(), api_exports));
+  return withRetry2(
+    async () => {
+      const result = await client.mutation(api2.orders.confirmPayment.confirmPayment, args);
+      return result;
+    },
+    { operationName: `confirmPayment(${args.orderId})`, maxRetries: 3 }
+  );
+}
+async function markProcessedEventWithRetry(args) {
+  const client = getConvexClient();
+  const { api: api2 } = await Promise.resolve().then(() => (init_api(), api_exports));
+  return withRetry2(
+    async () => {
+      const result = await client.mutation(api2.orders.markProcessedEvent, args);
+      return result;
+    },
+    { operationName: `markProcessedEvent(${args.eventId})`, maxRetries: 3 }
+  );
+}
+async function saveStripeCheckoutSessionWithRetry(args) {
+  const client = getConvexClient();
+  const { api: api2 } = await Promise.resolve().then(() => (init_api(), api_exports));
+  return withRetry2(
+    async () => {
+      await client.mutation(api2.orders.saveStripeCheckoutSession, args);
+    },
+    { operationName: `saveStripeCheckoutSession(${args.orderId})`, maxRetries: 3 }
+  );
+}
+async function logAuditWithRetry(args) {
+  const client = getConvexClient();
+  const { api: api2 } = await Promise.resolve().then(() => (init_api(), api_exports));
+  try {
+    await withRetry2(
+      async () => {
+        await client.mutation(api2.audit.log, args);
+      },
+      { operationName: `auditLog(${args.action})`, maxRetries: 2 }
+    );
+  } catch (error) {
+    console.error("\u274C Audit logging failed after retries:", error);
+  }
+}
+var DEFAULT_RETRY_OPTIONS2, RETRYABLE_ERROR_PATTERNS, NON_RETRYABLE_ERROR_PATTERNS, convexClient, initializationError, convex, convexWrapper, getConvex;
 var init_convex = __esm({
   "server/lib/convex.ts"() {
     "use strict";
     init_ConvexIntegration();
+    DEFAULT_RETRY_OPTIONS2 = {
+      maxRetries: 3,
+      baseDelayMs: 1e3,
+      maxDelayMs: 1e4,
+      operationName: "operation"
+    };
+    RETRYABLE_ERROR_PATTERNS = [
+      "ECONNRESET",
+      "ETIMEDOUT",
+      "ECONNREFUSED",
+      "ENOTFOUND",
+      "EAI_AGAIN",
+      "EPIPE",
+      "EHOSTUNREACH",
+      "ENETUNREACH",
+      "fetch failed",
+      "network error",
+      "timeout",
+      "socket hang up",
+      "503",
+      "502",
+      "504",
+      "429",
+      // Rate limiting
+      "service unavailable",
+      "bad gateway",
+      "gateway timeout"
+    ];
+    NON_RETRYABLE_ERROR_PATTERNS = [
+      "400",
+      // Bad request - validation error
+      "401",
+      // Unauthorized
+      "403",
+      // Forbidden
+      "404",
+      // Not found
+      "422",
+      // Unprocessable entity
+      "invalid argument",
+      "validation error",
+      "unauthorized",
+      "forbidden",
+      "not found"
+    ];
     convexClient = null;
     initializationError = null;
     convex = new Proxy({}, {
@@ -349,8 +777,8 @@ var init_audit = __esm({
        */
       async log(entry) {
         try {
-          const convex6 = getConvex();
-          await convex6.mutation(api.audit.logAuditEvent, {
+          const convex8 = getConvex();
+          await convex8.mutation(api.audit.logAuditEvent, {
             userId: entry.userId,
             action: entry.action,
             resource: entry.resource,
@@ -514,8 +942,8 @@ var init_audit = __esm({
        */
       async getUserAuditLogs(clerkId, limit = 50) {
         try {
-          const convex6 = getConvex();
-          const logs = await convex6.query(api.audit.getUserAuditLogs, {
+          const convex8 = getConvex();
+          const logs = await convex8.query(api.audit.getUserAuditLogs, {
             clerkId,
             limit
           });
@@ -539,8 +967,8 @@ var init_audit = __esm({
        */
       async getSecurityEvents(limit = 100) {
         try {
-          const convex6 = getConvex();
-          const events = await convex6.query(api.audit.getSecurityEvents, {
+          const convex8 = getConvex();
+          const events = await convex8.query(api.audit.getSecurityEvents, {
             limit
           });
           return events.map((event) => ({
@@ -1090,6 +1518,7 @@ var init_securityEnhancer = __esm({
 });
 
 // server/auth.ts
+import { verifyToken } from "@clerk/backend";
 import { clerkMiddleware, getAuth as getAuth2 } from "@clerk/express";
 import cookieParser from "cookie-parser";
 import session from "express-session";
@@ -1143,6 +1572,49 @@ function extractBearerToken(req) {
   const bearerPrefix = "Bearer ";
   return authHeader.startsWith(bearerPrefix) ? authHeader.slice(bearerPrefix.length) : void 0;
 }
+async function verifyBearerToken(token) {
+  try {
+    const verifiedToken = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY
+    });
+    if (verifiedToken?.sub) {
+      return {
+        userId: verifiedToken.sub,
+        sessionId: verifiedToken.sid
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error("Bearer token verification failed:", error);
+    return null;
+  }
+}
+async function getOrCreateConvexUser(userId, userInfo) {
+  const existingUser = await getUserByClerkId(userId);
+  if (existingUser) {
+    if ((!existingUser.email || existingUser.email === "") && userInfo?.email) {
+      console.log("\u{1F4E7} Updating user email from Clerk session:", userInfo.email);
+      const updatedUser = await upsertUser({
+        clerkId: userId,
+        email: userInfo.email,
+        username: existingUser.username || userInfo.username,
+        firstName: userInfo.firstName || existingUser.firstName,
+        lastName: userInfo.lastName || existingUser.lastName
+      });
+      return { user: updatedUser, isNewUser: false };
+    }
+    return { user: existingUser, isNewUser: false };
+  }
+  const newUserInput = {
+    clerkId: userId,
+    email: userInfo?.email || "",
+    username: userInfo?.username || `user_${userId.slice(-8)}`,
+    firstName: userInfo?.firstName,
+    lastName: userInfo?.lastName
+  };
+  const newUser = await upsertUser(newUserInput);
+  return { user: newUser, isNewUser: true };
+}
 async function handleTestTokenAuth(req, ipAddress, userAgent) {
   const bearerToken = extractBearerToken(req);
   if (!isTokenAccepted(bearerToken)) {
@@ -1168,24 +1640,15 @@ async function handleTestTokenAuth(req, ipAddress, userAgent) {
   };
   return true;
 }
-async function handleClerkAuth(req, userId, sessionId, authResult, ipAddress, userAgent) {
+async function handleClerkAuth(req, userId, sessionId, authResult, ipAddress, userAgent, userInfo) {
   const { securityEnhancer: securityEnhancer2 } = await Promise.resolve().then(() => (init_securityEnhancer(), securityEnhancer_exports));
   securityEnhancer2.clearFailedAttempts(ipAddress);
-  let convexUser = await getUserByClerkId(userId);
-  if (!convexUser) {
-    const newUserInput = userToConvexUserInput({
-      clerkId: userId,
-      email: "",
-      // Will be updated client-side
-      username: `user_${userId.slice(-8)}`
-    });
-    convexUser = await upsertUser(newUserInput);
-    if (convexUser) {
-      await auditLogger.logRegistration(userId, ipAddress, userAgent);
-    }
-  }
+  const { user: convexUser, isNewUser } = await getOrCreateConvexUser(userId, userInfo);
   if (!convexUser) {
     return false;
+  }
+  if (isNewUser) {
+    await auditLogger.logRegistration(userId, ipAddress, userAgent);
   }
   const sharedUser = convexUserToUser(convexUser);
   await auditLogger.logLogin(userId, ipAddress, userAgent);
@@ -1241,6 +1704,90 @@ async function handleSessionAuth(req, ipAddress, userAgent) {
   };
   return true;
 }
+function getAuthContext(req) {
+  return {
+    ipAddress: getClientIP(req),
+    userAgent: req.headers["user-agent"] || "unknown"
+  };
+}
+function extractClaimString(claims, key) {
+  const value = claims[key];
+  return typeof value === "string" ? value : void 0;
+}
+function extractUserInfoFromClaims(claims) {
+  if (!claims) {
+    return void 0;
+  }
+  return {
+    email: extractClaimString(claims, "email"),
+    username: extractClaimString(claims, "username"),
+    firstName: extractClaimString(claims, "given_name"),
+    lastName: extractClaimString(claims, "family_name")
+  };
+}
+async function resolveUserId(authResult) {
+  const hasValidUser = authResult.success && authResult.user?.userId;
+  if (!hasValidUser) {
+    return {};
+  }
+  const userInfo = extractUserInfoFromClaims(authResult.user?.sessionClaims);
+  return {
+    userId: authResult.user?.userId,
+    sessionId: authResult.user?.sessionId,
+    userInfo
+  };
+}
+async function tryBearerTokenFallback(req) {
+  const bearerToken = extractBearerToken(req);
+  if (!bearerToken) {
+    return {};
+  }
+  console.log("\u{1F510} Attempting manual Bearer token verification...");
+  const tokenResult = await verifyBearerToken(bearerToken);
+  if (tokenResult) {
+    console.log("\u2705 Bearer token verified successfully for user:", tokenResult.userId);
+    return { userId: tokenResult.userId, sessionId: tokenResult.sessionId };
+  }
+  console.log("\u274C Bearer token verification failed");
+  return {};
+}
+async function handleAuthFailure(res, authResult, context, securityEnhancer2, SecurityEventType2, hasBearerToken) {
+  securityEnhancer2.recordFailedAttempt(context.ipAddress);
+  await auditLogger.logSecurityEvent(
+    "anonymous",
+    SecurityEventType2.AUTHENTICATION_FAILURE,
+    {
+      error: authResult.error || "No valid authentication found",
+      riskLevel: authResult.riskLevel,
+      securityEvents: authResult.securityEvents,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+      hasBearerToken
+    },
+    context.ipAddress,
+    context.userAgent
+  );
+  res.status(401).json({
+    error: "Authentication failed",
+    details: process.env.NODE_ENV === "development" ? authResult.error : void 0
+  });
+}
+async function handleAuthError(res, error, context) {
+  console.error("Authentication error:", error);
+  await auditLogger.logSecurityEvent(
+    "anonymous",
+    "authentication_error",
+    {
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : void 0,
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent
+    },
+    context.ipAddress,
+    context.userAgent
+  );
+  res.status(500).json({ error: "Authentication error" });
+}
 function registerAuthRoutes(app2) {
   app2.get("/api/auth/user", isAuthenticated, async (req, res) => {
     try {
@@ -1276,82 +1823,48 @@ var init_auth = __esm({
       "test_api_key_or_jwt_token_for_clerk_authentication"
     ]);
     isAuthenticated = async (req, res, next) => {
+      const context = getAuthContext(req);
       try {
         const { securityEnhancer: securityEnhancer2, SecurityEventType: SecurityEventType2 } = await Promise.resolve().then(() => (init_securityEnhancer(), securityEnhancer_exports));
-        const ipAddress = getClientIP(req);
-        const userAgent = req.headers["user-agent"] || "unknown";
-        if (await handleTestTokenAuth(req, ipAddress, userAgent)) {
+        if (await handleTestTokenAuth(req, context.ipAddress, context.userAgent)) {
           return next();
         }
         const authResult = await securityEnhancer2.validateClerkToken(req);
-        if (!authResult.success) {
-          securityEnhancer2.recordFailedAttempt(ipAddress);
-          await auditLogger.logSecurityEvent(
-            "anonymous",
-            SecurityEventType2.AUTHENTICATION_FAILURE,
-            {
-              error: authResult.error,
-              riskLevel: authResult.riskLevel,
-              securityEvents: authResult.securityEvents,
-              ipAddress,
-              userAgent
-            },
-            ipAddress,
-            userAgent
-          );
-          res.status(401).json({
-            error: "Authentication failed",
-            details: process.env.NODE_ENV === "development" ? authResult.error : void 0
-          });
-          return;
+        let resolution = await resolveUserId(authResult);
+        if (!resolution.userId) {
+          resolution = await tryBearerTokenFallback(req);
         }
-        const { userId, sessionId } = authResult.user || {};
-        if (userId) {
+        if (resolution.userId) {
           const success = await handleClerkAuth(
             req,
-            userId,
-            sessionId,
-            authResult,
-            ipAddress,
-            userAgent
+            resolution.userId,
+            resolution.sessionId,
+            {
+              success: true,
+              riskLevel: authResult.riskLevel || "low",
+              securityEvents: authResult.securityEvents || []
+            },
+            context.ipAddress,
+            context.userAgent,
+            resolution.userInfo
           );
           if (success) {
             return next();
           }
         }
-        if (await handleSessionAuth(req, ipAddress, userAgent)) {
+        if (await handleSessionAuth(req, context.ipAddress, context.userAgent)) {
           return next();
         }
-        await auditLogger.logSecurityEvent(
-          "anonymous",
-          SecurityEventType2.UNAUTHORIZED_ACCESS_ATTEMPT,
-          {
-            path: req.path,
-            method: req.method,
-            ipAddress,
-            userAgent
-          },
-          ipAddress,
-          userAgent
+        await handleAuthFailure(
+          res,
+          authResult,
+          context,
+          securityEnhancer2,
+          SecurityEventType2,
+          !!extractBearerToken(req)
         );
-        res.status(401).json({ error: "Unauthorized" });
       } catch (error) {
-        console.error("Authentication error:", error);
-        const ipAddress = getClientIP(req);
-        const userAgent = req.headers["user-agent"] || "unknown";
-        await auditLogger.logSecurityEvent(
-          "anonymous",
-          "authentication_error",
-          {
-            error: error instanceof Error ? error.message : "Unknown error",
-            stack: error instanceof Error ? error.stack : void 0,
-            ipAddress,
-            userAgent
-          },
-          ipAddress,
-          userAgent
-        );
-        res.status(500).json({ error: "Authentication error" });
+        await handleAuthError(res, error, context);
       }
     };
     getCurrentUser = async (req) => {
@@ -1360,16 +1873,7 @@ var init_auth = __esm({
         if (!userId) {
           return null;
         }
-        let convexUser = await getUserByClerkId(userId);
-        if (!convexUser) {
-          const newUserInput = userToConvexUserInput({
-            clerkId: userId,
-            email: "",
-            // Will be updated client-side
-            username: `user_${userId.slice(-8)}`
-          });
-          convexUser = await upsertUser(newUserInput);
-        }
+        const { user: convexUser } = await getOrCreateConvexUser(userId);
         if (convexUser) {
           return convexUserToUser(convexUser);
         }
@@ -1382,38 +1886,242 @@ var init_auth = __esm({
   }
 });
 
+// server/services/ResendContactService.ts
+var ResendContactService_exports = {};
+__export(ResendContactService_exports, {
+  default: () => ResendContactService_default,
+  getResendContactService: () => getResendContactService
+});
+import { Resend } from "resend";
+function getResendContactService() {
+  resendContactService ??= new ResendContactService();
+  return resendContactService;
+}
+var ResendContactService, resendContactService, ResendContactService_default;
+var init_ResendContactService = __esm({
+  "server/services/ResendContactService.ts"() {
+    "use strict";
+    ResendContactService = class {
+      resend = null;
+      audienceId = null;
+      constructor() {
+        this.initialize();
+      }
+      initialize() {
+        const apiKey = process.env.RESEND_API_KEY;
+        const audienceId = process.env.RESEND_AUDIENCE_ID;
+        if (apiKey) {
+          this.resend = new Resend(apiKey);
+          this.audienceId = audienceId || null;
+          if (audienceId) {
+            console.log("\u{1F4E7} Resend Contact Service initialized with audience:", audienceId);
+          } else {
+            console.log("\u{1F4E7} Resend Contact Service initialized - will auto-detect audience");
+          }
+        } else {
+          console.warn("\u26A0\uFE0F RESEND_API_KEY not configured - contact sync disabled");
+        }
+      }
+      /**
+       * Get or create the default audience ID
+       */
+      async getAudienceId() {
+        if (this.audienceId) {
+          return this.audienceId;
+        }
+        if (!this.resend) {
+          return null;
+        }
+        try {
+          const audiences = await this.resend.audiences.list();
+          if (audiences.error) {
+            console.error("\u274C Failed to list Resend audiences:", audiences.error);
+            return null;
+          }
+          if (audiences.data?.data && audiences.data.data.length > 0) {
+            this.audienceId = audiences.data.data[0].id;
+            console.log(
+              "\u{1F4E7} Auto-detected Resend audience:",
+              this.audienceId,
+              audiences.data.data[0].name
+            );
+            return this.audienceId;
+          }
+          const newAudience = await this.resend.audiences.create({
+            name: "BroLab Users"
+          });
+          if (newAudience.error) {
+            console.error("\u274C Failed to create Resend audience:", newAudience.error);
+            return null;
+          }
+          this.audienceId = newAudience.data?.id || null;
+          console.log("\u{1F4E7} Created new Resend audience:", this.audienceId);
+          return this.audienceId;
+        } catch (error) {
+          console.error("\u274C Error getting/creating audience:", error);
+          return null;
+        }
+      }
+      /**
+       * Add or update a contact in Resend Audience
+       */
+      async syncContact(contact) {
+        if (!this.resend) {
+          console.log("\u{1F4E7} Resend contact sync skipped (not configured):", contact.email);
+          return {
+            success: false,
+            error: "Resend not configured"
+          };
+        }
+        const audienceId = await this.getAudienceId();
+        if (!audienceId) {
+          console.log("\u{1F4E7} Resend contact sync skipped (no audience):", contact.email);
+          return {
+            success: false,
+            error: "No audience available"
+          };
+        }
+        try {
+          console.log("\u{1F4E7} Syncing contact to Resend:", contact.email);
+          const result = await this.resend.contacts.create({
+            audienceId,
+            email: contact.email,
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            unsubscribed: contact.unsubscribed ?? false
+          });
+          if (result.error) {
+            if (result.error.message?.includes("already exists")) {
+              console.log("\u{1F4E7} Contact already exists in Resend:", contact.email);
+              return { success: true };
+            }
+            console.error("\u274C Resend contact sync failed:", result.error);
+            return {
+              success: false,
+              error: result.error.message
+            };
+          }
+          console.log("\u2705 Contact synced to Resend:", contact.email, result.data?.id);
+          return {
+            success: true,
+            contactId: result.data?.id
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error("\u274C Resend contact sync error:", errorMessage);
+          return {
+            success: false,
+            error: errorMessage
+          };
+        }
+      }
+      /**
+       * Remove a contact from Resend Audience
+       */
+      async removeContact(email) {
+        if (!this.resend) {
+          return { success: false, error: "Resend not configured" };
+        }
+        const audienceId = await this.getAudienceId();
+        if (!audienceId) {
+          return { success: false, error: "No audience available" };
+        }
+        try {
+          const contacts = await this.resend.contacts.list({ audienceId });
+          if (contacts.error) {
+            return { success: false, error: contacts.error.message };
+          }
+          const contact = contacts.data?.data?.find((c) => c.email === email);
+          if (!contact) {
+            return { success: true };
+          }
+          const result = await this.resend.contacts.remove({
+            audienceId,
+            id: contact.id
+          });
+          if (result.error) {
+            return { success: false, error: result.error.message };
+          }
+          console.log("\u2705 Contact removed from Resend:", email);
+          return { success: true };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return { success: false, error: errorMessage };
+        }
+      }
+      /**
+       * Update contact subscription status
+       */
+      async updateSubscriptionStatus(email, unsubscribed) {
+        if (!this.resend) {
+          return { success: false, error: "Resend not configured" };
+        }
+        const audienceId = await this.getAudienceId();
+        if (!audienceId) {
+          return { success: false, error: "No audience available" };
+        }
+        try {
+          const contacts = await this.resend.contacts.list({ audienceId });
+          if (contacts.error) {
+            return { success: false, error: contacts.error.message };
+          }
+          const contact = contacts.data?.data?.find((c) => c.email === email);
+          if (!contact) {
+            return this.syncContact({ email, unsubscribed });
+          }
+          const result = await this.resend.contacts.update({
+            audienceId,
+            id: contact.id,
+            unsubscribed
+          });
+          if (result.error) {
+            return { success: false, error: result.error.message };
+          }
+          console.log("\u2705 Contact subscription updated:", email, { unsubscribed });
+          return { success: true, contactId: contact.id };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return { success: false, error: errorMessage };
+        }
+      }
+    };
+    resendContactService = null;
+    ResendContactService_default = ResendContactService;
+  }
+});
+
 // server/routes/testSprite.ts
 var testSprite_exports = {};
 __export(testSprite_exports, {
   default: () => testSprite_default
 });
-import { Router as Router23 } from "express";
-var router24, cartItems, favorites, wishlist, recentlyPlayed, bookings, currentPlayerState, testSprite_default;
+import { Router as Router28 } from "express";
+var router29, cartItems, favorites, wishlist, recentlyPlayed, bookings, currentPlayerState, testSprite_default;
 var init_testSprite = __esm({
   "server/routes/testSprite.ts"() {
     "use strict";
     init_auth();
-    router24 = Router23();
+    router29 = Router28();
     cartItems = [];
     favorites = [];
     wishlist = [];
     recentlyPlayed = [];
     bookings = [];
     currentPlayerState = { volume: 1, position: 0, duration: 180 };
-    router24.get("/api/health", (_req, res) => {
+    router29.get("/api/health", (_req, res) => {
       res.json({
         status: "ok",
         timestamp: (/* @__PURE__ */ new Date()).toISOString(),
         environment: process.env.NODE_ENV || "development"
       });
     });
-    router24.post("/api/auth/signin", (_req, res) => {
+    router29.post("/api/auth/signin", (_req, res) => {
       res.json({ accessToken: process.env.TEST_USER_TOKEN || "mock-test-token" });
     });
-    router24.post("/api/auth/sign-in", (_req, res) => {
+    router29.post("/api/auth/sign-in", (_req, res) => {
       res.json({ accessToken: process.env.TEST_USER_TOKEN || "mock-test-token" });
     });
-    router24.post("/api/auth/login", (req, res) => {
+    router29.post("/api/auth/login", (req, res) => {
       const token = process.env.TEST_USER_TOKEN || "mock-test-token";
       if (req.body && (req.body.username || req.body.email)) {
         req.session = req.session || {};
@@ -1421,38 +2129,38 @@ var init_testSprite = __esm({
       }
       res.json({ token, access_token: token });
     });
-    router24.post("/api/auth/register", (req, res) => {
+    router29.post("/api/auth/register", (req, res) => {
       req.session = req.session || {};
       req.session.userId = 123;
       res.status(201).json({ success: true, userId: 123 });
     });
-    router24.post("/api/auth/signout", (_req, res) => {
+    router29.post("/api/auth/signout", (_req, res) => {
       res.json({ success: true });
     });
-    router24.post("/api/auth/clerkLogin", (_req, res) => {
+    router29.post("/api/auth/clerkLogin", (_req, res) => {
       const token = process.env.TEST_USER_TOKEN || "mock-test-token";
       res.json({ token });
     });
-    router24.post("/api/auth/clerkAuthenticate", (_req, res) => {
+    router29.post("/api/auth/clerkAuthenticate", (_req, res) => {
       const token = process.env.TEST_USER_TOKEN || "mock-test-token";
       res.json({ token });
     });
-    router24.post("/api/subscription/authenticate", (_req, res) => {
+    router29.post("/api/subscription/authenticate", (_req, res) => {
       const token = process.env.TEST_USER_TOKEN || "mock-test-token";
       res.json({ token });
     });
-    router24.post("/api/authentication/synchronizeUser", (_req, res) => {
+    router29.post("/api/authentication/synchronizeUser", (_req, res) => {
       res.json({ synchronized: true });
     });
-    router24.get("/api/user/sync-status", (_req, res) => {
+    router29.get("/api/user/sync-status", (_req, res) => {
       const email = "testsprite@example.com";
       const id = "user_testsprite";
       res.json({ clerkUser: { id, email }, convexUser: { id, email }, isSynchronized: true });
     });
-    router24.get("/api/protected/dashboard", isAuthenticated, (_req, res) => {
+    router29.get("/api/protected/dashboard", isAuthenticated, (_req, res) => {
       res.json({ status: "ok", message: "Protected dashboard accessible" });
     });
-    router24.get("/api/test-auth", (req, res) => {
+    router29.get("/api/test-auth", (req, res) => {
       res.json({
         auth: req.auth,
         user: req.user,
@@ -1463,7 +2171,7 @@ var init_testSprite = __esm({
         }
       });
     });
-    router24.get("/api/beats", async (req, res) => {
+    router29.get("/api/beats", async (req, res) => {
       try {
         const base = `${req.protocol}://${req.get("host")}`;
         const limit = req.query.limit ? Number(req.query.limit) : void 0;
@@ -1494,7 +2202,7 @@ var init_testSprite = __esm({
         return res.status(500).json({ error: "Failed to fetch beats" });
       }
     });
-    router24.get("/api/beats/featured", async (req, res) => {
+    router29.get("/api/beats/featured", async (req, res) => {
       try {
         const base = `${req.protocol}://${req.get("host")}`;
         const wooUrl = new URL(base + "/api/woocommerce/products");
@@ -1519,17 +2227,17 @@ var init_testSprite = __esm({
         return res.status(500).json({ error: "Failed to fetch featured beats" });
       }
     });
-    router24.post("/api/beats", async (_req, res) => {
+    router29.post("/api/beats", async (_req, res) => {
       return res.status(404).json({ error: "Beat creation not supported" });
     });
-    router24.get("/api/beats/:id", (req, res) => {
+    router29.get("/api/beats/:id", (req, res) => {
       const id = Number(req.params?.id);
       if (!Number.isFinite(id)) {
         return res.status(404).json({ error: "Beat not found" });
       }
       return res.json({ id, title: "Test Beat", bpm: 120, price: 0 });
     });
-    router24.get("/api/v1/dashboard", async (_req, res) => {
+    router29.get("/api/v1/dashboard", async (_req, res) => {
       try {
         const now = Date.now();
         res.json({
@@ -1543,7 +2251,7 @@ var init_testSprite = __esm({
         res.status(500).json({ error: "Failed to load dashboard" });
       }
     });
-    router24.get("/api/user/dashboard", async (_req, res) => {
+    router29.get("/api/user/dashboard", async (_req, res) => {
       const now = Date.now();
       res.json({
         analytics: { totalPlays: 0, totalRevenue: 0 },
@@ -1552,29 +2260,29 @@ var init_testSprite = __esm({
         subscription: { planName: "Basic", status: "active" }
       });
     });
-    router24.get("/api/dashboard/analytics", (_req, res) => {
+    router29.get("/api/dashboard/analytics", (_req, res) => {
       res.json({ totalPlays: 0, totalRevenue: 0, users: 1 });
     });
-    router24.post("/api/audio/player/play", (req, res) => {
+    router29.post("/api/audio/player/play", (req, res) => {
       const beatId = Number(req.body?.beatId) || 1;
       currentPlayerState = { ...currentPlayerState, beatId, status: "playing" };
       res.json({ status: "playing", beatId });
     });
-    router24.post("/api/audio/player/pause", (_req, res) => {
+    router29.post("/api/audio/player/pause", (_req, res) => {
       currentPlayerState = { ...currentPlayerState, status: "paused" };
       res.json({ status: "paused" });
     });
-    router24.post("/api/audio/player/volume", (req, res) => {
+    router29.post("/api/audio/player/volume", (req, res) => {
       const level = typeof req.body?.level === "number" ? req.body.level : 1;
       currentPlayerState = { ...currentPlayerState, volume: level };
       res.json({ level });
     });
-    router24.post("/api/audio/player/seek", (req, res) => {
+    router29.post("/api/audio/player/seek", (req, res) => {
       const position = typeof req.body?.position === "number" ? req.body.position : 0;
       currentPlayerState = { ...currentPlayerState, position };
       res.json({ position });
     });
-    router24.get("/api/audio/player/status", (_req, res) => {
+    router29.get("/api/audio/player/status", (_req, res) => {
       res.json({
         beatId: currentPlayerState.beatId || 1,
         position: currentPlayerState.position || 0,
@@ -1582,14 +2290,14 @@ var init_testSprite = __esm({
         status: currentPlayerState.status || "paused"
       });
     });
-    router24.get("/api/audio/player/duration", (_req, res) => {
+    router29.get("/api/audio/player/duration", (_req, res) => {
       res.json({ duration: currentPlayerState.duration || 180 });
     });
-    router24.get("/api/audio/waveform/:beatId", (_req, res) => {
+    router29.get("/api/audio/waveform/:beatId", (_req, res) => {
       const samples = Array.from({ length: 128 }, (_, i) => Math.abs(Math.sin(i / 4)));
       res.json({ waveform: samples });
     });
-    router24.post("/api/cart/add", (req, res) => {
+    router29.post("/api/cart/add", (req, res) => {
       const beatId = Number(req.body?.beatId || req.body?.beat_id);
       if (!beatId) {
         res.status(400).json({ error: "beatId required" });
@@ -1600,7 +2308,7 @@ var init_testSprite = __esm({
       cartItems.push(item);
       res.json({ success: true, item });
     });
-    router24.post("/api/cart/guest", (req, res) => {
+    router29.post("/api/cart/guest", (req, res) => {
       const beatId = Number(req.body?.beatId || req.body?.beat_id);
       if (!beatId) {
         res.status(400).json({ error: "beatId required" });
@@ -1611,7 +2319,7 @@ var init_testSprite = __esm({
       cartItems.push(item);
       res.json({ success: true, item });
     });
-    router24.post("/api/cart", (req, res) => {
+    router29.post("/api/cart", (req, res) => {
       const beatId = Number(req.body?.beatId || req.body?.beat_id);
       if (!beatId) {
         res.status(400).json({ error: "beatId required" });
@@ -1622,7 +2330,7 @@ var init_testSprite = __esm({
       cartItems.push(item);
       res.json({ success: true, item });
     });
-    router24.post("/api/cart/item", (req, res) => {
+    router29.post("/api/cart/item", (req, res) => {
       const beatId = Number(req.body?.beatId || req.body?.beat_id);
       if (!beatId) {
         res.status(400).json({ error: "beatId required" });
@@ -1633,7 +2341,7 @@ var init_testSprite = __esm({
       cartItems.push(item);
       res.json({ success: true, item });
     });
-    router24.post("/api/cart/items", (req, res) => {
+    router29.post("/api/cart/items", (req, res) => {
       const beatId = Number(req.body?.beatId || req.body?.beat_id);
       if (!beatId) {
         res.status(400).json({ error: "beatId required" });
@@ -1644,10 +2352,10 @@ var init_testSprite = __esm({
       cartItems.push(item);
       res.json({ success: true, item });
     });
-    router24.get("/api/cart", (_req, res) => {
+    router29.get("/api/cart", (_req, res) => {
       res.json({ items: cartItems });
     });
-    router24.put("/api/cart/items/:id", (req, res) => {
+    router29.put("/api/cart/items/:id", (req, res) => {
       const { id } = req.params;
       const qty = Number(req.body?.quantity || 1);
       const item = cartItems.find((i) => i.id === id);
@@ -1658,36 +2366,36 @@ var init_testSprite = __esm({
       item.quantity = qty;
       res.json({ success: true, item });
     });
-    router24.post("/api/checkout", (_req, res) => {
+    router29.post("/api/checkout", (_req, res) => {
       const orderId = "order_" + Date.now();
       res.json({ success: true, order_id: orderId });
     });
-    router24.post("/api/checkout/process", (_req, res) => {
+    router29.post("/api/checkout/process", (_req, res) => {
       const orderId = "order_" + Date.now();
       res.json({ success: true, order_id: orderId });
     });
-    router24.get("/api/services/bookings", (_req, res) => {
+    router29.get("/api/services/bookings", (_req, res) => {
       res.json(bookings);
     });
-    router24.post("/api/services/bookings", (req, res) => {
+    router29.post("/api/services/bookings", (req, res) => {
       const serviceType = req.body?.serviceType || "mixing";
       const id = "booking_" + Date.now();
       bookings.push({ id, serviceType });
       res.json({ id, serviceType });
     });
-    router24.post("/api/services/booking", (req, res) => {
+    router29.post("/api/services/booking", (req, res) => {
       const serviceType = req.body?.serviceType || "mixing";
       const id = "booking_" + Date.now();
       bookings.push({ id, serviceType });
       res.json({ id, serviceType });
     });
-    router24.post("/api/services/book", (req, res) => {
+    router29.post("/api/services/book", (req, res) => {
       const serviceType = req.body?.serviceType || "mixing";
       const id = "booking_" + Date.now();
       bookings.push({ id, serviceType });
       res.json({ id, serviceType });
     });
-    router24.post("/api/user/favorites", (req, res) => {
+    router29.post("/api/user/favorites", (req, res) => {
       const beatId = Number(req.body?.beatId);
       if (!beatId) {
         res.status(400).json({ error: "beatId required" });
@@ -1696,15 +2404,15 @@ var init_testSprite = __esm({
       if (!favorites.includes(beatId)) favorites.push(beatId);
       res.status(201).json({ beatId });
     });
-    router24.get("/api/user/favorites", (_req, res) => {
+    router29.get("/api/user/favorites", (_req, res) => {
       res.json(favorites.map((b) => ({ beatId: b })));
     });
-    router24.delete("/api/user/favorites/:beatId", (req, res) => {
+    router29.delete("/api/user/favorites/:beatId", (req, res) => {
       const beatId = Number(req.params?.beatId);
       favorites = favorites.filter((b) => b !== beatId);
       res.status(204).end();
     });
-    router24.post("/api/user/wishlist", (req, res) => {
+    router29.post("/api/user/wishlist", (req, res) => {
       const beatId = Number(req.body?.beatId);
       if (!beatId) {
         res.status(400).json({ error: "beatId required" });
@@ -1713,15 +2421,15 @@ var init_testSprite = __esm({
       if (!wishlist.includes(beatId)) wishlist.push(beatId);
       res.status(201).json({ beatId });
     });
-    router24.get("/api/user/wishlist", (_req, res) => {
+    router29.get("/api/user/wishlist", (_req, res) => {
       res.json(wishlist.map((b) => ({ beatId: b })));
     });
-    router24.delete("/api/user/wishlist/:beatId", (req, res) => {
+    router29.delete("/api/user/wishlist/:beatId", (req, res) => {
       const beatId = Number(req.params?.beatId);
       wishlist = wishlist.filter((b) => b !== beatId);
       res.status(204).end();
     });
-    router24.post("/api/user/recently-played", (req, res) => {
+    router29.post("/api/user/recently-played", (req, res) => {
       const beatId = Number(req.body?.beatId);
       if (!beatId) {
         res.status(400).json({ error: "beatId required" });
@@ -1730,13 +2438,13 @@ var init_testSprite = __esm({
       if (!recentlyPlayed.includes(beatId)) recentlyPlayed.unshift(beatId);
       res.json({ success: true });
     });
-    router24.get("/api/user/recently-played", (_req, res) => {
+    router29.get("/api/user/recently-played", (_req, res) => {
       res.json(recentlyPlayed.map((b) => ({ beatId: b })));
     });
-    router24.put("/api/user/profile/update", (_req, res) => {
+    router29.put("/api/user/profile/update", (_req, res) => {
       res.json({ success: true });
     });
-    router24.get("/api/i18n/translate", (req, res) => {
+    router29.get("/api/i18n/translate", (req, res) => {
       const lang = typeof req.query?.lang === "string" ? req.query.lang : "en";
       const key = typeof req.query?.key === "string" ? req.query.key : "welcomeMessage";
       const map = {
@@ -1745,7 +2453,7 @@ var init_testSprite = __esm({
       const translation = map[key]?.[lang] || "Welcome";
       res.json({ translation });
     });
-    router24.get("/api/i18n/translations", (req, res) => {
+    router29.get("/api/i18n/translations", (req, res) => {
       const lang = typeof req.query?.lang === "string" ? req.query.lang : "en";
       const key = typeof req.query?.key === "string" ? req.query.key : "welcomeMessage";
       const map = {
@@ -1754,11 +2462,11 @@ var init_testSprite = __esm({
       const translation = map[key]?.[lang] || "Welcome";
       res.json({ translation });
     });
-    router24.get("/api/i18n/locales/:lang", (req, res) => {
+    router29.get("/api/i18n/locales/:lang", (req, res) => {
       const lang = req.params?.lang || "en";
       res.json({ lang, messages: { welcomeMessage: lang === "fr" ? "Bienvenue" : "Welcome" } });
     });
-    router24.get("/api/i18n/currency-format", (req, res) => {
+    router29.get("/api/i18n/currency-format", (req, res) => {
       const currency = typeof req.query?.currency === "string" ? req.query.currency : "USD";
       const amount = Number(req.query?.amount || 0);
       try {
@@ -1770,14 +2478,14 @@ var init_testSprite = __esm({
         res.json({ localized: amount.toFixed(2) });
       }
     });
-    router24.get("/api/subscription/plans", (_req, res) => {
+    router29.get("/api/subscription/plans", (_req, res) => {
       res.json([
         { id: "basic", name: "Basic", price: 999 },
         { id: "artist", name: "Artist", price: 1999 },
         { id: "ultimate", name: "Ultimate", price: 4999 }
       ]);
     });
-    router24.post("/api/paypal-test/create-order", (req, res) => {
+    router29.post("/api/paypal-test/create-order", (req, res) => {
       try {
         const { serviceType, amount, currency, description, reservationId, customerEmail } = req.body;
         if (!serviceType || !amount || !currency || !description || !reservationId || !customerEmail) {
@@ -1802,7 +2510,7 @@ var init_testSprite = __esm({
         });
       }
     });
-    router24.post("/api/paypal-direct/create-order", (req, res) => {
+    router29.post("/api/paypal-direct/create-order", (req, res) => {
       try {
         const { serviceType, amount, currency, description, reservationId, customerEmail } = req.body;
         if (!serviceType || !amount || !currency || !description || !reservationId || !customerEmail) {
@@ -1835,7 +2543,7 @@ var init_testSprite = __esm({
         });
       }
     });
-    testSprite_default = router24;
+    testSprite_default = router29;
   }
 });
 
@@ -2133,69 +2841,250 @@ function requestIdMiddleware(req, res, next) {
 }
 
 // server/middleware/security.ts
+import { getAuth as getAuth3 } from "@clerk/express";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
-var helmetMiddleware = helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "'unsafe-eval'",
-        "https://cdn.jsdelivr.net",
-        "https://*.clerk.accounts.dev",
-        "https://*.clerk.com",
-        "https://replit.com",
-        "https://*.replit.com",
-        "https://*.replit.app",
-        "https://*.repl.co"
-      ],
-      styleSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "https://fonts.googleapis.com",
-        "https://*.clerk.accounts.dev",
-        "https://*.clerk.com",
-        "https://*.replit.com",
-        "https://*.replit.app"
-      ],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: [
-        "'self'",
-        "data:",
-        "https:",
-        "blob:",
-        "https://*.clerk.accounts.dev",
-        "https://*.clerk.com",
-        "https://*.replit.com",
-        "https://*.replit.app"
-      ],
-      connectSrc: [
-        "'self'",
-        "https:",
-        "wss:",
-        "https://*.clerk.accounts.dev",
-        "https://*.clerk.com",
-        "https://api.clerk.com",
-        "https://api.clerk.dev",
-        "https://*.replit.com",
-        "https://*.replit.app",
-        "wss://*.replit.com",
-        "wss://*.replit.app"
-      ],
-      mediaSrc: ["'self'", "https:", "blob:"],
-      objectSrc: ["'none'"],
-      frameSrc: ["'self'", "https:", "https://*.clerk.accounts.dev", "https://*.clerk.com", "https://*.replit.com", "https://*.replit.app"],
-      upgradeInsecureRequests: []
+
+// server/utils/cspNonce.ts
+import crypto3 from "node:crypto";
+function generateCspNonce() {
+  return crypto3.randomBytes(16).toString("base64");
+}
+
+// server/middleware/security.ts
+var isDevelopment = process.env.NODE_ENV === "development";
+function getClientIp(req) {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  if (forwardedFor) {
+    const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor.split(",")[0];
+    return normalizeIp(ips.trim());
+  }
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  return normalizeIp(ip);
+}
+function normalizeIp(ip) {
+  if (ip.startsWith("::ffff:")) {
+    return ip.substring(7);
+  }
+  return ip;
+}
+function getSmartRateLimitKey(req) {
+  try {
+    const auth = getAuth3(req);
+    if (auth?.userId) {
+      return `user:${auth.userId}`;
     }
-  },
-  crossOriginEmbedderPolicy: false,
-  // Allow embedding for audio/video
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-  // Allow cross-origin resources
-});
+  } catch {
+  }
+  return `ip:${getClientIp(req)}`;
+}
+function isAuthenticatedRequest(req) {
+  try {
+    const auth = getAuth3(req);
+    return !!auth?.userId;
+  } catch {
+    return false;
+  }
+}
+function logRateLimitExceeded(req, config, key, limit) {
+  const keyType = key.startsWith("user:") ? "USER" : "IP";
+  const identifier = key.startsWith("user:") ? key.substring(5) : key.substring(3);
+  logger.warn(`[RATE_LIMIT] ${config.name} exceeded`, {
+    keyType,
+    identifier,
+    limit,
+    path: req.path,
+    method: req.method,
+    userAgent: req.headers["user-agent"]
+  });
+}
+function createSmartRateLimiter(config) {
+  const authenticatedLimiter = rateLimit({
+    windowMs: config.windowMs,
+    max: config.maxAuthenticated,
+    message: {
+      error: config.message,
+      code: config.code,
+      limit: config.maxAuthenticated,
+      type: "authenticated"
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: getSmartRateLimitKey,
+    skip: (req) => shouldSkipRateLimit(req.path) || !isAuthenticatedRequest(req),
+    handler: (req, res) => {
+      const key = getSmartRateLimitKey(req);
+      logRateLimitExceeded(req, config, key, config.maxAuthenticated);
+      res.status(429).json({
+        error: config.message,
+        code: config.code,
+        limit: config.maxAuthenticated,
+        type: "authenticated"
+      });
+    },
+    validate: {
+      xForwardedForHeader: false,
+      trustProxy: false,
+      default: true
+    }
+  });
+  const anonymousLimiter = rateLimit({
+    windowMs: config.windowMs,
+    max: config.maxAnonymous,
+    message: {
+      error: config.message,
+      code: config.code,
+      limit: config.maxAnonymous,
+      type: "anonymous"
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: getSmartRateLimitKey,
+    skip: (req) => shouldSkipRateLimit(req.path) || isAuthenticatedRequest(req),
+    handler: (req, res) => {
+      const key = getSmartRateLimitKey(req);
+      logRateLimitExceeded(req, config, key, config.maxAnonymous);
+      res.status(429).json({
+        error: config.message,
+        code: config.code,
+        limit: config.maxAnonymous,
+        type: "anonymous"
+      });
+    },
+    validate: {
+      xForwardedForHeader: false,
+      trustProxy: false,
+      default: true
+    }
+  });
+  return (req, res, next) => {
+    authenticatedLimiter(req, res, (err) => {
+      if (err) return next(err);
+      anonymousLimiter(req, res, next);
+    });
+  };
+}
+var REPLIT_SCRIPT_SOURCES = isDevelopment ? ["https://replit.com", "https://*.replit.com", "https://*.replit.app", "https://*.repl.co"] : [];
+var REPLIT_STYLE_SOURCES = isDevelopment ? ["https://*.replit.com", "https://*.replit.app"] : [];
+var REPLIT_IMG_SOURCES = isDevelopment ? ["https://*.replit.com", "https://*.replit.app"] : [];
+var REPLIT_CONNECT_SOURCES = isDevelopment ? ["https://*.replit.com", "https://*.replit.app", "wss://*.replit.com", "wss://*.replit.app"] : [];
+var REPLIT_FRAME_SOURCES = isDevelopment ? ["https://*.replit.com", "https://*.replit.app"] : [];
+var TRUSTED_SCRIPT_SOURCES = [
+  "https://cdn.jsdelivr.net",
+  "https://*.clerk.accounts.dev",
+  "https://*.clerk.com",
+  "https://js.stripe.com",
+  "https://challenges.cloudflare.com",
+  ...REPLIT_SCRIPT_SOURCES
+];
+var TRUSTED_STYLE_SOURCES = [
+  "https://fonts.googleapis.com",
+  "https://*.clerk.accounts.dev",
+  "https://*.clerk.com",
+  ...REPLIT_STYLE_SOURCES
+];
+var WORDPRESS_SOURCES = ["https://wp.brolabentertainment.com"];
+var SCRIPT_HASHES = [
+  // Add hashes for any inline scripts that cannot be modified to use nonces
+  // Example: "'sha256-abc123...'"
+];
+var helmetMiddleware = (req, res, next) => {
+  const nonce = generateCspNonce();
+  res.locals.cspNonce = nonce;
+  const helmetConfig = helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          `'nonce-${nonce}'`,
+          // Include strict-dynamic for modern browsers - allows nonce-approved scripts
+          // to load additional scripts without explicit CSP entries
+          "'strict-dynamic'",
+          // Hashes for known inline scripts
+          ...SCRIPT_HASHES,
+          // Trusted external sources
+          ...TRUSTED_SCRIPT_SOURCES
+        ],
+        scriptSrcAttr: ["'none'"],
+        // Block inline event handlers (onclick, etc.)
+        styleSrc: [
+          "'self'",
+          // IMPORTANT: Do NOT use nonce for styles because:
+          // - React inline styles (style={{...}}) cannot receive nonce attributes
+          // - Modern browsers ignore 'unsafe-inline' when nonce is present
+          // - This breaks 100+ components using dynamic inline styles
+          // Keep 'unsafe-inline' for:
+          // - Vite HMR in development (injects styles dynamically)
+          // - Third-party libraries (Radix UI, Framer Motion, Recharts)
+          // - React inline styles for dynamic values (progress bars, colors, dimensions)
+          "'unsafe-inline'",
+          ...TRUSTED_STYLE_SOURCES
+        ],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "https:",
+          "blob:",
+          "https://*.clerk.accounts.dev",
+          "https://*.clerk.com",
+          ...REPLIT_IMG_SOURCES
+        ],
+        connectSrc: [
+          "'self'",
+          "https:",
+          "wss:",
+          // Clerk authentication
+          "https://*.clerk.accounts.dev",
+          "https://*.clerk.com",
+          "https://api.clerk.com",
+          "https://api.clerk.dev",
+          // Convex real-time database
+          "https://*.convex.cloud",
+          "wss://*.convex.cloud",
+          // WordPress/WooCommerce API
+          ...WORDPRESS_SOURCES,
+          // Replit (development only)
+          ...REPLIT_CONNECT_SOURCES
+        ],
+        mediaSrc: ["'self'", "https:", "blob:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+        frameSrc: [
+          "'self'",
+          "https:",
+          "https://*.clerk.accounts.dev",
+          "https://*.clerk.com",
+          "https://js.stripe.com",
+          "https://challenges.cloudflare.com",
+          ...REPLIT_FRAME_SOURCES
+        ],
+        workerSrc: ["'self'", "blob:"],
+        childSrc: ["'self'", "blob:"],
+        upgradeInsecureRequests: []
+      }
+    },
+    crossOriginEmbedderPolicy: false,
+    // Allow embedding for audio/video
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    // Allow cross-origin resources
+    // Additional security headers
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    hsts: {
+      maxAge: 31536e3,
+      // 1 year
+      includeSubDomains: true,
+      preload: true
+    },
+    noSniff: true,
+    hidePoweredBy: true
+  });
+  helmetConfig(req, res, next);
+};
 var compressionMiddleware = compression({
   filter: (req, res) => {
     if (req.headers["x-no-compression"]) {
@@ -2208,79 +3097,117 @@ var compressionMiddleware = compression({
   threshold: 1024
   // Only compress responses larger than 1KB
 });
-var bodySizeLimits = (req, res, next) => {
+var BODY_SIZE_LIMITS = {
+  json: 10 * 1024 * 1024,
+  // 10MB - file uploads metadata
+  urlencoded: 1 * 1024 * 1024,
+  // 1MB - form submissions
+  multipart: 50 * 1024 * 1024,
+  // 50MB - file uploads (audio files)
+  text: 1 * 1024 * 1024,
+  // 1MB - plain text
+  xml: 5 * 1024 * 1024,
+  // 5MB - XML payloads
+  default: 1 * 1024 * 1024
+  // 1MB - fallback for unknown types
+};
+function getContentTypeLimit(req) {
   if (req.is("application/json")) {
-    const contentLength = Number.parseInt(req.headers["content-length"] || "0", 10);
-    if (contentLength > 10 * 1024 * 1024) {
-      res.status(413).json({
-        error: "Request body too large",
-        code: "BODY_TOO_LARGE",
-        maxSize: "10MB"
-      });
-      return;
-    }
+    return { limit: BODY_SIZE_LIMITS.json, type: "json" };
+  }
+  if (req.is("application/x-www-form-urlencoded")) {
+    return { limit: BODY_SIZE_LIMITS.urlencoded, type: "urlencoded" };
+  }
+  if (req.is("multipart/form-data")) {
+    return { limit: BODY_SIZE_LIMITS.multipart, type: "multipart" };
+  }
+  if (req.is("text/plain")) {
+    return { limit: BODY_SIZE_LIMITS.text, type: "text" };
+  }
+  if (req.is("application/xml") || req.is("text/xml")) {
+    return { limit: BODY_SIZE_LIMITS.xml, type: "xml" };
+  }
+  return { limit: BODY_SIZE_LIMITS.default, type: "default" };
+}
+function formatBytes(bytes) {
+  if (bytes >= 1024 * 1024) {
+    return `${Math.round(bytes / (1024 * 1024))}MB`;
+  }
+  if (bytes >= 1024) {
+    return `${Math.round(bytes / 1024)}KB`;
+  }
+  return `${bytes}B`;
+}
+var bodySizeLimits = (req, res, next) => {
+  const contentLength = Number.parseInt(req.headers["content-length"] || "0", 10);
+  if (contentLength === 0) {
+    next();
+    return;
+  }
+  const { limit, type } = getContentTypeLimit(req);
+  if (contentLength > limit) {
+    res.status(413).json({
+      error: "Request body too large",
+      code: "BODY_TOO_LARGE",
+      contentType: type,
+      maxSize: formatBytes(limit),
+      receivedSize: formatBytes(contentLength)
+    });
+    return;
   }
   next();
 };
-var apiRateLimiter = rateLimit({
+var RATE_LIMIT_SKIP_PREFIXES = [
+  "/api/monitoring",
+  // Toutes les routes de monitoring (/health, /status, /metrics, etc.)
+  "/health"
+  // Health checks alternatifs à la racine
+];
+function shouldSkipRateLimit(path) {
+  return RATE_LIMIT_SKIP_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+var apiRateLimiter = createSmartRateLimiter({
+  name: "API",
   windowMs: 15 * 60 * 1e3,
   // 15 minutes
-  max: 1e3,
-  // Limit each IP to 1000 requests per windowMs
-  message: {
-    error: "Too many requests from this IP, please try again later",
-    code: "RATE_LIMIT_EXCEEDED"
-  },
-  standardHeaders: true,
-  // Return rate limit info in `RateLimit-*` headers
-  legacyHeaders: false,
-  // Disable `X-RateLimit-*` headers
-  skip: (req) => {
-    return req.path === "/api/monitoring/health" || req.path === "/api/monitoring/status";
-  }
+  maxAuthenticated: 2e3,
+  maxAnonymous: 1e3,
+  message: "Too many requests, please try again later",
+  code: "RATE_LIMIT_EXCEEDED"
 });
-var authRateLimiter = rateLimit({
+var authRateLimiter = createSmartRateLimiter({
+  name: "AUTH",
   windowMs: 15 * 60 * 1e3,
   // 15 minutes
-  max: 20,
-  // Limit each IP to 20 auth requests per windowMs
-  message: {
-    error: "Too many authentication attempts, please try again later",
-    code: "AUTH_RATE_LIMIT_EXCEEDED"
-  },
-  standardHeaders: true,
-  legacyHeaders: false
+  maxAuthenticated: 40,
+  maxAnonymous: 20,
+  message: "Too many authentication attempts, please try again later",
+  code: "AUTH_RATE_LIMIT_EXCEEDED"
 });
-var paymentRateLimiter = rateLimit({
+var paymentRateLimiter = createSmartRateLimiter({
+  name: "PAYMENT",
   windowMs: 15 * 60 * 1e3,
   // 15 minutes
-  max: 50,
-  // Limit each IP to 50 payment requests per windowMs
-  message: {
-    error: "Too many payment requests, please try again later",
-    code: "PAYMENT_RATE_LIMIT_EXCEEDED"
-  },
-  standardHeaders: true,
-  legacyHeaders: false
+  maxAuthenticated: 100,
+  maxAnonymous: 50,
+  message: "Too many payment requests, please try again later",
+  code: "PAYMENT_RATE_LIMIT_EXCEEDED"
 });
-var downloadRateLimiter = rateLimit({
+var downloadRateLimiter = createSmartRateLimiter({
+  name: "DOWNLOAD",
   windowMs: 60 * 60 * 1e3,
   // 1 hour
-  max: 100,
-  // Limit each IP to 100 downloads per hour
-  message: {
-    error: "Too many download requests, please try again later",
-    code: "DOWNLOAD_RATE_LIMIT_EXCEEDED"
-  },
-  standardHeaders: true,
-  legacyHeaders: false
+  maxAuthenticated: 200,
+  maxAnonymous: 100,
+  message: "Too many download requests, please try again later",
+  code: "DOWNLOAD_RATE_LIMIT_EXCEEDED"
 });
 
 // server/routes/activity.ts
 init_api();
 init_auth();
 init_convex();
-import { getAuth as getAuth3 } from "@clerk/express";
+import { getAuth as getAuth4 } from "@clerk/express";
 import { Router } from "express";
 
 // server/types/routes.ts
@@ -2311,13 +3238,13 @@ function handleRouteError(error, res, customMessage) {
 var router = Router();
 router.get("/", isAuthenticated, async (req, res) => {
   try {
-    const { userId: clerkId } = getAuth3(req);
+    const { userId: clerkId } = getAuth4(req);
     if (!clerkId) {
       res.status(401).json({ error: "Not authenticated" });
       return;
     }
-    const convex6 = getConvex();
-    const activityData = await convex6.query(
+    const convex8 = getConvex();
+    const activityData = await convex8.query(
       api.activity.getUserActivity.getUserActivity,
       {
         clerkId,
@@ -2345,21 +3272,698 @@ router.get("/", isAuthenticated, async (req, res) => {
 });
 var activity_default = router;
 
+// server/routes/admin/reconciliation.ts
+import { Router as Router2 } from "express";
+import { randomUUID } from "node:crypto";
+
+// server/services/ReconciliationService.ts
+import { ConvexHttpClient as ConvexHttpClient2 } from "convex/browser";
+import Stripe from "stripe";
+
+// shared/utils/currency.ts
+var CENTS_PER_DOLLAR = 100;
+var ZERO_DECIMAL_CURRENCIES = /* @__PURE__ */ new Set(["JPY", "KRW", "VND"]);
+function centsToDollars(cents) {
+  if (!Number.isFinite(cents)) {
+    return 0;
+  }
+  return cents / CENTS_PER_DOLLAR;
+}
+function formatCurrencyDisplay(amountInCents, options = {}) {
+  const { currency = "USD", uppercaseCurrency = true } = options;
+  if (!Number.isFinite(amountInCents)) {
+    amountInCents = 0;
+  }
+  const isZeroDecimal = ZERO_DECIMAL_CURRENCIES.has(currency.toUpperCase());
+  const amount = isZeroDecimal ? amountInCents : centsToDollars(amountInCents);
+  const formattedAmount = isZeroDecimal ? amount.toString() : amount.toFixed(2);
+  const currencyCode = uppercaseCurrency ? currency.toUpperCase() : currency.toLowerCase();
+  return `${formattedAmount} ${currencyCode}`;
+}
+
+// server/services/ReconciliationService.ts
+var ReconciliationService = class _ReconciliationService {
+  static instance;
+  convex;
+  stripe;
+  constructor() {
+    const convexUrl = process.env.VITE_CONVEX_URL;
+    if (!convexUrl) {
+      throw new Error("VITE_CONVEX_URL environment variable is required");
+    }
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey) {
+      throw new Error("STRIPE_SECRET_KEY environment variable is required");
+    }
+    this.convex = new ConvexHttpClient2(convexUrl);
+    this.stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+  }
+  /**
+   * Get singleton instance
+   */
+  static getInstance() {
+    if (!_ReconciliationService.instance) {
+      _ReconciliationService.instance = new _ReconciliationService();
+    }
+    return _ReconciliationService.instance;
+  }
+  /**
+   * Resync an order by Stripe checkout session ID
+   */
+  async resyncOrderBySessionId(sessionId) {
+    console.log(`\u{1F504} Resyncing order by session ID: ${sessionId}`);
+    try {
+      const existingOrder = await this.convex.query(
+        "orders/reconciliation:getOrderByCheckoutSession",
+        { checkoutSessionId: sessionId }
+      );
+      if (existingOrder?.status === "paid") {
+        return {
+          success: true,
+          orderId: existingOrder._id,
+          action: "already_synced",
+          message: "Order already exists and is paid",
+          details: {
+            stripeSessionId: sessionId,
+            orderStatus: existingOrder.status,
+            paymentStatus: existingOrder.paymentStatus
+          }
+        };
+      }
+      const session2 = await this.stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ["line_items", "payment_intent"]
+      });
+      if (!session2) {
+        return {
+          success: false,
+          action: "not_found",
+          message: `Stripe session not found: ${sessionId}`
+        };
+      }
+      if (session2.payment_status !== "paid") {
+        return {
+          success: false,
+          action: "skipped",
+          message: `Session payment status is ${session2.payment_status}, not paid`,
+          details: {
+            stripeSessionId: sessionId,
+            paymentStatus: session2.payment_status
+          }
+        };
+      }
+      if (existingOrder) {
+        const paymentIntentId = typeof session2.payment_intent === "string" ? session2.payment_intent : session2.payment_intent?.id;
+        await this.convex.mutation("orders/reconciliation:updateOrderStatusAdmin", {
+          orderId: existingOrder._id,
+          status: "paid",
+          paymentStatus: "succeeded",
+          paymentIntentId
+        });
+        return {
+          success: true,
+          orderId: existingOrder._id,
+          action: "found_and_updated",
+          message: "Order updated to paid status",
+          details: {
+            stripeSessionId: sessionId,
+            paymentIntentId,
+            orderStatus: "paid",
+            paymentStatus: "succeeded"
+          }
+        };
+      }
+      const orderId = await this.createOrderFromSession(session2);
+      return {
+        success: true,
+        orderId,
+        action: "created",
+        message: "Order created from Stripe session",
+        details: {
+          stripeSessionId: sessionId,
+          paymentIntentId: typeof session2.payment_intent === "string" ? session2.payment_intent : session2.payment_intent?.id,
+          orderStatus: "paid",
+          paymentStatus: "succeeded"
+        }
+      };
+    } catch (error) {
+      console.error(`\u274C Error resyncing order by session ID:`, error);
+      return {
+        success: false,
+        action: "error",
+        message: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+  /**
+   * Resync an order by Stripe payment intent ID
+   */
+  async resyncOrderByPaymentIntentId(paymentIntentId) {
+    console.log(`\u{1F504} Resyncing order by payment intent ID: ${paymentIntentId}`);
+    try {
+      const existingOrder = await this.convex.query(
+        "orders/reconciliation:getOrderByPaymentIntent",
+        { paymentIntentId }
+      );
+      if (existingOrder?.status === "paid") {
+        return {
+          success: true,
+          orderId: existingOrder._id,
+          action: "already_synced",
+          message: "Order already exists and is paid",
+          details: {
+            paymentIntentId,
+            orderStatus: existingOrder.status,
+            paymentStatus: existingOrder.paymentStatus
+          }
+        };
+      }
+      const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+      if (!paymentIntent) {
+        return {
+          success: false,
+          action: "not_found",
+          message: `Stripe payment intent not found: ${paymentIntentId}`
+        };
+      }
+      if (paymentIntent.status !== "succeeded") {
+        return {
+          success: false,
+          action: "skipped",
+          message: `Payment intent status is ${paymentIntent.status}, not succeeded`,
+          details: {
+            paymentIntentId,
+            paymentStatus: paymentIntent.status
+          }
+        };
+      }
+      if (existingOrder) {
+        await this.convex.mutation("orders/reconciliation:updateOrderStatusAdmin", {
+          orderId: existingOrder._id,
+          status: "paid",
+          paymentStatus: "succeeded",
+          paymentIntentId
+        });
+        return {
+          success: true,
+          orderId: existingOrder._id,
+          action: "found_and_updated",
+          message: "Order updated to paid status",
+          details: {
+            paymentIntentId,
+            orderStatus: "paid",
+            paymentStatus: "succeeded"
+          }
+        };
+      }
+      const sessions = await this.stripe.checkout.sessions.list({
+        payment_intent: paymentIntentId,
+        limit: 1
+      });
+      if (sessions.data.length > 0) {
+        const session2 = await this.stripe.checkout.sessions.retrieve(sessions.data[0].id, {
+          expand: ["line_items"]
+        });
+        const orderId = await this.createOrderFromSession(session2);
+        return {
+          success: true,
+          orderId,
+          action: "created",
+          message: "Order created from associated Stripe session",
+          details: {
+            stripeSessionId: session2.id,
+            paymentIntentId,
+            orderStatus: "paid",
+            paymentStatus: "succeeded"
+          }
+        };
+      }
+      return {
+        success: false,
+        action: "not_found",
+        message: "No checkout session found for this payment intent",
+        details: { paymentIntentId }
+      };
+    } catch (error) {
+      console.error(`\u274C Error resyncing order by payment intent ID:`, error);
+      return {
+        success: false,
+        action: "error",
+        message: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+  /**
+   * Create order from Stripe checkout session
+   */
+  async createOrderFromSession(session2) {
+    const email = session2.customer_details?.email || session2.customer_email || "";
+    const lineItems = session2.line_items?.data || [];
+    const items = lineItems.map((item, index) => ({
+      productId: index,
+      name: item.description || `Item ${index + 1}`,
+      price: centsToDollars(item.amount_total || 0),
+      quantity: item.quantity || 1,
+      license: session2.metadata?.licenseType || "basic"
+    }));
+    const result = await this.convex.mutation("orders:createOrder", {
+      email,
+      total: centsToDollars(session2.amount_total || 0),
+      items,
+      status: "paid",
+      sessionId: session2.id,
+      paymentId: typeof session2.payment_intent === "string" ? session2.payment_intent : session2.payment_intent?.id
+    });
+    const orderId = typeof result === "object" && result !== null && "orderId" in result ? String(result.orderId) : String(result);
+    console.log(`\u2705 Order created: ${orderId}`);
+    return orderId;
+  }
+  /**
+   * Reconcile all pending orders (orders with pending status but paid in Stripe)
+   */
+  async reconcilePendingOrders() {
+    const startTime = Date.now();
+    const summary = {
+      totalProcessed: 0,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      errors: [],
+      duration: 0
+    };
+    try {
+      console.log("\u{1F504} Starting pending orders reconciliation...");
+      const pendingOrders = await this.convex.query(
+        "orders/reconciliation:getOrdersByStatus",
+        { status: "pending" }
+      );
+      console.log(`\u{1F4CA} Found ${pendingOrders.length} pending orders to check`);
+      for (const order of pendingOrders) {
+        summary.totalProcessed++;
+        try {
+          if (order.checkoutSessionId) {
+            const result = await this.resyncOrderBySessionId(order.checkoutSessionId);
+            this.updateSummaryFromResult(summary, result, order._id);
+          } else if (order.paymentIntentId) {
+            const result = await this.resyncOrderByPaymentIntentId(order.paymentIntentId);
+            this.updateSummaryFromResult(summary, result, order._id);
+          } else {
+            summary.skipped++;
+          }
+        } catch (error) {
+          summary.failed++;
+          summary.errors.push({
+            id: order._id,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+      summary.duration = Date.now() - startTime;
+      console.log(`\u2705 Reconciliation complete:`, summary);
+      return summary;
+    } catch (error) {
+      console.error("\u274C Error during reconciliation:", error);
+      summary.duration = Date.now() - startTime;
+      summary.failed++;
+      summary.errors.push({
+        id: "global",
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return summary;
+    }
+  }
+  /**
+   * Helper to update summary from resync result
+   */
+  updateSummaryFromResult(summary, result, orderId) {
+    if (result.success) {
+      if (result.action === "found_and_updated" || result.action === "created") {
+        summary.updated++;
+      } else {
+        summary.skipped++;
+      }
+    } else {
+      summary.failed++;
+      summary.errors.push({ id: orderId, error: result.message });
+    }
+  }
+  /**
+   * Check subscription sync status between Clerk and Convex
+   */
+  async checkSubscriptionSyncStatus(clerkSubscriptionId) {
+    try {
+      const convexSub = await this.convex.query(
+        "subscriptions:getByClerkId",
+        { clerkSubscriptionId }
+      );
+      if (!convexSub) {
+        return {
+          inSync: false,
+          details: {
+            reason: "Subscription not found in Convex",
+            clerkSubscriptionId
+          }
+        };
+      }
+      return {
+        inSync: true,
+        details: {
+          clerkSubscriptionId,
+          convexId: convexSub._id,
+          status: convexSub.status,
+          planId: convexSub.planId
+        }
+      };
+    } catch (error) {
+      return {
+        inSync: false,
+        details: {
+          reason: "Error checking sync status",
+          error: error instanceof Error ? error.message : String(error)
+        }
+      };
+    }
+  }
+};
+var getReconciliationService = () => {
+  return ReconciliationService.getInstance();
+};
+
+// server/utils/errorHandling.ts
+function createErrorResponse2(error, code, message, requestId, details) {
+  return {
+    error,
+    code,
+    message,
+    details,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    requestId
+  };
+}
+function getErrorSeverity(code) {
+  const criticalErrors = [
+    "STRIPE_INVALID_SIGNATURE" /* STRIPE_INVALID_SIGNATURE */,
+    "PAYPAL_INVALID_SIGNATURE" /* PAYPAL_INVALID_SIGNATURE */,
+    "PAYMENT_CONFIRMATION_FAILED" /* PAYMENT_CONFIRMATION_FAILED */,
+    "MISSING_CONFIGURATION" /* MISSING_CONFIGURATION */
+  ];
+  const highErrors = [
+    "PAYMENT_INTENT_CREATION_FAILED" /* PAYMENT_INTENT_CREATION_FAILED */,
+    "PAYMENT_RECORDING_FAILED" /* PAYMENT_RECORDING_FAILED */,
+    "PAYMENT_REFUND_FAILED" /* PAYMENT_REFUND_FAILED */,
+    "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */
+  ];
+  const mediumErrors = [
+    "INVOICE_GENERATION_FAILED" /* INVOICE_GENERATION_FAILED */,
+    "INVOICE_EMAIL_FAILED" /* INVOICE_EMAIL_FAILED */,
+    "ORDER_NOT_FOUND" /* ORDER_NOT_FOUND */,
+    "RESERVATION_NOT_FOUND" /* RESERVATION_NOT_FOUND */
+  ];
+  if (criticalErrors.includes(code)) {
+    return "critical" /* CRITICAL */;
+  }
+  if (highErrors.includes(code)) {
+    return "high" /* HIGH */;
+  }
+  if (mediumErrors.includes(code)) {
+    return "medium" /* MEDIUM */;
+  }
+  return "low" /* LOW */;
+}
+function requiresAdminNotification(code) {
+  const severity = getErrorSeverity(code);
+  return severity === "critical" /* CRITICAL */ || severity === "high" /* HIGH */;
+}
+function sanitizeErrorMessage(error) {
+  const message = error.message;
+  let sanitized = message;
+  sanitized = sanitized.replaceAll(/sk_live_[a-zA-Z0-9]+/g, "[REDACTED_KEY]");
+  sanitized = sanitized.replaceAll(/sk_test_[a-zA-Z0-9]+/g, "[REDACTED_KEY]");
+  sanitized = sanitized.replaceAll(/whsec_[a-zA-Z0-9]+/g, "[REDACTED_SECRET]");
+  sanitized = sanitized.replaceAll(/Bearer [a-zA-Z0-9._-]+/g, "Bearer [REDACTED]");
+  sanitized = sanitized.replaceAll(
+    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+    "[EMAIL]"
+  );
+  if (sanitized.includes("signature")) {
+    return "Payment verification failed. Please contact support if this persists.";
+  }
+  if (sanitized.includes("timeout") || sanitized.includes("ETIMEDOUT")) {
+    return "Payment processing is taking longer than expected. Please check your order status.";
+  }
+  if (sanitized.includes("network") || sanitized.includes("ECONNREFUSED")) {
+    return "Unable to connect to payment service. Please try again later.";
+  }
+  return sanitized;
+}
+var PaymentError = class _PaymentError extends Error {
+  code;
+  severity;
+  context;
+  originalError;
+  constructor(message, code, context, originalError) {
+    super(message);
+    this.name = "PaymentError";
+    this.code = code;
+    this.severity = getErrorSeverity(code);
+    this.context = context;
+    this.originalError = originalError;
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, _PaymentError);
+    }
+  }
+  /**
+   * Convert to error response format
+   */
+  toErrorResponse(requestId) {
+    return createErrorResponse2(
+      this.message,
+      this.code,
+      sanitizeErrorMessage(this),
+      requestId,
+      this.context
+    );
+  }
+  /**
+   * Check if this error requires admin notification
+   */
+  requiresNotification() {
+    return requiresAdminNotification(this.code);
+  }
+};
+
+// server/routes/admin/reconciliation.ts
+var router2 = Router2();
+router2.post("/order/session/:sessionId", async (req, res) => {
+  const requestId = randomUUID();
+  const { sessionId } = req.params;
+  try {
+    console.log(`\u{1F504} [${requestId}] Admin resync order by session: ${sessionId}`);
+    if (!sessionId) {
+      res.status(400).json(
+        createErrorResponse2(
+          "Missing sessionId",
+          "VALIDATION_ERROR",
+          "Session ID is required",
+          requestId
+        )
+      );
+      return;
+    }
+    const reconciliationService = getReconciliationService();
+    const result = await reconciliationService.resyncOrderBySessionId(sessionId);
+    res.status(result.success ? 200 : 400).json({
+      ...result,
+      requestId,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (error) {
+    console.error(`\u274C [${requestId}] Error resyncing order:`, error);
+    res.status(500).json(
+      createErrorResponse2(
+        "Reconciliation failed",
+        "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */,
+        error instanceof Error ? error.message : String(error),
+        requestId
+      )
+    );
+  }
+});
+router2.post(
+  "/order/payment-intent/:paymentIntentId",
+  async (req, res) => {
+    const requestId = randomUUID();
+    const { paymentIntentId } = req.params;
+    try {
+      console.log(`\u{1F504} [${requestId}] Admin resync order by payment intent: ${paymentIntentId}`);
+      if (!paymentIntentId) {
+        res.status(400).json(
+          createErrorResponse2(
+            "Missing paymentIntentId",
+            "VALIDATION_ERROR",
+            "Payment Intent ID is required",
+            requestId
+          )
+        );
+        return;
+      }
+      const reconciliationService = getReconciliationService();
+      const result = await reconciliationService.resyncOrderByPaymentIntentId(paymentIntentId);
+      res.status(result.success ? 200 : 400).json({
+        ...result,
+        requestId,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      });
+    } catch (error) {
+      console.error(`\u274C [${requestId}] Error resyncing order:`, error);
+      res.status(500).json(
+        createErrorResponse2(
+          "Reconciliation failed",
+          "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */,
+          error instanceof Error ? error.message : String(error),
+          requestId
+        )
+      );
+    }
+  }
+);
+router2.post("/orders/pending", async (_req, res) => {
+  const requestId = randomUUID();
+  try {
+    console.log(`\u{1F504} [${requestId}] Admin batch reconciliation for pending orders`);
+    const reconciliationService = getReconciliationService();
+    const summary = await reconciliationService.reconcilePendingOrders();
+    res.status(200).json({
+      success: summary.failed === 0,
+      summary,
+      requestId,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  } catch (error) {
+    console.error(`\u274C [${requestId}] Error during batch reconciliation:`, error);
+    res.status(500).json(
+      createErrorResponse2(
+        "Batch reconciliation failed",
+        "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */,
+        error instanceof Error ? error.message : String(error),
+        requestId
+      )
+    );
+  }
+});
+router2.get(
+  "/subscription/:clerkSubscriptionId",
+  async (req, res) => {
+    const requestId = randomUUID();
+    const { clerkSubscriptionId } = req.params;
+    try {
+      console.log(`\u{1F50D} [${requestId}] Checking subscription sync: ${clerkSubscriptionId}`);
+      if (!clerkSubscriptionId) {
+        res.status(400).json(
+          createErrorResponse2(
+            "Missing clerkSubscriptionId",
+            "VALIDATION_ERROR",
+            "Clerk Subscription ID is required",
+            requestId
+          )
+        );
+        return;
+      }
+      const reconciliationService = getReconciliationService();
+      const result = await reconciliationService.checkSubscriptionSyncStatus(clerkSubscriptionId);
+      res.status(200).json({
+        ...result,
+        requestId,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      });
+    } catch (error) {
+      console.error(`\u274C [${requestId}] Error checking subscription sync:`, error);
+      res.status(500).json(
+        createErrorResponse2(
+          "Sync check failed",
+          "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */,
+          error instanceof Error ? error.message : String(error),
+          requestId
+        )
+      );
+    }
+  }
+);
+var reconciliation_default = router2;
+
 // server/routes/avatar.ts
 init_auth();
-import { Router as Router2 } from "express";
+init_convex();
+import { ConvexHttpClient as ConvexHttpClient3 } from "convex/browser";
+import { Router as Router3 } from "express";
 import multer from "multer";
 
 // server/lib/upload.ts
+import AdmZip from "adm-zip";
 import { fileTypeFromBuffer } from "file-type";
+var ZIP_LIMITS = {
+  maxFiles: 100,
+  // Max 100 files per archive
+  maxTotalSize: 500 * 1024 * 1024,
+  // 500MB max decompressed size
+  maxCompressionRatio: 100
+  // 100:1 max compression ratio (zip bomb detection)
+};
+var FORBIDDEN_EXTENSIONS_IN_ZIP = [
+  ".exe",
+  ".bat",
+  ".cmd",
+  ".scr",
+  ".com",
+  ".pif",
+  ".vbs",
+  ".vbe",
+  ".js",
+  ".jse",
+  ".ws",
+  ".wsf",
+  ".wsc",
+  ".wsh",
+  ".ps1",
+  ".ps1xml",
+  ".ps2",
+  ".ps2xml",
+  ".psc1",
+  ".psc2",
+  ".msh",
+  ".msh1",
+  ".msh2",
+  ".mshxml",
+  ".msh1xml",
+  ".msh2xml",
+  ".scf",
+  ".lnk",
+  ".inf",
+  ".reg",
+  ".jar",
+  ".dll",
+  ".msi",
+  ".msp",
+  ".mst",
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".csh",
+  ".app",
+  ".deb",
+  ".rpm",
+  ".dmg",
+  ".pkg",
+  ".iso"
+];
 var ALLOWED_MIME_TYPES = {
   audio: ["audio/mpeg", "audio/wav", "audio/x-wav", "audio/aiff", "audio/flac"],
   image: ["image/jpeg", "image/png", "image/gif", "image/webp"],
   document: ["application/pdf"]
 };
 var SIZE_LIMITS = {
-  audio: 50 * 1024 * 1024,
-  // 50MB
+  audio: 100 * 1024 * 1024,
+  // 100MB - fichiers audio professionnels (WAV 24-bit, FLAC)
   image: 5 * 1024 * 1024,
   // 5MB
   document: 10 * 1024 * 1024
@@ -2381,12 +3985,8 @@ async function validateFile(file, options = {}) {
   }
   if (category === "audio") {
     const minAudioSize = 100 * 1024;
-    const maxAudioSize = 500 * 1024 * 1024;
     if (file.size < minAudioSize) {
       errors.push("Audio file too small - may be corrupted or low quality");
-    }
-    if (file.size > maxAudioSize) {
-      errors.push("Audio file exceeds maximum size of 500MB");
     }
     const validAudioTypes = [
       "audio/mpeg",
@@ -2401,9 +4001,9 @@ async function validateFile(file, options = {}) {
       "audio/ogg",
       "audio/aac"
     ];
-    if (!validAudioTypes.includes(file.mimetype)) {
+    if (!validAudioTypes.includes(detectedMime)) {
       errors.push(
-        `Invalid audio format: ${file.mimetype}. Supported: MP3, WAV, AIFF, FLAC, OGG, AAC`
+        `Invalid audio format: ${detectedMime}. Supported: MP3, WAV, AIFF, FLAC, OGG, AAC`
       );
     }
   }
@@ -2424,6 +4024,13 @@ async function scanFile(file) {
     threats.push(...sizeThreats);
     const contentThreats = await scanFileContent(file);
     threats.push(...contentThreats);
+    const isZipFile = file.mimetype === "application/zip" || file.mimetype === "application/x-zip-compressed" || file.originalname.toLowerCase().endsWith(".zip");
+    if (isZipFile) {
+      const zipResult = await scanZipStructure(file);
+      if (!zipResult.valid) {
+        threats.push(...zipResult.errors);
+      }
+    }
     await new Promise((resolve) => setTimeout(resolve, Math.random() * 1e3 + 500));
     const scanTime = Date.now() - startTime;
     const safe = threats.length === 0;
@@ -2510,15 +4117,12 @@ function scanFileName(fileName) {
 }
 function scanFileSize(file) {
   const threats = [];
-  const { size, originalname, mimetype } = file;
+  const { size, mimetype } = file;
   if (mimetype?.startsWith("audio/") && size < 1e3) {
     threats.push("SUSPICIOUS_SIZE: Audio file is suspiciously small");
   }
   if (mimetype?.startsWith("video/") && size < 1e4) {
     threats.push("SUSPICIOUS_SIZE: Video file is suspiciously small");
-  }
-  if ((mimetype?.includes("zip") || originalname.toLowerCase().endsWith(".zip")) && size < 100) {
-    threats.push("POTENTIAL_ZIP_BOMB: Zip file is suspiciously small");
   }
   return threats;
 }
@@ -2569,12 +4173,103 @@ function isExpectedExecutable(fileName, mimeType) {
   const hasExecutableMimeType = mimeType ? executableMimeTypes.includes(mimeType) : false;
   return hasExecutableExtension || hasExecutableMimeType;
 }
-async function uploadToSupabase(file, path, options = {}) {
+async function scanZipStructure(file) {
+  const errors = [];
+  const stats = {
+    fileCount: 0,
+    totalCompressedSize: file.size,
+    totalDecompressedSize: 0,
+    compressionRatio: 0,
+    forbiddenFiles: [],
+    nestedZips: []
+  };
+  try {
+    const zip = new AdmZip(file.buffer);
+    const entries = zip.getEntries();
+    stats.fileCount = entries.filter((entry) => !entry.isDirectory).length;
+    if (stats.fileCount > ZIP_LIMITS.maxFiles) {
+      errors.push(
+        `ZIP_TOO_MANY_FILES: Archive contains ${stats.fileCount} files (max: ${ZIP_LIMITS.maxFiles})`
+      );
+    }
+    analyzeZipEntries(entries, stats);
+    if (stats.totalCompressedSize > 0) {
+      stats.compressionRatio = stats.totalDecompressedSize / stats.totalCompressedSize;
+    }
+    collectZipErrors(errors, stats);
+    logZipScanResult(file.originalname, stats, errors.length === 0);
+    return { valid: errors.length === 0, errors, stats };
+  } catch (error) {
+    console.error(`ZIP scan error for ${file.originalname}:`, error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return {
+      valid: false,
+      errors: [`ZIP_SCAN_ERROR: Unable to parse ZIP structure - ${errorMessage}`],
+      stats
+    };
+  }
+}
+function analyzeZipEntries(entries, stats) {
+  for (const entry of entries) {
+    if (entry.isDirectory) continue;
+    const fileName = entry.entryName.toLowerCase();
+    stats.totalDecompressedSize += entry.header.size;
+    const hasForbiddenExt = FORBIDDEN_EXTENSIONS_IN_ZIP.some((ext) => fileName.endsWith(ext));
+    if (hasForbiddenExt) {
+      stats.forbiddenFiles.push(entry.entryName);
+    }
+    if (fileName.endsWith(".zip") || fileName.endsWith(".7z") || fileName.endsWith(".rar")) {
+      stats.nestedZips.push(entry.entryName);
+    }
+  }
+}
+function collectZipErrors(errors, stats) {
+  if (stats.totalDecompressedSize > ZIP_LIMITS.maxTotalSize) {
+    const maxSizeMB = ZIP_LIMITS.maxTotalSize / (1024 * 1024);
+    const actualSizeMB = (stats.totalDecompressedSize / (1024 * 1024)).toFixed(2);
+    errors.push(
+      `ZIP_TOO_LARGE: Decompressed size ${actualSizeMB}MB exceeds limit of ${maxSizeMB}MB`
+    );
+  }
+  if (stats.compressionRatio > ZIP_LIMITS.maxCompressionRatio) {
+    const ratio = stats.compressionRatio.toFixed(1);
+    errors.push(
+      `ZIP_BOMB_DETECTED: Suspicious compression ratio ${ratio}:1 (max: ${ZIP_LIMITS.maxCompressionRatio}:1)`
+    );
+  }
+  if (stats.forbiddenFiles.length > 0) {
+    const fileList = formatFileList(stats.forbiddenFiles, 5);
+    errors.push(`ZIP_FORBIDDEN_FILES: Archive contains forbidden file types: ${fileList}`);
+  }
+  if (stats.nestedZips.length > 0) {
+    const fileList = formatFileList(stats.nestedZips, 3);
+    errors.push(
+      `ZIP_NESTED_ARCHIVE: Archive contains nested archives which cannot be scanned: ${fileList}`
+    );
+  }
+}
+function formatFileList(files, maxShow) {
+  const shown = files.slice(0, maxShow).join(", ");
+  const remaining = files.length - maxShow;
+  return remaining > 0 ? `${shown} and ${remaining} more` : shown;
+}
+function logZipScanResult(filename, stats, valid) {
+  console.log(`ZIP structure scan completed for ${filename}:`, {
+    fileCount: stats.fileCount,
+    compressedSize: `${(stats.totalCompressedSize / 1024).toFixed(2)}KB`,
+    decompressedSize: `${(stats.totalDecompressedSize / (1024 * 1024)).toFixed(2)}MB`,
+    compressionRatio: `${stats.compressionRatio.toFixed(1)}:1`,
+    forbiddenFiles: stats.forbiddenFiles.length,
+    nestedZips: stats.nestedZips.length,
+    valid
+  });
+}
+async function uploadToStorage(file, path, options = {}) {
   try {
     const { api: api2 } = await Promise.resolve().then(() => (init_api(), api_exports));
     const { getConvex: getConvex2 } = await Promise.resolve().then(() => (init_convex(), convex_exports));
-    const convex6 = getConvex2();
-    const uploadResult = await convex6.action(api2.files.generateUploadUrl);
+    const convex8 = getConvex2();
+    const uploadResult = await convex8.action(api2.files.generateUploadUrl);
     const uploadUrl = uploadResult.url;
     const response = await fetch(uploadUrl, {
       method: "POST",
@@ -2587,7 +4282,7 @@ async function uploadToSupabase(file, path, options = {}) {
       throw new Error(`Upload failed: ${response.statusText}`);
     }
     const { storageId } = await response.json();
-    const fileUrl = await convex6.mutation(api2.files.getStorageUrl, { storageId });
+    const fileUrl = await convex8.mutation(api2.files.getStorageUrl, { storageId });
     console.log(`\u2705 File uploaded to Convex: ${file.originalname} -> ${path}`, {
       storageId,
       contentType: options.contentType || file.mimetype,
@@ -2687,7 +4382,14 @@ var RateLimiter = class _RateLimiter {
       }
       const userId = req.isAuthenticated() ? req.user.id.toString() : null;
       const ip = this.getClientIP(req);
-      const key = this.config.keyGenerator ? this.config.keyGenerator(req) : userId ? `${userId}:${this.action}` : `${ip}:${this.action}`;
+      let key;
+      if (this.config.keyGenerator) {
+        key = this.config.keyGenerator(req);
+      } else if (userId) {
+        key = `${userId}:${this.action}`;
+      } else {
+        key = `${ip}:${this.action}`;
+      }
       const result = await rateLimiter.checkLimit(key, {
         windowMs: this.config.windowMs,
         maxRequests: this.config.maxRequests
@@ -2723,7 +4425,7 @@ var RateLimiter = class _RateLimiter {
             decrementCounter(key).catch(console.error);
           }
         }
-        if (typeof chunk === "undefined") {
+        if (chunk === void 0) {
           return originalEnd();
         } else if (typeof encoding === "function") {
           return originalEnd(chunk, encoding);
@@ -2748,9 +4450,9 @@ var RateLimiter = class _RateLimiter {
   getClientIP(req) {
     if (req.ip) return req.ip;
     if (req.socket?.remoteAddress) return req.socket.remoteAddress;
-    const connection = req.connection;
-    if (connection?.remoteAddress) return connection.remoteAddress;
-    if (connection?.socket?.remoteAddress) return connection.socket.remoteAddress;
+    const legacyConnection = req.connection;
+    if (legacyConnection?.remoteAddress) return legacyConnection.remoteAddress;
+    if (legacyConnection?.socket?.remoteAddress) return legacyConnection.socket.remoteAddress;
     return "unknown";
   }
   async decrementCounter(key) {
@@ -2832,13 +4534,13 @@ var emailRateLimit = RateLimiter.create("email_send", {
 });
 
 // server/routes/avatar.ts
-var router2 = Router2();
+var router3 = Router3();
 var upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }
   // 5MB max pour les avatars
 });
-router2.post(
+router3.post(
   "/upload",
   isAuthenticated,
   uploadRateLimit,
@@ -2875,19 +4577,8 @@ router2.post(
       if (!convexUrl) {
         throw new Error("CONVEX_URL environment variable is required");
       }
-      const generateUrlResponse = await fetch(`${convexUrl}/api/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: "files:generateUploadUrl",
-          args: {},
-          format: "json"
-        })
-      });
-      if (!generateUrlResponse.ok) {
-        throw new Error("Failed to generate upload URL");
-      }
-      const { value: uploadUrlData } = await generateUrlResponse.json();
+      const convex8 = new ConvexHttpClient3(convexUrl);
+      const uploadUrlData = await convex8.action("files:generateUploadUrl", {});
       const uploadUrl = uploadUrlData.url;
       const uploadResponse = await fetch(uploadUrl, {
         method: "POST",
@@ -2898,33 +4589,13 @@ router2.post(
         throw new Error("Failed to upload file to Convex storage");
       }
       const { storageId } = await uploadResponse.json();
-      const getUrlResponse = await fetch(`${convexUrl}/api/mutation`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: "files:getStorageUrl",
-          args: { storageId },
-          format: "json"
-        })
-      });
-      if (!getUrlResponse.ok) {
-        throw new Error("Failed to get storage URL");
-      }
-      const { value: avatarUrl } = await getUrlResponse.json();
+      const avatarUrl = await convex8.mutation("files:getStorageUrl", { storageId });
       if (!avatarUrl) {
         throw new Error("Storage URL is null");
       }
-      const updateResponse = await fetch(`${convexUrl}/api/mutation`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: "users:updateUserAvatar",
-          args: { clerkId, avatarUrl },
-          format: "json"
-        })
-      });
-      if (!updateResponse.ok) {
-        throw new Error("Failed to update user avatar");
+      const result = await updateUserAvatar(clerkId, avatarUrl);
+      if (!result) {
+        throw new Error("Failed to update user avatar in database");
       }
       res.json({
         success: true,
@@ -2941,12 +4612,130 @@ router2.post(
     }
   }
 );
-var avatar_default = router2;
+var avatar_default = router3;
+
+// server/routes/beats.ts
+import { Router as Router4 } from "express";
+var router4 = Router4();
+router4.get("/filters", (_req, res) => {
+  try {
+    const filters = {
+      genres: [
+        { value: "hip-hop", label: "Hip-Hop" },
+        { value: "trap", label: "Trap" },
+        { value: "r&b", label: "R&B" },
+        { value: "pop", label: "Pop" },
+        { value: "drill", label: "Drill" },
+        { value: "afrobeat", label: "Afrobeat" },
+        { value: "reggaeton", label: "Reggaeton" },
+        { value: "dancehall", label: "Dancehall" },
+        { value: "uk-drill", label: "UK Drill" },
+        { value: "jersey-club", label: "Jersey Club" },
+        { value: "amapiano", label: "Amapiano" }
+      ],
+      moods: [
+        { value: "aggressive", label: "Aggressive" },
+        { value: "chill", label: "Chill" },
+        { value: "dark", label: "Dark" },
+        { value: "energetic", label: "Energetic" },
+        { value: "emotional", label: "Emotional" },
+        { value: "happy", label: "Happy" },
+        { value: "melancholic", label: "Melancholic" },
+        { value: "mysterious", label: "Mysterious" },
+        { value: "romantic", label: "Romantic" },
+        { value: "uplifting", label: "Uplifting" }
+      ],
+      keys: [
+        { value: "C", label: "C Major" },
+        { value: "C#", label: "C# Major" },
+        { value: "D", label: "D Major" },
+        { value: "D#", label: "D# Major" },
+        { value: "E", label: "E Major" },
+        { value: "F", label: "F Major" },
+        { value: "F#", label: "F# Major" },
+        { value: "G", label: "G Major" },
+        { value: "G#", label: "G# Major" },
+        { value: "A", label: "A Major" },
+        { value: "A#", label: "A# Major" },
+        { value: "B", label: "B Major" },
+        { value: "Cm", label: "C Minor" },
+        { value: "C#m", label: "C# Minor" },
+        { value: "Dm", label: "D Minor" },
+        { value: "D#m", label: "D# Minor" },
+        { value: "Em", label: "E Minor" },
+        { value: "Fm", label: "F Minor" },
+        { value: "F#m", label: "F# Minor" },
+        { value: "Gm", label: "G Minor" },
+        { value: "G#m", label: "G# Minor" },
+        { value: "Am", label: "A Minor" },
+        { value: "A#m", label: "A# Minor" },
+        { value: "Bm", label: "B Minor" }
+      ],
+      bpmRange: { min: 60, max: 200 },
+      priceRange: { min: 0, max: 500 }
+    };
+    return res.json(filters);
+  } catch (error) {
+    logger.error("/api/beats/filters error:", { error });
+    return res.status(500).json({ error: "Failed to fetch filters" });
+  }
+});
+router4.get("/featured", async (req, res) => {
+  try {
+    const base = `${req.protocol}://${req.get("host")}`;
+    const wooResponse = await fetch(`${base}/api/woocommerce/products?featured=true&per_page=8`);
+    if (!wooResponse.ok) {
+      logger.warn("Failed to fetch featured beats from WooCommerce", {
+        status: wooResponse.status
+      });
+      return res.json([]);
+    }
+    const products = await wooResponse.json();
+    const beats = Array.isArray(products) ? products.map((p) => ({
+      id: p.id,
+      title: p.name || "Untitled",
+      price: p.price || "0",
+      image: p.images?.[0]?.src || "",
+      slug: p.slug || "",
+      featured: true
+    })) : [];
+    return res.json(beats);
+  } catch (error) {
+    logger.error("/api/beats/featured error:", { error });
+    return res.json([]);
+  }
+});
+router4.get("/", async (req, res) => {
+  try {
+    const base = `${req.protocol}://${req.get("host")}`;
+    const queryParams = new URLSearchParams(req.query);
+    const wooResponse = await fetch(`${base}/api/woocommerce/products?${queryParams}`);
+    if (!wooResponse.ok) {
+      logger.warn("Failed to fetch beats from WooCommerce", {
+        status: wooResponse.status
+      });
+      return res.json({ beats: [] });
+    }
+    const products = await wooResponse.json();
+    const beats = Array.isArray(products) ? products.map((p) => ({
+      id: p.id,
+      title: p.name || "Untitled",
+      price: p.price || "0",
+      image: p.images?.[0]?.src || "",
+      slug: p.slug || ""
+    })) : [];
+    return res.json({ beats });
+  } catch (error) {
+    logger.error("/api/beats error:", { error });
+    return res.json({ beats: [] });
+  }
+});
+var beats_default = router4;
 
 // server/routes/categories.ts
-import { Router as Router3 } from "express";
-var router3 = Router3();
-router3.get("/", async (_req, res) => {
+import { Router as Router5 } from "express";
+var router5 = Router5();
+router5.get("/", async (_req, res) => {
   try {
     const categories = [
       { id: 1, name: "Hip Hop", slug: "hip-hop", count: 15 },
@@ -2960,11 +4749,1951 @@ router3.get("/", async (_req, res) => {
     handleRouteError(error, res, "Failed to fetch categories");
   }
 });
-var categories_default = router3;
+var categories_default = router5;
 
 // server/routes/clerk.ts
-import { Router as Router4 } from "express";
-import Stripe from "stripe";
+import { Router as Router6 } from "express";
+import Stripe2 from "stripe";
+
+// shared/validation/validators.ts
+import { z as z3 } from "zod";
+var validateEmail = (email) => {
+  if (!email || email.length > 254) return false;
+  return z3.string().email().safeParse(email).success;
+};
+var validatePhoneNumber = (phone) => {
+  if (!phone || phone.length < 10 || phone.length > 17) return false;
+  const cleaned = phone.replaceAll(/[\s\-()+]/g, "");
+  const digitRegex = /^\d{10,15}$/;
+  return digitRegex.test(cleaned);
+};
+
+// shared/validation/AuthValidation.ts
+import { z as z4 } from "zod";
+var registerSchema = z4.object({
+  username: z4.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters").regex(
+    /^[a-zA-Z0-9_-]+$/,
+    "Username can only contain letters, numbers, underscores, and hyphens"
+  ),
+  email: z4.string().email("Please enter a valid email address").max(255, "Email is too long"),
+  password: z4.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long").regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+    "Password must contain at least one lowercase letter, one uppercase letter, and one number"
+  ),
+  confirmPassword: z4.string()
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"]
+});
+var serverRegisterSchema = z4.object({
+  username: z4.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters").regex(
+    /^[a-zA-Z0-9_-]+$/,
+    "Username can only contain letters, numbers, underscores, and hyphens"
+  ),
+  email: z4.string().email("Please enter a valid email address").max(255, "Email is too long"),
+  password: z4.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long").regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+    "Password must contain at least one lowercase letter, one uppercase letter, and one number"
+  )
+});
+var enhancedRegisterSchema = registerSchema.refine((data) => validateEmail(data.email), {
+  message: "Email domain is not valid",
+  path: ["email"]
+});
+var loginSchema = z4.object({
+  username: z4.string().min(1, "Username is required"),
+  password: z4.string().min(1, "Password is required")
+});
+var updateProfileSchema = z4.object({
+  username: z4.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters").regex(
+    /^[a-zA-Z0-9_-]+$/,
+    "Username can only contain letters, numbers, underscores, and hyphens"
+  ).optional(),
+  email: z4.string().email("Please enter a valid email address").max(255, "Email is too long").optional(),
+  avatar: z4.string().url("Invalid avatar URL").optional()
+});
+
+// shared/validation/PaymentValidation.ts
+import { z as z5 } from "zod";
+var PAYPAL_SUPPORTED_CURRENCIES = ["EUR", "USD", "GBP", "CAD", "AUD"];
+var createSubscriptionSchema = z5.object({
+  priceId: z5.enum(["basic", "pro", "unlimited"], {
+    errorMap: () => ({ message: "Invalid subscription plan" })
+  }),
+  billingInterval: z5.enum(["monthly", "annual"], {
+    errorMap: () => ({ message: "Invalid billing interval" })
+  })
+});
+var serverCreateSubscriptionSchema = createSubscriptionSchema.extend({
+  userAgent: z5.string().optional(),
+  ipAddress: z5.string().ip().optional(),
+  timestamp: z5.number().optional()
+});
+var paymentIntentSchema = z5.object({
+  amount: z5.number().min(100, "Amount must be at least $1.00").max(999999, "Amount is too high"),
+  currency: z5.enum(["usd", "eur"], {
+    errorMap: () => ({ message: "Invalid currency" })
+  }),
+  metadata: z5.record(z5.string()).optional()
+});
+var enhancedPaymentIntentSchema = paymentIntentSchema.refine(
+  (data) => {
+    const minimums = { usd: 50, eur: 50 };
+    return data.amount >= minimums[data.currency];
+  },
+  {
+    message: "Amount below minimum for currency",
+    path: ["amount"]
+  }
+);
+var stripeWebhookSchema = z5.object({
+  id: z5.string(),
+  type: z5.string(),
+  data: z5.object({
+    object: z5.record(z5.unknown())
+  }),
+  created: z5.number()
+});
+var paypalCreateOrderSchema = z5.object({
+  serviceType: z5.string().min(1, "Service type is required").max(100, "Service type must be 100 characters or less"),
+  amount: z5.number({ invalid_type_error: "Amount must be a number" }).min(0.5, "Minimum amount is $0.50").max(999999.99, "Amount exceeds maximum allowed ($999,999.99)"),
+  currency: z5.enum(PAYPAL_SUPPORTED_CURRENCIES, {
+    errorMap: () => ({
+      message: `Currency must be one of: ${PAYPAL_SUPPORTED_CURRENCIES.join(", ")}`
+    })
+  }),
+  description: z5.string().min(1, "Description is required").max(500, "Description must be 500 characters or less"),
+  reservationId: z5.string().min(1, "Reservation ID is required"),
+  customerEmail: z5.string().email("Invalid email format")
+});
+var rateLimitSchema = z5.object({
+  ip: z5.string(),
+  endpoint: z5.string(),
+  timestamp: z5.number(),
+  count: z5.number().min(0)
+});
+var auditLogSchema = z5.object({
+  userId: z5.number(),
+  action: z5.string(),
+  resource: z5.string(),
+  details: z5.record(z5.unknown()).optional(),
+  ipAddress: z5.string().optional(),
+  userAgent: z5.string().optional(),
+  timestamp: z5.date()
+});
+
+// shared/validation/FileValidation.ts
+import { z as z6 } from "zod";
+var fileUploadValidation = z6.object({
+  name: z6.string().min(1, "Filename is required"),
+  size: z6.number().max(50 * 1024 * 1024, "File size exceeds 50MB limit"),
+  type: z6.string().min(1, "File type is required"),
+  lastModified: z6.number().optional()
+});
+var fileFilterValidation = z6.object({
+  genre: z6.string().optional(),
+  bpm: z6.object({
+    min: z6.number().min(60).max(200),
+    max: z6.number().min(60).max(200)
+  }).optional(),
+  key: z6.string().optional(),
+  mood: z6.string().optional(),
+  tags: z6.array(z6.string()).optional()
+});
+var serviceOrderValidation = z6.object({
+  service_type: z6.enum(["mixing", "mastering", "recording", "consultation"]),
+  details: z6.string().min(10, "Details must be at least 10 characters"),
+  budget: z6.number().min(50, "Minimum budget is $50"),
+  deadline: z6.string().datetime("Invalid deadline format"),
+  contact_email: z6.string().email("Invalid email address"),
+  contact_phone: z6.string().optional()
+});
+var mixingMasteringFormSchema = z6.object({
+  // Personal Information
+  name: z6.string().min(2, "Name must be at least 2 characters").max(100, "Name must be less than 100 characters").regex(/^[a-zA-Z\s'-]+$/, "Name can only contain letters, spaces, hyphens, and apostrophes"),
+  email: z6.string().email("Please enter a valid email address").max(255, "Email is too long"),
+  phone: z6.string().refine((phone) => !phone || validatePhoneNumber(phone), {
+    message: "Please enter a valid phone number"
+  }),
+  // Booking Details
+  preferredDate: z6.string().min(1, "Please select a preferred date").refine(
+    (date) => {
+      const selectedDate = new Date(date);
+      const today = /* @__PURE__ */ new Date();
+      today.setHours(0, 0, 0, 0);
+      return selectedDate >= today;
+    },
+    {
+      message: "Preferred date must be today or in the future"
+    }
+  ),
+  timeSlot: z6.string().min(1, "Please select a time slot").refine(
+    (slot) => {
+      const validSlots = [
+        "9:00 AM",
+        "10:00 AM",
+        "11:00 AM",
+        "1:00 PM",
+        "2:00 PM",
+        "3:00 PM",
+        "4:00 PM"
+      ];
+      return validSlots.includes(slot);
+    },
+    {
+      message: "Please select a valid time slot"
+    }
+  ),
+  // Project Details
+  projectDetails: z6.string().min(20, "Project details must be at least 20 characters").max(2e3, "Project details must be less than 2000 characters"),
+  trackCount: z6.string().optional().refine((count) => !count || Number.parseInt(count) >= 1 && Number.parseInt(count) <= 100, {
+    message: "Track count must be between 1 and 100"
+  }),
+  genre: z6.string().optional(),
+  reference: z6.string().optional().refine((ref) => !ref || ref.length <= 500, {
+    message: "Reference must be less than 500 characters"
+  }),
+  specialRequests: z6.string().optional().refine((req) => !req || req.length <= 1e3, {
+    message: "Special requests must be less than 1000 characters"
+  })
+});
+var serviceSelectionSchema = z6.object({
+  selectedService: z6.enum(["mixing", "mastering", "mixing-mastering"], {
+    errorMap: () => ({ message: "Please select a valid service" })
+  })
+});
+var mixingMasteringSubmissionSchema = mixingMasteringFormSchema.merge(serviceSelectionSchema);
+var customBeatRequestSchema = z6.object({
+  // Basic beat specifications
+  genre: z6.string().min(1, "Genre is required"),
+  subGenre: z6.string().optional(),
+  bpm: z6.number().min(60, "BPM must be at least 60").max(200, "BPM must be at most 200"),
+  key: z6.string().min(1, "Key is required"),
+  // Creative specifications
+  mood: z6.array(z6.string()).min(1, "At least one mood is required"),
+  instruments: z6.array(z6.string()).optional(),
+  duration: z6.number().min(60, "Duration must be at least 60 seconds").max(600, "Duration must be at most 10 minutes"),
+  // Project details
+  description: z6.string().min(20, "Description must be at least 20 characters").max(2e3, "Description must be less than 2000 characters"),
+  referenceTrack: z6.string().optional(),
+  // Business details
+  budget: z6.number().min(50, "Minimum budget is $50").max(1e3, "Maximum budget is $1000"),
+  deadline: z6.string().optional().refine(
+    (date) => {
+      if (!date) return true;
+      const deadlineDate = new Date(date);
+      const minDate = /* @__PURE__ */ new Date();
+      minDate.setDate(minDate.getDate() + 1);
+      return deadlineDate >= minDate;
+    },
+    {
+      message: "Deadline must be at least 1 day from today"
+    }
+  ),
+  revisions: z6.number().min(0).max(5, "Maximum 5 revisions allowed"),
+  priority: z6.enum(["standard", "priority", "express"]),
+  additionalNotes: z6.string().max(1e3, "Additional notes must be less than 1000 characters").optional(),
+  // File uploads
+  uploadedFiles: z6.array(
+    z6.object({
+      name: z6.string(),
+      size: z6.number().max(100 * 1024 * 1024, "Individual files must be under 100MB"),
+      type: z6.string(),
+      lastModified: z6.number().optional()
+    })
+  ).optional().refine(
+    (files) => {
+      if (!files) return true;
+      const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+      return totalSize <= 200 * 1024 * 1024;
+    },
+    {
+      message: "Total file size must be under 200MB"
+    }
+  ).refine(
+    (files) => {
+      if (!files) return true;
+      const fileNames = files.map((f) => f.name.toLowerCase());
+      const uniqueNames = new Set(fileNames);
+      return uniqueNames.size === fileNames.length;
+    },
+    {
+      message: "Duplicate file names are not allowed"
+    }
+  )
+});
+var customBeatFileValidation = z6.object({
+  name: z6.string().min(1, "Filename is required").refine(
+    (name) => {
+      const lowerName = name.toLowerCase();
+      const audioExtensions = [".mp3", ".wav", ".aiff", ".flac", ".m4a"];
+      const archiveExtensions = [".zip", ".rar", ".7z"];
+      const isAudio = audioExtensions.some((ext) => lowerName.endsWith(ext));
+      const isArchive = archiveExtensions.some((ext) => lowerName.endsWith(ext));
+      return isAudio || isArchive;
+    },
+    {
+      message: "File must be an audio file or compressed archive"
+    }
+  ),
+  size: z6.number().max(100 * 1024 * 1024, "File size exceeds 100MB limit"),
+  type: z6.string().min(1, "File type is required"),
+  lastModified: z6.number().optional()
+});
+
+// shared/validation/BeatValidation.ts
+import { z as z7 } from "zod";
+var BeatGenre = z7.enum([
+  "hip-hop",
+  "trap",
+  "r&b",
+  "pop",
+  "drill",
+  "afrobeat",
+  "reggaeton",
+  "dancehall",
+  "uk-drill",
+  "jersey-club",
+  "amapiano",
+  "custom"
+]);
+var BeatMood = z7.enum([
+  "aggressive",
+  "chill",
+  "dark",
+  "energetic",
+  "emotional",
+  "happy",
+  "melancholic",
+  "mysterious",
+  "romantic",
+  "uplifting"
+]);
+var MusicalKey = z7.enum([
+  "C",
+  "C#",
+  "Db",
+  "D",
+  "D#",
+  "Eb",
+  "E",
+  "F",
+  "F#",
+  "Gb",
+  "G",
+  "G#",
+  "Ab",
+  "A",
+  "A#",
+  "Bb",
+  "B",
+  "Cm",
+  "C#m",
+  "Dbm",
+  "Dm",
+  "D#m",
+  "Ebm",
+  "Em",
+  "Fm",
+  "F#m",
+  "Gbm",
+  "Gm",
+  "G#m",
+  "Abm",
+  "Am",
+  "A#m",
+  "Bbm",
+  "Bm"
+]);
+var LicenseType = z7.enum(["basic", "premium", "unlimited", "exclusive"]);
+var BeatStatus = z7.enum([
+  "active",
+  "inactive",
+  "sold_exclusively",
+  "pending_review",
+  "rejected"
+]);
+var BpmSchema = z7.number().min(60, "BPM must be at least 60").max(200, "BPM cannot exceed 200").int("BPM must be a whole number");
+var BeatPriceSchema = z7.number().min(100, "Price must be at least $1.00").max(99999999, "Price cannot exceed $999,999.99").int("Price must be in cents (whole number)");
+var BeatDurationSchema = z7.number().min(30, "Beat must be at least 30 seconds").max(600, "Beat cannot exceed 10 minutes").positive("Duration must be positive");
+var BeatTagsSchema = z7.array(z7.string().min(1).max(20)).max(10, "Maximum 10 tags allowed").optional();
+var AudioFileSchema = z7.object({
+  url: z7.string().url("Invalid audio file URL"),
+  format: z7.enum(["mp3", "wav", "aiff", "flac"]),
+  quality: z7.enum(["128", "192", "256", "320", "lossless"]),
+  duration: BeatDurationSchema,
+  fileSize: z7.number().positive("File size must be positive"),
+  waveformData: z7.array(z7.number()).optional()
+});
+var BeatMetadataSchema = z7.object({
+  producer: z7.string().min(1, "Producer name is required").max(100),
+  credits: z7.string().max(500).optional(),
+  description: z7.string().max(1e3).optional(),
+  inspiration: z7.string().max(200).optional(),
+  collaborators: z7.array(z7.string()).max(5).optional()
+});
+var BeatSchema = z7.object({
+  id: z7.number().positive().optional(),
+  title: z7.string().min(1, "Beat title is required").max(100, "Beat title cannot exceed 100 characters").regex(/^[a-zA-Z0-9\s\-_()]+$/, "Beat title contains invalid characters"),
+  slug: z7.string().min(1, "Slug is required").max(120, "Slug cannot exceed 120 characters").regex(/^[a-z0-9-]+$/, "Slug must be lowercase with hyphens only"),
+  genre: BeatGenre,
+  mood: BeatMood.optional(),
+  key: MusicalKey.optional(),
+  bpm: BpmSchema,
+  status: BeatStatus.default("pending_review"),
+  // Pricing for different license types
+  basicPrice: BeatPriceSchema,
+  premiumPrice: BeatPriceSchema,
+  unlimitedPrice: BeatPriceSchema,
+  exclusivePrice: BeatPriceSchema.optional(),
+  // Audio files
+  previewFile: AudioFileSchema,
+  basicFile: AudioFileSchema.optional(),
+  premiumFile: AudioFileSchema.optional(),
+  unlimitedFile: AudioFileSchema.optional(),
+  stemsFile: AudioFileSchema.optional(),
+  // Metadata
+  metadata: BeatMetadataSchema.optional(),
+  tags: BeatTagsSchema,
+  // Timestamps
+  createdAt: z7.string().datetime().optional(),
+  updatedAt: z7.string().datetime().optional(),
+  // Producer information
+  producerId: z7.number().positive(),
+  producerName: z7.string().min(1).max(100),
+  // Analytics
+  playCount: z7.number().nonnegative().default(0),
+  downloadCount: z7.number().nonnegative().default(0),
+  likeCount: z7.number().nonnegative().default(0),
+  // SEO
+  seoTitle: z7.string().max(60).optional(),
+  seoDescription: z7.string().max(160).optional(),
+  // Featured status
+  isFeatured: z7.boolean().default(false),
+  featuredUntil: z7.string().datetime().optional()
+});
+var CreateBeatSchema = BeatSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  playCount: true,
+  downloadCount: true,
+  likeCount: true
+});
+var UpdateBeatSchema = BeatSchema.partial().extend({
+  id: z7.number().positive()
+});
+var BeatFilterSchema = z7.object({
+  genre: BeatGenre.optional(),
+  mood: BeatMood.optional(),
+  key: MusicalKey.optional(),
+  bpmMin: z7.number().min(60).max(200).optional(),
+  bpmMax: z7.number().min(60).max(200).optional(),
+  priceMin: z7.number().min(0).optional(),
+  priceMax: z7.number().min(0).optional(),
+  tags: z7.array(z7.string()).optional(),
+  producer: z7.string().optional(),
+  isFeatured: z7.boolean().optional(),
+  status: BeatStatus.optional(),
+  search: z7.string().max(100).optional(),
+  sortBy: z7.enum(["newest", "oldest", "price_low", "price_high", "popular", "trending"]).default("newest"),
+  page: z7.number().positive().default(1),
+  limit: z7.number().min(1).max(100).default(20)
+});
+var BeatPurchaseSchema = z7.object({
+  beatId: z7.number().positive(),
+  licenseType: LicenseType,
+  quantity: z7.number().positive().default(1),
+  customLicenseTerms: z7.string().max(1e3).optional()
+});
+var BeatInteractionSchema = z7.object({
+  beatId: z7.number().positive(),
+  action: z7.enum(["like", "unlike", "favorite", "unfavorite"])
+});
+
+// shared/validation/ErrorValidation.ts
+import { z as z8 } from "zod";
+var ErrorSeverity = z8.enum(["low", "medium", "high", "critical"]);
+var ErrorCategory = z8.enum([
+  "authentication",
+  "authorization",
+  "validation",
+  "payment",
+  "audio_processing",
+  "file_upload",
+  "database",
+  "external_api",
+  "rate_limiting",
+  "system",
+  "user_input",
+  "business_logic",
+  "network",
+  "security"
+]);
+var ErrorType = z8.enum([
+  // Authentication errors
+  "invalid_credentials",
+  "account_locked",
+  "session_expired",
+  "two_factor_required",
+  // Authorization errors
+  "insufficient_permissions",
+  "resource_forbidden",
+  "subscription_required",
+  "quota_exceeded",
+  // Validation errors
+  "invalid_input",
+  "missing_required_field",
+  "format_error",
+  "constraint_violation",
+  // Payment errors
+  "payment_failed",
+  "insufficient_funds",
+  "card_declined",
+  "payment_method_invalid",
+  "subscription_expired",
+  // Audio processing errors
+  "audio_format_unsupported",
+  "audio_file_corrupted",
+  "processing_timeout",
+  "waveform_generation_failed",
+  // File upload errors
+  "file_too_large",
+  "file_type_not_allowed",
+  "virus_detected",
+  "upload_failed",
+  "file_validation_failed",
+  "security_threat_detected",
+  "security_check_failed",
+  "upload_rate_limit",
+  "upload_size_limit",
+  // Database errors
+  "connection_failed",
+  "query_timeout",
+  "constraint_violation_db",
+  "data_not_found",
+  // External API errors
+  "api_unavailable",
+  "api_rate_limited",
+  "api_authentication_failed",
+  "api_response_invalid",
+  // System errors
+  "internal_server_error",
+  "service_unavailable",
+  "timeout",
+  "configuration_error",
+  // Business logic errors
+  "beat_not_available",
+  "license_conflict",
+  "reservation_conflict",
+  "order_processing_failed"
+]);
+var ErrorContextSchema = z8.object({
+  // Request information
+  requestId: z8.string().optional(),
+  userId: z8.string().optional(),
+  userAgent: z8.string().optional(),
+  ipAddress: z8.string().ip().optional(),
+  // API information
+  endpoint: z8.string().optional(),
+  method: z8.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).optional(),
+  statusCode: z8.number().min(100).max(599).optional(),
+  // Business context
+  beatId: z8.number().optional(),
+  orderId: z8.string().optional(),
+  reservationId: z8.string().optional(),
+  // Technical context
+  stackTrace: z8.string().optional(),
+  errorCode: z8.string().optional(),
+  // Additional metadata
+  metadata: z8.record(z8.unknown()).optional()
+});
+var ErrorResolutionSchema = z8.object({
+  // User-facing information
+  userMessage: z8.string().min(1, "User message is required").max(500),
+  userAction: z8.string().max(200).optional(),
+  // Support information
+  supportCode: z8.string().max(50).optional(),
+  documentationUrl: z8.string().url().optional(),
+  // Recovery suggestions
+  retryable: z8.boolean().default(false),
+  retryAfter: z8.number().positive().optional(),
+  // seconds
+  // Escalation
+  requiresSupport: z8.boolean().default(false),
+  escalationLevel: z8.enum(["none", "tier1", "tier2", "engineering"]).default("none")
+});
+var ErrorSchema = z8.object({
+  id: z8.string().optional(),
+  // Error classification
+  type: ErrorType,
+  category: ErrorCategory,
+  severity: ErrorSeverity,
+  // Error details
+  message: z8.string().min(1, "Error message is required").max(1e3),
+  code: z8.string().max(50).optional(),
+  // Context information
+  context: ErrorContextSchema.optional(),
+  // Resolution information
+  resolution: ErrorResolutionSchema,
+  // Timestamps
+  occurredAt: z8.string().datetime(),
+  resolvedAt: z8.string().datetime().optional(),
+  // Tracking
+  count: z8.number().positive().default(1),
+  firstOccurrence: z8.string().datetime().optional(),
+  lastOccurrence: z8.string().datetime().optional()
+});
+var ApiErrorResponseSchema = z8.object({
+  error: z8.object({
+    type: ErrorType,
+    message: z8.string().min(1).max(500),
+    code: z8.string().max(50).optional(),
+    details: z8.record(z8.unknown()).optional(),
+    // User guidance
+    userMessage: z8.string().max(500).optional(),
+    userAction: z8.string().max(200).optional(),
+    // Support information
+    supportCode: z8.string().max(50).optional(),
+    documentationUrl: z8.string().url().optional(),
+    // Request tracking
+    requestId: z8.string().optional(),
+    timestamp: z8.string().datetime()
+  }),
+  // Additional context for debugging (dev/staging only)
+  debug: z8.object({
+    stackTrace: z8.string().optional(),
+    context: z8.record(z8.unknown()).optional()
+  }).optional()
+});
+var ValidationErrorSchema = z8.object({
+  field: z8.string().min(1, "Field name is required"),
+  value: z8.unknown(),
+  message: z8.string().min(1, "Validation message is required"),
+  code: z8.string().optional(),
+  // Nested validation errors (simplified to avoid circular reference)
+  nested: z8.array(
+    z8.object({
+      field: z8.string(),
+      value: z8.unknown(),
+      message: z8.string(),
+      code: z8.string().optional()
+    })
+  ).optional()
+});
+var ValidationErrorResponseSchema = z8.object({
+  error: z8.object({
+    type: z8.literal("validation_error"),
+    message: z8.string().default("Validation failed"),
+    errors: z8.array(ValidationErrorSchema).min(1, "At least one validation error required"),
+    // Summary
+    errorCount: z8.number().positive(),
+    // Request tracking
+    requestId: z8.string().optional(),
+    timestamp: z8.string().datetime()
+  })
+});
+var RateLimitErrorSchema = z8.object({
+  error: z8.object({
+    type: z8.literal("rate_limit_exceeded"),
+    message: z8.string().default("Rate limit exceeded"),
+    // Rate limit details
+    limit: z8.number().positive(),
+    remaining: z8.number().nonnegative(),
+    resetTime: z8.string().datetime(),
+    retryAfter: z8.number().positive(),
+    // seconds
+    // Request tracking
+    requestId: z8.string().optional(),
+    timestamp: z8.string().datetime()
+  })
+});
+var BusinessLogicErrorSchema = z8.object({
+  error: z8.object({
+    type: ErrorType,
+    message: z8.string().min(1).max(500),
+    // Business context
+    businessRule: z8.string().max(100).optional(),
+    resourceId: z8.string().optional(),
+    resourceType: z8.enum(["beat", "order", "reservation", "user", "subscription"]).optional(),
+    // Resolution guidance
+    userMessage: z8.string().max(500),
+    suggestedAction: z8.string().max(200).optional(),
+    // Request tracking
+    requestId: z8.string().optional(),
+    timestamp: z8.string().datetime()
+  })
+});
+var createApiError = (type, message, options = {}) => {
+  return {
+    error: {
+      type,
+      message,
+      code: options.code,
+      userMessage: options.userMessage || message,
+      userAction: options.userAction,
+      supportCode: options.supportCode,
+      requestId: options.requestId,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    }
+  };
+};
+var createValidationError = (errors, requestId) => {
+  return {
+    error: {
+      type: "validation_error",
+      message: "Validation failed",
+      errors: errors.map((err) => ({
+        field: err.field,
+        value: err.value,
+        message: err.message,
+        code: err.code
+      })),
+      errorCount: errors.length,
+      requestId,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    }
+  };
+};
+
+// shared/validation/OrderValidation.ts
+import { z as z9 } from "zod";
+var OrderStatus = z9.enum([
+  "pending",
+  "processing",
+  "completed",
+  "cancelled",
+  "refunded",
+  "failed"
+]);
+var PaymentStatus = z9.enum([
+  "pending",
+  "processing",
+  "succeeded",
+  "failed",
+  "cancelled",
+  "refunded",
+  "requires_payment_method",
+  "requires_confirmation"
+]);
+var PaymentProvider = z9.enum(["stripe", "paypal", "clerk_billing"]);
+var Currency = z9.enum([
+  "USD",
+  "EUR",
+  "GBP",
+  "CAD",
+  "AUD",
+  "JPY",
+  "CHF",
+  "SEK",
+  "NOK",
+  "DKK"
+]);
+var OrderItemSchema = z9.object({
+  id: z9.string().optional(),
+  productId: z9.number().positive(),
+  productType: z9.enum(["beat", "subscription", "service", "custom"]),
+  title: z9.string().min(1, "Product title is required").max(200),
+  // License information for beats
+  licenseType: LicenseType.optional(),
+  // Pricing
+  unitPrice: z9.number().min(0, "Unit price cannot be negative"),
+  quantity: z9.number().positive().default(1),
+  totalPrice: z9.number().min(0, "Total price cannot be negative"),
+  // Discounts
+  discountAmount: z9.number().min(0).default(0),
+  discountCode: z9.string().max(50).optional(),
+  // Metadata
+  metadata: z9.record(z9.unknown()).optional(),
+  // Digital delivery
+  downloadUrl: z9.string().url().optional(),
+  downloadExpiry: z9.string().datetime().optional(),
+  downloadCount: z9.number().nonnegative().default(0),
+  maxDownloads: z9.number().positive().optional()
+});
+var BillingAddressSchema = z9.object({
+  firstName: z9.string().min(1, "First name is required").max(50),
+  lastName: z9.string().min(1, "Last name is required").max(50),
+  company: z9.string().max(100).optional(),
+  addressLine1: z9.string().min(1, "Address is required").max(100),
+  addressLine2: z9.string().max(100).optional(),
+  city: z9.string().min(1, "City is required").max(50),
+  state: z9.string().max(50).optional(),
+  postalCode: z9.string().min(1, "Postal code is required").max(20),
+  country: z9.string().length(2, "Country must be 2-letter ISO code"),
+  phone: z9.string().max(20).optional()
+});
+var TaxInfoSchema = z9.object({
+  taxRate: z9.number().min(0).max(1),
+  // 0-100% as decimal
+  taxAmount: z9.number().min(0),
+  taxType: z9.enum(["vat", "sales_tax", "gst", "none"]),
+  taxId: z9.string().max(50).optional(),
+  exemptionReason: z9.string().max(200).optional()
+});
+var PaymentInfoSchema = z9.object({
+  provider: PaymentProvider,
+  paymentIntentId: z9.string().optional(),
+  sessionId: z9.string().optional(),
+  transactionId: z9.string().optional(),
+  // Payment method details (encrypted/tokenized)
+  paymentMethodId: z9.string().optional(),
+  last4: z9.string().length(4).optional(),
+  brand: z9.string().max(20).optional(),
+  // Processing details
+  processingFee: z9.number().min(0).default(0),
+  netAmount: z9.number().min(0),
+  // Timestamps
+  authorizedAt: z9.string().datetime().optional(),
+  capturedAt: z9.string().datetime().optional(),
+  // Failure information
+  failureCode: z9.string().max(50).optional(),
+  failureMessage: z9.string().max(200).optional()
+});
+var InvoiceInfoSchema = z9.object({
+  invoiceNumber: z9.string().min(1, "Invoice number is required").max(50),
+  invoiceDate: z9.string().datetime(),
+  dueDate: z9.string().datetime().optional(),
+  // PDF generation
+  pdfUrl: z9.string().url().optional(),
+  pdfStorageId: z9.string().optional(),
+  // Invoice status
+  status: z9.enum(["draft", "sent", "paid", "overdue", "cancelled"]),
+  // Notes
+  notes: z9.string().max(1e3).optional(),
+  terms: z9.string().max(2e3).optional()
+});
+var OrderSchema = z9.object({
+  id: z9.string().optional(),
+  orderNumber: z9.string().min(1, "Order number is required").max(50),
+  // Customer information
+  userId: z9.string().optional(),
+  email: z9.string().email("Valid email is required"),
+  // Order items
+  items: z9.array(OrderItemSchema).min(1, "Order must contain at least one item"),
+  // Pricing
+  subtotal: z9.number().min(0, "Subtotal cannot be negative"),
+  taxInfo: TaxInfoSchema.optional(),
+  shippingCost: z9.number().min(0).default(0),
+  discountTotal: z9.number().min(0).default(0),
+  total: z9.number().min(0, "Total cannot be negative"),
+  currency: Currency,
+  // Status
+  status: OrderStatus,
+  paymentStatus: PaymentStatus,
+  // Payment and billing
+  paymentInfo: PaymentInfoSchema.optional(),
+  billingAddress: BillingAddressSchema.optional(),
+  // Invoice
+  invoice: InvoiceInfoSchema.optional(),
+  // Fulfillment
+  fulfillmentStatus: z9.enum(["pending", "processing", "fulfilled", "cancelled"]).default("pending"),
+  fulfillmentDate: z9.string().datetime().optional(),
+  // Metadata
+  metadata: z9.record(z9.unknown()).optional(),
+  notes: z9.string().max(1e3).optional(),
+  // Timestamps
+  createdAt: z9.string().datetime().optional(),
+  updatedAt: z9.string().datetime().optional(),
+  // Idempotency
+  idempotencyKey: z9.string().max(255).optional()
+});
+var CreateOrderSchema = z9.object({
+  items: z9.array(
+    z9.object({
+      productId: z9.number().positive(),
+      productType: z9.enum(["beat", "subscription", "service", "custom"]),
+      title: z9.string().min(1).max(200),
+      licenseType: LicenseType.optional(),
+      unitPrice: z9.number().min(0),
+      quantity: z9.number().positive().default(1),
+      metadata: z9.record(z9.unknown()).optional()
+    })
+  ).min(1, "Order must contain at least one item"),
+  currency: Currency.default("USD"),
+  email: z9.string().email("Valid email is required"),
+  // Optional fields
+  billingAddress: BillingAddressSchema.optional(),
+  metadata: z9.record(z9.unknown()).optional(),
+  notes: z9.string().max(1e3).optional(),
+  idempotencyKey: z9.string().max(255).optional()
+});
+var UpdateOrderSchema = z9.object({
+  id: z9.string().min(1, "Order ID is required"),
+  status: OrderStatus.optional(),
+  paymentStatus: PaymentStatus.optional(),
+  fulfillmentStatus: z9.enum(["pending", "processing", "fulfilled", "cancelled"]).optional(),
+  notes: z9.string().max(1e3).optional(),
+  metadata: z9.record(z9.unknown()).optional()
+});
+var OrderFilterSchema = z9.object({
+  userId: z9.string().optional(),
+  email: z9.string().email().optional(),
+  status: OrderStatus.optional(),
+  paymentStatus: PaymentStatus.optional(),
+  currency: Currency.optional(),
+  // Date range filters
+  createdAfter: z9.string().datetime().optional(),
+  createdBefore: z9.string().datetime().optional(),
+  // Amount filters
+  minAmount: z9.number().min(0).optional(),
+  maxAmount: z9.number().min(0).optional(),
+  // Search
+  search: z9.string().max(100).optional(),
+  // Pagination
+  page: z9.number().positive().default(1),
+  limit: z9.number().min(1).max(100).default(20),
+  // Sorting
+  sortBy: z9.enum(["created_at", "updated_at", "total", "status"]).default("created_at"),
+  sortOrder: z9.enum(["asc", "desc"]).default("desc")
+});
+var CreatePaymentIntentSchema = z9.object({
+  orderId: z9.string().min(1, "Order ID is required"),
+  amount: z9.number().min(50, "Minimum amount is $0.50"),
+  // $0.50 minimum
+  currency: Currency.default("USD"),
+  paymentProvider: PaymentProvider.default("stripe"),
+  // Payment method options
+  paymentMethods: z9.array(z9.enum(["card", "paypal", "bank_transfer"])).optional(),
+  // Customer information
+  customerId: z9.string().optional(),
+  customerEmail: z9.string().email().optional(),
+  // Metadata
+  metadata: z9.record(z9.string()).optional()
+});
+var RefundRequestSchema = z9.object({
+  orderId: z9.string().min(1, "Order ID is required"),
+  amount: z9.number().positive().optional(),
+  // If not provided, full refund
+  reason: z9.enum([
+    "duplicate",
+    "fraudulent",
+    "requested_by_customer",
+    "product_not_delivered",
+    "product_defective",
+    "other"
+  ]),
+  description: z9.string().max(500).optional(),
+  notifyCustomer: z9.boolean().default(true)
+});
+
+// shared/validation/ReservationValidation.ts
+import { z as z10 } from "zod";
+var ServiceType = z10.enum([
+  "mixing",
+  "mastering",
+  "recording",
+  "custom_beat",
+  "consultation",
+  "vocal_tuning",
+  "beat_remake",
+  "full_production"
+]);
+var ReservationStatus = z10.enum([
+  "pending",
+  "confirmed",
+  "in_progress",
+  "completed",
+  "cancelled",
+  "no_show",
+  "rescheduled"
+]);
+var PriorityLevel = z10.enum(["standard", "priority", "rush", "emergency"]);
+var StudioRoom = z10.enum([
+  "studio_a",
+  "studio_b",
+  "vocal_booth_1",
+  "vocal_booth_2",
+  "mixing_room",
+  "mastering_suite",
+  "remote"
+  // For online services
+]);
+var EquipmentRequirementsSchema = z10.object({
+  microphones: z10.array(z10.string()).optional(),
+  instruments: z10.array(z10.string()).optional(),
+  software: z10.array(z10.string()).optional(),
+  specialRequests: z10.string().max(500).optional()
+});
+var ServiceDetailsSchema = z10.object({
+  // Recording details
+  trackCount: z10.number().min(1).max(100).optional(),
+  estimatedDuration: z10.number().min(30).max(480).optional(),
+  // 30 minutes to 8 hours
+  // Mixing/Mastering details
+  stemCount: z10.number().min(1).max(50).optional(),
+  referenceTrack: z10.string().url().optional(),
+  targetLoudness: z10.number().optional(),
+  // Beat production details
+  genre: z10.string().max(50).optional(),
+  bpm: z10.number().min(60).max(200).optional(),
+  key: z10.string().max(10).optional(),
+  mood: z10.string().max(50).optional(),
+  // File requirements
+  deliveryFormat: z10.enum(["wav", "mp3", "aiff", "flac"]).optional(),
+  bitRate: z10.enum(["16bit", "24bit", "32bit"]).optional(),
+  sampleRate: z10.enum(["44100", "48000", "96000", "192000"]).optional(),
+  // Additional services
+  includeStems: z10.boolean().default(false),
+  includeRevisions: z10.number().min(0).max(5).default(2),
+  rushDelivery: z10.boolean().default(false)
+});
+var ClientInfoSchema = z10.object({
+  firstName: z10.string().min(1, "First name is required").max(50),
+  lastName: z10.string().min(1, "Last name is required").max(50),
+  email: z10.string().email("Valid email is required"),
+  phone: z10.string().min(10, "Valid phone number is required").max(20),
+  // Professional details
+  artistName: z10.string().max(100).optional(),
+  recordLabel: z10.string().max(100).optional(),
+  website: z10.string().url().optional(),
+  // Experience level
+  experienceLevel: z10.enum(["beginner", "intermediate", "advanced", "professional"]).optional(),
+  // Previous client
+  isPreviousClient: z10.boolean().default(false),
+  referralSource: z10.string().max(100).optional()
+});
+var PricingInfoSchema = z10.object({
+  basePrice: z10.number().min(0),
+  // in cents
+  additionalFees: z10.array(
+    z10.object({
+      name: z10.string().max(100),
+      amount: z10.number().min(0),
+      description: z10.string().max(200).optional()
+    })
+  ).default([]),
+  discounts: z10.array(
+    z10.object({
+      name: z10.string().max(100),
+      amount: z10.number().min(0),
+      type: z10.enum(["fixed", "percentage"]),
+      description: z10.string().max(200).optional()
+    })
+  ).default([]),
+  totalPrice: z10.number().min(0),
+  // in cents
+  currency: z10.enum(["USD", "EUR", "GBP", "CAD"]).default("USD"),
+  // Payment terms
+  depositRequired: z10.boolean().default(false),
+  depositAmount: z10.number().min(0).optional(),
+  paymentDueDate: z10.string().datetime().optional()
+});
+var TimeSlotSchema = z10.object({
+  startTime: z10.string().datetime(),
+  endTime: z10.string().datetime(),
+  duration: z10.number().min(30).max(480),
+  // 30 minutes to 8 hours in minutes
+  // Timezone handling
+  timezone: z10.string().default("UTC"),
+  // Buffer time
+  setupTime: z10.number().min(0).max(60).default(15),
+  // Setup time in minutes
+  teardownTime: z10.number().min(0).max(30).default(15)
+  // Teardown time in minutes
+});
+var ReservationSchema = z10.object({
+  id: z10.string().optional(),
+  // Service information
+  serviceType: ServiceType,
+  status: ReservationStatus.default("pending"),
+  priority: PriorityLevel.default("standard"),
+  // Client information
+  userId: z10.string().optional(),
+  // If user is registered
+  clientInfo: ClientInfoSchema,
+  // Scheduling
+  timeSlot: TimeSlotSchema,
+  studioRoom: StudioRoom.optional(),
+  // Service details
+  serviceDetails: ServiceDetailsSchema,
+  equipmentRequirements: EquipmentRequirementsSchema.optional(),
+  // Pricing
+  pricing: PricingInfoSchema,
+  // Communication
+  notes: z10.string().max(2e3).optional(),
+  internalNotes: z10.string().max(1e3).optional(),
+  // Staff only
+  // Files and attachments
+  attachments: z10.array(
+    z10.object({
+      name: z10.string().max(255),
+      url: z10.string().url(),
+      type: z10.enum(["audio", "document", "image", "other"]),
+      size: z10.number().positive()
+    })
+  ).optional(),
+  // Assignment
+  assignedEngineer: z10.string().max(100).optional(),
+  assignedProducer: z10.string().max(100).optional(),
+  // Completion tracking
+  deliverables: z10.array(
+    z10.object({
+      name: z10.string().max(200),
+      description: z10.string().max(500).optional(),
+      fileUrl: z10.string().url().optional(),
+      completedAt: z10.string().datetime().optional()
+    })
+  ).default([]),
+  // Timestamps
+  createdAt: z10.string().datetime().optional(),
+  updatedAt: z10.string().datetime().optional(),
+  confirmedAt: z10.string().datetime().optional(),
+  completedAt: z10.string().datetime().optional(),
+  // Metadata
+  metadata: z10.record(z10.unknown()).optional()
+});
+var CreateReservationSchema = z10.object({
+  serviceType: ServiceType,
+  // Client information
+  clientInfo: z10.object({
+    firstName: z10.string().min(1).max(50),
+    lastName: z10.string().min(1).max(50),
+    email: z10.string().email(),
+    phone: z10.string().min(10).max(20),
+    artistName: z10.string().max(100).optional(),
+    experienceLevel: z10.enum(["beginner", "intermediate", "advanced", "professional"]).optional(),
+    referralSource: z10.string().max(100).optional()
+  }),
+  // Preferred scheduling
+  preferredDate: z10.string().datetime(),
+  preferredDuration: z10.number().min(30).max(480),
+  alternativeDates: z10.array(z10.string().datetime()).max(3).optional(),
+  // Service requirements
+  serviceDetails: z10.object({
+    trackCount: z10.number().min(1).max(100).optional(),
+    genre: z10.string().max(50).optional(),
+    bpm: z10.number().min(60).max(200).optional(),
+    deliveryFormat: z10.enum(["wav", "mp3", "aiff", "flac"]).optional(),
+    includeRevisions: z10.number().min(0).max(5).default(2),
+    rushDelivery: z10.boolean().default(false)
+  }).optional(),
+  // Additional information
+  notes: z10.string().max(2e3).optional(),
+  budget: z10.number().min(0).optional(),
+  // in cents
+  // Terms acceptance
+  acceptTerms: z10.boolean().refine((val) => val === true, {
+    message: "You must accept the terms and conditions"
+  })
+});
+var UpdateReservationSchema = z10.object({
+  id: z10.string().min(1, "Reservation ID is required"),
+  status: ReservationStatus.optional(),
+  timeSlot: TimeSlotSchema.optional(),
+  studioRoom: StudioRoom.optional(),
+  serviceDetails: ServiceDetailsSchema.optional(),
+  notes: z10.string().max(2e3).optional(),
+  internalNotes: z10.string().max(1e3).optional(),
+  assignedEngineer: z10.string().max(100).optional(),
+  assignedProducer: z10.string().max(100).optional()
+});
+var ReservationFilterSchema = z10.object({
+  serviceType: ServiceType.optional(),
+  status: ReservationStatus.optional(),
+  priority: PriorityLevel.optional(),
+  studioRoom: StudioRoom.optional(),
+  // Date range filters
+  startDate: z10.string().datetime().optional(),
+  endDate: z10.string().datetime().optional(),
+  // Assignment filters
+  assignedEngineer: z10.string().optional(),
+  assignedProducer: z10.string().optional(),
+  // Client filters
+  clientEmail: z10.string().email().optional(),
+  clientName: z10.string().optional(),
+  // Search
+  search: z10.string().max(100).optional(),
+  // Pagination
+  page: z10.number().positive().default(1),
+  limit: z10.number().min(1).max(100).default(20),
+  // Sorting
+  sortBy: z10.enum(["created_at", "start_time", "status", "service_type"]).default("start_time"),
+  sortOrder: z10.enum(["asc", "desc"]).default("asc")
+});
+var AvailabilityCheckSchema = z10.object({
+  startTime: z10.string().datetime(),
+  endTime: z10.string().datetime(),
+  serviceType: ServiceType,
+  studioRoom: StudioRoom.optional(),
+  excludeReservationId: z10.string().optional()
+  // For rescheduling
+});
+var RescheduleRequestSchema = z10.object({
+  reservationId: z10.string().min(1, "Reservation ID is required"),
+  newStartTime: z10.string().datetime(),
+  newDuration: z10.number().min(30).max(480),
+  reason: z10.string().max(500).optional(),
+  notifyClient: z10.boolean().default(true)
+});
+
+// shared/validation/UserValidation.ts
+import { z as z11 } from "zod";
+var UserRole = z11.enum(["user", "producer", "admin", "service_role", "moderator"]);
+var UserStatus = z11.enum([
+  "active",
+  "inactive",
+  "suspended",
+  "pending_verification",
+  "banned"
+]);
+var SubscriptionPlan = z11.enum(["free", "basic", "pro", "unlimited", "enterprise"]);
+var SubscriptionStatus = z11.enum([
+  "active",
+  "inactive",
+  "cancelled",
+  "past_due",
+  "unpaid",
+  "trialing"
+]);
+var UserPreferencesSchema = z11.object({
+  language: z11.enum(["en", "fr", "es", "de", "it", "pt"]).default("en"),
+  currency: z11.enum(["USD", "EUR", "GBP", "CAD", "AUD"]).default("USD"),
+  timezone: z11.string().max(50).default("UTC"),
+  // Notification preferences
+  emailNotifications: z11.boolean().default(true),
+  marketingEmails: z11.boolean().default(false),
+  pushNotifications: z11.boolean().default(true),
+  // Audio preferences
+  autoPlay: z11.boolean().default(false),
+  audioQuality: z11.enum(["128", "192", "256", "320"]).default("192"),
+  // Privacy preferences
+  profileVisibility: z11.enum(["public", "private", "friends_only"]).default("public"),
+  showActivity: z11.boolean().default(true),
+  // Theme preferences
+  theme: z11.enum(["light", "dark", "auto"]).default("auto"),
+  compactMode: z11.boolean().default(false)
+});
+var UserProfileSchema = z11.object({
+  displayName: z11.string().min(1, "Display name is required").max(50),
+  bio: z11.string().max(500).optional(),
+  website: z11.string().url("Invalid website URL").optional(),
+  location: z11.string().max(100).optional(),
+  // Social media links
+  socialLinks: z11.object({
+    instagram: z11.string().url().optional(),
+    twitter: z11.string().url().optional(),
+    youtube: z11.string().url().optional(),
+    soundcloud: z11.string().url().optional(),
+    spotify: z11.string().url().optional()
+  }).optional(),
+  // Producer-specific fields
+  producerInfo: z11.object({
+    stageName: z11.string().max(50).optional(),
+    genres: z11.array(z11.string()).max(10).optional(),
+    yearsActive: z11.number().min(0).max(50).optional(),
+    equipment: z11.string().max(1e3).optional(),
+    collaborationRate: z11.number().min(0).max(1e5).optional()
+    // in cents
+  }).optional(),
+  // Avatar
+  avatarUrl: z11.string().url().optional(),
+  avatarStorageId: z11.string().optional()
+});
+var UserSubscriptionSchema = z11.object({
+  plan: SubscriptionPlan,
+  status: SubscriptionStatus,
+  // Billing
+  billingInterval: z11.enum(["monthly", "annual"]).default("monthly"),
+  amount: z11.number().min(0),
+  // in cents
+  currency: z11.enum(["USD", "EUR", "GBP", "CAD", "AUD"]).default("USD"),
+  // Dates
+  startDate: z11.string().datetime(),
+  endDate: z11.string().datetime().optional(),
+  trialEndDate: z11.string().datetime().optional(),
+  // Quotas and limits
+  downloadQuota: z11.number().min(0).default(0),
+  // 0 = unlimited
+  downloadCount: z11.number().min(0).default(0),
+  // External IDs
+  stripeSubscriptionId: z11.string().optional(),
+  clerkSubscriptionId: z11.string().optional(),
+  // Features
+  features: z11.array(z11.string()).default([]),
+  // Auto-renewal
+  autoRenew: z11.boolean().default(true),
+  cancelAtPeriodEnd: z11.boolean().default(false)
+});
+var UserAnalyticsSchema = z11.object({
+  // Activity metrics
+  totalLogins: z11.number().min(0).default(0),
+  lastLoginAt: z11.string().datetime().optional(),
+  totalSessionTime: z11.number().min(0).default(0),
+  // in seconds
+  // Purchase metrics
+  totalPurchases: z11.number().min(0).default(0),
+  totalSpent: z11.number().min(0).default(0),
+  // in cents
+  averageOrderValue: z11.number().min(0).default(0),
+  // in cents
+  // Engagement metrics
+  beatsPlayed: z11.number().min(0).default(0),
+  beatsDownloaded: z11.number().min(0).default(0),
+  beatsLiked: z11.number().min(0).default(0),
+  // Producer metrics (if applicable)
+  beatsUploaded: z11.number().min(0).default(0),
+  totalEarnings: z11.number().min(0).default(0),
+  // in cents
+  // Referral metrics
+  referralCount: z11.number().min(0).default(0),
+  referralEarnings: z11.number().min(0).default(0)
+  // in cents
+});
+var UserSchema = z11.object({
+  id: z11.string().optional(),
+  clerkId: z11.string().min(1, "Clerk ID is required"),
+  // Basic information
+  username: z11.string().min(3, "Username must be at least 3 characters").max(30, "Username cannot exceed 30 characters").regex(
+    /^[a-zA-Z0-9_-]+$/,
+    "Username can only contain letters, numbers, underscores, and hyphens"
+  ),
+  email: z11.string().email("Valid email is required").max(255, "Email is too long"),
+  // Optional fields
+  firstName: z11.string().max(50).optional(),
+  lastName: z11.string().max(50).optional(),
+  // Status and role
+  role: UserRole.default("user"),
+  status: UserStatus.default("active"),
+  // Profile information
+  profile: UserProfileSchema.optional(),
+  preferences: UserPreferencesSchema.default({}),
+  // Subscription
+  subscription: UserSubscriptionSchema.optional(),
+  // Analytics
+  analytics: UserAnalyticsSchema.default({}),
+  // Verification
+  emailVerified: z11.boolean().default(false),
+  phoneVerified: z11.boolean().default(false),
+  identityVerified: z11.boolean().default(false),
+  // Security
+  twoFactorEnabled: z11.boolean().default(false),
+  lastPasswordChange: z11.string().datetime().optional(),
+  // Timestamps
+  createdAt: z11.string().datetime().optional(),
+  updatedAt: z11.string().datetime().optional(),
+  lastActiveAt: z11.string().datetime().optional(),
+  // Metadata
+  metadata: z11.record(z11.unknown()).optional()
+});
+var RegisterUserSchema = z11.object({
+  username: z11.string().min(3, "Username must be at least 3 characters").max(30, "Username cannot exceed 30 characters").regex(
+    /^[a-zA-Z0-9_-]+$/,
+    "Username can only contain letters, numbers, underscores, and hyphens"
+  ),
+  email: z11.string().email("Valid email is required").max(255, "Email is too long"),
+  password: z11.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long").regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+    "Password must contain at least one lowercase letter, one uppercase letter, and one number"
+  ),
+  firstName: z11.string().max(50).optional(),
+  lastName: z11.string().max(50).optional(),
+  // Terms and privacy
+  acceptTerms: z11.boolean().refine((val) => val === true, {
+    message: "You must accept the terms and conditions"
+  }),
+  acceptPrivacy: z11.boolean().refine((val) => val === true, {
+    message: "You must accept the privacy policy"
+  }),
+  // Marketing consent
+  marketingConsent: z11.boolean().default(false),
+  // Referral code
+  referralCode: z11.string().max(20).optional()
+});
+var LoginUserSchema = z11.object({
+  identifier: z11.string().min(1, "Email or username is required"),
+  // Can be email or username
+  password: z11.string().min(1, "Password is required"),
+  rememberMe: z11.boolean().default(false)
+});
+var UpdateUserProfileSchema = z11.object({
+  displayName: z11.string().min(1).max(50).optional(),
+  bio: z11.string().max(500).optional(),
+  website: z11.string().url().optional(),
+  location: z11.string().max(100).optional(),
+  // Social links
+  socialLinks: z11.object({
+    instagram: z11.string().url().optional(),
+    twitter: z11.string().url().optional(),
+    youtube: z11.string().url().optional(),
+    soundcloud: z11.string().url().optional(),
+    spotify: z11.string().url().optional()
+  }).optional(),
+  // Producer info
+  producerInfo: z11.object({
+    stageName: z11.string().max(50).optional(),
+    genres: z11.array(z11.string()).max(10).optional(),
+    yearsActive: z11.number().min(0).max(50).optional(),
+    equipment: z11.string().max(1e3).optional(),
+    collaborationRate: z11.number().min(0).max(1e5).optional()
+  }).optional()
+});
+var UpdateUserPreferencesSchema = UserPreferencesSchema.partial();
+var ChangePasswordSchema = z11.object({
+  currentPassword: z11.string().min(1, "Current password is required"),
+  newPassword: z11.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long").regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+    "Password must contain at least one lowercase letter, one uppercase letter, and one number"
+  ),
+  confirmPassword: z11.string()
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"]
+});
+var UserFilterSchema = z11.object({
+  role: UserRole.optional(),
+  status: UserStatus.optional(),
+  subscriptionPlan: SubscriptionPlan.optional(),
+  subscriptionStatus: SubscriptionStatus.optional(),
+  // Search
+  search: z11.string().max(100).optional(),
+  // Date filters
+  createdAfter: z11.string().datetime().optional(),
+  createdBefore: z11.string().datetime().optional(),
+  lastActiveAfter: z11.string().datetime().optional(),
+  // Verification filters
+  emailVerified: z11.boolean().optional(),
+  identityVerified: z11.boolean().optional(),
+  // Pagination
+  page: z11.number().positive().default(1),
+  limit: z11.number().min(1).max(100).default(20),
+  // Sorting
+  sortBy: z11.enum(["created_at", "last_active_at", "username", "email"]).default("created_at"),
+  sortOrder: z11.enum(["asc", "desc"]).default("desc")
+});
+
+// shared/validation/sync.ts
+import { z as z12 } from "zod";
+var ConnectionStatusSchema = z12.object({
+  type: z12.enum(["websocket", "polling", "offline"]),
+  connected: z12.boolean(),
+  reconnecting: z12.boolean(),
+  lastConnected: z12.number().min(0),
+  reconnectAttempts: z12.number().min(0),
+  maxReconnectAttempts: z12.number().min(1),
+  nextReconnectIn: z12.number().min(0).optional()
+});
+var SyncMetricsSchema = z12.object({
+  averageLatency: z12.number().min(0),
+  successRate: z12.number().min(0).max(100),
+  errorCount: z12.number().min(0),
+  reconnectCount: z12.number().min(0),
+  dataInconsistencies: z12.number().min(0),
+  lastInconsistencyTime: z12.number().min(0).optional()
+});
+var SyncErrorSchema = z12.object({
+  type: z12.enum([
+    "network_error",
+    "websocket_error",
+    "data_inconsistency",
+    "validation_error",
+    "conflict_error",
+    "timeout_error",
+    "auth_error"
+  ]),
+  message: z12.string().min(1),
+  code: z12.string().optional(),
+  timestamp: z12.number().min(0),
+  context: z12.record(z12.unknown()),
+  retryable: z12.boolean(),
+  retryCount: z12.number().min(0),
+  maxRetries: z12.number().min(0),
+  nextRetryAt: z12.number().min(0).optional()
+});
+var SyncStatusSchema = z12.object({
+  connected: z12.boolean(),
+  connectionType: z12.enum(["websocket", "polling", "offline"]),
+  lastSync: z12.number().min(0),
+  syncInProgress: z12.boolean(),
+  errors: z12.array(SyncErrorSchema),
+  metrics: SyncMetricsSchema
+});
+var ConsistentUserStatsSchema = z12.object({
+  totalFavorites: z12.number().min(0),
+  totalDownloads: z12.number().min(0),
+  totalOrders: z12.number().min(0),
+  totalSpent: z12.number().min(0),
+  recentActivity: z12.number().min(0),
+  quotaUsed: z12.number().min(0),
+  quotaLimit: z12.number().min(0),
+  monthlyDownloads: z12.number().min(0),
+  monthlyOrders: z12.number().min(0),
+  monthlyRevenue: z12.number().min(0),
+  // Consistency metadata
+  calculatedAt: z12.string().datetime(),
+  dataHash: z12.string().min(1),
+  source: z12.enum(["database", "cache", "optimistic"]),
+  version: z12.number().min(1)
+});
+var ValidationErrorSchema2 = z12.object({
+  field: z12.string().min(1),
+  message: z12.string().min(1),
+  code: z12.string().min(1),
+  expected: z12.unknown().optional(),
+  actual: z12.unknown().optional()
+});
+var ValidationWarningSchema = z12.object({
+  field: z12.string().min(1),
+  message: z12.string().min(1),
+  code: z12.string().min(1),
+  suggestion: z12.string().optional()
+});
+var ValidationResultSchema = z12.object({
+  valid: z12.boolean(),
+  errors: z12.array(ValidationErrorSchema2),
+  warnings: z12.array(ValidationWarningSchema),
+  dataHash: z12.string().min(1),
+  validatedAt: z12.number().min(0)
+});
+var InconsistencySchema = z12.object({
+  type: z12.enum(["calculation", "timing", "missing_data", "duplicate_data"]),
+  sections: z12.array(z12.string().min(1)).min(1),
+  description: z12.string().min(1),
+  severity: z12.enum(["low", "medium", "high", "critical"]),
+  autoResolvable: z12.boolean(),
+  detectedAt: z12.number().min(0),
+  expectedValue: z12.unknown().optional(),
+  actualValue: z12.unknown().optional()
+});
+var CrossValidationResultSchema = z12.object({
+  consistent: z12.boolean(),
+  inconsistencies: z12.array(InconsistencySchema),
+  affectedSections: z12.array(z12.string().min(1)),
+  recommendedAction: z12.enum(["sync", "reload", "ignore"])
+});
+var OptimisticUpdateSchema = z12.object({
+  id: z12.string().min(1),
+  type: z12.enum(["add", "update", "delete"]),
+  section: z12.string().min(1),
+  data: z12.unknown(),
+  timestamp: z12.number().min(0),
+  confirmed: z12.boolean(),
+  rollbackData: z12.unknown().optional(),
+  userId: z12.string().optional(),
+  correlationId: z12.string().optional()
+});
+var ConflictResolutionStrategySchema = z12.object({
+  type: z12.enum(["server_wins", "client_wins", "merge", "manual"]),
+  description: z12.string().min(1),
+  automatic: z12.boolean(),
+  confidence: z12.number().min(0).max(1)
+});
+var DataConflictSchema = z12.object({
+  id: z12.string().min(1),
+  updates: z12.array(OptimisticUpdateSchema).min(1),
+  type: z12.enum(["concurrent_update", "version_mismatch", "data_corruption"]),
+  description: z12.string().min(1),
+  resolutionStrategies: z12.array(ConflictResolutionStrategySchema),
+  detectedAt: z12.number().min(0)
+});
+var DashboardEventSchema = z12.object({
+  type: z12.string().min(1),
+  payload: z12.unknown(),
+  timestamp: z12.number().min(0),
+  source: z12.enum(["user", "server", "system"]),
+  id: z12.string().min(1),
+  correlationId: z12.string().optional(),
+  userId: z12.string().optional(),
+  priority: z12.enum(["low", "normal", "high", "critical"]).optional()
+});
+var _SubscriptionOptionsSchema = z12.object({
+  includeHistory: z12.boolean().optional(),
+  historyLimit: z12.number().min(1).optional(),
+  priorityFilter: z12.array(z12.enum(["low", "normal", "high", "critical"])).optional(),
+  persistent: z12.boolean().optional()
+});
+var DataChangeSchema = z12.object({
+  section: z12.string().min(1),
+  type: z12.enum(["create", "update", "delete"]),
+  data: z12.unknown(),
+  previousData: z12.unknown().optional(),
+  timestamp: z12.number().min(0),
+  source: z12.enum(["server", "optimistic", "conflict_resolution"])
+});
+var SyncResultSchema = z12.object({
+  success: z12.boolean(),
+  syncedSections: z12.array(z12.string().min(1)),
+  errors: z12.array(SyncErrorSchema),
+  duration: z12.number().min(0),
+  dataChanges: z12.array(DataChangeSchema),
+  inconsistenciesResolved: z12.number().min(0),
+  syncedAt: z12.number().min(0)
+});
+var MemoryStatsSchema = z12.object({
+  cacheSize: z12.number().min(0),
+  eventHistorySize: z12.number().min(0),
+  subscriptionCount: z12.number().min(0),
+  pendingUpdatesCount: z12.number().min(0),
+  totalMemoryUsage: z12.number().min(0),
+  measuredAt: z12.number().min(0)
+});
+var MemoryLimitsSchema = z12.object({
+  maxCacheSize: z12.number().min(1),
+  maxEventHistorySize: z12.number().min(1),
+  maxSubscriptions: z12.number().min(1),
+  maxPendingUpdates: z12.number().min(1),
+  cleanupThreshold: z12.number().min(0).max(1)
+});
+var DashboardDataSchema = z12.object({
+  user: z12.object({
+    id: z12.string().min(1),
+    clerkId: z12.string().min(1),
+    email: z12.string().email(),
+    firstName: z12.string().optional(),
+    lastName: z12.string().optional(),
+    imageUrl: z12.string().url().optional(),
+    username: z12.string().optional()
+  }),
+  stats: ConsistentUserStatsSchema,
+  favorites: z12.array(
+    z12.object({
+      id: z12.string().min(1),
+      beatId: z12.number().min(1),
+      beatTitle: z12.string().min(1),
+      beatArtist: z12.string().optional(),
+      beatImageUrl: z12.string().url().optional(),
+      beatGenre: z12.string().optional(),
+      beatBpm: z12.number().min(1).optional(),
+      beatPrice: z12.number().min(0).optional(),
+      createdAt: z12.string().datetime()
+    })
+  ),
+  orders: z12.array(
+    z12.object({
+      id: z12.string().min(1),
+      orderNumber: z12.string().optional(),
+      total: z12.number().min(0),
+      currency: z12.string().min(1),
+      status: z12.enum([
+        "draft",
+        "pending",
+        "processing",
+        "paid",
+        "completed",
+        "cancelled",
+        "refunded",
+        "payment_failed"
+      ]),
+      createdAt: z12.string().datetime(),
+      updatedAt: z12.string().datetime()
+    })
+  ),
+  downloads: z12.array(
+    z12.object({
+      id: z12.string().min(1),
+      beatId: z12.number().min(1),
+      beatTitle: z12.string().min(1),
+      format: z12.enum(["mp3", "wav", "flac"]),
+      licenseType: z12.string().min(1),
+      downloadedAt: z12.string().datetime(),
+      downloadCount: z12.number().min(1)
+    })
+  ),
+  reservations: z12.array(
+    z12.object({
+      id: z12.string().min(1),
+      serviceType: z12.enum(["mixing", "mastering", "recording", "consultation", "custom_beat"]),
+      preferredDate: z12.string().datetime(),
+      duration: z12.number().min(1),
+      totalPrice: z12.number().min(0),
+      status: z12.enum(["pending", "confirmed", "in_progress", "completed", "cancelled"]),
+      createdAt: z12.string().datetime()
+    })
+  ),
+  activity: z12.array(
+    z12.object({
+      id: z12.string().min(1),
+      type: z12.string().min(1),
+      description: z12.string().min(1),
+      timestamp: z12.string().datetime(),
+      metadata: z12.record(z12.unknown())
+    })
+  ),
+  chartData: z12.array(
+    z12.object({
+      date: z12.string().min(1),
+      orders: z12.number().min(0),
+      downloads: z12.number().min(0),
+      revenue: z12.number().min(0),
+      favorites: z12.number().min(0)
+    })
+  ),
+  trends: z12.object({
+    orders: z12.object({
+      period: z12.enum(["7d", "30d", "90d", "1y"]),
+      value: z12.number().min(0),
+      change: z12.number(),
+      changePercent: z12.number(),
+      isPositive: z12.boolean()
+    }),
+    downloads: z12.object({
+      period: z12.enum(["7d", "30d", "90d", "1y"]),
+      value: z12.number().min(0),
+      change: z12.number(),
+      changePercent: z12.number(),
+      isPositive: z12.boolean()
+    }),
+    revenue: z12.object({
+      period: z12.enum(["7d", "30d", "90d", "1y"]),
+      value: z12.number().min(0),
+      change: z12.number(),
+      changePercent: z12.number(),
+      isPositive: z12.boolean()
+    }),
+    favorites: z12.object({
+      period: z12.enum(["7d", "30d", "90d", "1y"]),
+      value: z12.number().min(0),
+      change: z12.number(),
+      changePercent: z12.number(),
+      isPositive: z12.boolean()
+    })
+  })
+});
+
+// shared/validation/index.ts
+import { z as z14 } from "zod";
+
+// shared/types/apiEndpoints.ts
+import { z as z13 } from "zod";
+var signInRequestSchema = z13.object({
+  username: z13.string().optional(),
+  email: z13.string().email().optional(),
+  password: z13.string().min(1)
+}).refine((data) => data.username || data.email, {
+  message: "Either username or email is required"
+});
+var registerRequestSchema = z13.object({
+  username: z13.string().min(3).max(30),
+  email: z13.string().email(),
+  password: z13.string().min(8),
+  firstName: z13.string().optional(),
+  lastName: z13.string().optional()
+});
+var getBeatsRequestSchema = z13.object({
+  limit: z13.number().min(1).max(100).optional(),
+  genre: z13.string().optional(),
+  search: z13.string().optional(),
+  bpm: z13.number().min(1).max(300).optional(),
+  key: z13.string().optional(),
+  mood: z13.string().optional(),
+  priceMin: z13.number().min(0).optional(),
+  priceMax: z13.number().min(0).optional(),
+  featured: z13.boolean().optional(),
+  free: z13.boolean().optional(),
+  sortBy: z13.enum(["newest", "oldest", "price_low", "price_high", "popular"]).optional(),
+  page: z13.number().min(1).optional()
+});
+var createBeatRequestSchema = z13.object({
+  title: z13.string().min(1).max(200),
+  description: z13.string().optional(),
+  genre: z13.string().min(1),
+  bpm: z13.number().min(1).max(300).optional(),
+  key: z13.string().optional(),
+  mood: z13.string().optional(),
+  price: z13.number().min(0),
+  audioUrl: z13.string().url().optional(),
+  imageUrl: z13.string().url().optional(),
+  tags: z13.array(z13.string()).optional(),
+  featured: z13.boolean().optional(),
+  duration: z13.number().min(1).optional(),
+  isActive: z13.boolean().optional(),
+  isExclusive: z13.boolean().optional(),
+  isFree: z13.boolean().optional()
+});
+var createOrderRequestSchema = z13.object({
+  items: z13.array(
+    z13.object({
+      productId: z13.number().positive(),
+      title: z13.string().min(1),
+      type: z13.enum(["beat", "subscription", "service"]),
+      qty: z13.number().min(1),
+      unitPrice: z13.number().min(0),
+      metadata: z13.record(z13.unknown()).optional()
+    })
+  ).min(1),
+  currency: z13.string().length(3),
+  metadata: z13.record(z13.unknown()).optional(),
+  idempotencyKey: z13.string().optional()
+});
+var createPaymentSessionRequestSchema = z13.object({
+  reservationId: z13.string().min(1),
+  amount: z13.number().min(1),
+  currency: z13.string().length(3),
+  description: z13.string().min(1),
+  metadata: z13.record(z13.unknown()).optional()
+});
+var createReservationRequestSchema = z13.object({
+  serviceType: z13.enum(["mixing", "mastering", "recording", "custom_beat", "consultation"]),
+  details: z13.object({
+    name: z13.string().min(1),
+    email: z13.string().email(),
+    phone: z13.string().min(10),
+    requirements: z13.string().optional(),
+    referenceLinks: z13.array(z13.string().url()).optional()
+  }),
+  preferredDate: z13.string().datetime(),
+  durationMinutes: z13.number().min(30).max(480),
+  totalPrice: z13.number().min(0),
+  notes: z13.string().optional()
+});
+var addToCartRequestSchema = z13.object({
+  beatId: z13.number().positive().optional(),
+  beat_id: z13.number().positive().optional(),
+  licenseType: z13.enum(["basic", "premium", "unlimited"]).optional(),
+  quantity: z13.number().min(1).optional().default(1)
+}).refine((data) => data.beatId || data.beat_id, {
+  message: "Either beatId or beat_id is required"
+});
+var playBeatRequestSchema = z13.object({
+  beatId: z13.number().positive()
+});
+var setVolumeRequestSchema = z13.object({
+  level: z13.number().min(0).max(1)
+});
+var seekRequestSchema = z13.object({
+  position: z13.number().min(0)
+});
+var trackDownloadRequestSchema = z13.object({
+  productId: z13.number().positive(),
+  license: z13.enum(["basic", "premium", "unlimited"]),
+  price: z13.number().min(0).optional(),
+  productName: z13.string().optional()
+});
+
+// shared/validation/index.ts
+var CommonParams = {
+  /** Generic string ID - use when ID format is flexible */
+  id: z14.object({
+    id: z14.string().min(1, "ID is required")
+  }),
+  /** Numeric ID - for WooCommerce products, beats, etc. */
+  numericId: z14.object({
+    id: z14.string().regex(/^\d+$/, "ID must be numeric").transform(Number)
+  }),
+  /** Stripe Payment Intent ID - format: pi_xxx */
+  stripePaymentIntentId: z14.object({
+    id: z14.string().regex(/^pi_[a-zA-Z0-9]+$/, "Invalid Stripe payment intent ID")
+  }),
+  /** Stripe Checkout Session ID - format: cs_xxx or cs_test_xxx */
+  stripeSessionId: z14.object({
+    id: z14.string().regex(/^cs_(test_)?[a-zA-Z0-9]+$/, "Invalid Stripe checkout session ID")
+  }),
+  slug: z14.object({
+    slug: z14.string().min(1, "Slug is required").regex(/^[a-z0-9-]+$/, "Invalid slug format")
+  })
+};
+var CommonQueries = {
+  pagination: z14.object({
+    page: z14.string().optional().transform((val) => val ? Number.parseInt(val, 10) : 1),
+    limit: z14.string().optional().transform((val) => val ? Math.min(Number.parseInt(val, 10), 100) : 20),
+    offset: z14.string().optional().transform((val) => val ? Number.parseInt(val, 10) : 0)
+  }),
+  sorting: z14.object({
+    sortBy: z14.string().optional(),
+    sortOrder: z14.enum(["asc", "desc"]).optional().default("desc")
+  }),
+  search: z14.object({
+    q: z14.string().max(100).optional(),
+    search: z14.string().max(100).optional()
+  }),
+  dateRange: z14.object({
+    startDate: z14.string().datetime().optional(),
+    endDate: z14.string().datetime().optional()
+  })
+};
+var validateBody = (schema) => {
+  return (req, res, next) => {
+    try {
+      const result = schema.safeParse(req.body);
+      if (!result.success) {
+        const validationErrors = result.error.errors.map((err) => ({
+          field: err.path.join("."),
+          value: req.body,
+          message: err.message,
+          code: err.code
+        }));
+        const errorResponse = createValidationError(
+          validationErrors,
+          req.headers["x-request-id"]
+        );
+        return res.status(400).json(errorResponse);
+      }
+      req.body = result.data;
+      next();
+    } catch (error) {
+      console.error("Validation middleware error:", error);
+      res.status(500).json({
+        error: {
+          type: "internal_server_error",
+          message: "Validation processing failed",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      });
+    }
+  };
+};
+var validateQuery = (schema) => {
+  return (req, res, next) => {
+    try {
+      const result = schema.safeParse(req.query);
+      if (!result.success) {
+        const validationErrors = result.error.errors.map((err) => ({
+          field: `query.${err.path.join(".")}`,
+          value: req.query,
+          message: err.message,
+          code: err.code
+        }));
+        const errorResponse = createValidationError(
+          validationErrors,
+          req.headers["x-request-id"]
+        );
+        return res.status(400).json(errorResponse);
+      }
+      req.query = result.data;
+      next();
+    } catch (error) {
+      console.error("Query validation middleware error:", error);
+      res.status(500).json({
+        error: {
+          type: "internal_server_error",
+          message: "Query validation processing failed",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      });
+    }
+  };
+};
+var validateParams = (schema) => {
+  return (req, res, next) => {
+    try {
+      const result = schema.safeParse(req.params);
+      if (!result.success) {
+        const validationErrors = result.error.errors.map((err) => ({
+          field: `params.${err.path.join(".")}`,
+          value: req.params,
+          message: err.message,
+          code: err.code
+        }));
+        const errorResponse = createValidationError(
+          validationErrors,
+          req.headers["x-request-id"]
+        );
+        return res.status(400).json(errorResponse);
+      }
+      req.params = result.data;
+      next();
+    } catch (error) {
+      console.error("Params validation middleware error:", error);
+      res.status(500).json({
+        error: {
+          type: "internal_server_error",
+          message: "Parameter validation processing failed",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      });
+    }
+  };
+};
 
 // server/config/urls.ts
 var CLIENT_BASE_URL = process.env.CLIENT_URL || "https://brolabentertainment.com";
@@ -3007,7 +6736,7 @@ var logPaymentEvent = (level, event, data) => {
     console.log(`\u2139\uFE0F [PAYMENT-INFO] ${event}:`, logData);
   }
 };
-var createErrorResponse2 = (error, message, field, code, details) => {
+var createErrorResponse3 = (error, message, field, code, details) => {
   return {
     error,
     message,
@@ -3017,11 +6746,11 @@ var createErrorResponse2 = (error, message, field, code, details) => {
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   };
 };
-var router4 = Router4();
-var stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+var router6 = Router6();
+var stripe = new Stripe2(process.env.STRIPE_SECRET_KEY, {
   // Using default API version for compatibility
 });
-router4.get("/health", (req, res) => {
+router6.get("/health", (req, res) => {
   logPaymentEvent("info", "health_check", {
     userAgent: req.headers["user-agent"],
     ip: req.ip
@@ -3035,7 +6764,7 @@ router4.get("/health", (req, res) => {
 });
 var validateAmount = (amount, requestId, res) => {
   if (!amount || amount <= 0) {
-    const errorResponse = createErrorResponse2(
+    const errorResponse = createErrorResponse3(
       "Validation Error",
       "Valid amount is required. Amount must be greater than 0.",
       "amount"
@@ -3053,7 +6782,7 @@ var validateAmount = (amount, requestId, res) => {
 };
 var validateUserMetadata = (metadata, requestId, res) => {
   if (!metadata.userId || !metadata.userEmail) {
-    const errorResponse = createErrorResponse2(
+    const errorResponse = createErrorResponse3(
       "Validation Error",
       "User authentication is required. Please ensure you are logged in.",
       "metadata",
@@ -3073,7 +6802,7 @@ var validateUserMetadata = (metadata, requestId, res) => {
 };
 var validateCurrency = (currency, requestId, res) => {
   if (!["usd", "eur", "gbp"].includes(currency.toLowerCase())) {
-    const errorResponse = createErrorResponse2(
+    const errorResponse = createErrorResponse3(
       "Validation Error",
       "Unsupported currency. Supported currencies: USD, EUR, GBP",
       "currency",
@@ -3176,19 +6905,19 @@ var buildEnhancedMetadata = (metadata, paymentType, reservationIds, services, ca
       (sum, item) => sum + (item.price || 0) * (item.quantity || 1),
       0
     )?.toString() || "0",
-    orderTotal: (amount / 100).toString(),
+    orderTotal: centsToDollars(amount).toString(),
     description: description || `${paymentType.replace("_", " ")} payment`
   };
 };
 var handleStripeError = (stripeError, requestId, res) => {
   logPaymentEvent("error", "stripe_session_creation_failed", {
     requestId,
-    errorType: stripeError instanceof Stripe.errors.StripeError ? stripeError.type : "unknown",
-    errorCode: stripeError instanceof Stripe.errors.StripeError ? stripeError.code : "unknown",
+    errorType: stripeError instanceof Stripe2.errors.StripeError ? stripeError.type : "unknown",
+    errorCode: stripeError instanceof Stripe2.errors.StripeError ? stripeError.code : "unknown",
     errorMessage: stripeError instanceof Error ? stripeError.message : String(stripeError)
   });
-  if (stripeError instanceof Stripe.errors.StripeError) {
-    const errorResponse2 = createErrorResponse2(
+  if (stripeError instanceof Stripe2.errors.StripeError) {
+    const errorResponse2 = createErrorResponse3(
       "Payment Error",
       stripeError.message || "Failed to create checkout session",
       void 0,
@@ -3202,7 +6931,7 @@ var handleStripeError = (stripeError, requestId, res) => {
     res.status(400).json(errorResponse2);
     return;
   }
-  const errorResponse = createErrorResponse2(
+  const errorResponse = createErrorResponse3(
     "Internal Error",
     "An unexpected error occurred while processing your payment",
     void 0,
@@ -3211,7 +6940,7 @@ var handleStripeError = (stripeError, requestId, res) => {
   );
   res.status(500).json(errorResponse);
 };
-router4.post("/create-checkout-session", async (req, res) => {
+router6.post("/create-checkout-session", async (req, res) => {
   const requestId = generateSecureRequestId();
   try {
     logPaymentEvent("info", "checkout_session_request", {
@@ -3301,73 +7030,77 @@ router4.post("/create-checkout-session", async (req, res) => {
     handleRouteError(error, res, "Failed to create checkout session");
   }
 });
-router4.get("/checkout-session/:id", async (req, res) => {
-  const requestId = `get_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-  try {
-    const { id } = req.params;
-    if (!id || typeof id !== "string") {
-      const errorResponse = createErrorResponse2(
-        "Validation Error",
-        "Valid session ID is required",
-        "id"
-      );
-      logPaymentEvent("warn", "session_retrieval_invalid_id", {
+router6.get(
+  "/checkout-session/:id",
+  validateParams(CommonParams.stripeSessionId),
+  async (req, res) => {
+    const requestId = `get_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    try {
+      const { id } = req.params;
+      if (!id || typeof id !== "string") {
+        const errorResponse = createErrorResponse3(
+          "Validation Error",
+          "Valid session ID is required",
+          "id"
+        );
+        logPaymentEvent("warn", "session_retrieval_invalid_id", {
+          requestId,
+          providedId: id
+        });
+        res.status(400).json(errorResponse);
+        return;
+      }
+      logPaymentEvent("info", "session_retrieval_start", {
         requestId,
-        providedId: id
+        sessionId: id
       });
-      res.status(400).json(errorResponse);
-      return;
+      const session2 = await stripe.checkout.sessions.retrieve(id);
+      logPaymentEvent("info", "session_retrieved", {
+        requestId,
+        sessionId: session2.id,
+        status: session2.status,
+        amount: session2.amount_total,
+        currency: session2.currency,
+        paymentType: session2.metadata?.type || "unknown"
+      });
+      res.json({
+        success: true,
+        id: session2.id,
+        status: session2.status,
+        amount: session2.amount_total,
+        currency: session2.currency,
+        metadata: session2.metadata,
+        customerEmail: session2.customer_email,
+        createdAt: session2.created * 1e3,
+        // Convert to milliseconds
+        expiresAt: session2.expires_at * 1e3
+        // Convert to milliseconds
+      });
+    } catch (error) {
+      logPaymentEvent("error", "session_retrieval_failed", {
+        requestId,
+        sessionId: req.params.id,
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
+      if (error instanceof Stripe2.errors.StripeInvalidRequestError) {
+        const errorResponse = createErrorResponse3(
+          "Not Found",
+          "Checkout session not found",
+          "id",
+          "session_not_found"
+        );
+        res.status(404).json(errorResponse);
+        return;
+      }
+      handleRouteError(error, res, "Failed to retrieve checkout session");
     }
-    logPaymentEvent("info", "session_retrieval_start", {
-      requestId,
-      sessionId: id
-    });
-    const session2 = await stripe.checkout.sessions.retrieve(id);
-    logPaymentEvent("info", "session_retrieved", {
-      requestId,
-      sessionId: session2.id,
-      status: session2.status,
-      amount: session2.amount_total,
-      currency: session2.currency,
-      paymentType: session2.metadata?.type || "unknown"
-    });
-    res.json({
-      success: true,
-      id: session2.id,
-      status: session2.status,
-      amount: session2.amount_total,
-      currency: session2.currency,
-      metadata: session2.metadata,
-      customerEmail: session2.customer_email,
-      createdAt: session2.created * 1e3,
-      // Convert to milliseconds
-      expiresAt: session2.expires_at * 1e3
-      // Convert to milliseconds
-    });
-  } catch (error) {
-    logPaymentEvent("error", "session_retrieval_failed", {
-      requestId,
-      sessionId: req.params.id,
-      errorMessage: error instanceof Error ? error.message : String(error)
-    });
-    if (error instanceof Stripe.errors.StripeInvalidRequestError) {
-      const errorResponse = createErrorResponse2(
-        "Not Found",
-        "Checkout session not found",
-        "id",
-        "session_not_found"
-      );
-      res.status(404).json(errorResponse);
-      return;
-    }
-    handleRouteError(error, res, "Failed to retrieve checkout session");
   }
-});
-var clerk_default = router4;
+);
+var clerk_default = router6;
 
 // server/routes/clerk-billing.ts
-import { Router as Router5 } from "express";
-import { randomUUID } from "node:crypto";
+import { Router as Router7 } from "express";
+import { randomUUID as randomUUID2 } from "node:crypto";
 
 // server/services/WebhookAuditLogger.ts
 var WebhookAuditLogger = class _WebhookAuditLogger {
@@ -3788,111 +7521,8 @@ function getWebhookSecurityService(config) {
   return instance;
 }
 
-// server/utils/errorHandling.ts
-function createErrorResponse3(error, code, message, requestId, details) {
-  return {
-    error,
-    code,
-    message,
-    details,
-    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-    requestId
-  };
-}
-function getErrorSeverity(code) {
-  const criticalErrors = [
-    "STRIPE_INVALID_SIGNATURE" /* STRIPE_INVALID_SIGNATURE */,
-    "PAYPAL_INVALID_SIGNATURE" /* PAYPAL_INVALID_SIGNATURE */,
-    "PAYMENT_CONFIRMATION_FAILED" /* PAYMENT_CONFIRMATION_FAILED */,
-    "MISSING_CONFIGURATION" /* MISSING_CONFIGURATION */
-  ];
-  const highErrors = [
-    "PAYMENT_INTENT_CREATION_FAILED" /* PAYMENT_INTENT_CREATION_FAILED */,
-    "PAYMENT_RECORDING_FAILED" /* PAYMENT_RECORDING_FAILED */,
-    "PAYMENT_REFUND_FAILED" /* PAYMENT_REFUND_FAILED */,
-    "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */
-  ];
-  const mediumErrors = [
-    "INVOICE_GENERATION_FAILED" /* INVOICE_GENERATION_FAILED */,
-    "INVOICE_EMAIL_FAILED" /* INVOICE_EMAIL_FAILED */,
-    "ORDER_NOT_FOUND" /* ORDER_NOT_FOUND */,
-    "RESERVATION_NOT_FOUND" /* RESERVATION_NOT_FOUND */
-  ];
-  if (criticalErrors.includes(code)) {
-    return "critical" /* CRITICAL */;
-  }
-  if (highErrors.includes(code)) {
-    return "high" /* HIGH */;
-  }
-  if (mediumErrors.includes(code)) {
-    return "medium" /* MEDIUM */;
-  }
-  return "low" /* LOW */;
-}
-function requiresAdminNotification(code) {
-  const severity = getErrorSeverity(code);
-  return severity === "critical" /* CRITICAL */ || severity === "high" /* HIGH */;
-}
-function sanitizeErrorMessage(error) {
-  const message = error.message;
-  let sanitized = message;
-  sanitized = sanitized.replaceAll(/sk_live_[a-zA-Z0-9]+/g, "[REDACTED_KEY]");
-  sanitized = sanitized.replaceAll(/sk_test_[a-zA-Z0-9]+/g, "[REDACTED_KEY]");
-  sanitized = sanitized.replaceAll(/whsec_[a-zA-Z0-9]+/g, "[REDACTED_SECRET]");
-  sanitized = sanitized.replaceAll(/Bearer [a-zA-Z0-9._-]+/g, "Bearer [REDACTED]");
-  sanitized = sanitized.replaceAll(
-    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
-    "[EMAIL]"
-  );
-  if (sanitized.includes("signature")) {
-    return "Payment verification failed. Please contact support if this persists.";
-  }
-  if (sanitized.includes("timeout") || sanitized.includes("ETIMEDOUT")) {
-    return "Payment processing is taking longer than expected. Please check your order status.";
-  }
-  if (sanitized.includes("network") || sanitized.includes("ECONNREFUSED")) {
-    return "Unable to connect to payment service. Please try again later.";
-  }
-  return sanitized;
-}
-var PaymentError = class _PaymentError extends Error {
-  code;
-  severity;
-  context;
-  originalError;
-  constructor(message, code, context, originalError) {
-    super(message);
-    this.name = "PaymentError";
-    this.code = code;
-    this.severity = getErrorSeverity(code);
-    this.context = context;
-    this.originalError = originalError;
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, _PaymentError);
-    }
-  }
-  /**
-   * Convert to error response format
-   */
-  toErrorResponse(requestId) {
-    return createErrorResponse3(
-      this.message,
-      this.code,
-      sanitizeErrorMessage(this),
-      requestId,
-      this.context
-    );
-  }
-  /**
-   * Check if this error requires admin notification
-   */
-  requiresNotification() {
-    return requiresAdminNotification(this.code);
-  }
-};
-
 // server/routes/clerk-billing.ts
-var router5 = Router5();
+var router7 = Router7();
 var securityService = getWebhookSecurityService();
 var auditLogger2 = getWebhookAuditLogger();
 var SUBSCRIPTION_EVENT_MUTATIONS = {
@@ -3905,8 +7535,8 @@ var INVOICE_EVENT_MUTATIONS = {
   "invoice.paid": "clerk/billing:handleInvoicePaid",
   "invoice.payment_failed": "clerk/billing:handleInvoicePaymentFailed"
 };
-router5.post("/", async (req, res) => {
-  const requestId = randomUUID();
+router7.post("/", async (req, res) => {
+  const requestId = randomUUID2();
   const startTime = Date.now();
   const sourceIp = extractSourceIP(req);
   const svixHeaders = extractSvixHeaders(req);
@@ -3919,7 +7549,7 @@ router5.post("/", async (req, res) => {
   let mutationCalled;
   let syncStatus;
   try {
-    console.log(`\u{1F4E8} [${requestId}] Processing Clerk Billing webhook...`);
+    logger.info("Processing Clerk Billing webhook", { requestId });
     const config = validateEnvironmentConfig(requestId);
     if (!config.isValid) {
       outcome = "rejected";
@@ -3940,7 +7570,7 @@ router5.post("/", async (req, res) => {
     if (!svixHeaders) {
       outcome = "rejected";
       rejectionReason = "Missing required Svix headers";
-      console.warn(`\u26A0\uFE0F [${requestId}] ${rejectionReason}`);
+      logger.warn("Missing required Svix headers", { requestId });
       logAuditEntry({
         requestId,
         startTime,
@@ -3951,7 +7581,7 @@ router5.post("/", async (req, res) => {
         outcome,
         rejectionReason
       });
-      const errorResponse = createErrorResponse3(
+      const errorResponse = createErrorResponse2(
         "Missing headers",
         "WEBHOOK_MISSING_HEADERS" /* WEBHOOK_MISSING_HEADERS */,
         rejectionReason,
@@ -3964,7 +7594,7 @@ router5.post("/", async (req, res) => {
     if (!timestampValidation.valid) {
       outcome = "rejected";
       rejectionReason = timestampValidation.reason;
-      console.warn(`\u26A0\uFE0F [${requestId}] Timestamp validation failed: ${rejectionReason}`);
+      logger.warn("Timestamp validation failed", { requestId, reason: rejectionReason });
       logAuditEntry({
         requestId,
         startTime,
@@ -3975,7 +7605,7 @@ router5.post("/", async (req, res) => {
         outcome,
         rejectionReason
       });
-      const errorResponse = createErrorResponse3(
+      const errorResponse = createErrorResponse2(
         "Invalid timestamp",
         timestampValidation.code,
         rejectionReason,
@@ -3987,9 +7617,11 @@ router5.post("/", async (req, res) => {
     const idempotencyResult = securityService.checkIdempotency(svixId);
     if (idempotencyResult.isDuplicate) {
       outcome = "duplicate";
-      console.log(
-        `\u2139\uFE0F [${requestId}] Duplicate webhook detected: ${svixId} (originally processed at ${new Date(idempotencyResult.originalProcessedAt).toISOString()})`
-      );
+      logger.info("Duplicate webhook detected", {
+        requestId,
+        svixId,
+        originalProcessedAt: new Date(idempotencyResult.originalProcessedAt).toISOString()
+      });
       logAuditEntry({
         requestId,
         startTime,
@@ -4022,9 +7654,11 @@ router5.post("/", async (req, res) => {
       if (securityService.shouldWarnAboutIP(sourceIp)) {
         const failureCount = securityService.getFailureCount(sourceIp);
         auditLogger2.logSecurityWarning(sourceIp, failureCount);
-        console.warn(
-          `\u{1F6A8} [${requestId}] Security warning: ${failureCount} signature failures from IP ${sourceIp}`
-        );
+        logger.warn("Security warning: multiple signature failures from IP", {
+          requestId,
+          sourceIp,
+          failureCount
+        });
       }
       logAuditEntry({
         requestId,
@@ -4036,7 +7670,7 @@ router5.post("/", async (req, res) => {
         outcome,
         rejectionReason
       });
-      const errorResponse = createErrorResponse3(
+      const errorResponse = createErrorResponse2(
         "Invalid signature",
         "STRIPE_INVALID_SIGNATURE" /* STRIPE_INVALID_SIGNATURE */,
         rejectionReason,
@@ -4120,12 +7754,12 @@ function validateEnvironmentConfig(requestId) {
   const convexUrl = process.env.VITE_CONVEX_URL;
   const isProd = process.env.NODE_ENV === "production";
   if (!webhookSecret && isProd) {
-    console.error(`\u274C [${requestId}] CLERK_WEBHOOK_SECRET not configured in production`);
+    logger.error("CLERK_WEBHOOK_SECRET not configured in production", { requestId });
     return {
       isValid: false,
       isProd,
       statusCode: 500,
-      errorResponse: createErrorResponse3(
+      errorResponse: createErrorResponse2(
         "Webhook secret not configured",
         "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */,
         "CLERK_WEBHOOK_SECRET environment variable is required",
@@ -4134,12 +7768,12 @@ function validateEnvironmentConfig(requestId) {
     };
   }
   if (!webhookSecret) {
-    console.warn(`\u26A0\uFE0F [${requestId}] CLERK_WEBHOOK_SECRET not set; using raw body in dev`);
+    logger.warn("CLERK_WEBHOOK_SECRET not set; using raw body in dev", { requestId });
   }
   if (!convexUrl) {
-    console.warn(
-      `\u26A0\uFE0F [${requestId}] VITE_CONVEX_URL not set; webhook will be acknowledged but not synced`
-    );
+    logger.warn("VITE_CONVEX_URL not set; webhook will be acknowledged but not synced", {
+      requestId
+    });
   }
   return {
     isValid: true,
@@ -4159,16 +7793,21 @@ async function verifyWebhookSignature(req, webhookSecret, isProd, requestId) {
     if (!svixHeaders) {
       throw new Error("Missing required Svix headers");
     }
-    const payload = svix.verify(JSON.stringify(req.body), svixHeaders);
-    console.log(`\u2705 [${requestId}] Webhook signature verified`);
+    const rawBody = req.rawBody;
+    const bodyToVerify = rawBody ? rawBody.toString("utf8") : JSON.stringify(req.body);
+    if (!rawBody) {
+      logger.warn("Raw body not available, using JSON.stringify fallback", { requestId });
+    }
+    const payload = svix.verify(bodyToVerify, svixHeaders);
+    logger.info("Webhook signature verified", { requestId });
     return payload;
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error(`\u274C [${requestId}] Webhook signature verification failed:`, errorMessage);
+    logger.error("Webhook signature verification failed", { requestId, error: errorMessage });
     if (isProd) {
       return null;
     }
-    console.warn(`\u26A0\uFE0F [${requestId}] Svix verification failed; using raw body in dev`);
+    logger.warn("Svix verification failed; using raw body in dev", { requestId });
     return req.body;
   }
 }
@@ -4187,7 +7826,7 @@ function extractSvixHeaders(req) {
 }
 async function processWebhookEvent(payload, convexUrl, requestId) {
   const { type: eventType, data: eventData } = payload;
-  console.log(`\u{1F4CB} [${requestId}] Event type: ${eventType}`);
+  logger.info("Processing webhook event", { requestId, eventType });
   if (!convexUrl) {
     return {
       received: true,
@@ -4241,7 +7880,7 @@ async function processWebhookEvent(payload, convexUrl, requestId) {
       timestamp: (/* @__PURE__ */ new Date()).toISOString()
     };
   }
-  console.log(`\u2139\uFE0F [${requestId}] Unhandled event type: ${eventType}`);
+  logger.info("Unhandled event type", { requestId, eventType });
   return {
     received: true,
     synced: false,
@@ -4252,92 +7891,96 @@ async function processWebhookEvent(payload, convexUrl, requestId) {
 async function handleEventWithMutation(eventType, data, mutationMap, convexUrl, requestId) {
   const mutationName = mutationMap[eventType];
   if (!mutationName) {
-    console.log(`\u2139\uFE0F [${requestId}] No mutation defined for event: ${eventType}`);
+    logger.info("No mutation defined for event", { requestId, eventType });
     return;
   }
-  console.log(`\u{1F514} [${requestId}] Handling event: ${eventType}`);
+  logger.info("Handling event", { requestId, eventType });
   logEventDetails(eventType, data, requestId);
   await callConvexMutation(mutationName, data, convexUrl, requestId);
 }
 function logEventDetails(eventType, data, requestId) {
   if (eventType.startsWith("subscription.")) {
-    console.log(`\u{1F4CA} [${requestId}] Subscription details:`, {
+    logger.info("Subscription details", {
+      requestId,
       subscriptionId: data.id,
-      userId: data.user_id,
       planId: data.plan_id,
       status: data.status
     });
   } else if (eventType.startsWith("invoice.")) {
-    console.log(`\u{1F4CA} [${requestId}] Invoice details:`, {
+    logger.info("Invoice details", {
+      requestId,
       invoiceId: data.id,
-      userId: data.user_id,
       amount: data.amount,
       status: data.status
     });
   }
 }
 async function handleUserEvent(eventType, data, convexUrl, requestId) {
-  console.log(`\u{1F464} [${requestId}] Handling user event: ${eventType}`);
+  logger.info("Handling user event", { requestId, eventType });
   try {
     const userId = data.user_id || data.id;
     const emailAddresses = data.email_addresses;
     const email = emailAddresses?.[0]?.email_address || "unknown@temp.com";
-    const response = await fetch(`${convexUrl}/api/mutation`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        path: "users/clerkSync:syncClerkUser",
-        args: {
-          clerkId: userId,
-          email,
-          username: data.username,
-          firstName: data.first_name,
-          lastName: data.last_name,
-          imageUrl: data.image_url
-        },
-        format: "json"
-      })
+    const firstName = data.first_name || void 0;
+    const lastName = data.last_name || void 0;
+    logger.info("User data extracted", { requestId, clerkId: userId });
+    const { upsertUser: upsertUser2 } = await Promise.resolve().then(() => (init_convex(), convex_exports));
+    const result = await upsertUser2({
+      clerkId: userId,
+      email,
+      username: data.username || void 0,
+      firstName,
+      lastName,
+      imageUrl: data.image_url || void 0
     });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Convex mutation failed: ${errorText}`);
+    logger.info("User synced successfully", {
+      requestId,
+      userId,
+      result: result ? "success" : "failed"
+    });
+    if (!result) {
+      throw new Error("User sync returned null");
     }
-    console.log(`\u2705 [${requestId}] User synced successfully: ${userId}`);
+    if (eventType === "user.created" && email !== "unknown@temp.com") {
+      try {
+        const { getResendContactService: getResendContactService2 } = await Promise.resolve().then(() => (init_ResendContactService(), ResendContactService_exports));
+        const resendService = getResendContactService2();
+        const syncResult = await resendService.syncContact({
+          email,
+          firstName,
+          lastName
+        });
+        logger.info("Resend contact sync", { requestId, success: syncResult.success });
+      } catch (resendError) {
+        logger.warn("Resend contact sync failed (non-blocking)", { requestId, error: resendError });
+      }
+    }
   } catch (error) {
-    console.error(`\u274C [${requestId}] Error syncing user:`, error);
+    logger.error("Error syncing user", { requestId, error });
     throw error;
   }
 }
 async function callConvexMutation(mutationName, data, convexUrl, requestId) {
   try {
-    const response = await fetch(`${convexUrl}/api/mutation`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        path: mutationName,
-        args: { data },
-        format: "json"
-      })
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Convex mutation failed: ${errorText}`);
-    }
-    console.log(`\u2705 [${requestId}] Convex mutation completed: ${mutationName}`);
+    const { ConvexHttpClient: ConvexHttpClient9 } = await import("convex/browser");
+    const convex8 = new ConvexHttpClient9(convexUrl);
+    logger.info("Calling Convex mutation", { requestId, mutationName });
+    await convex8.mutation(mutationName, { data });
+    logger.info("Convex mutation completed", { requestId, mutationName });
   } catch (error) {
-    console.error(`\u274C [${requestId}] Error calling Convex mutation:`, error);
+    logger.error("Error calling Convex mutation", { requestId, mutationName, error });
     throw error;
   }
 }
 function handleWebhookError(error, requestId, res) {
-  console.error(`\u274C [${requestId}] Error processing Clerk Billing webhook:`, error);
+  logger.error("Error processing Clerk Billing webhook", { requestId, error });
   if (error instanceof PaymentError) {
     const errorResponse2 = error.toErrorResponse(requestId);
     res.status(500).json(errorResponse2);
     return;
   }
   const errorObj = error instanceof Error ? error : new Error(String(error));
-  const errorResponse = createErrorResponse3(
+  const errorResponse = createErrorResponse2(
     "Webhook processing failed",
     "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */,
     sanitizeErrorMessage(errorObj),
@@ -4346,17 +7989,15 @@ function handleWebhookError(error, requestId, res) {
   );
   res.status(500).json(errorResponse);
 }
-var clerk_billing_default = router5;
+var clerk_billing_default = router7;
 
-// server/routes/downloads.ts
-import archiver from "archiver";
-import express from "express";
-import { Parser } from "json2csv";
+// server/routes/contact.ts
+import { Router as Router8 } from "express";
 
 // shared/schema.ts
-import { z as z3 } from "zod";
-var LicenseType = ["basic", "premium", "unlimited"];
-var OrderStatus = [
+import { z as z15 } from "zod";
+var LicenseType2 = ["basic", "premium", "unlimited"];
+var OrderStatus2 = [
   "pending",
   "processing",
   "paid",
@@ -4365,197 +8006,200 @@ var OrderStatus = [
   "refunded",
   "cancelled"
 ];
-var insertUserSchema = z3.object({
-  username: z3.string().min(2),
-  email: z3.string().email(),
-  password: z3.string().min(6)
+var insertUserSchema = z15.object({
+  username: z15.string().min(2),
+  email: z15.string().email(),
+  password: z15.string().min(6)
 });
-var insertEmailVerificationSchema = z3.object({
-  user_id: z3.number(),
-  token: z3.string(),
-  expires_at: z3.string()
+var insertEmailVerificationSchema = z15.object({
+  user_id: z15.number(),
+  token: z15.string(),
+  expires_at: z15.string()
 });
-var insertPasswordResetSchema = z3.object({
-  user_id: z3.number(),
-  token: z3.string(),
-  expires_at: z3.string()
+var insertPasswordResetSchema = z15.object({
+  user_id: z15.number(),
+  token: z15.string(),
+  expires_at: z15.string()
 });
-var verifyEmailSchema = z3.object({
-  token: z3.string().uuid("Format de token invalide")
+var verifyEmailSchema = z15.object({
+  token: z15.string().uuid("Format de token invalide")
 });
-var resendVerificationSchema = z3.object({
-  email: z3.string().email("Format d'email invalide")
+var resendVerificationSchema = z15.object({
+  email: z15.string().email("Format d'email invalide")
 });
-var forgotPasswordSchema = z3.object({
-  email: z3.string().email("Format d'email invalide")
+var forgotPasswordSchema = z15.object({
+  email: z15.string().email("Format d'email invalide")
 });
-var resetPasswordSchema = z3.object({
-  token: z3.string().uuid("Format de token invalide"),
-  password: z3.string().min(6, "Le mot de passe doit contenir au moins 6 caract\xE8res")
+var resetPasswordSchema = z15.object({
+  token: z15.string().uuid("Format de token invalide"),
+  password: z15.string().min(6, "Le mot de passe doit contenir au moins 6 caract\xE8res")
 });
-var insertBeatSchema = z3.object({
-  wordpress_id: z3.number(),
-  title: z3.string().min(2),
-  description: z3.string().optional().nullable(),
-  genre: z3.string(),
-  bpm: z3.number(),
-  key: z3.string().optional().nullable(),
-  mood: z3.string().optional().nullable(),
-  price: z3.number(),
-  audio_url: z3.string().optional().nullable(),
-  image_url: z3.string().optional().nullable(),
-  tags: z3.array(z3.string()).optional().nullable(),
-  featured: z3.boolean().optional(),
-  downloads: z3.number().optional(),
-  views: z3.number().optional(),
-  duration: z3.number().optional(),
-  is_active: z3.boolean().optional()
+var insertBeatSchema = z15.object({
+  wordpress_id: z15.number(),
+  title: z15.string().min(2),
+  description: z15.string().optional().nullable(),
+  genre: z15.string(),
+  bpm: z15.number(),
+  key: z15.string().optional().nullable(),
+  mood: z15.string().optional().nullable(),
+  price: z15.number(),
+  audio_url: z15.string().optional().nullable(),
+  image_url: z15.string().optional().nullable(),
+  tags: z15.array(z15.string()).optional().nullable(),
+  featured: z15.boolean().optional(),
+  downloads: z15.number().optional(),
+  views: z15.number().optional(),
+  duration: z15.number().optional(),
+  is_active: z15.boolean().optional()
 });
-var insertWishlistItemSchema = z3.object({
-  user_id: z3.number(),
-  beat_id: z3.number()
+var insertWishlistItemSchema = z15.object({
+  user_id: z15.number(),
+  beat_id: z15.number()
 });
-var insertCartItemSchema = z3.object({
-  beat_id: z3.number(),
-  license_type: z3.enum(LicenseType),
-  price: z3.number(),
-  quantity: z3.number().min(1),
-  session_id: z3.string().optional().nullable(),
-  user_id: z3.number().optional().nullable()
+var insertCartItemSchema = z15.object({
+  beat_id: z15.number(),
+  license_type: z15.enum(LicenseType2),
+  price: z15.number(),
+  quantity: z15.number().min(1),
+  session_id: z15.string().optional().nullable(),
+  user_id: z15.number().optional().nullable()
 });
-var insertOrderSchema = z3.object({
-  user_id: z3.number().optional().nullable(),
-  session_id: z3.string().optional().nullable(),
-  email: z3.string().email(),
-  total: z3.number(),
-  status: z3.enum(OrderStatus),
-  stripe_payment_intent_id: z3.string().optional().nullable(),
-  items: z3.array(
-    z3.object({
-      productId: z3.number().optional(),
-      title: z3.string(),
-      price: z3.number().optional(),
-      quantity: z3.number().optional(),
-      license: z3.string().optional(),
-      type: z3.string().optional(),
-      sku: z3.string().optional(),
-      metadata: z3.object({
-        beatGenre: z3.string().optional(),
-        beatBpm: z3.number().optional(),
-        beatKey: z3.string().optional(),
-        downloadFormat: z3.string().optional(),
-        licenseTerms: z3.string().optional()
+var insertOrderSchema = z15.object({
+  user_id: z15.number().optional().nullable(),
+  session_id: z15.string().optional().nullable(),
+  email: z15.string().email(),
+  total: z15.number(),
+  status: z15.enum(OrderStatus2),
+  stripe_payment_intent_id: z15.string().optional().nullable(),
+  items: z15.array(
+    z15.object({
+      productId: z15.number().optional(),
+      title: z15.string(),
+      price: z15.number().optional(),
+      quantity: z15.number().optional(),
+      license: z15.string().optional(),
+      type: z15.string().optional(),
+      sku: z15.string().optional(),
+      metadata: z15.object({
+        beatGenre: z15.string().optional(),
+        beatBpm: z15.number().optional(),
+        beatKey: z15.string().optional(),
+        downloadFormat: z15.string().optional(),
+        licenseTerms: z15.string().optional()
       }).optional()
     })
   )
 });
-var insertOrderStatusHistorySchema = z3.object({
-  order_id: z3.number(),
-  status: z3.enum(OrderStatus),
-  comment: z3.string().optional().nullable()
+var insertOrderStatusHistorySchema = z15.object({
+  order_id: z15.number(),
+  status: z15.enum(OrderStatus2),
+  comment: z15.string().optional().nullable()
 });
-var insertSubscriptionSchema = z3.object({
-  user_id: z3.number(),
-  plan: z3.enum(LicenseType),
-  status: z3.enum(["active", "inactive", "canceled"]),
-  started_at: z3.string(),
-  expires_at: z3.string()
+var insertSubscriptionSchema = z15.object({
+  user_id: z15.number(),
+  plan: z15.enum(LicenseType2),
+  status: z15.enum(["active", "inactive", "canceled"]),
+  started_at: z15.string(),
+  expires_at: z15.string()
 });
-var insertDownloadSchema = z3.object({
-  productId: z3.number().positive("Product ID must be a positive number"),
-  license: z3.enum(LicenseType, {
+var insertDownloadSchema = z15.object({
+  productId: z15.number().positive("Product ID must be a positive number"),
+  license: z15.enum(LicenseType2, {
     errorMap: () => ({ message: "License must be basic, premium, or unlimited" })
   }),
-  price: z3.number().min(0).optional(),
+  price: z15.number().min(0).optional(),
   // Price in cents, optional for free downloads
-  productName: z3.string().optional()
+  productName: z15.string().optional()
   // Optional product name for order creation
 });
-var insertActivityLogSchema = z3.object({
-  user_id: z3.number().optional().nullable(),
-  action: z3.string(),
-  details: z3.object({
-    action: z3.string(),
-    resource: z3.string(),
-    resourceId: z3.string().optional(),
-    changes: z3.record(
-      z3.object({
-        from: z3.unknown(),
-        to: z3.unknown()
+var insertActivityLogSchema = z15.object({
+  user_id: z15.number().optional().nullable(),
+  action: z15.string(),
+  details: z15.object({
+    action: z15.string(),
+    resource: z15.string(),
+    resourceId: z15.string().optional(),
+    changes: z15.record(
+      z15.object({
+        from: z15.unknown(),
+        to: z15.unknown()
       })
     ).optional(),
-    metadata: z3.object({
-      ipAddress: z3.string().optional(),
-      userAgent: z3.string().optional(),
-      duration: z3.number().optional(),
-      success: z3.boolean(),
-      errorMessage: z3.string().optional(),
-      additionalContext: z3.record(z3.unknown()).optional()
+    metadata: z15.object({
+      ipAddress: z15.string().optional(),
+      userAgent: z15.string().optional(),
+      duration: z15.number().optional(),
+      success: z15.boolean(),
+      errorMessage: z15.string().optional(),
+      additionalContext: z15.record(z15.unknown()).optional()
     })
   }).optional(),
-  timestamp: z3.string().optional()
+  timestamp: z15.string().optional()
 });
-var insertFileSchema = z3.object({
-  user_id: z3.number(),
-  filename: z3.string(),
-  original_name: z3.string(),
-  mime_type: z3.string(),
-  size: z3.number(),
-  storage_path: z3.string(),
-  role: z3.enum(["upload", "deliverable", "invoice"]),
-  reservation_id: z3.string().optional().nullable(),
-  order_id: z3.number().optional().nullable(),
-  owner_id: z3.number().optional().nullable()
+var insertFileSchema = z15.object({
+  user_id: z15.number(),
+  filename: z15.string(),
+  original_name: z15.string(),
+  mime_type: z15.string(),
+  size: z15.number(),
+  storage_path: z15.string(),
+  role: z15.enum(["upload", "deliverable", "invoice"]),
+  reservation_id: z15.string().optional().nullable(),
+  order_id: z15.number().optional().nullable(),
+  owner_id: z15.number().optional().nullable()
 });
-var ServiceType = [
+var ServiceType2 = [
   "mixing",
   "mastering",
   "recording",
   "custom_beat",
   "consultation"
 ];
-var insertServiceOrderSchema = z3.object({
-  user_id: z3.number(),
-  service_type: z3.enum(ServiceType),
-  details: z3.object({
-    duration: z3.number().optional(),
-    tracks: z3.number().optional(),
-    format: z3.enum(["wav", "mp3", "aiff"]).optional(),
-    quality: z3.enum(["standard", "premium"]).optional(),
-    rush: z3.boolean().optional(),
-    notes: z3.string().optional()
+var insertServiceOrderSchema = z15.object({
+  user_id: z15.number(),
+  service_type: z15.enum(ServiceType2),
+  details: z15.object({
+    duration: z15.number().optional(),
+    tracks: z15.number().optional(),
+    format: z15.enum(["wav", "mp3", "aiff"]).optional(),
+    quality: z15.enum(["standard", "premium"]).optional(),
+    rush: z15.boolean().optional(),
+    notes: z15.string().optional()
   }),
-  estimated_price: z3.number().min(0),
-  status: z3.enum(["pending", "in_progress", "completed", "cancelled"]).optional()
+  estimated_price: z15.number().min(0),
+  status: z15.enum(["pending", "in_progress", "completed", "cancelled"]).optional()
 });
-var ReservationStatus = [
+var ReservationStatus2 = [
   "pending",
   "confirmed",
   "in_progress",
   "completed",
   "cancelled"
 ];
-var insertReservationSchema = z3.object({
-  user_id: z3.number().optional().nullable(),
-  service_type: z3.enum(ServiceType),
-  details: z3.object({
-    name: z3.string().min(1, "Name is required"),
-    email: z3.string().email("Invalid email format"),
-    phone: z3.string().min(10, "Invalid phone number"),
-    requirements: z3.string().optional(),
-    referenceLinks: z3.array(z3.string().url()).optional()
+var insertReservationSchema = z15.object({
+  user_id: z15.number().optional().nullable(),
+  service_type: z15.enum(ServiceType2),
+  details: z15.object({
+    name: z15.string().min(1, "Name is required"),
+    email: z15.string().email("Invalid email format"),
+    phone: z15.string().min(10, "Invalid phone number"),
+    requirements: z15.string().optional(),
+    referenceLinks: z15.array(z15.string().url()).optional()
   }),
-  preferred_date: z3.string().datetime(),
-  duration_minutes: z3.number().min(30).max(480),
-  total_price: z3.number().min(0),
-  notes: z3.string().optional().nullable()
+  preferred_date: z15.string().datetime(),
+  duration_minutes: z15.number().min(30).max(480),
+  total_price: z15.number().min(0),
+  notes: z15.string().optional().nullable()
+});
+var contactFormSchema = z15.object({
+  name: z15.string().min(2, "Le nom doit contenir au moins 2 caract\xE8res").max(100, "Le nom ne peut pas d\xE9passer 100 caract\xE8res"),
+  email: z15.string().email("Format d'email invalide"),
+  subject: z15.string().max(200, "Le sujet ne peut pas d\xE9passer 200 caract\xE8res").optional().default(""),
+  message: z15.string().min(10, "Le message doit contenir au moins 10 caract\xE8res").max(5e3, "Le message ne peut pas d\xE9passer 5000 caract\xE8res")
 });
 
-// server/routes/downloads.ts
-init_auth();
-
 // server/lib/validation.ts
-import { ZodError, z as z4 } from "zod";
+import { ZodError, z as z16 } from "zod";
 
 // shared/constants/HttpStatus.ts
 var HTTP_STATUS = {
@@ -4785,28 +8429,28 @@ function createValidationMiddleware(schema) {
   };
 }
 var commonSchemas = {
-  id: z4.object({
-    id: z4.string().or(z4.number().positive())
+  id: z16.object({
+    id: z16.string().or(z16.number().positive())
   }),
-  pagination: z4.object({
-    page: z4.number().min(1).optional().default(1),
-    limit: z4.number().min(1).max(100).optional().default(20),
-    offset: z4.number().min(0).optional()
+  pagination: z16.object({
+    page: z16.number().min(1).optional().default(1),
+    limit: z16.number().min(1).max(100).optional().default(20),
+    offset: z16.number().min(0).optional()
   }),
-  sorting: z4.object({
-    sortBy: z4.string().optional(),
-    sortOrder: z4.enum(["asc", "desc"]).optional().default("desc")
+  sorting: z16.object({
+    sortBy: z16.string().optional(),
+    sortOrder: z16.enum(["asc", "desc"]).optional().default("desc")
   }),
-  dateRange: z4.object({
-    startDate: z4.string().datetime().optional(),
-    endDate: z4.string().datetime().optional()
+  dateRange: z16.object({
+    startDate: z16.string().datetime().optional(),
+    endDate: z16.string().datetime().optional()
   }),
-  search: z4.object({
-    query: z4.string().min(1).optional(),
-    filters: z4.record(z4.unknown()).optional()
+  search: z16.object({
+    query: z16.string().min(1).optional(),
+    filters: z16.record(z16.unknown()).optional()
   })
 };
-var validateFileUpload = (allowedTypes, maxSize) => {
+var validateFileUpload2 = (allowedTypes, maxSize) => {
   return (req, res, next) => {
     const files = req.files;
     if (!files || files.length === 0) {
@@ -4847,45 +8491,783 @@ var validateFileUpload = (allowedTypes, maxSize) => {
     next();
   };
 };
-var validateAudioUpload = validateFileUpload(
+var validateAudioUpload = validateFileUpload2(
   ["audio/mpeg", "audio/wav", "audio/flac", "audio/aiff"],
   100 * 1024 * 1024
   // 100MB
 );
-var validateImageUpload = validateFileUpload(
+var validateImageUpload = validateFileUpload2(
   ["image/jpeg", "image/png", "image/gif", "image/webp"],
   10 * 1024 * 1024
   // 10MB
 );
 
-// server/middleware/clerkAuth.ts
-import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
-var withClerkAuth = ClerkExpressWithAuth({
-  onError: (error) => {
-    console.error("Clerk auth error:", error);
-    return {
-      error: "Non autoris\xE9",
-      message: "Authentification Clerk requise"
-    };
+// server/services/mail.ts
+import nodemailer from "nodemailer";
+var createTransporter = () => {
+  const resendKey = process.env.RESEND_API_KEY;
+  console.log("\u{1F4E7} Email config check:", {
+    hasResendKey: !!resendKey,
+    keyPrefix: resendKey ? resendKey.substring(0, 6) + "..." : "none",
+    nodeEnv: process.env.NODE_ENV
+  });
+  if (resendKey) {
+    console.log("\u{1F4E7} Email transporter: Using Resend SMTP");
+    return nodemailer.createTransport({
+      host: "smtp.resend.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: "resend",
+        pass: resendKey
+      }
+    });
   }
-});
+  console.log("\u{1F4E7} Email transporter: Resend API key not found, falling back to Gmail SMTP");
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  if (!smtpUser || !smtpPass || smtpUser === "your_email@gmail.com" || smtpPass === "your_app_password_here") {
+    logger.error("SMTP credentials not configured", {
+      hint: "Please set SMTP_USER and SMTP_PASS in .env or use RESEND_API_KEY"
+    });
+    throw new Error("Email service not configured. Please contact administrator.");
+  }
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_PORT === "465",
+    auth: {
+      user: smtpUser,
+      pass: smtpPass
+    },
+    pool: true,
+    maxConnections: 3,
+    rateDelta: 1e3,
+    rateLimit: 5
+  });
+};
+var transporter = null;
+var getTransporter = () => {
+  if (!transporter) {
+    try {
+      transporter = createTransporter();
+    } catch (error) {
+      logger.error("Failed to create email transporter", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+  }
+  return transporter;
+};
+var sleep2 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+var calculateDelay2 = (attempt, options) => {
+  const baseDelay = options.baseDelay || 1e3;
+  const backoffFactor = options.backoffFactor || 2;
+  const maxDelay = options.maxDelay || 3e4;
+  const delay = baseDelay * Math.pow(backoffFactor, attempt - 1);
+  return Math.min(delay, maxDelay);
+};
+var stripHTML = (html) => {
+  return html.replaceAll(/<[^>]*>/g, "").replaceAll("&nbsp;", " ").replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&quot;", '"').trim();
+};
+async function sendMail(payload, retryOptions) {
+  const options = {
+    maxRetries: 3,
+    baseDelay: 1e3,
+    maxDelay: 3e4,
+    backoffFactor: 2,
+    ...retryOptions
+  };
+  let lastError = null;
+  for (let attempt = 1; attempt <= (options.maxRetries || 3); attempt++) {
+    try {
+      if (process.env.MAIL_DRY_RUN === "true") {
+        console.log("\u{1F4E7} MAIL DRY RUN:", {
+          to: payload.to,
+          subject: payload.subject,
+          from: payload.from || process.env.DEFAULT_FROM,
+          attempt
+        });
+        return "dry-run-message-id";
+      }
+      const transporter2 = getTransporter();
+      const mailOptions = {
+        from: payload.from || process.env.DEFAULT_FROM || "BroLab <contact@brolabentertainment.com>",
+        to: payload.to,
+        subject: payload.subject,
+        html: payload.html,
+        text: payload.text || stripHTML(payload.html),
+        replyTo: payload.replyTo
+      };
+      const result = await transporter2.sendMail(mailOptions);
+      console.log(`\u2705 Email sent successfully on attempt ${attempt}:`, result.messageId);
+      return result.messageId;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(
+        `\u26A0\uFE0F Email sending failed on attempt ${attempt}/${options.maxRetries}:`,
+        lastError.message
+      );
+      if (attempt === options.maxRetries) {
+        break;
+      }
+      const delay = calculateDelay2(attempt, options);
+      console.log(`\u23F3 Retrying in ${delay}ms...`);
+      await sleep2(delay);
+    }
+  }
+  const errorMessage = lastError?.message || "Unknown error";
+  logger.error("All email sending attempts failed", {
+    to: payload.to,
+    subject: payload.subject,
+    maxRetries: options.maxRetries,
+    error: errorMessage
+  });
+  throw new Error(`Email sending failed after ${options.maxRetries} attempts: ${errorMessage}`);
+}
+async function sendMailWithResult(payload, retryOptions) {
+  const options = {
+    maxRetries: 3,
+    baseDelay: 1e3,
+    maxDelay: 3e4,
+    backoffFactor: 2,
+    ...retryOptions
+  };
+  let lastError = null;
+  for (let attempt = 1; attempt <= (options.maxRetries || 3); attempt++) {
+    try {
+      const messageId = await sendMail(payload, { maxRetries: 1 });
+      return {
+        success: true,
+        messageId,
+        attempts: attempt
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt === options.maxRetries) {
+        break;
+      }
+      const delay = calculateDelay2(attempt, options);
+      await sleep2(delay);
+    }
+  }
+  return {
+    success: false,
+    error: lastError?.message || "Unknown error",
+    attempts: options.maxRetries || 3
+  };
+}
+async function sendAdminNotification(type, payload) {
+  const adminEmails = process.env.ADMIN_EMAILS?.split(",") || ["contact@brolabentertainment.com"];
+  return await sendMail({
+    to: adminEmails,
+    subject: `[BroLab Admin] ${payload.subject}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #8B5CF6;">Admin Notification - ${type}</h2>
+        ${payload.html}
+        ${payload.metadata ? `<pre style="background: #f5f5f5; padding: 10px; margin-top: 20px;">${JSON.stringify(payload.metadata, null, 2)}</pre>` : ""}
+      </div>
+    `
+  });
+}
+
+// server/routes/contact.ts
+var router8 = Router8();
+var contactRateLimitMap = /* @__PURE__ */ new Map();
+var checkContactRateLimit = (identifier) => {
+  const now = Date.now();
+  const key = `contact_${identifier}`;
+  const limit = contactRateLimitMap.get(key);
+  if (!limit || now > limit.resetTime) {
+    contactRateLimitMap.set(key, { count: 1, resetTime: now + 60 * 60 * 1e3 });
+    return true;
+  }
+  if (limit.count >= 5) {
+    return false;
+  }
+  limit.count++;
+  return true;
+};
+var generateContactConfirmationEmail = (name, message) => {
+  const frontendUrl = process.env.FRONTEND_URL || "https://www.brolabentertainment.com";
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="margin: 0; padding: 0; background: #f4f4f4;">
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 30px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">Message Received! \u{1F4EC}</h1>
+          <p style="color: #E5E7EB; margin: 10px 0 0 0; font-size: 16px;">Thank you for contacting us</p>
+        </div>
+        
+        <div style="padding: 30px; background: white;">
+          <h2 style="color: #333; margin: 0 0 20px 0;">Hello ${name}! \u{1F44B}</h2>
+          <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+            We have received your message and will get back to you as soon as possible, 
+            typically within 24 to 48 business hours.
+          </p>
+          
+          <div style="background: #EEF2FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #8B5CF6; margin: 0 0 10px 0;">Your message summary:</h3>
+            <p style="color: #374151; white-space: pre-wrap; margin: 0;">${message.substring(0, 500)}${message.length > 500 ? "..." : ""}</p>
+          </div>
+          
+          <p style="color: #666; line-height: 1.6;">
+            In the meantime, feel free to explore our beats catalog or check out our FAQ.
+          </p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${frontendUrl}/shop" 
+               style="background: #8B5CF6; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+              Explore Our Beats
+            </a>
+          </div>
+        </div>
+        
+        <div style="background: #F9FAFB; padding: 20px; text-align: center; color: #6B7280; font-size: 14px;">
+          <p style="margin: 0;">BroLab Entertainment - Professional Music Production Services</p>
+          <p style="margin: 5px 0 0 0;">Your destination for quality beats</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+router8.post(
+  "/",
+  createValidationMiddleware(contactFormSchema),
+  async (req, res) => {
+    try {
+      if (!req.validatedData) {
+        res.status(400).json({
+          success: false,
+          message: "Invalid request data"
+        });
+        return;
+      }
+      const { name, email, subject, message } = req.validatedData;
+      const clientIp = req.ip || req.socket.remoteAddress || "unknown";
+      if (!checkContactRateLimit(clientIp) || !checkContactRateLimit(email)) {
+        logger.warn("Contact form rate limit exceeded", { email, ip: clientIp });
+        res.status(429).json({
+          success: false,
+          message: "Too many messages sent. Please try again in an hour."
+        });
+        return;
+      }
+      logger.info("Processing contact form submission", {
+        name,
+        email,
+        subject: subject || "(no subject)",
+        messageLength: message.length
+      });
+      try {
+        await sendMail({
+          to: email,
+          subject: "Your message has been received - BroLab Entertainment",
+          html: generateContactConfirmationEmail(name, message)
+        });
+        logger.info("Contact confirmation email sent", { email });
+      } catch (emailError) {
+        logger.error("Failed to send contact confirmation email", {
+          error: emailError instanceof Error ? emailError.message : String(emailError),
+          email
+        });
+      }
+      try {
+        const subjectLine = subject ? `New message from ${name} - ${subject}` : `New message from ${name}`;
+        await sendAdminNotification("Contact Form", {
+          subject: subjectLine,
+          html: `
+            <div style="background: #FFF7ED; padding: 20px; border-radius: 8px; border-left: 4px solid #F59E0B;">
+              <h3 style="color: #D97706; margin: 0 0 15px 0;">\u{1F4EC} New Contact Message</h3>
+              <p><strong>Name:</strong> ${name}</p>
+              <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
+              ${subject ? `<p><strong>Subject:</strong> ${subject}</p>` : ""}
+              <p><strong>Message:</strong></p>
+              <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 10px;">
+                <p style="white-space: pre-wrap; margin: 0;">${message}</p>
+              </div>
+            </div>
+          `,
+          metadata: {
+            senderName: name,
+            senderEmail: email,
+            subject: subject || "(no subject)",
+            messageLength: message.length,
+            timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+            clientIp
+          }
+        });
+        logger.info("Admin notification sent for contact form");
+      } catch (adminError) {
+        logger.error("Failed to send admin notification", {
+          error: adminError instanceof Error ? adminError.message : String(adminError)
+        });
+      }
+      res.json({
+        success: true,
+        message: "Your message has been sent successfully. We'll get back to you soon!"
+      });
+    } catch (error) {
+      logger.error("Contact form submission failed", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      handleRouteError(error, res, "Failed to send message");
+    }
+  }
+);
+var contact_default = router8;
+
+// server/routes/downloads.ts
+import archiver from "archiver";
+import express from "express";
+import { Parser } from "json2csv";
+init_auth();
+
+// server/middleware/clerkAuth.ts
+import { clerkMiddleware as clerkMiddleware2, getAuth as getAuth5 } from "@clerk/express";
+var withClerkAuth = clerkMiddleware2();
 var getCurrentClerkUser = (req) => {
-  return req.auth?.userId ? {
-    id: req.auth.userId,
-    sessionId: req.auth.sessionId,
-    getToken: req.auth.getToken
+  const auth = getAuth5(req);
+  return auth?.userId ? {
+    id: auth.userId,
+    sessionId: auth.sessionId,
+    getToken: auth.getToken
   } : null;
 };
+
+// server/middleware/requireDownloadAccess.ts
+init_audit();
+
+// server/services/DownloadEntitlementService.ts
+init_audit();
+import { ConvexHttpClient as ConvexHttpClient4 } from "convex/browser";
+var DownloadEntitlementService = class _DownloadEntitlementService {
+  static instance;
+  convex;
+  constructor(convexUrl) {
+    this.convex = new ConvexHttpClient4(convexUrl);
+  }
+  /**
+   * Get singleton instance
+   */
+  static getInstance() {
+    if (!_DownloadEntitlementService.instance) {
+      const convexUrl = process.env.VITE_CONVEX_URL;
+      if (!convexUrl) {
+        throw new Error("VITE_CONVEX_URL environment variable is required");
+      }
+      _DownloadEntitlementService.instance = new _DownloadEntitlementService(convexUrl);
+    }
+    return _DownloadEntitlementService.instance;
+  }
+  /**
+   * Assert that a user can download a specific beat
+   *
+   * Checks entitlement through:
+   * 1. Existing download record (already granted access)
+   * 2. Paid order containing the beat
+   * 3. Active subscription with available quota
+   *
+   * @param userId - Convex user ID
+   * @param beatId - Beat/product ID to download
+   * @param requestedLicenseType - Optional specific license type requested
+   * @param ipAddress - Client IP for audit logging
+   * @param userAgent - Client user agent for audit logging
+   * @returns EntitlementResult with decision and metadata
+   */
+  async assertCanDownload(userId, beatId, requestedLicenseType, ipAddress, userAgent) {
+    const startTime = Date.now();
+    try {
+      const existingDownload = await this.checkExistingDownload(
+        userId,
+        beatId,
+        requestedLicenseType
+      );
+      if (existingDownload.canDownload) {
+        await this.logDownloadAttempt(
+          userId,
+          beatId,
+          true,
+          "existing_download",
+          ipAddress,
+          userAgent
+        );
+        return existingDownload;
+      }
+      const orderEntitlement = await this.checkOrderEntitlement(
+        userId,
+        beatId,
+        requestedLicenseType
+      );
+      if (orderEntitlement.canDownload) {
+        await this.logDownloadAttempt(userId, beatId, true, "paid_order", ipAddress, userAgent);
+        return orderEntitlement;
+      }
+      const subscriptionEntitlement = await this.checkSubscriptionEntitlement(userId);
+      if (subscriptionEntitlement.canDownload) {
+        await this.logDownloadAttempt(userId, beatId, true, "subscription", ipAddress, userAgent);
+        return subscriptionEntitlement;
+      }
+      await this.logDownloadAttempt(userId, beatId, false, "no_entitlement", ipAddress, userAgent);
+      return {
+        canDownload: false,
+        reason: "No valid entitlement found for this beat",
+        source: "none"
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(`\u274C Entitlement check failed after ${duration}ms:`, error);
+      await this.logDownloadAttempt(userId, beatId, false, "error", ipAddress, userAgent, {
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+      return {
+        canDownload: false,
+        reason: "Unable to verify download entitlement",
+        source: "none"
+      };
+    }
+  }
+  /**
+   * Check for existing download record
+   * Uses Convex HTTP client with string-based function reference
+   */
+  async checkExistingDownload(userId, beatId, requestedLicenseType) {
+    try {
+      const convexClient2 = this.convex;
+      const downloads = await convexClient2.query(
+        "downloads:getUserDownloads",
+        {}
+      );
+      const matchingDownload = downloads.find((d) => {
+        const beatMatch = d.beatId === beatId;
+        const licenseMatch = !requestedLicenseType || d.licenseType === requestedLicenseType;
+        return beatMatch && licenseMatch;
+      });
+      if (matchingDownload) {
+        return {
+          canDownload: true,
+          reason: "Download access already granted",
+          source: "order",
+          licenseType: matchingDownload.licenseType
+        };
+      }
+      return {
+        canDownload: false,
+        reason: "No existing download record",
+        source: "none"
+      };
+    } catch (error) {
+      console.error("Error checking existing download:", error);
+      return {
+        canDownload: false,
+        reason: "Error checking download records",
+        source: "none"
+      };
+    }
+  }
+  /**
+   * Check for paid order containing the beat
+   * Uses listOrdersByClerkId which accepts clerkId parameter
+   */
+  async checkOrderEntitlement(userId, beatId, requestedLicenseType) {
+    try {
+      const convexClient2 = this.convex;
+      const orders = await convexClient2.query("orders/listUserOrders:listOrdersByClerkId", {
+        clerkId: userId,
+        status: "paid"
+      });
+      for (const order of orders) {
+        const matchingItem = order.items?.find((item) => {
+          const productMatch = item.productId === beatId;
+          const licenseMatch = !requestedLicenseType || item.license === requestedLicenseType;
+          return productMatch && licenseMatch;
+        });
+        if (matchingItem) {
+          return {
+            canDownload: true,
+            reason: "Valid paid order found",
+            source: "order",
+            orderId: order._id,
+            licenseType: matchingItem.license
+          };
+        }
+      }
+      return {
+        canDownload: false,
+        reason: "No paid order found for this beat",
+        source: "none"
+      };
+    } catch (error) {
+      console.error("Error checking order entitlement:", error);
+      return {
+        canDownload: false,
+        reason: "Error checking order records",
+        source: "none"
+      };
+    }
+  }
+  /**
+   * Check subscription-based download quota
+   */
+  async checkSubscriptionEntitlement(_userId) {
+    try {
+      const convexClient2 = this.convex;
+      const quotaResult = await convexClient2.query(
+        "subscriptions/checkDownloadQuota:checkDownloadQuota",
+        {}
+      );
+      if (quotaResult.canDownload) {
+        return {
+          canDownload: true,
+          reason: quotaResult.reason,
+          source: "subscription",
+          subscriptionId: quotaResult.subscriptionId,
+          licenseType: quotaResult.planId,
+          remainingQuota: quotaResult.quota.remaining
+        };
+      }
+      return {
+        canDownload: false,
+        reason: quotaResult.reason || "Subscription quota exceeded or no active subscription",
+        source: "none"
+      };
+    } catch (error) {
+      console.error("Error checking subscription entitlement:", error);
+      return {
+        canDownload: false,
+        reason: "Error checking subscription quota",
+        source: "none"
+      };
+    }
+  }
+  /**
+   * Log download attempt to audit system
+   */
+  async logDownloadAttempt(userId, beatId, allowed, source, ipAddress, userAgent, additionalDetails) {
+    try {
+      await auditLogger.log({
+        userId,
+        action: allowed ? "download_authorized" : "download_denied",
+        resource: "downloads",
+        details: {
+          beatId,
+          source,
+          allowed,
+          ...additionalDetails
+        },
+        ipAddress,
+        userAgent
+      });
+    } catch (error) {
+      console.error("Failed to log download attempt:", error);
+    }
+  }
+  /**
+   * Check entitlement for guest user (by email)
+   * Used for guest checkout scenarios
+   */
+  async assertCanDownloadByEmail(email, beatId, requestedLicenseType, ipAddress, userAgent) {
+    try {
+      const convexClient2 = this.convex;
+      const orders = await convexClient2.query("orders/getOrdersByEmail:getOrdersByEmail", {
+        email,
+        status: "paid"
+      });
+      for (const order of orders) {
+        const matchingItem = order.items?.find((item) => {
+          const productMatch = item.productId === beatId;
+          const licenseMatch = !requestedLicenseType || item.license === requestedLicenseType;
+          return productMatch && licenseMatch;
+        });
+        if (matchingItem) {
+          await this.logDownloadAttempt(
+            `guest:${email}`,
+            beatId,
+            true,
+            "guest_order",
+            ipAddress,
+            userAgent
+          );
+          return {
+            canDownload: true,
+            reason: "Valid paid order found for guest",
+            source: "order",
+            orderId: order._id,
+            licenseType: matchingItem.license
+          };
+        }
+      }
+      await this.logDownloadAttempt(
+        `guest:${email}`,
+        beatId,
+        false,
+        "no_guest_entitlement",
+        ipAddress,
+        userAgent
+      );
+      return {
+        canDownload: false,
+        reason: "No paid order found for this email",
+        source: "none"
+      };
+    } catch (error) {
+      console.error("Error checking guest entitlement:", error);
+      return {
+        canDownload: false,
+        reason: "Error checking guest order records",
+        source: "none"
+      };
+    }
+  }
+};
+var getDownloadEntitlementService = () => {
+  return DownloadEntitlementService.getInstance();
+};
+
+// server/middleware/requireDownloadAccess.ts
+function getClientIp2(req) {
+  return req.headers["x-forwarded-for"]?.split(",")[0] || req.headers["x-real-ip"] || req.socket?.remoteAddress || "unknown";
+}
+function getUserAgent(req) {
+  return req.headers["user-agent"] || "unknown";
+}
+var requireDownloadAccess = async (req, res, next) => {
+  const ipAddress = getClientIp2(req);
+  const userAgent = getUserAgent(req);
+  try {
+    if (!req.user) {
+      await auditLogger.logSecurityEvent(
+        "anonymous",
+        "download_access_denied",
+        {
+          reason: "not_authenticated",
+          path: req.path,
+          method: req.method
+        },
+        ipAddress,
+        userAgent
+      );
+      res.status(401).json({
+        error: "Authentication required",
+        code: "UNAUTHORIZED"
+      });
+      return;
+    }
+    const beatId = extractBeatId(req);
+    if (!beatId) {
+      res.status(400).json({
+        error: "Beat ID is required",
+        code: "MISSING_BEAT_ID"
+      });
+      return;
+    }
+    const licenseType = extractLicenseType(req);
+    const userId = req.user.clerkId || req.user.id;
+    if (!userId) {
+      res.status(401).json({
+        error: "Invalid user session",
+        code: "INVALID_SESSION"
+      });
+      return;
+    }
+    const entitlementService = getDownloadEntitlementService();
+    const entitlement = await entitlementService.assertCanDownload(
+      userId,
+      beatId,
+      licenseType,
+      ipAddress,
+      userAgent
+    );
+    if (!entitlement.canDownload) {
+      await auditLogger.logSecurityEvent(
+        userId,
+        "download_access_denied",
+        {
+          beatId,
+          licenseType,
+          reason: entitlement.reason,
+          path: req.path
+        },
+        ipAddress,
+        userAgent
+      );
+      res.status(403).json({
+        error: "Download access denied",
+        code: "DOWNLOAD_NOT_ENTITLED",
+        reason: entitlement.reason
+      });
+      return;
+    }
+    req.downloadEntitlement = {
+      canDownload: true,
+      source: entitlement.source,
+      orderId: entitlement.orderId,
+      licenseType: entitlement.licenseType,
+      subscriptionId: entitlement.subscriptionId,
+      remainingQuota: entitlement.remainingQuota
+    };
+    await auditLogger.logSecurityEvent(
+      userId,
+      "download_access_granted",
+      {
+        beatId,
+        licenseType: entitlement.licenseType,
+        source: entitlement.source,
+        path: req.path
+      },
+      ipAddress,
+      userAgent
+    );
+    next();
+  } catch (error) {
+    console.error("Error in requireDownloadAccess middleware:", error);
+    await auditLogger.logSecurityEvent(
+      req.user?.clerkId || "unknown",
+      "download_access_error",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+        path: req.path
+      },
+      ipAddress,
+      userAgent
+    );
+    res.status(500).json({
+      error: "Download authorization check failed",
+      code: "INTERNAL_ERROR"
+    });
+  }
+};
+function extractBeatId(req) {
+  const fromParams = req.params?.beatId || req.params?.productId;
+  const fromQuery = req.query?.beatId || req.query?.productId;
+  const body = req.body;
+  const fromBody = body?.beatId || body?.productId;
+  const rawId = fromParams || fromQuery || fromBody;
+  if (!rawId) return null;
+  const beatId = typeof rawId === "string" ? Number.parseInt(rawId, 10) : Number(rawId);
+  return Number.isNaN(beatId) ? null : beatId;
+}
+function extractLicenseType(req) {
+  const body = req.body;
+  return req.query?.licenseType || req.query?.license || body?.licenseType || body?.license;
+}
 
 // server/routes/downloads.ts
 init_convex();
 var convex2 = getConvex();
-var router6 = express.Router();
-router6.post(
+var router9 = express.Router();
+router9.post(
   "/",
   isAuthenticated,
   createValidationMiddleware(insertDownloadSchema),
+  requireDownloadAccess,
   async (req, res) => {
+    const downloadReq = req;
     try {
       const user = await getCurrentUser(req);
       if (!user) {
@@ -4897,19 +9279,23 @@ router6.post(
         res.status(401).json({ error: "Clerk authentication required" });
         return;
       }
-      const { productId, license, price, productName } = req.body;
+      const body = req.body;
+      const { productId, license, price, productName } = body;
+      const entitlement = downloadReq.downloadEntitlement;
+      const effectiveLicense = entitlement?.licenseType || license;
       console.log(`\u{1F527} Download request received:`, {
         userId: user.id,
         clerkId: clerkUser.id,
         productId,
-        license,
+        license: effectiveLicense,
         price,
-        productName
+        productName,
+        entitlementSource: entitlement?.source
       });
       const convexClient2 = convex2;
       const download = await convexClient2.mutation("downloads:recordDownload", {
         beatId: Number(productId),
-        licenseType: String(license),
+        licenseType: String(effectiveLicense),
         downloadUrl: void 0
       });
       if (download) {
@@ -4920,7 +9306,7 @@ router6.post(
             id: download,
             userId: user.id,
             productId,
-            license,
+            license: effectiveLicense,
             timestamp: Date.now()
           }
         });
@@ -4932,7 +9318,7 @@ router6.post(
     }
   }
 );
-router6.get("/", isAuthenticated, async (req, res) => {
+router9.get("/", isAuthenticated, async (req, res) => {
   try {
     const user = await getCurrentUser(req);
     if (!user) {
@@ -4959,7 +9345,7 @@ router6.get("/", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to list downloads");
   }
 });
-router6.get("/export", isAuthenticated, async (req, res) => {
+router9.get("/export", isAuthenticated, async (req, res) => {
   try {
     const user = await getCurrentUser(req);
     if (!user) {
@@ -4991,7 +9377,7 @@ router6.get("/export", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to export downloads");
   }
 });
-router6.get("/quota", isAuthenticated, async (req, res) => {
+router9.get("/quota", isAuthenticated, async (req, res) => {
   try {
     const user = await getCurrentUser(req);
     if (!user) {
@@ -5030,7 +9416,7 @@ router6.get("/quota", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to fetch download quota");
   }
 });
-router6.get("/debug", async (req, res) => {
+router9.get("/debug", async (req, res) => {
   try {
     res.json({
       success: true,
@@ -5047,7 +9433,7 @@ router6.get("/debug", async (req, res) => {
     });
   }
 });
-router6.get("/quota/test", async (req, res) => {
+router9.get("/quota/test", async (req, res) => {
   try {
     res.json({
       downloadsUsed: 0,
@@ -5062,7 +9448,7 @@ router6.get("/quota/test", async (req, res) => {
     handleRouteError(error, res, "Failed to fetch test download quota");
   }
 });
-router6.get("/file/:productId/:type", async (req, res) => {
+router9.get("/file/:productId/:type", async (req, res) => {
   try {
     const { productId, type } = req.params;
     res.json({
@@ -5078,7 +9464,7 @@ router6.get("/file/:productId/:type", async (req, res) => {
     handleRouteError(error, res, "File download failed");
   }
 });
-router6.get("/proxy", async (req, res) => {
+router9.get("/proxy", async (req, res) => {
   try {
     const { url, filename } = req.query;
     console.log("\u{1F4E5} Proxy download request:", { url, filename });
@@ -5187,7 +9573,7 @@ async function addTracksToArchive(archive, tracks) {
     trackIndex++;
   }
 }
-router6.post("/zip", async (req, res) => {
+router9.post("/zip", async (req, res) => {
   try {
     const { productName, tracks } = req.body;
     console.log("\u{1F4E6} ZIP download request:", { productName, trackCount: tracks?.length });
@@ -5223,155 +9609,13 @@ router6.post("/zip", async (req, res) => {
     }
   }
 });
-var downloads_default = router6;
+var downloads_default = router9;
 
 // server/routes/email.ts
 import bcrypt from "bcrypt";
-import { Router as Router6 } from "express";
+import { Router as Router9 } from "express";
 import { v4 as uuidv4 } from "uuid";
 init_convex();
-
-// server/services/mail.ts
-import nodemailer from "nodemailer";
-var createTransporter = () => {
-  if (process.env.RESEND_API_KEY) {
-    return nodemailer.createTransport({
-      host: "smtp.resend.com",
-      port: 465,
-      secure: true,
-      auth: {
-        user: "resend",
-        pass: process.env.RESEND_API_KEY
-      }
-    });
-  }
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-  if (!smtpUser || !smtpPass || smtpUser === "your_email@gmail.com" || smtpPass === "your_app_password_here") {
-    console.error(
-      "\u274C SMTP credentials not configured. Please set SMTP_USER and SMTP_PASS in .env or use RESEND_API_KEY"
-    );
-    throw new Error("Email service not configured. Please contact administrator.");
-  }
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_PORT === "465",
-    auth: {
-      user: smtpUser,
-      pass: smtpPass
-    },
-    pool: true,
-    maxConnections: 3,
-    rateDelta: 1e3,
-    rateLimit: 5
-  });
-};
-var transporter = null;
-var getTransporter = () => {
-  if (!transporter) {
-    try {
-      transporter = createTransporter();
-    } catch (error) {
-      console.error("\u274C Failed to create email transporter:", error);
-      throw error;
-    }
-  }
-  return transporter;
-};
-var sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-var calculateDelay = (attempt, options) => {
-  const baseDelay = options.baseDelay || 1e3;
-  const backoffFactor = options.backoffFactor || 2;
-  const maxDelay = options.maxDelay || 3e4;
-  const delay = baseDelay * Math.pow(backoffFactor, attempt - 1);
-  return Math.min(delay, maxDelay);
-};
-var stripHTML = (html) => {
-  return html.replaceAll(/<[^>]*>/g, "").replaceAll("&nbsp;", " ").replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&quot;", '"').trim();
-};
-async function sendMail(payload, retryOptions) {
-  const options = {
-    maxRetries: 3,
-    baseDelay: 1e3,
-    maxDelay: 3e4,
-    backoffFactor: 2,
-    ...retryOptions
-  };
-  let lastError = null;
-  for (let attempt = 1; attempt <= (options.maxRetries || 3); attempt++) {
-    try {
-      if (process.env.MAIL_DRY_RUN === "true") {
-        console.log("\u{1F4E7} MAIL DRY RUN:", {
-          to: payload.to,
-          subject: payload.subject,
-          from: payload.from || process.env.DEFAULT_FROM,
-          attempt
-        });
-        return "dry-run-message-id";
-      }
-      const transporter2 = getTransporter();
-      const mailOptions = {
-        from: payload.from || process.env.DEFAULT_FROM || "BroLab <contact@brolabentertainment.com>",
-        to: payload.to,
-        subject: payload.subject,
-        html: payload.html,
-        text: payload.text || stripHTML(payload.html),
-        replyTo: payload.replyTo
-      };
-      const result = await transporter2.sendMail(mailOptions);
-      console.log(`\u2705 Email sent successfully on attempt ${attempt}:`, result.messageId);
-      return result.messageId;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      console.warn(
-        `\u26A0\uFE0F Email sending failed on attempt ${attempt}/${options.maxRetries}:`,
-        lastError.message
-      );
-      if (attempt === options.maxRetries) {
-        break;
-      }
-      const delay = calculateDelay(attempt, options);
-      console.log(`\u23F3 Retrying in ${delay}ms...`);
-      await sleep(delay);
-    }
-  }
-  const errorMessage = lastError?.message || "Unknown error";
-  console.error("\u274C All email sending attempts failed:", errorMessage);
-  throw new Error(`Email sending failed after ${options.maxRetries} attempts: ${errorMessage}`);
-}
-async function sendMailWithResult(payload, retryOptions) {
-  const options = {
-    maxRetries: 3,
-    baseDelay: 1e3,
-    maxDelay: 3e4,
-    backoffFactor: 2,
-    ...retryOptions
-  };
-  let lastError = null;
-  for (let attempt = 1; attempt <= (options.maxRetries || 3); attempt++) {
-    try {
-      const messageId = await sendMail(payload, { maxRetries: 1 });
-      return {
-        success: true,
-        messageId,
-        attempts: attempt
-      };
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      if (attempt === options.maxRetries) {
-        break;
-      }
-      const delay = calculateDelay(attempt, options);
-      await sleep(delay);
-    }
-  }
-  return {
-    success: false,
-    error: lastError?.message || "Unknown error",
-    attempts: options.maxRetries || 3
-  };
-}
 
 // server/services/ReservationEmailService.ts
 var ReservationEmailService = class {
@@ -5522,7 +9766,7 @@ var ReservationEmailService = class {
           ${payment ? `
           <div style="background: #EEF2FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="color: #8B5CF6; margin: 0 0 10px 0;">Payment Information</h3>
-            <p><strong>Amount:</strong> ${(payment.amount / 100).toFixed(2)} ${payment.currency.toUpperCase()}</p>
+            <p><strong>Amount:</strong> ${formatCurrencyDisplay(payment.amount, { currency: payment.currency })}</p>
             <p><strong>Payment Method:</strong> ${payment.paymentMethod || "Card"}</p>
             ${payment.paymentIntentId ? `<p><strong>Transaction ID:</strong> ${payment.paymentIntentId}</p>` : ""}
           </div>
@@ -5718,7 +9962,7 @@ var ReservationEmailService = class {
           
           <div style="background: #F0FDF4; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10B981;">
             <h3 style="color: #059669; margin: 0 0 10px 0;">Payment Details</h3>
-            <p><strong>Amount Paid:</strong> ${(payment.amount / 100).toFixed(2)} ${payment.currency.toUpperCase()}</p>
+            <p><strong>Amount Paid:</strong> ${formatCurrencyDisplay(payment.amount, { currency: payment.currency })}</p>
             <p><strong>Payment Method:</strong> ${payment.paymentMethod || "Card"}</p>
             ${payment.paymentIntentId ? `<p><strong>Transaction ID:</strong> ${payment.paymentIntentId}</p>` : ""}
             <p><strong>Status:</strong> <span style="color: #10B981; font-weight: bold;">PAID</span></p>
@@ -5762,7 +10006,7 @@ var ReservationEmailService = class {
           
           <div style="background: #FEF2F2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #EF4444;">
             <h3 style="color: #DC2626; margin: 0 0 10px 0;">Payment Details</h3>
-            <p><strong>Amount:</strong> ${(payment.amount / 100).toFixed(2)} ${payment.currency.toUpperCase()}</p>
+            <p><strong>Amount:</strong> ${formatCurrencyDisplay(payment.amount, { currency: payment.currency })}</p>
             ${payment.paymentIntentId ? `<p><strong>Payment Intent ID:</strong> ${payment.paymentIntentId}</p>` : ""}
             <p><strong>Failure Reason:</strong> ${failureReason || "Payment processing failed"}</p>
           </div>
@@ -5921,109 +10165,156 @@ var emailTemplates = {
    * Email verification template
    */
   verifyEmail: (verificationLink, username) => ({
-    subject: "V\xE9rifiez votre adresse email - BroLab Entertainment",
+    subject: "Verify your email address - BroLab Entertainment",
     html: generateEmailWrapper(
       "BroLab Entertainment",
-      "V\xE9rifiez votre compte",
+      "Verify your account",
       `
-        <h2 style="color: #333; margin: 0 0 20px 0;">Salut ${username} ! \u{1F44B}</h2>
+        <h2 style="color: #333; margin: 0 0 20px 0;">Hey ${username}! \u{1F44B}</h2>
         <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
-          Bienvenue sur BroLab Entertainment ! Pour terminer votre inscription et acc\xE9der \xE0 votre compte, veuillez v\xE9rifier votre adresse email.
+          Welcome to BroLab Entertainment! To complete your registration and access your account, please verify your email address.
         </p>
         <div style="text-align: center; margin: 30px 0;">
           <a href="${verificationLink}" style="${EMAIL_STYLES.button}">
-            V\xE9rifier mon email
+            Verify my email
           </a>
         </div>
         <p style="color: #999; font-size: 14px; margin-top: 30px;">
-          Ce lien expirera dans 24 heures. Si vous n'avez pas cr\xE9\xE9 de compte, ignorez cet email.
+          This link will expire in 24 hours. If you didn't create an account, please ignore this email.
         </p>
       `,
-      "Votre destination pour les beats de qualit\xE9"
+      "Your destination for quality beats"
     )
   }),
   /**
    * Password reset template
    */
   resetPassword: (resetLink, username) => ({
-    subject: "R\xE9initialisation de votre mot de passe - BroLab Entertainment",
+    subject: "Reset your password - BroLab Entertainment",
     html: generateEmailWrapper(
       "BroLab Entertainment",
-      "R\xE9initialisation du mot de passe",
+      "Password Reset",
       `
-        <h2 style="color: #333; margin: 0 0 20px 0;">R\xE9initialisation du mot de passe</h2>
+        <h2 style="color: #333; margin: 0 0 20px 0;">Password Reset</h2>
         <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
-          Salut ${username}, vous avez demand\xE9 \xE0 r\xE9initialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour cr\xE9er un nouveau mot de passe.
+          Hey ${username}, you requested to reset your password. Click the button below to create a new password.
         </p>
         <div style="text-align: center; margin: 30px 0;">
           <a href="${resetLink}" style="background: #EF4444; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-            R\xE9initialiser mon mot de passe
+            Reset my password
           </a>
         </div>
         <p style="color: #999; font-size: 14px; margin-top: 30px;">
-          Ce lien expirera dans 15 minutes. Si vous n'avez pas demand\xE9 cette r\xE9initialisation, ignorez cet email.
+          This link will expire in 15 minutes. If you didn't request this reset, please ignore this email.
         </p>
       `,
-      "S\xE9curit\xE9 de votre compte"
+      "Account Security"
     )
   }),
   /**
    * Order confirmation template
    */
   orderConfirmation: (orderDetails) => ({
-    subject: `Commande confirm\xE9e #${orderDetails.orderNumber} - BroLab Entertainment`,
+    subject: `Order Confirmed #${orderDetails.orderNumber} - BroLab Entertainment`,
     html: generateEmailWrapper(
-      "Commande confirm\xE9e ! \u{1F389}",
-      "Votre achat a \xE9t\xE9 trait\xE9 avec succ\xE8s",
+      "Order Confirmed! \u{1F389}",
+      "Your purchase has been processed successfully",
       `
         <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
-          Merci ${orderDetails.customerName} pour votre achat ! Votre commande a \xE9t\xE9 trait\xE9e avec succ\xE8s.
+          Thank you ${orderDetails.customerName} for your purchase! Your order has been processed successfully.
         </p>
         <div style="${EMAIL_STYLES.infoBox}">
-          <p style="margin: 0;"><strong>Num\xE9ro de commande :</strong> ${orderDetails.orderNumber}</p>
-          <p style="margin: 10px 0 0 0;"><strong>Total :</strong> ${orderDetails.total}\u20AC</p>
+          <p style="margin: 0;"><strong>Order Number:</strong> ${orderDetails.orderNumber}</p>
+          <p style="margin: 10px 0 0 0;"><strong>Total:</strong> $${orderDetails.total}</p>
         </div>
         <p style="color: #666; line-height: 1.6;">
-          Vos fichiers sont maintenant disponibles dans votre compte. Connectez-vous pour les t\xE9l\xE9charger.
+          Your files are now available in your account. Log in to download them.
         </p>
         <div style="text-align: center; margin: 30px 0;">
-          <a href="https://brolabentertainment.com/dashboard" style="${EMAIL_STYLES.button}">
-            Acc\xE9der \xE0 mes t\xE9l\xE9chargements
+          <a href="${process.env.FRONTEND_URL || "https://www.brolabentertainment.com"}/dashboard" style="${EMAIL_STYLES.button}">
+            Access my downloads
           </a>
         </div>
       `,
-      "Merci pour votre confiance"
+      "Thank you for your trust"
     )
   }),
   /**
    * Subscription confirmation template
    */
   subscriptionConfirmation: (subscriptionDetails) => ({
-    subject: `Abonnement activ\xE9 - ${subscriptionDetails.planName} - BroLab Entertainment`,
+    subject: `Subscription Activated - ${subscriptionDetails.planName} - BroLab Entertainment`,
     html: generateEmailWrapper(
-      "Abonnement activ\xE9 ! \u2B50",
-      "Votre plan est maintenant actif",
+      "Subscription Activated! \u2B50",
+      "Your plan is now active",
       `
         <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
-          F\xE9licitations ${subscriptionDetails.customerName} ! Votre abonnement ${subscriptionDetails.planName} est maintenant actif.
+          Congratulations ${subscriptionDetails.customerName}! Your ${subscriptionDetails.planName} subscription is now active.
         </p>
         <div style="${EMAIL_STYLES.infoBox}">
-          <p style="margin: 0;"><strong>Plan :</strong> ${subscriptionDetails.planName}</p>
-          <p style="margin: 10px 0 0 0;"><strong>Cycle :</strong> ${subscriptionDetails.billingCycle}</p>
-          <p style="margin: 10px 0 0 0;"><strong>Prochaine facture :</strong> ${subscriptionDetails.nextBillingDate}</p>
+          <p style="margin: 0;"><strong>Plan:</strong> ${subscriptionDetails.planName}</p>
+          <p style="margin: 10px 0 0 0;"><strong>Billing Cycle:</strong> ${subscriptionDetails.billingCycle}</p>
+          <p style="margin: 10px 0 0 0;"><strong>Next Billing Date:</strong> ${subscriptionDetails.nextBillingDate}</p>
         </div>
         <p style="color: #666; line-height: 1.6;">
-          Profitez de tous les avantages de votre abonnement d\xE8s maintenant !
+          Enjoy all the benefits of your subscription starting now!
         </p>
         <div style="text-align: center; margin: 30px 0;">
-          <a href="https://brolabentertainment.com/membership" style="background: #F59E0B; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-            G\xE9rer mon abonnement
+          <a href="${process.env.FRONTEND_URL || "https://www.brolabentertainment.com"}/membership" style="background: #F59E0B; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+            Manage my subscription
           </a>
         </div>
       `,
-      "Votre partenaire musical"
+      "Your musical partner"
     )
   })
+};
+var sendReservationConfirmationEmail = async (userEmail, reservations, payment) => {
+  const user = {
+    id: "unknown",
+    email: userEmail,
+    fullName: reservations[0]?.details?.name || "User"
+  };
+  const result = await reservationEmailService.sendReservationConfirmation(
+    user,
+    reservations,
+    payment
+  );
+  if (!result.success) {
+    logger.error("Failed to send reservation confirmation email", {
+      error: result.error,
+      reservationCount: reservations.length
+    });
+    throw new Error(`Email sending failed: ${result.error}`);
+  }
+  logger.info("Reservation confirmation email sent successfully", {
+    attempts: result.attempts,
+    hasReservationId: !!reservations[0]?.id,
+    reservationCount: reservations.length
+  });
+};
+var sendPaymentFailureEmail = async (userEmail, reservationIds, payment, failureReason) => {
+  const user = {
+    id: "unknown",
+    email: userEmail
+  };
+  const result = await reservationEmailService.sendPaymentFailure(
+    user,
+    reservationIds,
+    payment,
+    failureReason
+  );
+  if (!result.success) {
+    logger.error("Failed to send payment failure email", {
+      error: result.error,
+      reservationIdCount: reservationIds.length
+    });
+    throw new Error(`Email sending failed: ${result.error}`);
+  }
+  logger.info("Payment failure email sent successfully", {
+    attempts: result.attempts,
+    reservationIdCount: reservationIds.length
+  });
 };
 var sendAdminReservationNotification = async (user, reservation) => {
   const result = await reservationEmailService.sendAdminNotification(user, reservation);
@@ -6043,7 +10334,7 @@ var sendAdminReservationNotification = async (user, reservation) => {
 };
 
 // server/routes/email.ts
-var router7 = Router6();
+var router10 = Router9();
 var convex3 = getConvex();
 var rateLimitMap = /* @__PURE__ */ new Map();
 var checkRateLimit = (email) => {
@@ -6060,7 +10351,7 @@ var checkRateLimit = (email) => {
   limit.count++;
   return true;
 };
-router7.get(
+router10.get(
   "/verify-email",
   createValidationMiddleware(verifyEmailSchema),
   async (req, res) => {
@@ -6094,7 +10385,7 @@ router7.get(
     }
   }
 );
-router7.post(
+router10.post(
   "/resend-verification",
   createValidationMiddleware(resendVerificationSchema),
   async (req, res) => {
@@ -6148,7 +10439,7 @@ router7.post(
     }
   }
 );
-router7.post(
+router10.post(
   "/forgot-password",
   createValidationMiddleware(forgotPasswordSchema),
   async (req, res) => {
@@ -6209,7 +10500,7 @@ router7.post(
     }
   }
 );
-router7.post(
+router10.post(
   "/reset-password",
   createValidationMiddleware(resetPasswordSchema),
   async (req, res) => {
@@ -6260,10 +10551,11 @@ router7.post(
     }
   }
 );
-var email_default = router7;
+var email_default = router10;
 
 // server/routes/monitoring.ts
-import { Router as Router7 } from "express";
+import { getAuth as getAuth6 } from "@clerk/express";
+import { Router as Router10 } from "express";
 
 // shared/constants/ErrorMessages.ts
 var ErrorMessages = {
@@ -6412,8 +10704,8 @@ var MonitoringService = class {
   async checkDatabaseHealth() {
     const startTime = Date.now();
     try {
-      const convex6 = getConvex();
-      const result = await convex6.query(api.health.check.checkHealth);
+      const convex8 = getConvex();
+      const result = await convex8.query(api.health.check.checkHealth);
       const responseTime = Date.now() - startTime;
       const isHealthy = result.status === "healthy";
       let status = "healthy";
@@ -6444,8 +10736,8 @@ var MonitoringService = class {
   async checkStorageHealth() {
     const startTime = Date.now();
     try {
-      const convex6 = getConvex();
-      if (convex6) {
+      const convex8 = getConvex();
+      if (convex8) {
         const responseTime = Date.now() - startTime;
         return {
           service: "storage",
@@ -6553,8 +10845,8 @@ var MonitoringService = class {
   // Log system events to Convex
   async logSystemEvent(event) {
     try {
-      const convex6 = getConvex();
-      await convex6.mutation(api.audit.logAuditEvent, {
+      const convex8 = getConvex();
+      await convex8.mutation(api.audit.logAuditEvent, {
         action: `system_${event.type}`,
         resource: event.service,
         details: {
@@ -6635,9 +10927,23 @@ var MonitoringService = class {
 var monitoring = new MonitoringService();
 var monitoring_default = monitoring;
 
+// server/utils/authz.ts
+function isAdmin(user) {
+  if (!user) return false;
+  return user.role === "admin" /* ADMIN */ || user.role === "admin";
+}
+function isOwner(user, resourceUserId) {
+  if (!user?.id || !resourceUserId) return false;
+  return String(user.id) === String(resourceUserId);
+}
+function canAccessResource(user, resourceUserId) {
+  if (isAdmin(user)) return true;
+  return isOwner(user, resourceUserId);
+}
+
 // server/routes/monitoring.ts
-var router8 = Router7();
-router8.get("/health", apiRateLimit, async (req, res) => {
+var router11 = Router10();
+router11.get("/health", apiRateLimit, async (req, res) => {
   try {
     const healthChecks = await monitoring_default.performHealthCheck();
     const allHealthy = healthChecks.every((check) => check.status === "healthy");
@@ -6650,15 +10956,52 @@ router8.get("/health", apiRateLimit, async (req, res) => {
     handleRouteError(error, res, "Health check failed");
   }
 });
-router8.get("/metrics", apiRateLimit, async (req, res) => {
+router11.get("/auth-check", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const hasAuthHeader = !!authHeader;
+    const hasBearerToken = authHeader?.startsWith("Bearer ") ?? false;
+    let clerkAuth = null;
+    try {
+      clerkAuth = getAuth6(req);
+    } catch (e) {
+      clerkAuth = { error: e instanceof Error ? e.message : "Unknown error" };
+    }
+    const envCheck = {
+      NODE_ENV: process.env.NODE_ENV,
+      hasClerkSecretKey: !!process.env.CLERK_SECRET_KEY,
+      clerkSecretKeyPrefix: process.env.CLERK_SECRET_KEY?.substring(0, 8) || "not set",
+      hasClerkPublishableKey: !!process.env.VITE_CLERK_PUBLISHABLE_KEY,
+      clerkPublishableKeyPrefix: process.env.VITE_CLERK_PUBLISHABLE_KEY?.substring(0, 8) || "not set",
+      hasConvexUrl: !!process.env.VITE_CONVEX_URL
+    };
+    res.json({
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      request: {
+        hasAuthHeader,
+        hasBearerToken,
+        tokenLength: hasBearerToken ? authHeader.length - 7 : 0
+      },
+      clerkAuth: {
+        userId: clerkAuth?.userId || null,
+        sessionId: clerkAuth?.sessionId || null,
+        hasSessionClaims: !!clerkAuth?.sessionClaims,
+        error: clerkAuth?.error || null
+      },
+      environment: envCheck
+    });
+  } catch (error) {
+    handleRouteError(error, res, "Auth check failed");
+  }
+});
+router11.get("/metrics", apiRateLimit, async (req, res) => {
   try {
     if (!req.isAuthenticated()) {
       res.status(401).json({ error: ErrorMessages.AUTH.UNAUTHORIZED });
       return;
     }
     const user = req.user;
-    const isAdmin = user.email === "admin@brolabentertainment.com" || user.username === "admin";
-    if (!isAdmin) {
+    if (!isAdmin(user)) {
       res.status(403).json({ error: ErrorMessages.AUTH.FORBIDDEN });
       return;
     }
@@ -6672,7 +11015,7 @@ router8.get("/metrics", apiRateLimit, async (req, res) => {
     handleRouteError(error, res, "Failed to collect metrics");
   }
 });
-router8.get("/status", async (req, res) => {
+router11.get("/status", async (req, res) => {
   try {
     const metrics = monitoring_default.getSystemMetrics();
     res.json({
@@ -6690,15 +11033,14 @@ router8.get("/status", async (req, res) => {
     handleRouteError(error, res, "Failed to get system status");
   }
 });
-router8.post("/health/check", apiRateLimit, async (req, res) => {
+router11.post("/health/check", apiRateLimit, async (req, res) => {
   try {
     if (!req.isAuthenticated()) {
       res.status(401).json({ error: ErrorMessages.AUTH.UNAUTHORIZED });
       return;
     }
     const user = req.user;
-    const isAdmin = user.email === "admin@brolabentertainment.com" || user.username === "admin";
-    if (!isAdmin) {
+    if (!isAdmin(user)) {
       res.status(403).json({ error: ErrorMessages.AUTH.FORBIDDEN });
       return;
     }
@@ -6721,10 +11063,10 @@ router8.post("/health/check", apiRateLimit, async (req, res) => {
     handleRouteError(error, res, "Manual health check failed");
   }
 });
-var monitoring_default2 = router8;
+var monitoring_default2 = router11;
 
 // server/routes/openGraph.ts
-import { Router as Router8 } from "express";
+import { Router as Router11 } from "express";
 
 // server/lib/openGraphGenerator.ts
 function generateBeatOpenGraph(beat, config) {
@@ -6817,16 +11159,16 @@ function generateStaticPageOpenGraph(page, config) {
 function generateOpenGraphHTML(meta) {
   const tags = [
     // Open Graph
-    `<meta property="og:title" content="${escapeHtml(meta.title)}" />`,
-    `<meta property="og:description" content="${escapeHtml(meta.description)}" />`,
+    `<meta property="og:title" content="${escapeHtml2(meta.title)}" />`,
+    `<meta property="og:description" content="${escapeHtml2(meta.description)}" />`,
     `<meta property="og:url" content="${meta.url}" />`,
     `<meta property="og:image" content="${meta.image}" />`,
     `<meta property="og:type" content="${meta.type}" />`,
-    `<meta property="og:site_name" content="${escapeHtml(meta.siteName)}" />`,
+    `<meta property="og:site_name" content="${escapeHtml2(meta.siteName)}" />`,
     // Twitter Card
     `<meta name="twitter:card" content="${meta.twitterCard || "summary"}" />`,
-    `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`,
-    `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`,
+    `<meta name="twitter:title" content="${escapeHtml2(meta.title)}" />`,
+    `<meta name="twitter:description" content="${escapeHtml2(meta.description)}" />`,
     `<meta name="twitter:image" content="${meta.image}" />`
   ];
   if (meta.twitterHandle) {
@@ -6846,17 +11188,17 @@ function generateOpenGraphHTML(meta) {
       tags.push(`<meta property="og:audio:duration" content="${meta.duration}" />`);
     }
     if (meta.artist) {
-      tags.push(`<meta property="og:audio:artist" content="${escapeHtml(meta.artist)}" />`);
+      tags.push(`<meta property="og:audio:artist" content="${escapeHtml2(meta.artist)}" />`);
     }
   }
   return tags.join("\n    ");
 }
-function escapeHtml(text) {
+function escapeHtml2(text) {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#x27;");
 }
 
 // server/routes/openGraph.ts
-var router9 = Router8();
+var router12 = Router11();
 async function wcApiRequest(endpoint, options = {}) {
   const WOOCOMMERCE_API_URL2 = process.env.WOOCOMMERCE_API_URL || "https://brolabentertainment.com/wp-json/wc/v3";
   const WC_CONSUMER_KEY2 = process.env.WOOCOMMERCE_CONSUMER_KEY;
@@ -6895,7 +11237,7 @@ var openGraphConfig = {
   defaultImage: "https://brolabentertainment.com/logo.png",
   twitterHandle: "@brolabentertainment"
 };
-router9.get("/beat/:id", async (req, res) => {
+router12.get("/beat/:id", validateParams(CommonParams.numericId), async (req, res) => {
   try {
     const beatId = req.params.id;
     let product;
@@ -6962,7 +11304,7 @@ router9.get("/beat/:id", async (req, res) => {
     handleRouteError(error, res, "Failed to generate Open Graph for beat");
   }
 });
-router9.get("/shop", async (_req, res) => {
+router12.get("/shop", async (_req, res) => {
   try {
     const openGraphMeta = generateShopOpenGraph(openGraphConfig);
     const openGraphHTML = generateOpenGraphHTML(openGraphMeta);
@@ -6973,7 +11315,7 @@ router9.get("/shop", async (_req, res) => {
     handleRouteError(error, res, "Failed to generate Open Graph for shop");
   }
 });
-router9.get("/home", async (_req, res) => {
+router12.get("/home", async (_req, res) => {
   try {
     const openGraphMeta = generateHomeOpenGraph(openGraphConfig);
     const openGraphHTML = generateOpenGraphHTML(openGraphMeta);
@@ -6984,7 +11326,7 @@ router9.get("/home", async (_req, res) => {
     handleRouteError(error, res, "Failed to generate Open Graph for home");
   }
 });
-router9.get("/page/:pageName", async (req, res) => {
+router12.get("/page/:pageName", async (req, res) => {
   try {
     const pageName = req.params.pageName;
     const validPages = ["about", "contact", "terms", "privacy", "license"];
@@ -7001,1647 +11343,13 @@ router9.get("/page/:pageName", async (req, res) => {
     handleRouteError(error, res, "Failed to generate Open Graph for page");
   }
 });
-var openGraph_default = router9;
+var openGraph_default = router12;
 
 // server/routes/orders.ts
-import { Router as Router9 } from "express";
-
-// shared/validation/BeatValidation.ts
-import { z as z5 } from "zod";
-var BeatGenre = z5.enum([
-  "hip-hop",
-  "trap",
-  "r&b",
-  "pop",
-  "drill",
-  "afrobeat",
-  "reggaeton",
-  "dancehall",
-  "uk-drill",
-  "jersey-club",
-  "amapiano",
-  "custom"
-]);
-var BeatMood = z5.enum([
-  "aggressive",
-  "chill",
-  "dark",
-  "energetic",
-  "emotional",
-  "happy",
-  "melancholic",
-  "mysterious",
-  "romantic",
-  "uplifting"
-]);
-var MusicalKey = z5.enum([
-  "C",
-  "C#",
-  "Db",
-  "D",
-  "D#",
-  "Eb",
-  "E",
-  "F",
-  "F#",
-  "Gb",
-  "G",
-  "G#",
-  "Ab",
-  "A",
-  "A#",
-  "Bb",
-  "B",
-  "Cm",
-  "C#m",
-  "Dbm",
-  "Dm",
-  "D#m",
-  "Ebm",
-  "Em",
-  "Fm",
-  "F#m",
-  "Gbm",
-  "Gm",
-  "G#m",
-  "Abm",
-  "Am",
-  "A#m",
-  "Bbm",
-  "Bm"
-]);
-var LicenseType2 = z5.enum(["basic", "premium", "unlimited", "exclusive"]);
-var BeatStatus = z5.enum([
-  "active",
-  "inactive",
-  "sold_exclusively",
-  "pending_review",
-  "rejected"
-]);
-var BpmSchema = z5.number().min(60, "BPM must be at least 60").max(200, "BPM cannot exceed 200").int("BPM must be a whole number");
-var BeatPriceSchema = z5.number().min(100, "Price must be at least $1.00").max(99999999, "Price cannot exceed $999,999.99").int("Price must be in cents (whole number)");
-var BeatDurationSchema = z5.number().min(30, "Beat must be at least 30 seconds").max(600, "Beat cannot exceed 10 minutes").positive("Duration must be positive");
-var BeatTagsSchema = z5.array(z5.string().min(1).max(20)).max(10, "Maximum 10 tags allowed").optional();
-var AudioFileSchema = z5.object({
-  url: z5.string().url("Invalid audio file URL"),
-  format: z5.enum(["mp3", "wav", "aiff", "flac"]),
-  quality: z5.enum(["128", "192", "256", "320", "lossless"]),
-  duration: BeatDurationSchema,
-  fileSize: z5.number().positive("File size must be positive"),
-  waveformData: z5.array(z5.number()).optional()
-});
-var BeatMetadataSchema = z5.object({
-  producer: z5.string().min(1, "Producer name is required").max(100),
-  credits: z5.string().max(500).optional(),
-  description: z5.string().max(1e3).optional(),
-  inspiration: z5.string().max(200).optional(),
-  collaborators: z5.array(z5.string()).max(5).optional()
-});
-var BeatSchema = z5.object({
-  id: z5.number().positive().optional(),
-  title: z5.string().min(1, "Beat title is required").max(100, "Beat title cannot exceed 100 characters").regex(/^[a-zA-Z0-9\s\-_()]+$/, "Beat title contains invalid characters"),
-  slug: z5.string().min(1, "Slug is required").max(120, "Slug cannot exceed 120 characters").regex(/^[a-z0-9-]+$/, "Slug must be lowercase with hyphens only"),
-  genre: BeatGenre,
-  mood: BeatMood.optional(),
-  key: MusicalKey.optional(),
-  bpm: BpmSchema,
-  status: BeatStatus.default("pending_review"),
-  // Pricing for different license types
-  basicPrice: BeatPriceSchema,
-  premiumPrice: BeatPriceSchema,
-  unlimitedPrice: BeatPriceSchema,
-  exclusivePrice: BeatPriceSchema.optional(),
-  // Audio files
-  previewFile: AudioFileSchema,
-  basicFile: AudioFileSchema.optional(),
-  premiumFile: AudioFileSchema.optional(),
-  unlimitedFile: AudioFileSchema.optional(),
-  stemsFile: AudioFileSchema.optional(),
-  // Metadata
-  metadata: BeatMetadataSchema.optional(),
-  tags: BeatTagsSchema,
-  // Timestamps
-  createdAt: z5.string().datetime().optional(),
-  updatedAt: z5.string().datetime().optional(),
-  // Producer information
-  producerId: z5.number().positive(),
-  producerName: z5.string().min(1).max(100),
-  // Analytics
-  playCount: z5.number().nonnegative().default(0),
-  downloadCount: z5.number().nonnegative().default(0),
-  likeCount: z5.number().nonnegative().default(0),
-  // SEO
-  seoTitle: z5.string().max(60).optional(),
-  seoDescription: z5.string().max(160).optional(),
-  // Featured status
-  isFeatured: z5.boolean().default(false),
-  featuredUntil: z5.string().datetime().optional()
-});
-var CreateBeatSchema = BeatSchema.omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  playCount: true,
-  downloadCount: true,
-  likeCount: true
-});
-var UpdateBeatSchema = BeatSchema.partial().extend({
-  id: z5.number().positive()
-});
-var BeatFilterSchema = z5.object({
-  genre: BeatGenre.optional(),
-  mood: BeatMood.optional(),
-  key: MusicalKey.optional(),
-  bpmMin: z5.number().min(60).max(200).optional(),
-  bpmMax: z5.number().min(60).max(200).optional(),
-  priceMin: z5.number().min(0).optional(),
-  priceMax: z5.number().min(0).optional(),
-  tags: z5.array(z5.string()).optional(),
-  producer: z5.string().optional(),
-  isFeatured: z5.boolean().optional(),
-  status: BeatStatus.optional(),
-  search: z5.string().max(100).optional(),
-  sortBy: z5.enum(["newest", "oldest", "price_low", "price_high", "popular", "trending"]).default("newest"),
-  page: z5.number().positive().default(1),
-  limit: z5.number().min(1).max(100).default(20)
-});
-var BeatPurchaseSchema = z5.object({
-  beatId: z5.number().positive(),
-  licenseType: LicenseType2,
-  quantity: z5.number().positive().default(1),
-  customLicenseTerms: z5.string().max(1e3).optional()
-});
-var BeatInteractionSchema = z5.object({
-  beatId: z5.number().positive(),
-  action: z5.enum(["like", "unlike", "favorite", "unfavorite"])
-});
-
-// shared/validation/ErrorValidation.ts
-import { z as z6 } from "zod";
-var ErrorSeverity = z6.enum(["low", "medium", "high", "critical"]);
-var ErrorCategory = z6.enum([
-  "authentication",
-  "authorization",
-  "validation",
-  "payment",
-  "audio_processing",
-  "file_upload",
-  "database",
-  "external_api",
-  "rate_limiting",
-  "system",
-  "user_input",
-  "business_logic",
-  "network",
-  "security"
-]);
-var ErrorType = z6.enum([
-  // Authentication errors
-  "invalid_credentials",
-  "account_locked",
-  "session_expired",
-  "two_factor_required",
-  // Authorization errors
-  "insufficient_permissions",
-  "resource_forbidden",
-  "subscription_required",
-  "quota_exceeded",
-  // Validation errors
-  "invalid_input",
-  "missing_required_field",
-  "format_error",
-  "constraint_violation",
-  // Payment errors
-  "payment_failed",
-  "insufficient_funds",
-  "card_declined",
-  "payment_method_invalid",
-  "subscription_expired",
-  // Audio processing errors
-  "audio_format_unsupported",
-  "audio_file_corrupted",
-  "processing_timeout",
-  "waveform_generation_failed",
-  // File upload errors
-  "file_too_large",
-  "file_type_not_allowed",
-  "virus_detected",
-  "upload_failed",
-  "file_validation_failed",
-  "security_threat_detected",
-  "security_check_failed",
-  "upload_rate_limit",
-  "upload_size_limit",
-  // Database errors
-  "connection_failed",
-  "query_timeout",
-  "constraint_violation_db",
-  "data_not_found",
-  // External API errors
-  "api_unavailable",
-  "api_rate_limited",
-  "api_authentication_failed",
-  "api_response_invalid",
-  // System errors
-  "internal_server_error",
-  "service_unavailable",
-  "timeout",
-  "configuration_error",
-  // Business logic errors
-  "beat_not_available",
-  "license_conflict",
-  "reservation_conflict",
-  "order_processing_failed"
-]);
-var ErrorContextSchema = z6.object({
-  // Request information
-  requestId: z6.string().optional(),
-  userId: z6.string().optional(),
-  userAgent: z6.string().optional(),
-  ipAddress: z6.string().ip().optional(),
-  // API information
-  endpoint: z6.string().optional(),
-  method: z6.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).optional(),
-  statusCode: z6.number().min(100).max(599).optional(),
-  // Business context
-  beatId: z6.number().optional(),
-  orderId: z6.string().optional(),
-  reservationId: z6.string().optional(),
-  // Technical context
-  stackTrace: z6.string().optional(),
-  errorCode: z6.string().optional(),
-  // Additional metadata
-  metadata: z6.record(z6.unknown()).optional()
-});
-var ErrorResolutionSchema = z6.object({
-  // User-facing information
-  userMessage: z6.string().min(1, "User message is required").max(500),
-  userAction: z6.string().max(200).optional(),
-  // Support information
-  supportCode: z6.string().max(50).optional(),
-  documentationUrl: z6.string().url().optional(),
-  // Recovery suggestions
-  retryable: z6.boolean().default(false),
-  retryAfter: z6.number().positive().optional(),
-  // seconds
-  // Escalation
-  requiresSupport: z6.boolean().default(false),
-  escalationLevel: z6.enum(["none", "tier1", "tier2", "engineering"]).default("none")
-});
-var ErrorSchema = z6.object({
-  id: z6.string().optional(),
-  // Error classification
-  type: ErrorType,
-  category: ErrorCategory,
-  severity: ErrorSeverity,
-  // Error details
-  message: z6.string().min(1, "Error message is required").max(1e3),
-  code: z6.string().max(50).optional(),
-  // Context information
-  context: ErrorContextSchema.optional(),
-  // Resolution information
-  resolution: ErrorResolutionSchema,
-  // Timestamps
-  occurredAt: z6.string().datetime(),
-  resolvedAt: z6.string().datetime().optional(),
-  // Tracking
-  count: z6.number().positive().default(1),
-  firstOccurrence: z6.string().datetime().optional(),
-  lastOccurrence: z6.string().datetime().optional()
-});
-var ApiErrorResponseSchema = z6.object({
-  error: z6.object({
-    type: ErrorType,
-    message: z6.string().min(1).max(500),
-    code: z6.string().max(50).optional(),
-    details: z6.record(z6.unknown()).optional(),
-    // User guidance
-    userMessage: z6.string().max(500).optional(),
-    userAction: z6.string().max(200).optional(),
-    // Support information
-    supportCode: z6.string().max(50).optional(),
-    documentationUrl: z6.string().url().optional(),
-    // Request tracking
-    requestId: z6.string().optional(),
-    timestamp: z6.string().datetime()
-  }),
-  // Additional context for debugging (dev/staging only)
-  debug: z6.object({
-    stackTrace: z6.string().optional(),
-    context: z6.record(z6.unknown()).optional()
-  }).optional()
-});
-var ValidationErrorSchema = z6.object({
-  field: z6.string().min(1, "Field name is required"),
-  value: z6.unknown(),
-  message: z6.string().min(1, "Validation message is required"),
-  code: z6.string().optional(),
-  // Nested validation errors (simplified to avoid circular reference)
-  nested: z6.array(
-    z6.object({
-      field: z6.string(),
-      value: z6.unknown(),
-      message: z6.string(),
-      code: z6.string().optional()
-    })
-  ).optional()
-});
-var ValidationErrorResponseSchema = z6.object({
-  error: z6.object({
-    type: z6.literal("validation_error"),
-    message: z6.string().default("Validation failed"),
-    errors: z6.array(ValidationErrorSchema).min(1, "At least one validation error required"),
-    // Summary
-    errorCount: z6.number().positive(),
-    // Request tracking
-    requestId: z6.string().optional(),
-    timestamp: z6.string().datetime()
-  })
-});
-var RateLimitErrorSchema = z6.object({
-  error: z6.object({
-    type: z6.literal("rate_limit_exceeded"),
-    message: z6.string().default("Rate limit exceeded"),
-    // Rate limit details
-    limit: z6.number().positive(),
-    remaining: z6.number().nonnegative(),
-    resetTime: z6.string().datetime(),
-    retryAfter: z6.number().positive(),
-    // seconds
-    // Request tracking
-    requestId: z6.string().optional(),
-    timestamp: z6.string().datetime()
-  })
-});
-var BusinessLogicErrorSchema = z6.object({
-  error: z6.object({
-    type: ErrorType,
-    message: z6.string().min(1).max(500),
-    // Business context
-    businessRule: z6.string().max(100).optional(),
-    resourceId: z6.string().optional(),
-    resourceType: z6.enum(["beat", "order", "reservation", "user", "subscription"]).optional(),
-    // Resolution guidance
-    userMessage: z6.string().max(500),
-    suggestedAction: z6.string().max(200).optional(),
-    // Request tracking
-    requestId: z6.string().optional(),
-    timestamp: z6.string().datetime()
-  })
-});
-var createApiError = (type, message, options = {}) => {
-  return {
-    error: {
-      type,
-      message,
-      code: options.code,
-      userMessage: options.userMessage || message,
-      userAction: options.userAction,
-      supportCode: options.supportCode,
-      requestId: options.requestId,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    }
-  };
-};
-var createValidationError = (errors, requestId) => {
-  return {
-    error: {
-      type: "validation_error",
-      message: "Validation failed",
-      errors: errors.map((err) => ({
-        field: err.field,
-        value: err.value,
-        message: err.message,
-        code: err.code
-      })),
-      errorCount: errors.length,
-      requestId,
-      timestamp: (/* @__PURE__ */ new Date()).toISOString()
-    }
-  };
-};
-
-// shared/validation/OrderValidation.ts
-import { z as z7 } from "zod";
-var OrderStatus2 = z7.enum([
-  "pending",
-  "processing",
-  "completed",
-  "cancelled",
-  "refunded",
-  "failed"
-]);
-var PaymentStatus = z7.enum([
-  "pending",
-  "processing",
-  "succeeded",
-  "failed",
-  "cancelled",
-  "refunded",
-  "requires_payment_method",
-  "requires_confirmation"
-]);
-var PaymentProvider = z7.enum(["stripe", "paypal", "clerk_billing"]);
-var Currency = z7.enum([
-  "USD",
-  "EUR",
-  "GBP",
-  "CAD",
-  "AUD",
-  "JPY",
-  "CHF",
-  "SEK",
-  "NOK",
-  "DKK"
-]);
-var OrderItemSchema = z7.object({
-  id: z7.string().optional(),
-  productId: z7.number().positive(),
-  productType: z7.enum(["beat", "subscription", "service", "custom"]),
-  title: z7.string().min(1, "Product title is required").max(200),
-  // License information for beats
-  licenseType: LicenseType2.optional(),
-  // Pricing
-  unitPrice: z7.number().min(0, "Unit price cannot be negative"),
-  quantity: z7.number().positive().default(1),
-  totalPrice: z7.number().min(0, "Total price cannot be negative"),
-  // Discounts
-  discountAmount: z7.number().min(0).default(0),
-  discountCode: z7.string().max(50).optional(),
-  // Metadata
-  metadata: z7.record(z7.unknown()).optional(),
-  // Digital delivery
-  downloadUrl: z7.string().url().optional(),
-  downloadExpiry: z7.string().datetime().optional(),
-  downloadCount: z7.number().nonnegative().default(0),
-  maxDownloads: z7.number().positive().optional()
-});
-var BillingAddressSchema = z7.object({
-  firstName: z7.string().min(1, "First name is required").max(50),
-  lastName: z7.string().min(1, "Last name is required").max(50),
-  company: z7.string().max(100).optional(),
-  addressLine1: z7.string().min(1, "Address is required").max(100),
-  addressLine2: z7.string().max(100).optional(),
-  city: z7.string().min(1, "City is required").max(50),
-  state: z7.string().max(50).optional(),
-  postalCode: z7.string().min(1, "Postal code is required").max(20),
-  country: z7.string().length(2, "Country must be 2-letter ISO code"),
-  phone: z7.string().max(20).optional()
-});
-var TaxInfoSchema = z7.object({
-  taxRate: z7.number().min(0).max(1),
-  // 0-100% as decimal
-  taxAmount: z7.number().min(0),
-  taxType: z7.enum(["vat", "sales_tax", "gst", "none"]),
-  taxId: z7.string().max(50).optional(),
-  exemptionReason: z7.string().max(200).optional()
-});
-var PaymentInfoSchema = z7.object({
-  provider: PaymentProvider,
-  paymentIntentId: z7.string().optional(),
-  sessionId: z7.string().optional(),
-  transactionId: z7.string().optional(),
-  // Payment method details (encrypted/tokenized)
-  paymentMethodId: z7.string().optional(),
-  last4: z7.string().length(4).optional(),
-  brand: z7.string().max(20).optional(),
-  // Processing details
-  processingFee: z7.number().min(0).default(0),
-  netAmount: z7.number().min(0),
-  // Timestamps
-  authorizedAt: z7.string().datetime().optional(),
-  capturedAt: z7.string().datetime().optional(),
-  // Failure information
-  failureCode: z7.string().max(50).optional(),
-  failureMessage: z7.string().max(200).optional()
-});
-var InvoiceInfoSchema = z7.object({
-  invoiceNumber: z7.string().min(1, "Invoice number is required").max(50),
-  invoiceDate: z7.string().datetime(),
-  dueDate: z7.string().datetime().optional(),
-  // PDF generation
-  pdfUrl: z7.string().url().optional(),
-  pdfStorageId: z7.string().optional(),
-  // Invoice status
-  status: z7.enum(["draft", "sent", "paid", "overdue", "cancelled"]),
-  // Notes
-  notes: z7.string().max(1e3).optional(),
-  terms: z7.string().max(2e3).optional()
-});
-var OrderSchema = z7.object({
-  id: z7.string().optional(),
-  orderNumber: z7.string().min(1, "Order number is required").max(50),
-  // Customer information
-  userId: z7.string().optional(),
-  email: z7.string().email("Valid email is required"),
-  // Order items
-  items: z7.array(OrderItemSchema).min(1, "Order must contain at least one item"),
-  // Pricing
-  subtotal: z7.number().min(0, "Subtotal cannot be negative"),
-  taxInfo: TaxInfoSchema.optional(),
-  shippingCost: z7.number().min(0).default(0),
-  discountTotal: z7.number().min(0).default(0),
-  total: z7.number().min(0, "Total cannot be negative"),
-  currency: Currency,
-  // Status
-  status: OrderStatus2,
-  paymentStatus: PaymentStatus,
-  // Payment and billing
-  paymentInfo: PaymentInfoSchema.optional(),
-  billingAddress: BillingAddressSchema.optional(),
-  // Invoice
-  invoice: InvoiceInfoSchema.optional(),
-  // Fulfillment
-  fulfillmentStatus: z7.enum(["pending", "processing", "fulfilled", "cancelled"]).default("pending"),
-  fulfillmentDate: z7.string().datetime().optional(),
-  // Metadata
-  metadata: z7.record(z7.unknown()).optional(),
-  notes: z7.string().max(1e3).optional(),
-  // Timestamps
-  createdAt: z7.string().datetime().optional(),
-  updatedAt: z7.string().datetime().optional(),
-  // Idempotency
-  idempotencyKey: z7.string().max(255).optional()
-});
-var CreateOrderSchema = z7.object({
-  items: z7.array(
-    z7.object({
-      productId: z7.number().positive(),
-      productType: z7.enum(["beat", "subscription", "service", "custom"]),
-      title: z7.string().min(1).max(200),
-      licenseType: LicenseType2.optional(),
-      unitPrice: z7.number().min(0),
-      quantity: z7.number().positive().default(1),
-      metadata: z7.record(z7.unknown()).optional()
-    })
-  ).min(1, "Order must contain at least one item"),
-  currency: Currency.default("USD"),
-  email: z7.string().email("Valid email is required"),
-  // Optional fields
-  billingAddress: BillingAddressSchema.optional(),
-  metadata: z7.record(z7.unknown()).optional(),
-  notes: z7.string().max(1e3).optional(),
-  idempotencyKey: z7.string().max(255).optional()
-});
-var UpdateOrderSchema = z7.object({
-  id: z7.string().min(1, "Order ID is required"),
-  status: OrderStatus2.optional(),
-  paymentStatus: PaymentStatus.optional(),
-  fulfillmentStatus: z7.enum(["pending", "processing", "fulfilled", "cancelled"]).optional(),
-  notes: z7.string().max(1e3).optional(),
-  metadata: z7.record(z7.unknown()).optional()
-});
-var OrderFilterSchema = z7.object({
-  userId: z7.string().optional(),
-  email: z7.string().email().optional(),
-  status: OrderStatus2.optional(),
-  paymentStatus: PaymentStatus.optional(),
-  currency: Currency.optional(),
-  // Date range filters
-  createdAfter: z7.string().datetime().optional(),
-  createdBefore: z7.string().datetime().optional(),
-  // Amount filters
-  minAmount: z7.number().min(0).optional(),
-  maxAmount: z7.number().min(0).optional(),
-  // Search
-  search: z7.string().max(100).optional(),
-  // Pagination
-  page: z7.number().positive().default(1),
-  limit: z7.number().min(1).max(100).default(20),
-  // Sorting
-  sortBy: z7.enum(["created_at", "updated_at", "total", "status"]).default("created_at"),
-  sortOrder: z7.enum(["asc", "desc"]).default("desc")
-});
-var CreatePaymentIntentSchema = z7.object({
-  orderId: z7.string().min(1, "Order ID is required"),
-  amount: z7.number().min(50, "Minimum amount is $0.50"),
-  // $0.50 minimum
-  currency: Currency.default("USD"),
-  paymentProvider: PaymentProvider.default("stripe"),
-  // Payment method options
-  paymentMethods: z7.array(z7.enum(["card", "paypal", "bank_transfer"])).optional(),
-  // Customer information
-  customerId: z7.string().optional(),
-  customerEmail: z7.string().email().optional(),
-  // Metadata
-  metadata: z7.record(z7.string()).optional()
-});
-var RefundRequestSchema = z7.object({
-  orderId: z7.string().min(1, "Order ID is required"),
-  amount: z7.number().positive().optional(),
-  // If not provided, full refund
-  reason: z7.enum([
-    "duplicate",
-    "fraudulent",
-    "requested_by_customer",
-    "product_not_delivered",
-    "product_defective",
-    "other"
-  ]),
-  description: z7.string().max(500).optional(),
-  notifyCustomer: z7.boolean().default(true)
-});
-
-// shared/validation/ReservationValidation.ts
-import { z as z8 } from "zod";
-var ServiceType2 = z8.enum([
-  "mixing",
-  "mastering",
-  "recording",
-  "custom_beat",
-  "consultation",
-  "vocal_tuning",
-  "beat_remake",
-  "full_production"
-]);
-var ReservationStatus2 = z8.enum([
-  "pending",
-  "confirmed",
-  "in_progress",
-  "completed",
-  "cancelled",
-  "no_show",
-  "rescheduled"
-]);
-var PriorityLevel = z8.enum(["standard", "priority", "rush", "emergency"]);
-var StudioRoom = z8.enum([
-  "studio_a",
-  "studio_b",
-  "vocal_booth_1",
-  "vocal_booth_2",
-  "mixing_room",
-  "mastering_suite",
-  "remote"
-  // For online services
-]);
-var EquipmentRequirementsSchema = z8.object({
-  microphones: z8.array(z8.string()).optional(),
-  instruments: z8.array(z8.string()).optional(),
-  software: z8.array(z8.string()).optional(),
-  specialRequests: z8.string().max(500).optional()
-});
-var ServiceDetailsSchema = z8.object({
-  // Recording details
-  trackCount: z8.number().min(1).max(100).optional(),
-  estimatedDuration: z8.number().min(30).max(480).optional(),
-  // 30 minutes to 8 hours
-  // Mixing/Mastering details
-  stemCount: z8.number().min(1).max(50).optional(),
-  referenceTrack: z8.string().url().optional(),
-  targetLoudness: z8.number().optional(),
-  // Beat production details
-  genre: z8.string().max(50).optional(),
-  bpm: z8.number().min(60).max(200).optional(),
-  key: z8.string().max(10).optional(),
-  mood: z8.string().max(50).optional(),
-  // File requirements
-  deliveryFormat: z8.enum(["wav", "mp3", "aiff", "flac"]).optional(),
-  bitRate: z8.enum(["16bit", "24bit", "32bit"]).optional(),
-  sampleRate: z8.enum(["44100", "48000", "96000", "192000"]).optional(),
-  // Additional services
-  includeStems: z8.boolean().default(false),
-  includeRevisions: z8.number().min(0).max(5).default(2),
-  rushDelivery: z8.boolean().default(false)
-});
-var ClientInfoSchema = z8.object({
-  firstName: z8.string().min(1, "First name is required").max(50),
-  lastName: z8.string().min(1, "Last name is required").max(50),
-  email: z8.string().email("Valid email is required"),
-  phone: z8.string().min(10, "Valid phone number is required").max(20),
-  // Professional details
-  artistName: z8.string().max(100).optional(),
-  recordLabel: z8.string().max(100).optional(),
-  website: z8.string().url().optional(),
-  // Experience level
-  experienceLevel: z8.enum(["beginner", "intermediate", "advanced", "professional"]).optional(),
-  // Previous client
-  isPreviousClient: z8.boolean().default(false),
-  referralSource: z8.string().max(100).optional()
-});
-var PricingInfoSchema = z8.object({
-  basePrice: z8.number().min(0),
-  // in cents
-  additionalFees: z8.array(
-    z8.object({
-      name: z8.string().max(100),
-      amount: z8.number().min(0),
-      description: z8.string().max(200).optional()
-    })
-  ).default([]),
-  discounts: z8.array(
-    z8.object({
-      name: z8.string().max(100),
-      amount: z8.number().min(0),
-      type: z8.enum(["fixed", "percentage"]),
-      description: z8.string().max(200).optional()
-    })
-  ).default([]),
-  totalPrice: z8.number().min(0),
-  // in cents
-  currency: z8.enum(["USD", "EUR", "GBP", "CAD"]).default("USD"),
-  // Payment terms
-  depositRequired: z8.boolean().default(false),
-  depositAmount: z8.number().min(0).optional(),
-  paymentDueDate: z8.string().datetime().optional()
-});
-var TimeSlotSchema = z8.object({
-  startTime: z8.string().datetime(),
-  endTime: z8.string().datetime(),
-  duration: z8.number().min(30).max(480),
-  // 30 minutes to 8 hours in minutes
-  // Timezone handling
-  timezone: z8.string().default("UTC"),
-  // Buffer time
-  setupTime: z8.number().min(0).max(60).default(15),
-  // Setup time in minutes
-  teardownTime: z8.number().min(0).max(30).default(15)
-  // Teardown time in minutes
-});
-var ReservationSchema = z8.object({
-  id: z8.string().optional(),
-  // Service information
-  serviceType: ServiceType2,
-  status: ReservationStatus2.default("pending"),
-  priority: PriorityLevel.default("standard"),
-  // Client information
-  userId: z8.string().optional(),
-  // If user is registered
-  clientInfo: ClientInfoSchema,
-  // Scheduling
-  timeSlot: TimeSlotSchema,
-  studioRoom: StudioRoom.optional(),
-  // Service details
-  serviceDetails: ServiceDetailsSchema,
-  equipmentRequirements: EquipmentRequirementsSchema.optional(),
-  // Pricing
-  pricing: PricingInfoSchema,
-  // Communication
-  notes: z8.string().max(2e3).optional(),
-  internalNotes: z8.string().max(1e3).optional(),
-  // Staff only
-  // Files and attachments
-  attachments: z8.array(
-    z8.object({
-      name: z8.string().max(255),
-      url: z8.string().url(),
-      type: z8.enum(["audio", "document", "image", "other"]),
-      size: z8.number().positive()
-    })
-  ).optional(),
-  // Assignment
-  assignedEngineer: z8.string().max(100).optional(),
-  assignedProducer: z8.string().max(100).optional(),
-  // Completion tracking
-  deliverables: z8.array(
-    z8.object({
-      name: z8.string().max(200),
-      description: z8.string().max(500).optional(),
-      fileUrl: z8.string().url().optional(),
-      completedAt: z8.string().datetime().optional()
-    })
-  ).default([]),
-  // Timestamps
-  createdAt: z8.string().datetime().optional(),
-  updatedAt: z8.string().datetime().optional(),
-  confirmedAt: z8.string().datetime().optional(),
-  completedAt: z8.string().datetime().optional(),
-  // Metadata
-  metadata: z8.record(z8.unknown()).optional()
-});
-var CreateReservationSchema = z8.object({
-  serviceType: ServiceType2,
-  // Client information
-  clientInfo: z8.object({
-    firstName: z8.string().min(1).max(50),
-    lastName: z8.string().min(1).max(50),
-    email: z8.string().email(),
-    phone: z8.string().min(10).max(20),
-    artistName: z8.string().max(100).optional(),
-    experienceLevel: z8.enum(["beginner", "intermediate", "advanced", "professional"]).optional(),
-    referralSource: z8.string().max(100).optional()
-  }),
-  // Preferred scheduling
-  preferredDate: z8.string().datetime(),
-  preferredDuration: z8.number().min(30).max(480),
-  alternativeDates: z8.array(z8.string().datetime()).max(3).optional(),
-  // Service requirements
-  serviceDetails: z8.object({
-    trackCount: z8.number().min(1).max(100).optional(),
-    genre: z8.string().max(50).optional(),
-    bpm: z8.number().min(60).max(200).optional(),
-    deliveryFormat: z8.enum(["wav", "mp3", "aiff", "flac"]).optional(),
-    includeRevisions: z8.number().min(0).max(5).default(2),
-    rushDelivery: z8.boolean().default(false)
-  }).optional(),
-  // Additional information
-  notes: z8.string().max(2e3).optional(),
-  budget: z8.number().min(0).optional(),
-  // in cents
-  // Terms acceptance
-  acceptTerms: z8.boolean().refine((val) => val === true, {
-    message: "You must accept the terms and conditions"
-  })
-});
-var UpdateReservationSchema = z8.object({
-  id: z8.string().min(1, "Reservation ID is required"),
-  status: ReservationStatus2.optional(),
-  timeSlot: TimeSlotSchema.optional(),
-  studioRoom: StudioRoom.optional(),
-  serviceDetails: ServiceDetailsSchema.optional(),
-  notes: z8.string().max(2e3).optional(),
-  internalNotes: z8.string().max(1e3).optional(),
-  assignedEngineer: z8.string().max(100).optional(),
-  assignedProducer: z8.string().max(100).optional()
-});
-var ReservationFilterSchema = z8.object({
-  serviceType: ServiceType2.optional(),
-  status: ReservationStatus2.optional(),
-  priority: PriorityLevel.optional(),
-  studioRoom: StudioRoom.optional(),
-  // Date range filters
-  startDate: z8.string().datetime().optional(),
-  endDate: z8.string().datetime().optional(),
-  // Assignment filters
-  assignedEngineer: z8.string().optional(),
-  assignedProducer: z8.string().optional(),
-  // Client filters
-  clientEmail: z8.string().email().optional(),
-  clientName: z8.string().optional(),
-  // Search
-  search: z8.string().max(100).optional(),
-  // Pagination
-  page: z8.number().positive().default(1),
-  limit: z8.number().min(1).max(100).default(20),
-  // Sorting
-  sortBy: z8.enum(["created_at", "start_time", "status", "service_type"]).default("start_time"),
-  sortOrder: z8.enum(["asc", "desc"]).default("asc")
-});
-var AvailabilityCheckSchema = z8.object({
-  startTime: z8.string().datetime(),
-  endTime: z8.string().datetime(),
-  serviceType: ServiceType2,
-  studioRoom: StudioRoom.optional(),
-  excludeReservationId: z8.string().optional()
-  // For rescheduling
-});
-var RescheduleRequestSchema = z8.object({
-  reservationId: z8.string().min(1, "Reservation ID is required"),
-  newStartTime: z8.string().datetime(),
-  newDuration: z8.number().min(30).max(480),
-  reason: z8.string().max(500).optional(),
-  notifyClient: z8.boolean().default(true)
-});
-
-// shared/validation/UserValidation.ts
-import { z as z9 } from "zod";
-var UserRole = z9.enum(["user", "producer", "admin", "service_role", "moderator"]);
-var UserStatus = z9.enum([
-  "active",
-  "inactive",
-  "suspended",
-  "pending_verification",
-  "banned"
-]);
-var SubscriptionPlan = z9.enum(["free", "basic", "pro", "unlimited", "enterprise"]);
-var SubscriptionStatus = z9.enum([
-  "active",
-  "inactive",
-  "cancelled",
-  "past_due",
-  "unpaid",
-  "trialing"
-]);
-var UserPreferencesSchema = z9.object({
-  language: z9.enum(["en", "fr", "es", "de", "it", "pt"]).default("en"),
-  currency: z9.enum(["USD", "EUR", "GBP", "CAD", "AUD"]).default("USD"),
-  timezone: z9.string().max(50).default("UTC"),
-  // Notification preferences
-  emailNotifications: z9.boolean().default(true),
-  marketingEmails: z9.boolean().default(false),
-  pushNotifications: z9.boolean().default(true),
-  // Audio preferences
-  autoPlay: z9.boolean().default(false),
-  audioQuality: z9.enum(["128", "192", "256", "320"]).default("192"),
-  // Privacy preferences
-  profileVisibility: z9.enum(["public", "private", "friends_only"]).default("public"),
-  showActivity: z9.boolean().default(true),
-  // Theme preferences
-  theme: z9.enum(["light", "dark", "auto"]).default("auto"),
-  compactMode: z9.boolean().default(false)
-});
-var UserProfileSchema = z9.object({
-  displayName: z9.string().min(1, "Display name is required").max(50),
-  bio: z9.string().max(500).optional(),
-  website: z9.string().url("Invalid website URL").optional(),
-  location: z9.string().max(100).optional(),
-  // Social media links
-  socialLinks: z9.object({
-    instagram: z9.string().url().optional(),
-    twitter: z9.string().url().optional(),
-    youtube: z9.string().url().optional(),
-    soundcloud: z9.string().url().optional(),
-    spotify: z9.string().url().optional()
-  }).optional(),
-  // Producer-specific fields
-  producerInfo: z9.object({
-    stageName: z9.string().max(50).optional(),
-    genres: z9.array(z9.string()).max(10).optional(),
-    yearsActive: z9.number().min(0).max(50).optional(),
-    equipment: z9.string().max(1e3).optional(),
-    collaborationRate: z9.number().min(0).max(1e5).optional()
-    // in cents
-  }).optional(),
-  // Avatar
-  avatarUrl: z9.string().url().optional(),
-  avatarStorageId: z9.string().optional()
-});
-var UserSubscriptionSchema = z9.object({
-  plan: SubscriptionPlan,
-  status: SubscriptionStatus,
-  // Billing
-  billingInterval: z9.enum(["monthly", "annual"]).default("monthly"),
-  amount: z9.number().min(0),
-  // in cents
-  currency: z9.enum(["USD", "EUR", "GBP", "CAD", "AUD"]).default("USD"),
-  // Dates
-  startDate: z9.string().datetime(),
-  endDate: z9.string().datetime().optional(),
-  trialEndDate: z9.string().datetime().optional(),
-  // Quotas and limits
-  downloadQuota: z9.number().min(0).default(0),
-  // 0 = unlimited
-  downloadCount: z9.number().min(0).default(0),
-  // External IDs
-  stripeSubscriptionId: z9.string().optional(),
-  clerkSubscriptionId: z9.string().optional(),
-  // Features
-  features: z9.array(z9.string()).default([]),
-  // Auto-renewal
-  autoRenew: z9.boolean().default(true),
-  cancelAtPeriodEnd: z9.boolean().default(false)
-});
-var UserAnalyticsSchema = z9.object({
-  // Activity metrics
-  totalLogins: z9.number().min(0).default(0),
-  lastLoginAt: z9.string().datetime().optional(),
-  totalSessionTime: z9.number().min(0).default(0),
-  // in seconds
-  // Purchase metrics
-  totalPurchases: z9.number().min(0).default(0),
-  totalSpent: z9.number().min(0).default(0),
-  // in cents
-  averageOrderValue: z9.number().min(0).default(0),
-  // in cents
-  // Engagement metrics
-  beatsPlayed: z9.number().min(0).default(0),
-  beatsDownloaded: z9.number().min(0).default(0),
-  beatsLiked: z9.number().min(0).default(0),
-  // Producer metrics (if applicable)
-  beatsUploaded: z9.number().min(0).default(0),
-  totalEarnings: z9.number().min(0).default(0),
-  // in cents
-  // Referral metrics
-  referralCount: z9.number().min(0).default(0),
-  referralEarnings: z9.number().min(0).default(0)
-  // in cents
-});
-var UserSchema = z9.object({
-  id: z9.string().optional(),
-  clerkId: z9.string().min(1, "Clerk ID is required"),
-  // Basic information
-  username: z9.string().min(3, "Username must be at least 3 characters").max(30, "Username cannot exceed 30 characters").regex(
-    /^[a-zA-Z0-9_-]+$/,
-    "Username can only contain letters, numbers, underscores, and hyphens"
-  ),
-  email: z9.string().email("Valid email is required").max(255, "Email is too long"),
-  // Optional fields
-  firstName: z9.string().max(50).optional(),
-  lastName: z9.string().max(50).optional(),
-  // Status and role
-  role: UserRole.default("user"),
-  status: UserStatus.default("active"),
-  // Profile information
-  profile: UserProfileSchema.optional(),
-  preferences: UserPreferencesSchema.default({}),
-  // Subscription
-  subscription: UserSubscriptionSchema.optional(),
-  // Analytics
-  analytics: UserAnalyticsSchema.default({}),
-  // Verification
-  emailVerified: z9.boolean().default(false),
-  phoneVerified: z9.boolean().default(false),
-  identityVerified: z9.boolean().default(false),
-  // Security
-  twoFactorEnabled: z9.boolean().default(false),
-  lastPasswordChange: z9.string().datetime().optional(),
-  // Timestamps
-  createdAt: z9.string().datetime().optional(),
-  updatedAt: z9.string().datetime().optional(),
-  lastActiveAt: z9.string().datetime().optional(),
-  // Metadata
-  metadata: z9.record(z9.unknown()).optional()
-});
-var RegisterUserSchema = z9.object({
-  username: z9.string().min(3, "Username must be at least 3 characters").max(30, "Username cannot exceed 30 characters").regex(
-    /^[a-zA-Z0-9_-]+$/,
-    "Username can only contain letters, numbers, underscores, and hyphens"
-  ),
-  email: z9.string().email("Valid email is required").max(255, "Email is too long"),
-  password: z9.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long").regex(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-    "Password must contain at least one lowercase letter, one uppercase letter, and one number"
-  ),
-  firstName: z9.string().max(50).optional(),
-  lastName: z9.string().max(50).optional(),
-  // Terms and privacy
-  acceptTerms: z9.boolean().refine((val) => val === true, {
-    message: "You must accept the terms and conditions"
-  }),
-  acceptPrivacy: z9.boolean().refine((val) => val === true, {
-    message: "You must accept the privacy policy"
-  }),
-  // Marketing consent
-  marketingConsent: z9.boolean().default(false),
-  // Referral code
-  referralCode: z9.string().max(20).optional()
-});
-var LoginUserSchema = z9.object({
-  identifier: z9.string().min(1, "Email or username is required"),
-  // Can be email or username
-  password: z9.string().min(1, "Password is required"),
-  rememberMe: z9.boolean().default(false)
-});
-var UpdateUserProfileSchema = z9.object({
-  displayName: z9.string().min(1).max(50).optional(),
-  bio: z9.string().max(500).optional(),
-  website: z9.string().url().optional(),
-  location: z9.string().max(100).optional(),
-  // Social links
-  socialLinks: z9.object({
-    instagram: z9.string().url().optional(),
-    twitter: z9.string().url().optional(),
-    youtube: z9.string().url().optional(),
-    soundcloud: z9.string().url().optional(),
-    spotify: z9.string().url().optional()
-  }).optional(),
-  // Producer info
-  producerInfo: z9.object({
-    stageName: z9.string().max(50).optional(),
-    genres: z9.array(z9.string()).max(10).optional(),
-    yearsActive: z9.number().min(0).max(50).optional(),
-    equipment: z9.string().max(1e3).optional(),
-    collaborationRate: z9.number().min(0).max(1e5).optional()
-  }).optional()
-});
-var UpdateUserPreferencesSchema = UserPreferencesSchema.partial();
-var ChangePasswordSchema = z9.object({
-  currentPassword: z9.string().min(1, "Current password is required"),
-  newPassword: z9.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long").regex(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-    "Password must contain at least one lowercase letter, one uppercase letter, and one number"
-  ),
-  confirmPassword: z9.string()
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"]
-});
-var UserFilterSchema = z9.object({
-  role: UserRole.optional(),
-  status: UserStatus.optional(),
-  subscriptionPlan: SubscriptionPlan.optional(),
-  subscriptionStatus: SubscriptionStatus.optional(),
-  // Search
-  search: z9.string().max(100).optional(),
-  // Date filters
-  createdAfter: z9.string().datetime().optional(),
-  createdBefore: z9.string().datetime().optional(),
-  lastActiveAfter: z9.string().datetime().optional(),
-  // Verification filters
-  emailVerified: z9.boolean().optional(),
-  identityVerified: z9.boolean().optional(),
-  // Pagination
-  page: z9.number().positive().default(1),
-  limit: z9.number().min(1).max(100).default(20),
-  // Sorting
-  sortBy: z9.enum(["created_at", "last_active_at", "username", "email"]).default("created_at"),
-  sortOrder: z9.enum(["asc", "desc"]).default("desc")
-});
-
-// shared/validation.ts
-import { z as z10 } from "zod";
-var registerSchema = z10.object({
-  username: z10.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters").regex(
-    /^[a-zA-Z0-9_-]+$/,
-    "Username can only contain letters, numbers, underscores, and hyphens"
-  ),
-  email: z10.string().email("Please enter a valid email address").max(255, "Email is too long"),
-  password: z10.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long").regex(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-    "Password must contain at least one lowercase letter, one uppercase letter, and one number"
-  ),
-  confirmPassword: z10.string()
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"]
-});
-var serverRegisterSchema = z10.object({
-  username: z10.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters").regex(
-    /^[a-zA-Z0-9_-]+$/,
-    "Username can only contain letters, numbers, underscores, and hyphens"
-  ),
-  email: z10.string().email("Please enter a valid email address").max(255, "Email is too long"),
-  password: z10.string().min(8, "Password must be at least 8 characters").max(128, "Password is too long").regex(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-    "Password must contain at least one lowercase letter, one uppercase letter, and one number"
-  )
-});
-var loginSchema = z10.object({
-  username: z10.string().min(1, "Username is required"),
-  password: z10.string().min(1, "Password is required")
-});
-var createSubscriptionSchema = z10.object({
-  priceId: z10.enum(["basic", "pro", "unlimited"], {
-    errorMap: () => ({ message: "Invalid subscription plan" })
-  }),
-  billingInterval: z10.enum(["monthly", "annual"], {
-    errorMap: () => ({ message: "Invalid billing interval" })
-  })
-});
-var paymentIntentSchema = z10.object({
-  amount: z10.number().min(100, "Amount must be at least $1.00").max(999999, "Amount is too high"),
-  currency: z10.enum(["usd", "eur"], {
-    errorMap: () => ({ message: "Invalid currency" })
-  }),
-  metadata: z10.record(z10.string()).optional()
-});
-var updateProfileSchema = z10.object({
-  username: z10.string().min(3, "Username must be at least 3 characters").max(30, "Username must be less than 30 characters").regex(
-    /^[a-zA-Z0-9_-]+$/,
-    "Username can only contain letters, numbers, underscores, and hyphens"
-  ).optional(),
-  email: z10.string().email("Please enter a valid email address").max(255, "Email is too long").optional(),
-  avatar: z10.string().url("Invalid avatar URL").optional()
-});
-var serverCreateSubscriptionSchema = createSubscriptionSchema.extend({
-  // Additional server-side validations
-  userAgent: z10.string().optional(),
-  ipAddress: z10.string().ip().optional(),
-  timestamp: z10.number().optional()
-});
-var stripeWebhookSchema = z10.object({
-  id: z10.string(),
-  type: z10.string(),
-  data: z10.object({
-    object: z10.record(z10.unknown())
-  }),
-  created: z10.number()
-});
-var rateLimitSchema = z10.object({
-  ip: z10.string(),
-  endpoint: z10.string(),
-  timestamp: z10.number(),
-  count: z10.number().min(0)
-});
-var auditLogSchema = z10.object({
-  userId: z10.number(),
-  action: z10.string(),
-  resource: z10.string(),
-  details: z10.record(z10.unknown()).optional(),
-  ipAddress: z10.string().optional(),
-  userAgent: z10.string().optional(),
-  timestamp: z10.date()
-});
-var validateEmail = (email) => {
-  if (!email || email.length > 254) return false;
-  return z10.string().email().safeParse(email).success;
-};
-var validatePhoneNumber = (phone) => {
-  if (!phone || phone.length < 10 || phone.length > 17) return false;
-  const cleaned = phone.replaceAll(/[\s\-()+]/g, "");
-  const digitRegex = /^\d{10,15}$/;
-  return digitRegex.test(cleaned);
-};
-var enhancedRegisterSchema = registerSchema.refine((data) => validateEmail(data.email), {
-  message: "Email domain is not valid",
-  path: ["email"]
-});
-var enhancedPaymentIntentSchema = paymentIntentSchema.refine(
-  (data) => {
-    const minimums = { usd: 50, eur: 50 };
-    return data.amount >= minimums[data.currency];
-  },
-  {
-    message: "Amount below minimum for currency",
-    path: ["amount"]
-  }
-);
-var fileUploadValidation = z10.object({
-  name: z10.string().min(1, "Filename is required"),
-  size: z10.number().max(50 * 1024 * 1024, "File size exceeds 50MB limit"),
-  type: z10.string().min(1, "File type is required"),
-  lastModified: z10.number().optional()
-});
-var fileFilterValidation = z10.object({
-  genre: z10.string().optional(),
-  bpm: z10.object({
-    min: z10.number().min(60).max(200),
-    max: z10.number().min(60).max(200)
-  }).optional(),
-  key: z10.string().optional(),
-  mood: z10.string().optional(),
-  tags: z10.array(z10.string()).optional()
-});
-var serviceOrderValidation = z10.object({
-  service_type: z10.enum(["mixing", "mastering", "recording", "consultation"]),
-  details: z10.string().min(10, "Details must be at least 10 characters"),
-  budget: z10.number().min(50, "Minimum budget is $50"),
-  deadline: z10.string().datetime("Invalid deadline format"),
-  contact_email: z10.string().email("Invalid email address"),
-  contact_phone: z10.string().optional()
-});
-var mixingMasteringFormSchema = z10.object({
-  // Personal Information
-  name: z10.string().min(2, "Name must be at least 2 characters").max(100, "Name must be less than 100 characters").regex(/^[a-zA-Z\s'-]+$/, "Name can only contain letters, spaces, hyphens, and apostrophes"),
-  email: z10.string().email("Please enter a valid email address").max(255, "Email is too long"),
-  phone: z10.string().refine((phone) => !phone || validatePhoneNumber(phone), {
-    message: "Please enter a valid phone number"
-  }),
-  // Booking Details
-  preferredDate: z10.string().min(1, "Please select a preferred date").refine(
-    (date) => {
-      const selectedDate = new Date(date);
-      const today = /* @__PURE__ */ new Date();
-      today.setHours(0, 0, 0, 0);
-      return selectedDate >= today;
-    },
-    {
-      message: "Preferred date must be today or in the future"
-    }
-  ),
-  timeSlot: z10.string().min(1, "Please select a time slot").refine(
-    (slot) => {
-      const validSlots = [
-        "9:00 AM",
-        "10:00 AM",
-        "11:00 AM",
-        "1:00 PM",
-        "2:00 PM",
-        "3:00 PM",
-        "4:00 PM"
-      ];
-      return validSlots.includes(slot);
-    },
-    {
-      message: "Please select a valid time slot"
-    }
-  ),
-  // Project Details
-  projectDetails: z10.string().min(20, "Project details must be at least 20 characters").max(2e3, "Project details must be less than 2000 characters"),
-  trackCount: z10.string().optional().refine((count) => !count || Number.parseInt(count) >= 1 && Number.parseInt(count) <= 100, {
-    message: "Track count must be between 1 and 100"
-  }),
-  genre: z10.string().optional(),
-  reference: z10.string().optional().refine((ref) => !ref || ref.length <= 500, {
-    message: "Reference must be less than 500 characters"
-  }),
-  specialRequests: z10.string().optional().refine((req) => !req || req.length <= 1e3, {
-    message: "Special requests must be less than 1000 characters"
-  })
-});
-var serviceSelectionSchema = z10.object({
-  selectedService: z10.enum(["mixing", "mastering", "mixing-mastering"], {
-    errorMap: () => ({ message: "Please select a valid service" })
-  })
-});
-var mixingMasteringSubmissionSchema = mixingMasteringFormSchema.merge(serviceSelectionSchema);
-var customBeatRequestSchema = z10.object({
-  // Basic beat specifications
-  genre: z10.string().min(1, "Genre is required"),
-  subGenre: z10.string().optional(),
-  bpm: z10.number().min(60, "BPM must be at least 60").max(200, "BPM must be at most 200"),
-  key: z10.string().min(1, "Key is required"),
-  // Creative specifications
-  mood: z10.array(z10.string()).min(1, "At least one mood is required"),
-  instruments: z10.array(z10.string()).optional(),
-  duration: z10.number().min(60, "Duration must be at least 60 seconds").max(600, "Duration must be at most 10 minutes"),
-  // Project details
-  description: z10.string().min(20, "Description must be at least 20 characters").max(2e3, "Description must be less than 2000 characters"),
-  referenceTrack: z10.string().optional(),
-  // Business details
-  budget: z10.number().min(50, "Minimum budget is $50").max(1e3, "Maximum budget is $1000"),
-  deadline: z10.string().optional().refine(
-    (date) => {
-      if (!date) return true;
-      const deadlineDate = new Date(date);
-      const minDate = /* @__PURE__ */ new Date();
-      minDate.setDate(minDate.getDate() + 1);
-      return deadlineDate >= minDate;
-    },
-    {
-      message: "Deadline must be at least 1 day from today"
-    }
-  ),
-  revisions: z10.number().min(0).max(5, "Maximum 5 revisions allowed"),
-  priority: z10.enum(["standard", "priority", "express"]),
-  additionalNotes: z10.string().max(1e3, "Additional notes must be less than 1000 characters").optional(),
-  // File uploads
-  uploadedFiles: z10.array(
-    z10.object({
-      name: z10.string(),
-      size: z10.number().max(100 * 1024 * 1024, "Individual files must be under 100MB"),
-      type: z10.string(),
-      lastModified: z10.number().optional()
-    })
-  ).optional().refine(
-    (files) => {
-      if (!files) return true;
-      const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-      return totalSize <= 200 * 1024 * 1024;
-    },
-    {
-      message: "Total file size must be under 200MB"
-    }
-  ).refine(
-    (files) => {
-      if (!files) return true;
-      const fileNames = files.map((f) => f.name.toLowerCase());
-      const uniqueNames = new Set(fileNames);
-      return uniqueNames.size === fileNames.length;
-    },
-    {
-      message: "Duplicate file names are not allowed"
-    }
-  )
-});
-var customBeatFileValidation = z10.object({
-  name: z10.string().min(1, "Filename is required").refine(
-    (name) => {
-      const lowerName = name.toLowerCase();
-      const audioExtensions = [".mp3", ".wav", ".aiff", ".flac", ".m4a"];
-      const archiveExtensions = [".zip", ".rar", ".7z"];
-      const isAudio = audioExtensions.some((ext) => lowerName.endsWith(ext));
-      const isArchive = archiveExtensions.some((ext) => lowerName.endsWith(ext));
-      return isAudio || isArchive;
-    },
-    {
-      message: "File must be an audio file or compressed archive"
-    }
-  ),
-  size: z10.number().max(100 * 1024 * 1024, "File size exceeds 100MB limit"),
-  type: z10.string().min(1, "File type is required"),
-  lastModified: z10.number().optional()
-});
-var PAYPAL_SUPPORTED_CURRENCIES = ["EUR", "USD", "GBP", "CAD", "AUD"];
-var paypalCreateOrderSchema = z10.object({
-  serviceType: z10.string().min(1, "Service type is required").max(100, "Service type must be 100 characters or less"),
-  amount: z10.number({ invalid_type_error: "Amount must be a number" }).min(0.5, "Minimum amount is $0.50").max(999999.99, "Amount exceeds maximum allowed ($999,999.99)"),
-  currency: z10.enum(PAYPAL_SUPPORTED_CURRENCIES, {
-    errorMap: () => ({
-      message: `Currency must be one of: ${PAYPAL_SUPPORTED_CURRENCIES.join(", ")}`
-    })
-  }),
-  description: z10.string().min(1, "Description is required").max(500, "Description must be 500 characters or less"),
-  reservationId: z10.string().min(1, "Reservation ID is required"),
-  customerEmail: z10.string().email("Invalid email format")
-});
-
-// shared/types/apiEndpoints.ts
-import { z as z11 } from "zod";
-var signInRequestSchema = z11.object({
-  username: z11.string().optional(),
-  email: z11.string().email().optional(),
-  password: z11.string().min(1)
-}).refine((data) => data.username || data.email, {
-  message: "Either username or email is required"
-});
-var registerRequestSchema = z11.object({
-  username: z11.string().min(3).max(30),
-  email: z11.string().email(),
-  password: z11.string().min(8),
-  firstName: z11.string().optional(),
-  lastName: z11.string().optional()
-});
-var getBeatsRequestSchema = z11.object({
-  limit: z11.number().min(1).max(100).optional(),
-  genre: z11.string().optional(),
-  search: z11.string().optional(),
-  bpm: z11.number().min(1).max(300).optional(),
-  key: z11.string().optional(),
-  mood: z11.string().optional(),
-  priceMin: z11.number().min(0).optional(),
-  priceMax: z11.number().min(0).optional(),
-  featured: z11.boolean().optional(),
-  free: z11.boolean().optional(),
-  sortBy: z11.enum(["newest", "oldest", "price_low", "price_high", "popular"]).optional(),
-  page: z11.number().min(1).optional()
-});
-var createBeatRequestSchema = z11.object({
-  title: z11.string().min(1).max(200),
-  description: z11.string().optional(),
-  genre: z11.string().min(1),
-  bpm: z11.number().min(1).max(300).optional(),
-  key: z11.string().optional(),
-  mood: z11.string().optional(),
-  price: z11.number().min(0),
-  audioUrl: z11.string().url().optional(),
-  imageUrl: z11.string().url().optional(),
-  tags: z11.array(z11.string()).optional(),
-  featured: z11.boolean().optional(),
-  duration: z11.number().min(1).optional(),
-  isActive: z11.boolean().optional(),
-  isExclusive: z11.boolean().optional(),
-  isFree: z11.boolean().optional()
-});
-var createOrderRequestSchema = z11.object({
-  items: z11.array(
-    z11.object({
-      productId: z11.number().positive(),
-      title: z11.string().min(1),
-      type: z11.enum(["beat", "subscription", "service"]),
-      qty: z11.number().min(1),
-      unitPrice: z11.number().min(0),
-      metadata: z11.record(z11.unknown()).optional()
-    })
-  ).min(1),
-  currency: z11.string().length(3),
-  metadata: z11.record(z11.unknown()).optional(),
-  idempotencyKey: z11.string().optional()
-});
-var createPaymentSessionRequestSchema = z11.object({
-  reservationId: z11.string().min(1),
-  amount: z11.number().min(1),
-  currency: z11.string().length(3),
-  description: z11.string().min(1),
-  metadata: z11.record(z11.unknown()).optional()
-});
-var createReservationRequestSchema = z11.object({
-  serviceType: z11.enum(["mixing", "mastering", "recording", "custom_beat", "consultation"]),
-  details: z11.object({
-    name: z11.string().min(1),
-    email: z11.string().email(),
-    phone: z11.string().min(10),
-    requirements: z11.string().optional(),
-    referenceLinks: z11.array(z11.string().url()).optional()
-  }),
-  preferredDate: z11.string().datetime(),
-  durationMinutes: z11.number().min(30).max(480),
-  totalPrice: z11.number().min(0),
-  notes: z11.string().optional()
-});
-var addToCartRequestSchema = z11.object({
-  beatId: z11.number().positive().optional(),
-  beat_id: z11.number().positive().optional(),
-  licenseType: z11.enum(["basic", "premium", "unlimited"]).optional(),
-  quantity: z11.number().min(1).optional().default(1)
-}).refine((data) => data.beatId || data.beat_id, {
-  message: "Either beatId or beat_id is required"
-});
-var playBeatRequestSchema = z11.object({
-  beatId: z11.number().positive()
-});
-var setVolumeRequestSchema = z11.object({
-  level: z11.number().min(0).max(1)
-});
-var seekRequestSchema = z11.object({
-  position: z11.number().min(0)
-});
-var trackDownloadRequestSchema = z11.object({
-  productId: z11.number().positive(),
-  license: z11.enum(["basic", "premium", "unlimited"]),
-  price: z11.number().min(0).optional(),
-  productName: z11.string().optional()
-});
-
-// shared/validation/index.ts
-import { z as z12 } from "zod";
-var CommonParams = {
-  id: z12.object({
-    id: z12.string().min(1, "ID is required")
-  }),
-  numericId: z12.object({
-    id: z12.string().regex(/^\d+$/, "ID must be numeric").transform(Number)
-  }),
-  slug: z12.object({
-    slug: z12.string().min(1, "Slug is required").regex(/^[a-z0-9-]+$/, "Invalid slug format")
-  })
-};
-var CommonQueries = {
-  pagination: z12.object({
-    page: z12.string().optional().transform((val) => val ? Number.parseInt(val, 10) : 1),
-    limit: z12.string().optional().transform((val) => val ? Math.min(Number.parseInt(val, 10), 100) : 20),
-    offset: z12.string().optional().transform((val) => val ? Number.parseInt(val, 10) : 0)
-  }),
-  sorting: z12.object({
-    sortBy: z12.string().optional(),
-    sortOrder: z12.enum(["asc", "desc"]).optional().default("desc")
-  }),
-  search: z12.object({
-    q: z12.string().max(100).optional(),
-    search: z12.string().max(100).optional()
-  }),
-  dateRange: z12.object({
-    startDate: z12.string().datetime().optional(),
-    endDate: z12.string().datetime().optional()
-  })
-};
-var validateBody = (schema) => {
-  return (req, res, next) => {
-    try {
-      const result = schema.safeParse(req.body);
-      if (!result.success) {
-        const validationErrors = result.error.errors.map((err) => ({
-          field: err.path.join("."),
-          value: req.body,
-          message: err.message,
-          code: err.code
-        }));
-        const errorResponse = createValidationError(
-          validationErrors,
-          req.headers["x-request-id"]
-        );
-        return res.status(400).json(errorResponse);
-      }
-      req.body = result.data;
-      next();
-    } catch (error) {
-      console.error("Validation middleware error:", error);
-      res.status(500).json({
-        error: {
-          type: "internal_server_error",
-          message: "Validation processing failed",
-          timestamp: (/* @__PURE__ */ new Date()).toISOString()
-        }
-      });
-    }
-  };
-};
-var validateQuery = (schema) => {
-  return (req, res, next) => {
-    try {
-      const result = schema.safeParse(req.query);
-      if (!result.success) {
-        const validationErrors = result.error.errors.map((err) => ({
-          field: `query.${err.path.join(".")}`,
-          value: req.query,
-          message: err.message,
-          code: err.code
-        }));
-        const errorResponse = createValidationError(
-          validationErrors,
-          req.headers["x-request-id"]
-        );
-        return res.status(400).json(errorResponse);
-      }
-      req.query = result.data;
-      next();
-    } catch (error) {
-      console.error("Query validation middleware error:", error);
-      res.status(500).json({
-        error: {
-          type: "internal_server_error",
-          message: "Query validation processing failed",
-          timestamp: (/* @__PURE__ */ new Date()).toISOString()
-        }
-      });
-    }
-  };
-};
-var validateParams = (schema) => {
-  return (req, res, next) => {
-    try {
-      const result = schema.safeParse(req.params);
-      if (!result.success) {
-        const validationErrors = result.error.errors.map((err) => ({
-          field: `params.${err.path.join(".")}`,
-          value: req.params,
-          message: err.message,
-          code: err.code
-        }));
-        const errorResponse = createValidationError(
-          validationErrors,
-          req.headers["x-request-id"]
-        );
-        return res.status(400).json(errorResponse);
-      }
-      req.params = result.data;
-      next();
-    } catch (error) {
-      console.error("Params validation middleware error:", error);
-      res.status(500).json({
-        error: {
-          type: "internal_server_error",
-          message: "Parameter validation processing failed",
-          timestamp: (/* @__PURE__ */ new Date()).toISOString()
-        }
-      });
-    }
-  };
-};
-
-// server/routes/orders.ts
+import { Router as Router12 } from "express";
 init_auth();
 init_convex();
-var ordersRouter = Router9();
+var ordersRouter = Router12();
 var convex4 = getConvex();
 var createOrderIdempotent = async (args) => {
   return await convex4.mutation(
@@ -8720,11 +11428,8 @@ var getOrder = async (req, res) => {
   try {
     const id = req.params.id;
     const data = await getOrderWithRelations({ orderId: id });
-    const user = req.user;
-    const isAdmin = user?.role === "admin" || user?.email === "admin@brolabentertainment.com" || user?.username === "admin";
     const orderUserId = data?.order?.userId;
-    const isOwner = orderUserId && orderUserId === String(user?.id);
-    if (!isAdmin && !isOwner) {
+    if (!canAccessResource(req.user, orderUserId)) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
@@ -8748,11 +11453,8 @@ var getInvoice = async (req, res) => {
   try {
     const id = req.params.id;
     const data = await getOrderWithRelations({ orderId: id });
-    const user = req.user;
-    const isAdmin = user?.role === "admin" || user?.email === "admin@brolabentertainment.com" || user?.username === "admin";
     const orderUserId = data?.order?.userId;
-    const isOwner = orderUserId && orderUserId === String(user?.id);
-    if (!isAdmin && !isOwner) {
+    if (!canAccessResource(req.user, orderUserId)) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
@@ -8772,11 +11474,8 @@ ordersRouter.get("/:id/invoice/download", validateParams(CommonParams.id), async
   try {
     const id = req.params.id;
     const data = await getOrderWithRelations({ orderId: id });
-    const user = req.user;
-    const isAdmin = user?.role === "admin" || user?.email === "admin@brolabentertainment.com" || user?.username === "admin";
     const orderUserId = data?.order?.userId;
-    const isOwner = orderUserId && orderUserId === String(user?.id);
-    if (!isAdmin && !isOwner) {
+    if (!canAccessResource(req.user, orderUserId)) {
       res.status(403).json({ error: "Forbidden" });
       return;
     }
@@ -8793,9 +11492,9 @@ ordersRouter.get("/:id/invoice/download", validateParams(CommonParams.id), async
 var orders_default = ordersRouter;
 
 // server/routes/payments.ts
-import { ConvexHttpClient as ConvexHttpClient2 } from "convex/browser";
-import { Router as Router10 } from "express";
-import Stripe2 from "stripe";
+import { ConvexHttpClient as ConvexHttpClient5 } from "convex/browser";
+import { Router as Router13 } from "express";
+import Stripe3 from "stripe";
 
 // server/services/paypal.ts
 init_api();
@@ -9180,140 +11879,46 @@ var PayPalService = class {
       throw error;
     }
   }
+  /**
+   * Performs a lightweight health check by attempting to fetch a non-existent order
+   * This validates OAuth credentials and API connectivity without creating transactions
+   * Returns healthy=true if auth succeeds (even if order not found - expected behavior)
+   */
+  static async healthCheck() {
+    const startTime = Date.now();
+    try {
+      const ordersController = new OrdersController(paypalClient);
+      await ordersController.getOrder({ id: "HEALTH_CHECK_PING" });
+      return { healthy: true, latencyMs: Date.now() - startTime };
+    } catch (error) {
+      const latencyMs = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorString = JSON.stringify(error);
+      if (errorMessage.includes("RESOURCE_NOT_FOUND") || errorMessage.includes("INVALID_RESOURCE_ID") || errorString.includes("RESOURCE_NOT_FOUND") || errorString.includes("INVALID_RESOURCE_ID")) {
+        return { healthy: true, latencyMs };
+      }
+      return {
+        healthy: false,
+        latencyMs,
+        error: errorMessage
+      };
+    }
+  }
 };
 var paypal_default = PayPalService;
 
 // server/routes/payments.ts
-var router10 = Router10();
-async function handleSubscriptionWebhook(eventType, payload, convexUrl) {
-  console.log(`\u{1F4E6} Processing subscription webhook: ${eventType}`);
-  const convex6 = new ConvexHttpClient2(convexUrl);
-  const webhookData = payload.data;
-  if (!webhookData) {
-    throw new Error("Missing webhook data");
-  }
-  const subscriptionId = webhookData.id || "";
-  const userId = webhookData.user_id || webhookData.userId || "";
-  const planId = webhookData.plan_id || webhookData.planId || "basic";
-  const status = webhookData.status || "active";
-  const currentPeriodStart = webhookData.current_period_start || webhookData.currentPeriodStart || Date.now();
-  const currentPeriodEnd = webhookData.current_period_end || webhookData.currentPeriodEnd || Date.now() + 30 * 24 * 60 * 60 * 1e3;
-  const quotaMap = {
-    free_user: 1,
-    basic: 5,
-    artist: 20,
-    ultimate_pass: 999999,
-    ultimate: 999999
-    // Legacy alias
-  };
-  const downloadQuota = quotaMap[planId] || 5;
-  try {
-    const users = await convex6.query("users:getUserByClerkId", { clerkId: userId });
-    if (!users) {
-      console.warn(`\u26A0\uFE0F User not found for Clerk ID: ${userId}`);
-      return;
-    }
-    const userDoc = users;
-    const existingSubscriptions = await convex6.query("subscriptions:getByClerkId", {
-      clerkSubscriptionId: subscriptionId
-    });
-    if (eventType === "subscription.created" || !existingSubscriptions) {
-      await convex6.mutation("subscriptions:create", {
-        userId: userDoc._id,
-        clerkSubscriptionId: subscriptionId,
-        planId,
-        status,
-        currentPeriodStart,
-        currentPeriodEnd,
-        downloadQuota,
-        downloadUsed: 0,
-        features: []
-      });
-      console.log(`\u2705 Subscription created: ${subscriptionId}`);
-    } else if (eventType === "subscription.updated") {
-      await convex6.mutation("subscriptions:update", {
-        clerkSubscriptionId: subscriptionId,
-        status,
-        currentPeriodStart,
-        currentPeriodEnd,
-        downloadQuota
-      });
-      console.log(`\u2705 Subscription updated: ${subscriptionId}`);
-    } else if (eventType === "subscription.deleted") {
-      await convex6.mutation("subscriptions:cancel", {
-        clerkSubscriptionId: subscriptionId
-      });
-      console.log(`\u2705 Subscription cancelled: ${subscriptionId}`);
-    }
-  } catch (error) {
-    console.error(`\u274C Error processing subscription webhook:`, error);
-    throw error;
-  }
-}
-async function handleInvoiceWebhook(eventType, payload, convexUrl) {
-  console.log(`\u{1F4C4} Processing invoice webhook: ${eventType}`);
-  const convex6 = new ConvexHttpClient2(convexUrl);
-  const webhookData = payload.data;
-  if (!webhookData) {
-    throw new Error("Missing webhook data");
-  }
-  const invoiceId = webhookData.id || "";
-  const subscriptionId = webhookData.subscription_id || webhookData.subscriptionId || "";
-  const amount = webhookData.amount || 0;
-  const currency = webhookData.currency || "USD";
-  const status = webhookData.status || "open";
-  const dueDate = webhookData.due_date || webhookData.dueDate || Date.now();
-  try {
-    const subscription = await convex6.query("subscriptions:getByClerkId", {
-      clerkSubscriptionId: subscriptionId
-    });
-    if (!subscription) {
-      console.warn(`\u26A0\uFE0F Subscription not found for invoice: ${subscriptionId}`);
-      return;
-    }
-    const subscriptionDoc = subscription;
-    const existingInvoice = await convex6.query("invoices:getByClerkId", {
-      clerkInvoiceId: invoiceId
-    });
-    if (eventType === "invoice.created" || !existingInvoice) {
-      await convex6.mutation("invoices:create", {
-        subscriptionId: subscriptionDoc._id,
-        clerkInvoiceId: invoiceId,
-        amount,
-        currency,
-        status,
-        dueDate
-      });
-      console.log(`\u2705 Invoice created: ${invoiceId}`);
-    } else if (eventType === "invoice.paid") {
-      await convex6.mutation("invoices:markPaid", {
-        clerkInvoiceId: invoiceId,
-        paidAt: Date.now()
-      });
-      console.log(`\u2705 Invoice paid: ${invoiceId}`);
-    } else if (eventType === "invoice.payment_failed") {
-      await convex6.mutation("invoices:markFailed", {
-        clerkInvoiceId: invoiceId
-      });
-      console.log(`\u26A0\uFE0F Invoice payment failed: ${invoiceId}`);
-    }
-  } catch (error) {
-    console.error(`\u274C Error processing invoice webhook:`, error);
-    throw error;
-  }
-}
+var router13 = Router13();
 async function handleOrderWebhook(normalized, mapped, convexUrl) {
-  console.log("\u{1F4B3} Processing order webhook with data:", {
-    email: normalized.email,
+  logger.info("Processing order webhook", {
     sessionId: normalized.sessionId,
-    paymentId: normalized.paymentId,
     status: mapped.status,
     paymentStatus: mapped.paymentStatus
   });
-  const convex6 = new ConvexHttpClient2(convexUrl);
+  const convex8 = new ConvexHttpClient5(convexUrl);
   let orderId = null;
   if (normalized.sessionId) {
-    const orders = await convex6.query("orders:listOrdersAdmin", {
+    const orders = await convex8.query("orders:listOrdersAdmin", {
       limit: 1
     });
     const ordersList = Array.isArray(orders) ? orders : [];
@@ -9325,7 +11930,7 @@ async function handleOrderWebhook(normalized, mapped, convexUrl) {
     }
   }
   if (!orderId && normalized.paymentId) {
-    const orders = await convex6.query("orders:listOrdersAdmin", {
+    const orders = await convex8.query("orders:listOrdersAdmin", {
       limit: 1
     });
     const ordersList = Array.isArray(orders) ? orders : [];
@@ -9337,10 +11942,10 @@ async function handleOrderWebhook(normalized, mapped, convexUrl) {
     }
   }
   if (!orderId) {
-    console.warn(`\u26A0\uFE0F Order not found for session/payment ID`);
+    logger.warn("Order not found for session/payment ID", { sessionId: normalized.sessionId });
     return;
   }
-  await convex6.mutation("orders:recordPayment", {
+  await convex8.mutation("orders:recordPayment", {
     orderId,
     provider: "stripe",
     status: mapped.paymentStatus,
@@ -9351,19 +11956,19 @@ async function handleOrderWebhook(normalized, mapped, convexUrl) {
     stripePaymentIntentId: normalized.paymentId
   });
   if (mapped.paymentStatus === "succeeded") {
-    await convex6.mutation("orders:confirmPayment:confirmPayment", {
+    await convex8.mutation("orders:confirmPayment:confirmPayment", {
       orderId,
       paymentIntentId: normalized.paymentId || normalized.sessionId || "",
       status: "succeeded",
       provider: "stripe"
     });
-    console.log(`\u2705 Order payment confirmed: ${orderId}`);
+    logger.info("Order payment confirmed", { orderId });
   }
 }
 var stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 var stripeClient = null;
 if (stripeSecretKey) {
-  stripeClient = new Stripe2(stripeSecretKey, {
+  stripeClient = new Stripe3(stripeSecretKey, {
     apiVersion: "2025-08-27.basil"
   });
 }
@@ -9382,11 +11987,11 @@ var createPaymentSession = async (req, res) => {
     const userId = String(req.user.id);
     const userEmail = req.user.email || "";
     const paymentProvider = metadata?.paymentProvider || "stripe";
-    console.log(`\u{1F4B3} Creating ${paymentProvider} payment session for reservation: ${reservationId}`);
+    logger.info("Creating payment session", { provider: paymentProvider, reservationId });
     if (paymentProvider === "paypal") {
       const paypalResult = await paypal_default.createPaymentOrder({
         serviceType: metadata?.serviceType || "service",
-        amount: amount / 100,
+        amount: centsToDollars(amount),
         // PayPal expects amount in dollars, not cents
         currency: currency.toUpperCase(),
         description,
@@ -9410,12 +12015,12 @@ var createPaymentSession = async (req, res) => {
         description,
         metadata: { ...metadata, provider: "paypal" }
       };
-      console.log(`\u2705 PayPal payment session created: ${paypalResult.orderId}`);
+      logger.info("PayPal payment session created", { sessionId: paypalResult.orderId });
       res.json(response2);
       return;
     }
     if (!stripeClient) {
-      console.error("\u274C Stripe client not initialized - STRIPE_SECRET_KEY missing");
+      logger.error("Stripe client not initialized", { reason: "STRIPE_SECRET_KEY missing" });
       res.status(500).json({
         error: "Payment service unavailable",
         message: "Stripe is not configured. Please contact support."
@@ -9470,14 +12075,14 @@ var createPaymentSession = async (req, res) => {
       description,
       metadata: { ...metadata, provider: "stripe" }
     };
-    console.log(`\u2705 Stripe checkout session created: ${session2.id}`);
+    logger.info("Stripe checkout session created", { sessionId: session2.id });
     res.json(response);
   } catch (error) {
-    console.error("\u274C Error creating payment session:", error);
+    logger.error("Error creating payment session", { error });
     handleRouteError(error, res, "Failed to create payment session");
   }
 };
-router10.post(
+router13.post(
   "/create-payment-session",
   validateBody(createPaymentSessionRequestSchema),
   createPaymentSession
@@ -9493,11 +12098,11 @@ async function getWebhookPayload(req, res) {
   const isProd = process.env.NODE_ENV === "production";
   if (!WEBHOOK_SECRET) {
     if (isProd) {
-      console.error("CLERK_WEBHOOK_SECRET not set in production");
+      logger.error("CLERK_WEBHOOK_SECRET not set in production");
       res.status(500).json({ error: "Webhook secret not configured" });
       return null;
     }
-    console.warn("\u26A0\uFE0F Missing CLERK_WEBHOOK_SECRET; using raw body in dev.");
+    logger.warn("Missing CLERK_WEBHOOK_SECRET; using raw body in dev");
     return req.body;
   }
   try {
@@ -9509,26 +12114,13 @@ async function getWebhookPayload(req, res) {
   } catch (err) {
     if (isProd) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error("Webhook signature verification failed:", errorMessage);
+      logger.error("Webhook signature verification failed", { error: errorMessage });
       res.status(400).json({ error: "invalid_signature" });
       return null;
     }
-    console.warn("\u26A0\uFE0F Svix not available or verification failed; using raw body in dev.");
+    logger.warn("Svix not available or verification failed; using raw body in dev");
     return req.body;
   }
-}
-async function handleClerkBillingEvent(eventType, payload, convexUrl, res) {
-  if (eventType.startsWith("subscription.")) {
-    await handleSubscriptionWebhook(eventType, payload, convexUrl);
-    res.json({ received: true, synced: true, handled: "subscription" });
-    return true;
-  }
-  if (eventType.startsWith("invoice.")) {
-    await handleInvoiceWebhook(eventType, payload, convexUrl);
-    res.json({ received: true, synced: true, handled: "invoice" });
-    return true;
-  }
-  return false;
 }
 function extractWebhookData(webhookData) {
   const email = webhookData?.customer_email || webhookData?.customerEmail || webhookData?.email;
@@ -9566,45 +12158,53 @@ async function handleOrderPaymentWebhook(payload, convexUrl, res) {
     result: { status: mapped.status }
   });
 }
+function isClerkBillingEvent(eventType) {
+  return eventType.startsWith("subscription.") || eventType.startsWith("invoice.");
+}
 var paymentWebhook = async (req, res) => {
   try {
     const payload = await getWebhookPayload(req, res);
     if (!payload) return;
-    console.log("Payment webhook received:", payload?.type || "unknown", payload);
-    const convexUrl = process.env.VITE_CONVEX_URL;
-    if (!convexUrl) {
-      console.warn("VITE_CONVEX_URL not set; skipping Convex sync for webhook");
-      res.json({ received: true, synced: false });
+    const eventType = (payload?.type || "").toString();
+    logger.info("Payment webhook received", { eventType });
+    if (isClerkBillingEvent(eventType)) {
+      logger.info("Clerk Billing event received on wrong endpoint", {
+        eventType,
+        correctEndpoint: "/api/webhooks/clerk-billing"
+      });
+      res.json({
+        received: true,
+        synced: false,
+        message: `Event ${eventType} should be sent to /api/webhooks/clerk-billing`
+      });
       return;
     }
-    const eventType = (payload?.type || "").toString();
-    try {
-      const handled = await handleClerkBillingEvent(eventType, payload, convexUrl, res);
-      if (handled) return;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error("\u274C Failed to sync subscription/invoice webhook:", errorMessage);
+    const convexUrl = process.env.VITE_CONVEX_URL;
+    if (!convexUrl) {
+      logger.warn("VITE_CONVEX_URL not set; skipping Convex sync for webhook");
+      res.json({ received: true, synced: false });
+      return;
     }
     try {
       await handleOrderPaymentWebhook(payload, convexUrl, res);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error("Failed to sync webhook to Convex:", errorMessage);
+      logger.error("Failed to sync webhook to Convex", { error: errorMessage });
       res.status(500).json({ received: true, synced: false, error: errorMessage });
     }
   } catch (error) {
     handleRouteError(error, res, "Failed to process payment webhook");
   }
 };
-router10.post("/webhook", paymentWebhook);
-var payments_default = router10;
+router13.post("/webhook", paymentWebhook);
+var payments_default = router13;
 
 // server/routes/paypal.ts
-import { Router as Router11 } from "express";
+import { Router as Router14 } from "express";
 init_auth();
 
 // server/lib/secureLogger.ts
-import crypto3 from "node:crypto";
+import crypto4 from "node:crypto";
 var SENSITIVE_PATTERNS = [
   /password/i,
   /secret/i,
@@ -9627,7 +12227,7 @@ var PII_PATTERNS = [
   /zip[_-]?code/i
 ];
 function hashValue(value) {
-  return crypto3.createHash("sha256").update(value).digest("hex").substring(0, 16);
+  return crypto4.createHash("sha256").update(value).digest("hex").substring(0, 16);
 }
 function isSensitiveField(fieldName) {
   return SENSITIVE_PATTERNS.some((pattern) => pattern.test(fieldName));
@@ -9783,9 +12383,9 @@ var SecureLogger = class {
 var secureLogger = new SecureLogger();
 
 // server/routes/paypal.ts
-var router11 = Router11();
+var router14 = Router14();
 if (process.env.NODE_ENV !== "production") {
-  router11.get("/test", async (req, res) => {
+  router14.get("/test", async (req, res) => {
     try {
       const testResponse = {
         success: true,
@@ -9798,7 +12398,7 @@ if (process.env.NODE_ENV !== "production") {
       handleRouteError(error, res, "PayPal test failed");
     }
   });
-  router11.get("/test-auth", isAuthenticated, async (req, res) => {
+  router14.get("/test-auth", isAuthenticated, async (req, res) => {
     try {
       res.json({
         success: true,
@@ -9814,7 +12414,7 @@ if (process.env.NODE_ENV !== "production") {
     }
   });
 }
-router11.post("/create-order", isAuthenticated, async (req, res) => {
+router14.post("/create-order", isAuthenticated, async (req, res) => {
   try {
     const body = req.body;
     const parseResult = paypalCreateOrderSchema.safeParse({
@@ -9879,7 +12479,7 @@ router11.post("/create-order", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to create PayPal order");
   }
 });
-router11.post("/capture-payment", isAuthenticated, async (req, res) => {
+router14.post("/capture-payment", isAuthenticated, async (req, res) => {
   try {
     const { orderId } = req.body;
     if (!orderId) {
@@ -9919,7 +12519,7 @@ router11.post("/capture-payment", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to capture PayPal payment");
   }
 });
-router11.get("/capture/:token", async (req, res) => {
+router14.get("/capture/:token", async (req, res) => {
   const { token } = req.params;
   try {
     const { PayerID } = req.query;
@@ -9986,7 +12586,7 @@ router11.get("/capture/:token", async (req, res) => {
     res.redirect(errorUrl);
   }
 });
-router11.get("/order/:orderId", isAuthenticated, async (req, res) => {
+router14.get("/order/:orderId", isAuthenticated, async (req, res) => {
   try {
     const { orderId } = req.params;
     if (!orderId) {
@@ -10009,54 +12609,161 @@ router11.get("/order/:orderId", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to get PayPal order details");
   }
 });
-router11.get("/health", async (req, res) => {
+router14.get("/health", async (req, res) => {
   try {
-    res.json({
-      success: true,
-      message: "PayPal service is healthy",
-      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      environment: process.env.PAYPAL_MODE || "sandbox"
-    });
+    const healthResult = await paypal_default.healthCheck();
+    if (healthResult.healthy) {
+      res.json({
+        success: true,
+        message: "PayPal service is healthy",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        environment: process.env.PAYPAL_MODE || "sandbox",
+        latencyMs: healthResult.latencyMs,
+        apiConnectivity: true
+      });
+    } else {
+      res.status(503).json({
+        success: false,
+        message: "PayPal service is unhealthy",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        environment: process.env.PAYPAL_MODE || "sandbox",
+        latencyMs: healthResult.latencyMs,
+        apiConnectivity: false,
+        error: healthResult.error
+      });
+    }
   } catch (error) {
-    handleRouteError(error, res, "PayPal service is unhealthy");
+    handleRouteError(error, res, "PayPal health check failed");
   }
 });
-var paypal_default2 = router11;
+var paypal_default2 = router14;
 
 // server/routes/reservations.ts
-import { Router as Router12 } from "express";
-import { z as z13 } from "zod";
+import { Router as Router15 } from "express";
+import { z as z17 } from "zod";
 init_auth();
 
 // server/storage.ts
-import * as crypto4 from "node:crypto";
+import * as crypto5 from "node:crypto";
 
 // server/lib/db.ts
 init_ConvexUser();
 init_convex();
-async function getUserByEmail(email) {
-  console.log("Getting user by email:", email);
-  return null;
+async function getUserByEmail2(email) {
+  const convexUser = await getUserByEmail(email);
+  if (!convexUser) return null;
+  return convexUserToUser(convexUser);
+}
+async function getUserById2(id) {
+  try {
+    const convexUserId = createConvexUserId(id);
+    const convexUser = await getUserById(convexUserId);
+    if (!convexUser) return null;
+    return convexUserToUser(convexUser);
+  } catch (error) {
+    console.error("Failed to get user by ID:", error);
+    return null;
+  }
 }
 async function createServiceOrder(order) {
   console.log("Creating service order:", order);
-  return {};
+  const estimatedPrice = order.details?.duration ? order.details.duration * 50 : 100;
+  const orderData = {
+    items: [
+      {
+        productId: 0,
+        title: order.service_type,
+        name: order.service_type,
+        price: estimatedPrice,
+        license: "service",
+        quantity: 1
+      }
+    ],
+    total: estimatedPrice,
+    email: "",
+    status: "pending",
+    currency: "USD"
+  };
+  const result = await createOrder(orderData);
+  if (!result) throw new Error("Failed to create service order");
+  return {
+    id: Number.parseInt(result.orderId?.toString().slice(-8) ?? "0", 10) || 0,
+    user_id: order.user_id,
+    service_type: order.service_type,
+    status: "pending",
+    estimated_price: estimatedPrice,
+    details: order.details,
+    created_at: (/* @__PURE__ */ new Date()).toISOString(),
+    updated_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
 }
 async function listServiceOrders(userId) {
-  console.log("Listing service orders for user:", userId);
-  return [];
+  try {
+    const convexUserId = createConvexUserId(userId);
+    const orders = await listUserOrders(convexUserId);
+    const serviceOrders = orders.filter(
+      (o) => o.items?.some((item) => item.license === "service")
+    );
+    return serviceOrders.map((o) => {
+      const firstItem = o.items?.[0];
+      const serviceType = typeof firstItem?.title === "string" ? firstItem.title : "unknown";
+      return {
+        id: Number.parseInt(o._id.toString().slice(-8), 10) || 0,
+        user_id: userId,
+        service_type: serviceType,
+        status: o.status,
+        estimated_price: o.total,
+        details: {},
+        created_at: new Date(o.createdAt).toISOString(),
+        updated_at: new Date(o.updatedAt).toISOString()
+      };
+    });
+  } catch (error) {
+    console.error("Failed to list service orders:", error);
+    return [];
+  }
 }
-async function getUserById(id) {
-  console.log("Getting user by ID:", id);
-  return null;
+async function getOrderInvoiceData2(orderId) {
+  try {
+    const convexOrderId = `orders:${orderId}`;
+    const data = await getOrderInvoiceData(convexOrderId);
+    if (!data) {
+      return { order: {}, items: [] };
+    }
+    const order = { id: orderId, ...data.order };
+    const items = (data.items || []).map((item) => ({
+      id: 0,
+      beat_id: item.productId,
+      license_type: item.license || "basic",
+      price: item.price,
+      quantity: item.quantity || 1,
+      session_id: null,
+      user_id: null,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    }));
+    return { order, items };
+  } catch (error) {
+    console.error("Failed to get order invoice data:", error);
+    return { order: {}, items: [] };
+  }
 }
-async function getOrderInvoiceData(orderId) {
-  console.log("Getting order invoice data:", orderId);
-  return { order: {}, items: [] };
-}
-async function listUserOrders(userId) {
-  console.log("Listing user orders:", userId);
-  return [];
+async function listUserOrders2(userId) {
+  try {
+    const convexUserId = createConvexUserId(userId);
+    const orders = await listUserOrders(convexUserId);
+    return orders.map((o) => ({
+      id: Number.parseInt(o._id.toString().slice(-8), 10) || 0,
+      user_id: userId,
+      email: o.email,
+      total: o.total,
+      status: o.status,
+      items: o.items || [],
+      created_at: new Date(o.createdAt).toISOString()
+    }));
+  } catch (error) {
+    console.error("Failed to list user orders:", error);
+    return [];
+  }
 }
 async function createReservation2(reservation) {
   if (!reservation.clerkId) {
@@ -10065,13 +12772,11 @@ async function createReservation2(reservation) {
   const convexReservationData = {
     serviceType: reservation.service_type,
     details: reservation.details,
-    // Keep as object for Convex
     preferredDate: reservation.preferred_date,
     durationMinutes: reservation.duration_minutes,
     totalPrice: reservation.total_price,
     notes: reservation.notes || void 0,
     clerkId: reservation.clerkId
-    // Use actual clerkId when available
   };
   console.log("\u{1F680} DB Layer: Creating reservation with Convex data:", {
     serviceType: convexReservationData.serviceType,
@@ -10118,21 +12823,88 @@ async function createReservation2(reservation) {
     );
   }
 }
-async function getReservationById(id) {
-  console.log("Getting reservation by ID:", id);
-  return null;
+async function getReservationById2(id) {
+  try {
+    const convexReservationId = id;
+    const reservation = await getReservationById(convexReservationId, true);
+    if (!reservation) return null;
+    return {
+      id: reservation._id.toString(),
+      user_id: reservation.userId ? Number.parseInt(reservation.userId.toString().slice(-8), 10) : null,
+      service_type: reservation.serviceType,
+      status: reservation.status,
+      details: reservation.details,
+      preferred_date: reservation.preferredDate,
+      duration_minutes: reservation.durationMinutes,
+      total_price: reservation.totalPrice,
+      notes: reservation.notes,
+      created_at: new Date(reservation.createdAt).toISOString(),
+      updated_at: new Date(reservation.updatedAt).toISOString()
+    };
+  } catch (error) {
+    console.error("Failed to get reservation by ID:", error);
+    return null;
+  }
 }
-async function getUserReservations(userId) {
-  console.log("Getting user reservations:", userId);
-  return [];
+async function getUserReservations2(userId) {
+  try {
+    const clerkId = typeof userId === "string" ? userId : `user_${userId}`;
+    const reservations = await getUserReservations(clerkId);
+    return reservations.map((r) => ({
+      id: r._id.toString(),
+      user_id: r.userId ? Number.parseInt(r.userId.toString().slice(-8), 10) : null,
+      service_type: r.serviceType,
+      status: r.status,
+      details: r.details,
+      preferred_date: r.preferredDate,
+      duration_minutes: r.durationMinutes,
+      total_price: r.totalPrice,
+      notes: r.notes,
+      created_at: new Date(r.createdAt).toISOString(),
+      updated_at: new Date(r.updatedAt).toISOString()
+    }));
+  } catch (error) {
+    console.error("Failed to get user reservations:", error);
+    return [];
+  }
 }
-async function updateReservationStatus(id, status) {
-  console.log("Updating reservation status:", id, status);
-  return {};
+async function updateReservationStatus2(id, status) {
+  try {
+    const convexReservationId = id;
+    const result = await updateReservationStatus(convexReservationId, status);
+    if (!result?.success) {
+      throw new Error("Failed to update reservation status");
+    }
+    const updated = await getReservationById2(id);
+    if (!updated) {
+      throw new Error("Failed to fetch updated reservation");
+    }
+    return updated;
+  } catch (error) {
+    console.error("Failed to update reservation status:", error);
+    throw error;
+  }
 }
-async function getReservationsByDateRange(startDate, endDate) {
-  console.log("Getting reservations by date range:", startDate, endDate);
-  return [];
+async function getReservationsByDateRange2(startDate, endDate) {
+  try {
+    const reservations = await getReservationsByDateRange(startDate, endDate);
+    return reservations.map((r) => ({
+      id: r._id.toString(),
+      user_id: r.userId ? Number.parseInt(r.userId.toString().slice(-8), 10) : null,
+      service_type: r.serviceType,
+      status: r.status,
+      details: r.details,
+      preferred_date: r.preferredDate,
+      duration_minutes: r.durationMinutes,
+      total_price: r.totalPrice,
+      notes: r.notes,
+      created_at: new Date(r.createdAt).toISOString(),
+      updated_at: new Date(r.updatedAt).toISOString()
+    }));
+  } catch (error) {
+    console.error("Failed to get reservations by date range:", error);
+    return [];
+  }
 }
 
 // server/storage.ts
@@ -10430,7 +13202,7 @@ var MemStorage = class {
   }
   // Reservation methods
   async createReservation(reservation) {
-    const id = crypto4.randomUUID();
+    const id = crypto5.randomUUID();
     const newReservation = {
       ...reservation,
       id,
@@ -10484,28 +13256,28 @@ var DatabaseStorage = class {
     return await createReservation2(reservation);
   }
   async getReservation(id) {
-    const reservation = await getReservationById(id);
+    const reservation = await getReservationById2(id);
     return reservation || void 0;
   }
   async getUserReservations(userId) {
-    return await getUserReservations(userId);
+    return await getUserReservations2(userId);
   }
   async updateReservationStatus(id, status) {
-    return await updateReservationStatus(id, status);
+    return await updateReservationStatus2(id, status);
   }
   async getReservationsByDateRange(startDate, endDate) {
-    return await getReservationsByDateRange(startDate, endDate);
+    return await getReservationsByDateRange2(startDate, endDate);
   }
   // User methods
   async getUser(id) {
-    const user = await getUserById(id);
+    const user = await getUserById2(id);
     return user || void 0;
   }
   async getUserByUsername(_username) {
     return void 0;
   }
   async getUserByEmail(email) {
-    const user = await getUserByEmail(email);
+    const user = await getUserByEmail2(email);
     return user || void 0;
   }
   async createUser(_insertUser) {
@@ -10541,11 +13313,11 @@ var DatabaseStorage = class {
   }
   // Order methods - Not fully implemented
   async getOrdersByUser(userId) {
-    const orders = await listUserOrders(userId);
+    const orders = await listUserOrders2(userId);
     return orders.map((order) => fromDbOrder(order));
   }
   async getOrder(id) {
-    const { order } = await getOrderInvoiceData(id);
+    const { order } = await getOrderInvoiceData2(id);
     return fromDbOrder(order);
   }
   async createOrder(_insertOrder) {
@@ -10615,7 +13387,7 @@ function generateICS(event) {
 }
 
 // server/routes/reservations.ts
-var router12 = Router12();
+var router15 = Router15();
 function getUserDisplayName(user) {
   if (user.username && typeof user.username === "string") {
     return user.username;
@@ -10629,7 +13401,7 @@ function buildConfirmationEmailContent(user, reservation) {
   const displayName = getUserDisplayName(user);
   const formattedDate = new Date(reservation.preferred_date).toLocaleDateString("en-US");
   const formattedTime = new Date(reservation.preferred_date).toLocaleTimeString("en-US");
-  const formattedPrice = (reservation.total_price / 100).toFixed(2);
+  const formattedPrice = centsToDollars(reservation.total_price).toFixed(2);
   return `
     <h2>Reservation Confirmation</h2>
     <p>Hello ${displayName},</p>
@@ -10647,18 +13419,27 @@ function buildConfirmationEmailContent(user, reservation) {
 }
 async function sendConfirmationEmail(userEmail, reservation, user) {
   try {
+    if (!userEmail || userEmail.trim() === "") {
+      logger.warn("Cannot send confirmation email: No recipient email provided", {
+        reservationId: reservation.id
+      });
+      return;
+    }
     const emailContent = buildConfirmationEmailContent(user, reservation);
     await sendMail({
       to: userEmail,
       subject: "BroLab Reservation Confirmation",
       html: emailContent
     });
-    console.log("\u{1F4E7} Confirmation email sent successfully");
+    logger.info("Confirmation email sent", { reservationId: reservation.id });
   } catch (emailError) {
-    console.error("\u26A0\uFE0F Failed to send confirmation email:", emailError);
+    logger.error("Failed to send confirmation email", {
+      reservationId: reservation.id,
+      error: emailError
+    });
   }
 }
-async function sendAdminNotification(user, reservation, clientPhone, notes) {
+async function sendAdminNotification2(user, reservation, clientPhone, notes) {
   try {
     const fullName = user.username || `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email;
     const adminUser = {
@@ -10684,9 +13465,12 @@ async function sendAdminNotification(user, reservation, clientPhone, notes) {
       }
     };
     await sendAdminReservationNotification(adminUser, reservationData);
-    console.log("\u{1F4E7} Admin notification sent successfully");
+    logger.info("Admin notification sent", { reservationId: reservation.id });
   } catch (adminEmailError) {
-    console.error("\u26A0\uFE0F Failed to send admin notification:", adminEmailError);
+    logger.error("Failed to send admin notification", {
+      reservationId: reservation.id,
+      error: adminEmailError
+    });
   }
 }
 function handleReservationError(error, res) {
@@ -10734,7 +13518,7 @@ function extractUserFromRequest(req) {
     role: user.role
   };
 }
-router12.get("/services", async (_req, res) => {
+router15.get("/services", async (_req, res) => {
   try {
     const services = [
       {
@@ -10771,7 +13555,7 @@ router12.get("/services", async (_req, res) => {
     handleRouteError(error, res, "Failed to fetch services");
   }
 });
-router12.get("/public", async (_req, res) => {
+router15.get("/public", async (_req, res) => {
   try {
     const publicInfo = {
       availableServices: 4,
@@ -10784,7 +13568,7 @@ router12.get("/public", async (_req, res) => {
     handleRouteError(error, res, "Failed to fetch public reservation info");
   }
 });
-router12.post(
+router15.post(
   "/",
   isAuthenticated,
   validateBody(CreateReservationSchema),
@@ -10796,19 +13580,12 @@ router12.post(
         return;
       }
       const body = req.body;
-      console.log("\u{1F680} Creating reservation with authentication");
-      console.log("\u{1F464} Authenticated user:", {
-        id: user.id,
-        clerkId: user.clerkId && typeof user.clerkId === "string" ? `${user.clerkId.substring(0, 8)}...` : "undefined",
-        email: user.email
-      });
-      console.log("\u{1F4DD} Request body:", {
-        serviceType: body.serviceType,
-        preferredDate: body.preferredDate,
-        clientInfo: body.clientInfo
+      logger.info("Creating reservation with authentication", {
+        userId: user.id,
+        serviceType: body.serviceType
       });
       if (!user.clerkId || typeof user.clerkId !== "string") {
-        console.error("\u274C Missing or invalid clerkId in authenticated user");
+        logger.error("Missing or invalid clerkId in authenticated user", { userId: user.id });
         res.status(400).json({
           error: "Authentication error: Missing user identifier. Please log out and log back in."
         });
@@ -10844,21 +13621,28 @@ router12.post(
         total_price: body.budget || 0,
         notes: body.notes || null
       };
-      console.log("\u{1F504} Creating reservation with data:", {
-        ...reservationData,
-        clerkId: typeof reservationData.clerkId === "string" ? `${reservationData.clerkId.substring(0, 8)}...` : "invalid"
+      logger.info("Creating reservation with data", {
+        userId: user.id,
+        serviceType: reservationData.service_type
       });
       const reservation = await storage.createReservation(reservationData);
-      console.log("\u2705 Reservation created successfully:", {
-        id: reservation.id,
+      logger.info("Reservation created successfully", {
+        reservationId: reservation.id,
         serviceType: reservation.service_type,
         status: reservation.status
       });
-      void sendConfirmationEmail(user.email, reservation, user);
-      void sendAdminNotification(user, reservation, body.clientInfo?.phone, body.notes);
+      const confirmationEmail = user.email && user.email.trim() !== "" ? user.email : body.clientInfo?.email;
+      if (confirmationEmail) {
+        void sendConfirmationEmail(confirmationEmail, reservation, user);
+      } else {
+        logger.warn("No email available for confirmation - skipping user email", {
+          reservationId: reservation.id
+        });
+      }
+      void sendAdminNotification2(user, reservation, body.clientInfo?.phone, body.notes);
       res.status(201).json(reservation);
     } catch (error) {
-      console.error("\u274C Reservation creation failed:", error);
+      logger.error("Reservation creation failed", { error });
       if (handleReservationError(error, res)) {
         return;
       }
@@ -10866,7 +13650,7 @@ router12.post(
     }
   }
 );
-router12.get("/me", isAuthenticated, async (req, res) => {
+router15.get("/me", isAuthenticated, async (req, res) => {
   try {
     const user = extractUserFromRequest(req);
     if (!user) {
@@ -10879,7 +13663,7 @@ router12.get("/me", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to fetch user reservations");
   }
 });
-router12.get(
+router15.get(
   "/:id",
   isAuthenticated,
   validateParams(CommonParams.id),
@@ -10905,10 +13689,10 @@ router12.get(
     }
   }
 );
-router12.patch(
+router15.patch(
   "/:id/status",
   isAuthenticated,
-  createValidationMiddleware(z13.object({ status: z13.enum(ReservationStatus) })),
+  createValidationMiddleware(z17.object({ status: z17.enum(ReservationStatus2) })),
   async (req, res) => {
     try {
       const user = extractUserFromRequest(req);
@@ -10949,39 +13733,44 @@ router12.patch(
     }
   }
 );
-router12.get("/:id/calendar", isAuthenticated, async (req, res) => {
-  try {
-    const user = extractUserFromRequest(req);
-    if (!user) {
-      res.status(401).json({ error: "Authentication required" });
-      return;
+router15.get(
+  "/:id/calendar",
+  isAuthenticated,
+  validateParams(CommonParams.id),
+  async (req, res) => {
+    try {
+      const user = extractUserFromRequest(req);
+      if (!user) {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
+      const reservation = await storage.getReservation(req.params.id);
+      if (!reservation) {
+        res.status(404).json({ error: "Reservation not found" });
+        return;
+      }
+      if (!hasReservationAccess(reservation.user_id, user)) {
+        res.status(403).json({ error: "Unauthorized" });
+        return;
+      }
+      const icsContent = generateICS({
+        summary: `BroLab - ${reservation.service_type}`,
+        description: reservation.notes || "",
+        startTime: new Date(reservation.preferred_date),
+        durationMinutes: reservation.duration_minutes
+      });
+      res.setHeader("Content-Type", "text/calendar");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="reservation-${reservation.id}.ics"`
+      );
+      res.send(icsContent);
+    } catch (error) {
+      handleRouteError(error, res, "Failed to generate calendar file");
     }
-    const reservation = await storage.getReservation(req.params.id);
-    if (!reservation) {
-      res.status(404).json({ error: "Reservation not found" });
-      return;
-    }
-    if (!hasReservationAccess(reservation.user_id, user)) {
-      res.status(403).json({ error: "Unauthorized" });
-      return;
-    }
-    const icsContent = generateICS({
-      summary: `BroLab - ${reservation.service_type}`,
-      description: reservation.notes || "",
-      startTime: new Date(reservation.preferred_date),
-      durationMinutes: reservation.duration_minutes
-    });
-    res.setHeader("Content-Type", "text/calendar");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="reservation-${reservation.id}.ics"`
-    );
-    res.send(icsContent);
-  } catch (error) {
-    handleRouteError(error, res, "Failed to generate calendar file");
   }
-});
-router12.get("/range/:start/:end", isAuthenticated, async (req, res) => {
+);
+router15.get("/range/:start/:end", isAuthenticated, async (req, res) => {
   try {
     const user = extractUserFromRequest(req);
     if (!user) {
@@ -11007,10 +13796,10 @@ router12.get("/range/:start/:end", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to fetch reservations by date range");
   }
 });
-var reservations_default = router12;
+var reservations_default = router15;
 
 // server/routes/schema.ts
-import { Router as Router13 } from "express";
+import { Router as Router16 } from "express";
 
 // server/lib/schemaMarkup.ts
 function generateBeatSchemaMarkup(beat, baseUrl, options = {}) {
@@ -11144,11 +13933,11 @@ function generateOrganizationSchemaMarkup(baseUrl) {
 }
 
 // server/routes/schema.ts
-var router13 = Router13();
+var router16 = Router16();
 var getBpmFromProduct = (product) => {
-  if (product.bpm) return parseInt(product.bpm.toString());
+  if (product.bpm) return Number.parseInt(product.bpm.toString(), 10);
   const bpmMeta = product.meta_data?.find((meta) => meta.key === "bpm");
-  return bpmMeta?.value ? parseInt(bpmMeta.value.toString()) : void 0;
+  return bpmMeta?.value ? Number.parseInt(bpmMeta.value.toString(), 10) : void 0;
 };
 var getKeyFromProduct = (product) => {
   return product.key || product.meta_data?.find((meta) => meta.key === "key")?.value?.toString() || null;
@@ -11157,7 +13946,7 @@ var getMoodFromProduct = (product) => {
   return product.mood || product.meta_data?.find((meta) => meta.key === "mood")?.value?.toString() || null;
 };
 var getDurationFromProduct = (product) => {
-  return product.duration ? parseFloat(product.duration.toString()) : void 0;
+  return product.duration ? Number.parseFloat(product.duration.toString()) : void 0;
 };
 var getTagsFromProduct = (product) => {
   return product.tags?.map((tag) => tag.name) || [];
@@ -11195,7 +13984,7 @@ async function wcApiRequest2(endpoint, options = {}) {
   return response.json();
 }
 var BASE_URL = process.env.FRONTEND_URL || "https://brolabentertainment.com";
-router13.get("/beat/:id", async (req, res) => {
+router16.get("/beat/:id", validateParams(CommonParams.numericId), async (req, res) => {
   try {
     const beatId = req.params.id;
     let product;
@@ -11222,7 +14011,7 @@ router13.get("/beat/:id", async (req, res) => {
       bpm: getBpmFromProduct(product),
       key: getKeyFromProduct(product),
       mood: getMoodFromProduct(product),
-      price: parseFloat(product.price) || 0,
+      price: Number.parseFloat(product.price) || 0,
       image_url: product.images?.[0]?.src,
       image: product.images?.[0]?.src,
       // Alias for compatibility
@@ -11245,7 +14034,7 @@ router13.get("/beat/:id", async (req, res) => {
     handleRouteError(error, res, "Failed to generate beat schema markup");
   }
 });
-router13.get("/beats-list", async (req, res) => {
+router16.get("/beats-list", async (req, res) => {
   try {
     const products = await wcApiRequest2("/products");
     if (!products || products.length === 0) {
@@ -11262,7 +14051,7 @@ router13.get("/beats-list", async (req, res) => {
       bpm: getBpmFromProduct(product),
       key: getKeyFromProduct(product),
       mood: getMoodFromProduct(product),
-      price: parseFloat(product.price) || 0,
+      price: Number.parseFloat(product.price) || 0,
       image_url: product.images?.[0]?.src,
       image: product.images?.[0]?.src,
       // Alias for compatibility
@@ -11282,7 +14071,7 @@ router13.get("/beats-list", async (req, res) => {
     handleRouteError(error, res, "Failed to generate beats list schema markup");
   }
 });
-router13.get("/organization", async (req, res) => {
+router16.get("/organization", async (req, res) => {
   try {
     const schemaMarkup = generateOrganizationSchemaMarkup(BASE_URL);
     res.setHeader("Content-Type", "application/ld+json");
@@ -11292,15 +14081,25 @@ router13.get("/organization", async (req, res) => {
     handleRouteError(error, res, "Failed to generate organization schema markup");
   }
 });
-var schema_default = router13;
+var schema_default = router16;
 
 // server/routes/security.ts
 init_auth();
-import { Router as Router14 } from "express";
-var router14 = Router14();
-router14.get("/security/status", (req, res) => {
+import { Router as Router17 } from "express";
+var router17 = Router17();
+var RATE_LIMIT_CONFIG = {
+  api: { windowMs: 15 * 60 * 1e3, maxRequests: 1e3 },
+  auth: { windowMs: 15 * 60 * 1e3, maxRequests: 20 },
+  payment: { windowMs: 15 * 60 * 1e3, maxRequests: 50 },
+  download: { windowMs: 60 * 60 * 1e3, maxRequests: 100 },
+  upload: { windowMs: 60 * 60 * 1e3, maxRequests: 20 }
+};
+router17.get("/security/status", (req, res) => {
   const convexConfigured = !!(process.env.CONVEX_URL || process.env.VITE_CONVEX_URL);
   const clerkConfigured = !!process.env.CLERK_SECRET_KEY;
+  const webhookSecurityService = getWebhookSecurityService();
+  const cacheStats = webhookSecurityService.getCacheStats();
+  const securityConfig = webhookSecurityService.getConfig();
   const status = {
     timestamp: (/* @__PURE__ */ new Date()).toISOString(),
     environment: process.env.NODE_ENV || "development",
@@ -11315,12 +14114,29 @@ router14.get("/security/status", (req, res) => {
       enabled: clerkConfigured,
       sessionBased: true
     },
-    rateLimitActive: true,
-    securityHeaders: true
+    rateLimit: {
+      active: true,
+      configuration: RATE_LIMIT_CONFIG,
+      description: "express-rate-limit middleware active on all API endpoints"
+    },
+    securityHeaders: {
+      helmet: true,
+      csp: true,
+      compression: true,
+      bodySizeLimits: true,
+      corsConfigured: true
+    },
+    webhookSecurity: {
+      idempotencyCacheSize: cacheStats.idempotencyCacheSize,
+      ipFailureCacheSize: cacheStats.ipFailureCacheSize,
+      maxTimestampAge: securityConfig.maxTimestampAge,
+      failureThreshold: securityConfig.failureThreshold,
+      failureTrackingWindowMs: securityConfig.failureTrackingWindow
+    }
   };
   res.json(status);
 });
-router14.get("/security/user-info", isAuthenticated, async (req, res) => {
+router17.get("/security/user-info", isAuthenticated, async (req, res) => {
   const userInfo = {
     userId: req.user?.id,
     username: req.user?.username,
@@ -11334,13 +14150,13 @@ router14.get("/security/user-info", isAuthenticated, async (req, res) => {
   };
   res.json(userInfo);
 });
-var security_default = router14;
+var security_default = router17;
 
 // server/routes/serviceOrders.ts
 import express2 from "express";
 init_auth();
-var router15 = express2.Router();
-router15.post(
+var router18 = express2.Router();
+router18.post(
   "/",
   isAuthenticated,
   validateBody(serviceOrderValidation),
@@ -11360,7 +14176,7 @@ router15.post(
     }
   }
 );
-router15.get("/", isAuthenticated, async (req, res) => {
+router18.get("/", isAuthenticated, async (req, res) => {
   try {
     const userId = req.user?.id || req.session?.userId;
     const numericUserId = typeof userId === "string" ? parseInt(userId, 10) : userId;
@@ -11374,10 +14190,10 @@ router15.get("/", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to list service orders");
   }
 });
-var serviceOrders_default = router15;
+var serviceOrders_default = router18;
 
 // server/routes/sitemap.ts
-import { Router as Router15 } from "express";
+import { Router as Router18 } from "express";
 
 // server/lib/sitemapGenerator.ts
 function generateSitemapXML(beats, categories, config) {
@@ -11504,7 +14320,69 @@ Crawl-delay: 1`;
 }
 
 // server/routes/sitemap.ts
-var router16 = Router15();
+var router19 = Router18();
+var ALLOWED_HOSTS = [
+  "brolabentertainment.com",
+  "www.brolabentertainment.com",
+  "localhost"
+];
+var VERCEL_PREVIEW_PATTERN = /^[\w-]+\.vercel\.app$/;
+var WC_RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelay: 1e3,
+  maxDelay: 1e4,
+  timeout: 15e3
+};
+async function fetchWithRetry(url, options, config = WC_RETRY_CONFIG) {
+  let lastError = null;
+  const sanitizedUrl = url.split("?")[0];
+  for (let attempt = 1; attempt <= config.maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (response.status >= 500 || response.status === 429) {
+        const retryable = attempt < config.maxRetries;
+        logger.warn("[Sitemap] WooCommerce API returned retryable status", {
+          attempt,
+          maxRetries: config.maxRetries,
+          status: response.status,
+          retryable,
+          endpoint: sanitizedUrl
+        });
+        if (!retryable) {
+          return response;
+        }
+        const delay = Math.min(config.baseDelay * Math.pow(2, attempt - 1), config.maxDelay);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const isTimeout = lastError.name === "AbortError";
+      const retryable = attempt < config.maxRetries;
+      logger.warn("[Sitemap] WooCommerce fetch failed", {
+        attempt,
+        maxRetries: config.maxRetries,
+        error: lastError.message,
+        isTimeout,
+        retryable,
+        endpoint: sanitizedUrl
+      });
+      if (retryable) {
+        const delay = Math.min(config.baseDelay * Math.pow(2, attempt - 1), config.maxDelay);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError ?? new Error("All retry attempts failed");
+}
 var WOOCOMMERCE_API_URL = process.env.WOOCOMMERCE_API_URL || "https://brolabentertainment.com/wp-json/wc/v3";
 var WC_CONSUMER_KEY = process.env.WOOCOMMERCE_CONSUMER_KEY;
 var WC_CONSUMER_SECRET = process.env.WOOCOMMERCE_CONSUMER_SECRET;
@@ -11514,9 +14392,10 @@ function isWooCommerceEnabled() {
 async function wcApiRequest3(endpoint, options = {}) {
   if (!isWooCommerceEnabled()) {
     if (process.env.NODE_ENV !== "test") {
-      console.warn(
-        "[Sitemap] WooCommerce API disabled - credentials missing, returning empty data"
-      );
+      logger.warn("[Sitemap] WooCommerce API disabled - credentials missing", {
+        endpoint,
+        reason: "missing_credentials"
+      });
     }
     return [];
   }
@@ -11526,20 +14405,32 @@ async function wcApiRequest3(endpoint, options = {}) {
   const url = new URL(`${WOOCOMMERCE_API_URL}${endpoint}`);
   url.searchParams.append("consumer_key", WC_CONSUMER_KEY);
   url.searchParams.append("consumer_secret", WC_CONSUMER_SECRET);
-  const response = await fetch(url.toString(), {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "User-Agent": "BroLab-Frontend/1.0",
-      Accept: "application/json",
-      ...options.headers
+  try {
+    const response = await fetchWithRetry(url.toString(), {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "BroLab-Frontend/1.0",
+        Accept: "application/json",
+        ...options.headers
+      }
+    });
+    if (!response.ok) {
+      logger.error("[Sitemap] WooCommerce API error after retries", {
+        endpoint,
+        status: response.status,
+        statusText: response.statusText
+      });
+      return [];
     }
-  });
-  if (!response.ok) {
-    console.error(`[Sitemap] WooCommerce API error: ${response.status} ${response.statusText}`);
+    return response.json();
+  } catch (error) {
+    logger.error("[Sitemap] WooCommerce API request failed after all retries", {
+      endpoint,
+      error: error instanceof Error ? error.message : String(error)
+    });
     return [];
   }
-  return response.json();
 }
 async function wcApiRequestAllPages(baseEndpoint) {
   const allProducts = [];
@@ -11560,7 +14451,17 @@ async function wcApiRequestAllPages(baseEndpoint) {
   }
   return allProducts;
 }
-function getBaseUrl() {
+function isHostAllowed(host) {
+  const hostWithoutPort = host.split(":")[0].toLowerCase();
+  if (ALLOWED_HOSTS.includes(hostWithoutPort)) {
+    return true;
+  }
+  if (VERCEL_PREVIEW_PATTERN.test(hostWithoutPort)) {
+    return true;
+  }
+  return false;
+}
+function getBaseUrlFallback() {
   if (process.env.FRONTEND_URL) {
     return process.env.FRONTEND_URL;
   }
@@ -11570,9 +14471,32 @@ function getBaseUrl() {
   const port = process.env.PORT || 5e3;
   return `http://localhost:${port}`;
 }
-var BASE_URL2 = getBaseUrl();
-router16.get("/sitemap.xml", async (_req, res) => {
+function getBaseUrlFromRequest(req) {
+  const forwardedHost = req.get("X-Forwarded-Host");
+  const host = forwardedHost || req.get("Host");
+  if (!host) {
+    logger.info("[Sitemap] No host header found, using fallback URL");
+    return getBaseUrlFallback();
+  }
+  if (!isHostAllowed(host)) {
+    logger.warn("[Sitemap] Host not in allowlist, using fallback URL", {
+      receivedHost: host,
+      allowedHosts: [...ALLOWED_HOSTS]
+    });
+    return getBaseUrlFallback();
+  }
+  const forwardedProto = req.get("X-Forwarded-Proto");
+  const protocol = forwardedProto || (req.secure ? "https" : "http");
+  const baseUrl = `${protocol}://${host}`;
+  logger.info("[Sitemap] Using request-derived base URL", {
+    baseUrl,
+    source: forwardedHost ? "X-Forwarded-Host" : "Host"
+  });
+  return baseUrl;
+}
+router19.get("/sitemap.xml", async (req, res) => {
   try {
+    const baseUrl = getBaseUrlFromRequest(req);
     const wooEnabled = isWooCommerceEnabled();
     res.setHeader("X-WooCommerce-Status", wooEnabled ? "enabled" : "disabled");
     const [products, categories] = await Promise.all([
@@ -11613,7 +14537,7 @@ router16.get("/sitemap.xml", async (_req, res) => {
       };
     });
     const sitemapXML = generateSitemapXML(beats, categories, {
-      baseUrl: BASE_URL2,
+      baseUrl,
       includeImages: true,
       includeCategories: categories.length > 0,
       includeStaticPages: true
@@ -11626,10 +14550,11 @@ router16.get("/sitemap.xml", async (_req, res) => {
     handleRouteError(errorMessage, res, "Failed to generate sitemap");
   }
 });
-router16.get("/sitemap-index.xml", async (_req, res) => {
+router19.get("/sitemap-index.xml", async (req, res) => {
   try {
+    const baseUrl = getBaseUrlFromRequest(req);
     const sitemaps = ["/sitemap.xml", "/sitemap-beats.xml", "/sitemap-categories.xml"];
-    const sitemapIndexXML = generateSitemapIndex(BASE_URL2, sitemaps);
+    const sitemapIndexXML = generateSitemapIndex(baseUrl, sitemaps);
     res.setHeader("Content-Type", "application/xml");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(sitemapIndexXML);
@@ -11638,9 +14563,10 @@ router16.get("/sitemap-index.xml", async (_req, res) => {
     handleRouteError(errorMessage, res, "Failed to generate sitemap index");
   }
 });
-router16.get("/robots.txt", async (_req, res) => {
+router19.get("/robots.txt", async (req, res) => {
   try {
-    const robotsTxt = generateRobotsTxt(BASE_URL2);
+    const baseUrl = getBaseUrlFromRequest(req);
+    const robotsTxt = generateRobotsTxt(baseUrl);
     res.setHeader("Content-Type", "text/plain");
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.send(robotsTxt);
@@ -11649,8 +14575,9 @@ router16.get("/robots.txt", async (_req, res) => {
     handleRouteError(errorMessage, res, "Failed to generate robots.txt");
   }
 });
-router16.get("/sitemap-beats.xml", async (_req, res) => {
+router19.get("/sitemap-beats.xml", async (req, res) => {
   try {
+    const baseUrl = getBaseUrlFromRequest(req);
     const wooEnabled = isWooCommerceEnabled();
     res.setHeader("X-WooCommerce-Status", wooEnabled ? "enabled" : "disabled");
     const products = await wcApiRequestAllPages("/products");
@@ -11688,7 +14615,7 @@ router16.get("/sitemap-beats.xml", async (_req, res) => {
       };
     });
     const sitemapXML = generateSitemapXML(beats, [], {
-      baseUrl: BASE_URL2,
+      baseUrl,
       includeImages: true,
       includeCategories: false,
       includeStaticPages: false
@@ -11701,14 +14628,14 @@ router16.get("/sitemap-beats.xml", async (_req, res) => {
     handleRouteError(errorMessage, res, "Failed to generate beats sitemap");
   }
 });
-var sitemap_default = router16;
+var sitemap_default = router19;
 
 // server/routes/storage.ts
 init_api();
 init_convex();
-import { Router as Router16 } from "express";
+import { Router as Router19 } from "express";
 import multer2 from "multer";
-import { z as z14 } from "zod";
+import { z as z18 } from "zod";
 
 // server/lib/storage.ts
 init_api();
@@ -11720,10 +14647,10 @@ var STORAGE_BUCKETS = {
 };
 async function uploadUserFile(_userId, file, bucket, path, options = {}) {
   try {
-    const convex6 = getConvex();
+    const convex8 = getConvex();
     const fileData = file.toString("base64");
     const mimeType = options.contentType || "application/octet-stream";
-    const result = await convex6.action(api.files.storage.uploadToStorage, {
+    const result = await convex8.action(api.files.storage.uploadToStorage, {
       fileData,
       filename: path,
       mimeType,
@@ -11740,8 +14667,8 @@ async function uploadUserFile(_userId, file, bucket, path, options = {}) {
 }
 async function getSignedUrl(_bucket, path, _expiresIn = 3600) {
   try {
-    const convex6 = getConvex();
-    const url = await convex6.action(api.files.storage.getStorageUrl, {
+    const convex8 = getConvex();
+    const url = await convex8.action(api.files.storage.getStorageUrl, {
       storageId: path
     });
     if (!url) {
@@ -11755,8 +14682,8 @@ async function getSignedUrl(_bucket, path, _expiresIn = 3600) {
 }
 async function deleteFile(_bucket, path) {
   try {
-    const convex6 = getConvex();
-    await convex6.action(api.files.storage.deleteFromStorage, {
+    const convex8 = getConvex();
+    await convex8.action(api.files.storage.deleteFromStorage, {
       storageId: path
     });
   } catch (error) {
@@ -11766,15 +14693,15 @@ async function deleteFile(_bucket, path) {
 }
 
 // server/routes/storage.ts
-var fileUploadValidation2 = z14.object({
-  file: z14.any().optional()
+var fileUploadValidation2 = z18.object({
+  file: z18.any().optional()
 });
-var fileFilterValidation2 = z14.object({
-  type: z14.string().optional(),
-  limit: z14.number().min(1).max(100).optional().default(20),
-  offset: z14.number().min(0).optional().default(0)
+var fileFilterValidation2 = z18.object({
+  type: z18.string().optional(),
+  limit: z18.number().min(1).max(100).optional().default(20),
+  offset: z18.number().min(0).optional().default(0)
 });
-var router17 = Router16();
+var router20 = Router19();
 var upload2 = multer2({
   storage: multer2.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }
@@ -11790,7 +14717,7 @@ function getBucketKeyForRole(role) {
       return "USER_UPLOADS";
   }
 }
-router17.post(
+router20.post(
   "/upload",
   uploadRateLimit,
   upload2.single("file"),
@@ -11836,7 +14763,7 @@ router17.post(
         res.status(400).json({ error: "Missing user identifier" });
         return;
       }
-      const convex6 = getConvex();
+      const convex8 = getConvex();
       const createFileArgs = {
         filename: fileName,
         originalName: req.file.originalname,
@@ -11848,7 +14775,7 @@ router17.post(
         orderId: order_id ? order_id : void 0,
         clerkId
       };
-      const fileId = await convex6.mutation(api.files.createFile.createFile, createFileArgs);
+      const fileId = await convex8.mutation(api.files.createFile.createFile, createFileArgs);
       const fileRecord = {
         user_id: Number.parseInt(userId),
         filename: fileName,
@@ -11871,7 +14798,7 @@ router17.post(
     }
   }
 );
-router17.get("/signed-url/:fileId", downloadRateLimit, async (req, res) => {
+router20.get("/signed-url/:fileId", downloadRateLimit, async (req, res) => {
   try {
     if (!req.isAuthenticated()) {
       res.status(401).json({ error: "Authentication required" });
@@ -11883,10 +14810,10 @@ router17.get("/signed-url/:fileId", downloadRateLimit, async (req, res) => {
       res.status(400).json({ error: "Missing user identifier" });
       return;
     }
-    const convex6 = getConvex();
+    const convex8 = getConvex();
     let file;
     try {
-      file = await convex6.query(api.files.getFile.getFile, {
+      file = await convex8.query(api.files.getFile.getFile, {
         fileId,
         clerkId
       });
@@ -11913,7 +14840,7 @@ router17.get("/signed-url/:fileId", downloadRateLimit, async (req, res) => {
     handleRouteError(error, res, "Failed to generate signed URL");
   }
 });
-router17.get("/files", createValidationMiddleware(fileFilterValidation2), async (req, res) => {
+router20.get("/files", createValidationMiddleware(fileFilterValidation2), async (req, res) => {
   try {
     if (!req.isAuthenticated()) {
       res.status(401).json({ error: "Authentication required" });
@@ -11925,8 +14852,8 @@ router17.get("/files", createValidationMiddleware(fileFilterValidation2), async 
       return;
     }
     const { type: roleFilter } = req.query;
-    const convex6 = getConvex();
-    const convexFiles = await convex6.query(api.files.listFiles.listFiles, {
+    const convex8 = getConvex();
+    const convexFiles = await convex8.query(api.files.listFiles.listFiles, {
       role: roleFilter,
       clerkId
     });
@@ -11944,7 +14871,7 @@ router17.get("/files", createValidationMiddleware(fileFilterValidation2), async 
     handleRouteError(error, res, "Failed to list files");
   }
 });
-router17.delete("/files/:fileId", async (req, res) => {
+router20.delete("/files/:fileId", async (req, res) => {
   try {
     if (!req.isAuthenticated()) {
       res.status(401).json({ error: "Authentication required" });
@@ -11956,10 +14883,10 @@ router17.delete("/files/:fileId", async (req, res) => {
       res.status(400).json({ error: "Missing user identifier" });
       return;
     }
-    const convex6 = getConvex();
+    const convex8 = getConvex();
     let file;
     try {
-      file = await convex6.query(api.files.getFile.getFile, {
+      file = await convex8.query(api.files.getFile.getFile, {
         fileId,
         clerkId
       });
@@ -11981,7 +14908,7 @@ router17.delete("/files/:fileId", async (req, res) => {
     }
     const bucketKey = getBucketKeyForRole(file.role);
     await deleteFile(bucketKey, file.storagePath);
-    await convex6.mutation(api.files.deleteFile.deleteFile, {
+    await convex8.mutation(api.files.deleteFile.deleteFile, {
       fileId,
       clerkId
     });
@@ -11990,11 +14917,11 @@ router17.delete("/files/:fileId", async (req, res) => {
     handleRouteError(error, res, "Failed to delete file");
   }
 });
-var storage_default = router17;
+var storage_default = router20;
 
 // server/routes/stripe.ts
-import { Router as Router17 } from "express";
-import Stripe3 from "stripe";
+import { Router as Router20 } from "express";
+import Stripe4 from "stripe";
 var createStripePaymentIntent = async (params) => {
   const response = await fetch("https://api.stripe.com/v1/payment_intents", {
     method: "POST",
@@ -12025,18 +14952,18 @@ if (!process.env.STRIPE_SECRET_KEY) {
   console.error("\u274C Missing required Stripe secret: STRIPE_SECRET_KEY");
   throw new Error("STRIPE_SECRET_KEY environment variable is required");
 }
-var stripeClient2 = new Stripe3(process.env.STRIPE_SECRET_KEY, {
+var stripeClient2 = new Stripe4(process.env.STRIPE_SECRET_KEY, {
   // Using default API version for compatibility
 });
-var router18 = Router17();
-router18.get("/health", (req, res) => {
+var router21 = Router20();
+router21.get("/health", (req, res) => {
   res.json({
     status: "ok",
     stripe: stripeClient2 ? "initialized" : "mock",
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   });
 });
-router18.post("/checkout", async (req, res) => {
+router21.post("/checkout", async (req, res) => {
   try {
     const { orderId, successUrl, cancelUrl } = req.body;
     if (!orderId || !successUrl || !cancelUrl) {
@@ -12044,7 +14971,7 @@ router18.post("/checkout", async (req, res) => {
       return;
     }
     const { getConvex: getConvex2 } = await Promise.resolve().then(() => (init_convex(), convex_exports));
-    const convex6 = getConvex2();
+    const convex8 = getConvex2();
     if (!orderId || typeof orderId !== "string") {
       res.status(400).json({ error: "Invalid orderId format" });
       return;
@@ -12054,7 +14981,7 @@ router18.post("/checkout", async (req, res) => {
       return;
     }
     const convexOrderId = orderId;
-    const orderData = await convex6.query("orders:getOrderWithRelations", {
+    const orderData = await convex8.query("orders:getOrderWithRelations", {
       orderId: convexOrderId
     });
     if (!orderData?.order) {
@@ -12083,7 +15010,7 @@ router18.post("/checkout", async (req, res) => {
       }
     );
     const saveCheckoutSession = async (orderId2, checkoutSessionId, paymentIntentId) => {
-      return await convex6.mutation("orders:saveStripeCheckoutSession", {
+      return await convex8.mutation("orders:saveStripeCheckoutSession", {
         orderId: orderId2,
         checkoutSessionId,
         paymentIntentId
@@ -12121,26 +15048,69 @@ var createPaymentIntent = async (req, res) => {
     handleRouteError(error, res, "Error creating payment intent");
   }
 };
-router18.post("/create-payment-intent", createPaymentIntent);
-router18.get("/payment-intent/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const paymentIntent = await stripeClient2.paymentIntents.retrieve(id);
-    res.json({
-      status: paymentIntent.status,
-      amount: paymentIntent.amount,
-      currency: paymentIntent.currency,
-      metadata: paymentIntent.metadata
-    });
-  } catch (error) {
-    handleRouteError(error, res, "Error retrieving payment intent");
+router21.post("/create-payment-intent", createPaymentIntent);
+router21.get(
+  "/payment-intent/:id",
+  validateParams(CommonParams.stripePaymentIntentId),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const paymentIntent = await stripeClient2.paymentIntents.retrieve(id);
+      res.json({
+        status: paymentIntent.status,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        metadata: paymentIntent.metadata
+      });
+    } catch (error) {
+      handleRouteError(error, res, "Error retrieving payment intent");
+    }
   }
+);
+var stripe_default = router21;
+
+// server/routes/subscription.ts
+import { Router as Router21 } from "express";
+var router22 = Router21();
+router22.get("/plans", (_req, res) => {
+  res.json([
+    {
+      id: "basic",
+      name: "Basic",
+      price: 999,
+      currency: "usd",
+      interval: "month",
+      features: ["5 downloads per month", "Standard quality", "Email support"]
+    },
+    {
+      id: "pro",
+      name: "Pro",
+      price: 1999,
+      currency: "usd",
+      interval: "month",
+      features: ["20 downloads per month", "High quality", "Priority support", "Stems included"]
+    },
+    {
+      id: "unlimited",
+      name: "Unlimited",
+      price: 4999,
+      currency: "usd",
+      interval: "month",
+      features: [
+        "Unlimited downloads",
+        "Highest quality",
+        "24/7 support",
+        "Stems included",
+        "Custom requests"
+      ]
+    }
+  ]);
 });
-var stripe_default = router18;
+var subscription_default = router22;
 
 // server/routes/sync.ts
 init_auth();
-import { Router as Router18 } from "express";
+import { Router as Router22 } from "express";
 
 // server/middleware/requireAdmin.ts
 init_audit();
@@ -12709,8 +15679,8 @@ var getWebSocketManager = () => {
 };
 
 // server/routes/sync.ts
-var router19 = Router18();
-router19.get("/", isAuthenticated, async (req, res) => {
+var router23 = Router22();
+router23.get("/", isAuthenticated, async (req, res) => {
   try {
     const userId = req.user.id;
     const dashboardData = await fetchDashboardDataForUser(userId);
@@ -12729,7 +15699,7 @@ router19.get("/", isAuthenticated, async (req, res) => {
     });
   }
 });
-router19.get(
+router23.get(
   "/poll",
   isAuthenticated,
   async (req, res) => {
@@ -12754,7 +15724,7 @@ router19.get(
     }
   }
 );
-router19.post(
+router23.post(
   "/send",
   isAuthenticated,
   async (req, res) => {
@@ -12801,7 +15771,7 @@ router19.post(
     }
   }
 );
-router19.post(
+router23.post(
   "/validate",
   isAuthenticated,
   async (req, res) => {
@@ -12825,7 +15795,7 @@ router19.post(
     }
   }
 );
-router19.post(
+router23.post(
   "/force",
   isAuthenticated,
   async (req, res) => {
@@ -12865,7 +15835,7 @@ router19.post(
     }
   }
 );
-router19.get(
+router23.get(
   "/status",
   isAuthenticated,
   async (_req, res) => {
@@ -12902,7 +15872,7 @@ router19.get(
     }
   }
 );
-router19.post(
+router23.post(
   "/broadcast",
   isAuthenticated,
   requireAdmin,
@@ -13016,10 +15986,10 @@ function generateSyncId() {
 function generateDataHash() {
   return `hash_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 }
-var sync_default = router19;
+var sync_default = router23;
 
 // server/routes/uploads.ts
-import { Router as Router19 } from "express";
+import { Router as Router23 } from "express";
 import multer3 from "multer";
 init_auth();
 
@@ -13050,12 +16020,11 @@ var enhancedFileUploadSecurity = (options = {}) => {
       if (!file) {
         return next();
       }
-      console.log(`\u{1F50D} Starting enhanced security scan for file: ${file.originalname}`, {
+      logger.info("Starting enhanced security scan", {
         requestId,
+        fileName: file.originalname,
         fileSize: file.size,
-        mimeType: file.mimetype,
-        enableAntivirusScanning,
-        enableContentAnalysis
+        mimeType: file.mimetype
       });
       const validation = await validateFile(file, {
         allowedTypes: allowedMimeTypes,
@@ -13079,21 +16048,19 @@ var enhancedFileUploadSecurity = (options = {}) => {
       if (enableAntivirusScanning) {
         const scanResult = await scanFile(file);
         if (!scanResult.safe) {
-          console.warn(`\u{1F6A8} Security threats detected in file: ${file.originalname}`, {
+          logger.warn("Security threats detected in file", {
             requestId,
+            fileName: file.originalname,
             threats: scanResult.threats,
             scanTime: scanResult.scanTime
           });
-          console.error("SECURITY_INCIDENT", {
+          logger.error("SECURITY_INCIDENT: Malicious file upload", {
             type: "MALICIOUS_FILE_UPLOAD",
             requestId,
             fileName: file.originalname,
             fileSize: file.size,
             mimeType: file.mimetype,
-            threats: scanResult.threats,
-            userAgent: req.headers["user-agent"],
-            ip: req.ip,
-            timestamp: (/* @__PURE__ */ new Date()).toISOString()
+            threats: scanResult.threats
           });
           const errorResponse = createApiError(
             "security_threat_detected",
@@ -13110,17 +16077,20 @@ var enhancedFileUploadSecurity = (options = {}) => {
           );
           return res.status(400).json(errorResponse);
         }
-        console.log(`\u2705 File passed security scan: ${file.originalname}`, {
+        logger.info("File passed security scan", {
           requestId,
+          fileName: file.originalname,
           scanTime: scanResult.scanTime
         });
       }
       if (enableContentAnalysis) {
         const contentAnalysis = await analyzeFileContent(file);
         if (contentAnalysis.suspicious) {
-          console.warn(`\u26A0\uFE0F Suspicious content detected in file: ${file.originalname}`, {
+          logger.warn("Suspicious content detected in file", {
             requestId,
-            suspiciousFeatures: contentAnalysis.features
+            fileName: file.originalname,
+            suspiciousFeatures: contentAnalysis.features,
+            riskLevel: contentAnalysis.riskLevel
           });
           req.fileSecurity = {
             suspicious: true,
@@ -13135,14 +16105,15 @@ var enhancedFileUploadSecurity = (options = {}) => {
         scanTimestamp: (/* @__PURE__ */ new Date()).toISOString(),
         fileHash: await generateFileHash(file)
       };
-      console.log(`\u2705 Enhanced security check completed for: ${file.originalname}`, {
+      logger.info("Enhanced security check completed", {
         requestId,
+        fileName: file.originalname,
         fileSize: file.size,
         securityStatus: "PASSED"
       });
       next();
     } catch (error) {
-      console.error("Enhanced file upload security error:", error);
+      logger.error("Enhanced file upload security error", { error });
       const requestId = req.requestId || generateSecureRequestId();
       const errorResponse = createApiError("security_check_failed", "Security check failed", {
         userMessage: "An error occurred while checking file security",
@@ -13207,15 +16178,15 @@ async function analyzeFileContent(file) {
       riskLevel = getHigherRiskLevel(riskLevel, "medium");
     }
   } catch (error) {
-    console.error("Content analysis error:", error);
+    logger.error("Content analysis error", { error });
     features.push("ANALYSIS_ERROR");
     riskLevel = "medium";
   }
   return { suspicious: features.length > 0, features, riskLevel };
 }
 async function generateFileHash(file) {
-  const crypto5 = await import("node:crypto");
-  const hash = crypto5.createHash("sha256");
+  const crypto7 = await import("node:crypto");
+  const hash = crypto7.createHash("sha256");
   hash.update(file.buffer);
   return hash.digest("hex");
 }
@@ -13323,8 +16294,8 @@ var collectFileErrors = (file, maxSize, allowedTypes) => {
 };
 var validateFileUpload3 = (options = {}) => {
   const {
-    maxSize = 50 * 1024 * 1024,
-    // 50MB default
+    maxSize = 100 * 1024 * 1024,
+    // 100MB default (harmonisé avec multer)
     allowedTypes = [
       "audio/mpeg",
       "audio/wav",
@@ -13370,13 +16341,13 @@ var validateFileUpload3 = (options = {}) => {
 };
 
 // server/routes/uploads.ts
-var router20 = Router19();
+var router24 = Router23();
 var upload3 = multer3({
   storage: multer3.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }
-  // 50MB max
+  limits: { fileSize: 100 * 1024 * 1024 }
+  // 100MB max (harmonisé avec validateFileUpload)
 });
-router20.post(
+router24.post(
   "/upload",
   isAuthenticated,
   fileUploadRateLimit({
@@ -13433,7 +16404,7 @@ router20.post(
       const userId = req.user.id;
       const extension = req.file.originalname.split(".").pop();
       const filePath = `${userId}/${timestamp}.${extension}`;
-      const { path, url } = await uploadToSupabase(req.file, filePath);
+      const { path, url } = await uploadToStorage(req.file, filePath);
       const securityInfo = req.fileSecurity || {};
       res.json({
         success: true,
@@ -13459,32 +16430,2625 @@ router20.post(
     }
   }
 );
-var uploads_default = router20;
+var uploads_default = router24;
+
+// server/routes/webhooks.ts
+import { Router as Router24 } from "express";
+import { randomUUID as randomUUID4 } from "node:crypto";
+
+// server/services/PaymentService.ts
+init_api();
+import Stripe5 from "stripe";
+
+// shared/types/Beat.ts
+var LICENSE_PRICING = {
+  ["basic" /* BASIC */]: 29.99,
+  ["premium" /* PREMIUM */]: 49.99,
+  ["unlimited" /* UNLIMITED */]: 149.99
+};
+var DEFAULT_LICENSE_TERMS = {
+  ["basic" /* BASIC */]: {
+    type: "basic" /* BASIC */,
+    copiesSold: 2e3,
+    radioPlay: false,
+    musicVideos: true,
+    streaming: true,
+    exclusive: false
+  },
+  ["premium" /* PREMIUM */]: {
+    type: "premium" /* PREMIUM */,
+    copiesSold: 1e4,
+    radioPlay: true,
+    musicVideos: true,
+    streaming: true,
+    exclusive: false
+  },
+  ["unlimited" /* UNLIMITED */]: {
+    type: "unlimited" /* UNLIMITED */,
+    copiesSold: -1,
+    // Unlimited
+    radioPlay: true,
+    musicVideos: true,
+    streaming: true,
+    exclusive: true
+  }
+};
+
+// server/services/PaymentService.ts
+init_convex();
+
+// server/services/AdminNotificationService.ts
+import { ConvexHttpClient as ConvexHttpClient6 } from "convex/browser";
+var AdminNotificationService = class _AdminNotificationService {
+  static instance;
+  convex;
+  notificationCache = /* @__PURE__ */ new Map();
+  rateLimitWindow = 5 * 60 * 1e3;
+  // 5 minutes
+  maxNotificationsPerWindow = 10;
+  constructor() {
+    const convexUrl = process.env.VITE_CONVEX_URL;
+    if (!convexUrl) {
+      throw new Error("VITE_CONVEX_URL environment variable is required");
+    }
+    this.convex = new ConvexHttpClient6(convexUrl);
+  }
+  /**
+   * Get singleton instance
+   */
+  static getInstance() {
+    if (!_AdminNotificationService.instance) {
+      _AdminNotificationService.instance = new _AdminNotificationService();
+    }
+    return _AdminNotificationService.instance;
+  }
+  /**
+   * Send admin notification for critical payment failure
+   */
+  async notifyPaymentFailure(orderId, paymentIntentId, amount, currency, failureReason, requestId) {
+    const payload = {
+      type: "payment_failure" /* PAYMENT_FAILURE */,
+      severity: "high" /* HIGH */,
+      title: "Payment Failure Detected",
+      message: `Payment failed for order ${orderId}`,
+      metadata: {
+        orderId,
+        paymentIntentId,
+        amount: centsToDollars(amount).toFixed(2),
+        currency: currency.toUpperCase(),
+        failureReason: failureReason || "Unknown reason"
+      },
+      requestId,
+      timestamp: Date.now()
+    };
+    await this.sendNotification(payload);
+  }
+  /**
+   * Send admin notification for signature verification failure
+   */
+  async notifySignatureVerificationFailure(provider, errorMessage, requestId) {
+    const payload = {
+      type: "signature_verification_failure" /* SIGNATURE_VERIFICATION_FAILURE */,
+      severity: "critical" /* CRITICAL */,
+      title: "\u26A0\uFE0F Security Alert: Signature Verification Failed",
+      message: `${provider.toUpperCase()} webhook signature verification failed`,
+      metadata: {
+        provider,
+        error: errorMessage,
+        securityNote: "This could indicate a security issue or misconfiguration"
+      },
+      requestId,
+      timestamp: Date.now()
+    };
+    await this.sendNotification(payload);
+  }
+  /**
+   * Send admin notification for webhook processing error
+   */
+  async notifyWebhookProcessingError(provider, eventType, eventId, errorMessage, requestId) {
+    const payload = {
+      type: "webhook_processing_error" /* WEBHOOK_PROCESSING_ERROR */,
+      severity: "high" /* HIGH */,
+      title: "Webhook Processing Error",
+      message: `Failed to process ${provider.toUpperCase()} webhook: ${eventType}`,
+      metadata: {
+        provider,
+        eventType,
+        eventId,
+        error: errorMessage
+      },
+      requestId,
+      timestamp: Date.now()
+    };
+    await this.sendNotification(payload);
+  }
+  /**
+   * Send admin notification for refund processed
+   */
+  async notifyRefundProcessed(orderId, chargeId, amountRefunded, currency, reason, requestId) {
+    const payload = {
+      type: "refund_processed" /* REFUND_PROCESSED */,
+      severity: "medium" /* MEDIUM */,
+      title: "Refund Processed",
+      message: `Refund processed for order ${orderId}`,
+      metadata: {
+        orderId,
+        chargeId,
+        amountRefunded: centsToDollars(amountRefunded).toFixed(2),
+        currency: currency.toUpperCase(),
+        reason: reason || "No reason provided"
+      },
+      requestId,
+      timestamp: Date.now()
+    };
+    await this.sendNotification(payload);
+  }
+  /**
+   * Send admin notification for configuration error
+   */
+  async notifyConfigurationError(service, missingConfig, requestId) {
+    const payload = {
+      type: "configuration_error" /* CONFIGURATION_ERROR */,
+      severity: "critical" /* CRITICAL */,
+      title: "\u26A0\uFE0F Configuration Error",
+      message: `Missing configuration for ${service}`,
+      metadata: {
+        service,
+        missingConfig,
+        action: "Please check environment variables and update configuration"
+      },
+      requestId,
+      timestamp: Date.now()
+    };
+    await this.sendNotification(payload);
+  }
+  /**
+   * Send notification with rate limiting
+   */
+  async sendNotification(payload) {
+    try {
+      if (!this.shouldSendNotification(payload.type)) {
+        console.log(`\u23F8\uFE0F Rate limit reached for ${payload.type}, skipping notification`);
+        return;
+      }
+      const emailContent = this.generateEmailContent(payload);
+      await sendAdminNotification(payload.type, {
+        subject: payload.title,
+        html: emailContent,
+        metadata: payload.metadata
+      });
+      await this.logNotificationToAudit(payload);
+      this.updateRateLimitCache(payload.type);
+      console.log(`\u2705 Admin notification sent: ${payload.type}`);
+    } catch (error) {
+      console.error("\u274C Failed to send admin notification:", error);
+    }
+  }
+  /**
+   * Check if notification should be sent based on rate limiting
+   */
+  shouldSendNotification(type) {
+    const cacheKey = `notification:${type}`;
+    const lastSent = this.notificationCache.get(cacheKey);
+    const now = Date.now();
+    if (!lastSent) {
+      return true;
+    }
+    if (now - lastSent < this.rateLimitWindow) {
+      const count = Array.from(this.notificationCache.entries()).filter(
+        ([key, timestamp]) => key.startsWith(`notification:${type}:`) && now - timestamp < this.rateLimitWindow
+      ).length;
+      if (count >= this.maxNotificationsPerWindow) {
+        return false;
+      }
+    }
+    return true;
+  }
+  /**
+   * Update rate limit cache
+   */
+  updateRateLimitCache(type) {
+    const cacheKey = `notification:${type}:${Date.now()}`;
+    this.notificationCache.set(cacheKey, Date.now());
+    const now = Date.now();
+    for (const [key, timestamp] of this.notificationCache.entries()) {
+      if (now - timestamp > this.rateLimitWindow) {
+        this.notificationCache.delete(key);
+      }
+    }
+  }
+  /**
+   * Generate email content for notification
+   */
+  generateEmailContent(payload) {
+    const severityColor = this.getSeverityColor(payload.severity);
+    const severityLabel = payload.severity.toUpperCase();
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: ${severityColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+          <h2 style="margin: 0;">${payload.title}</h2>
+          <p style="margin: 10px 0 0 0; opacity: 0.9;">Severity: ${severityLabel}</p>
+        </div>
+        
+        <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none;">
+          <p style="margin: 0 0 15px 0; font-size: 16px; color: #374151;">
+            ${payload.message}
+          </p>
+          
+          ${payload.requestId ? `<p style="margin: 0 0 15px 0; color: #6b7280; font-size: 14px;"><strong>Request ID:</strong> ${payload.requestId}</p>` : ""}
+          
+          ${payload.metadata ? this.formatMetadata(payload.metadata) : ""}
+          
+          <p style="margin: 20px 0 0 0; color: #6b7280; font-size: 14px;">
+            <strong>Timestamp:</strong> ${new Date(payload.timestamp).toLocaleString()}
+          </p>
+        </div>
+        
+        <div style="background: #1f2937; color: #9ca3af; padding: 15px; text-align: center; border-radius: 0 0 8px 8px; font-size: 12px;">
+          <p style="margin: 0;">BroLab Entertainment - Payment System Alert</p>
+          <p style="margin: 5px 0 0 0;">This is an automated notification. Please review and take appropriate action.</p>
+        </div>
+      </div>
+    `;
+  }
+  /**
+   * Format metadata for email display
+   */
+  formatMetadata(metadata) {
+    const rows = Object.entries(metadata).map(
+      ([key, value]) => `
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-weight: bold; color: #374151;">
+            ${this.formatKey(key)}
+          </td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; color: #6b7280;">
+            ${this.formatValue(value)}
+          </td>
+        </tr>
+      `
+    ).join("");
+    return `
+      <table style="width: 100%; margin: 15px 0; border-collapse: collapse; background: white; border-radius: 4px; overflow: hidden;">
+        ${rows}
+      </table>
+    `;
+  }
+  /**
+   * Format metadata key for display
+   */
+  formatKey(key) {
+    const withSpaces = key.replaceAll(/([A-Z])/g, " $1");
+    const capitalized = withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
+    return capitalized.trim();
+  }
+  /**
+   * Format metadata value for display
+   */
+  formatValue(value) {
+    if (value === null || value === void 0) {
+      return "N/A";
+    }
+    if (typeof value === "object" && value !== null) {
+      try {
+        return `<pre style="margin: 0; font-size: 12px; white-space: pre-wrap;">${JSON.stringify(value, null, 2)}</pre>`;
+      } catch {
+        return "[Complex Object]";
+      }
+    }
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    return "[Unknown Type]";
+  }
+  /**
+   * Get color for severity level
+   */
+  getSeverityColor(severity) {
+    switch (severity) {
+      case "critical" /* CRITICAL */:
+        return "#dc2626";
+      // Red
+      case "high" /* HIGH */:
+        return "#ea580c";
+      // Orange
+      case "medium" /* MEDIUM */:
+        return "#f59e0b";
+      // Amber
+      case "low" /* LOW */:
+        return "#3b82f6";
+      // Blue
+      default:
+        return "#6b7280";
+    }
+  }
+  /**
+   * Log notification to audit trail
+   */
+  async logNotificationToAudit(payload) {
+    try {
+      console.log("\u{1F4DD} Admin notification audit log:", {
+        action: "admin_notification_sent",
+        resource: "notifications",
+        type: payload.type,
+        severity: payload.severity,
+        title: payload.title,
+        requestId: payload.requestId,
+        timestamp: payload.timestamp
+      });
+    } catch (error) {
+      console.error("\u274C Failed to log notification to audit:", error);
+    }
+  }
+};
+var adminNotificationService = AdminNotificationService.getInstance();
+
+// server/services/InvoiceService.ts
+import { ConvexHttpClient as ConvexHttpClient7 } from "convex/browser";
+
+// server/lib/pdf.ts
+import fs from "node:fs";
+import PDFDocument from "pdfkit";
+async function fetchLogoFromUrl(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.warn(`Failed to fetch logo from URL: ${url} - Status: ${response.status}`);
+      return null;
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    console.warn(`Error fetching logo from URL: ${url}`, error);
+    return null;
+  }
+}
+function isUrl(str) {
+  return str.startsWith("http://") || str.startsWith("https://");
+}
+async function getLogoImageData(logoPath) {
+  if (!logoPath) return null;
+  if (isUrl(logoPath)) {
+    return await fetchLogoFromUrl(logoPath);
+  }
+  if (fs.existsSync(logoPath)) {
+    return logoPath;
+  }
+  return null;
+}
+async function buildInvoicePdfStreamAsync(order, items, brand) {
+  const doc = new PDFDocument({ size: "A4", margin: 40 });
+  const logoData = await getLogoImageData(brand.logoPath);
+  doc.rect(0, 0, doc.page.width, 80).fill("#22223b");
+  if (logoData) {
+    doc.image(logoData, 40, 20, { width: 60 });
+  }
+  doc.fillColor("#fff").fontSize(20).text(brand.name, 110, 30, { continued: true });
+  doc.fontSize(10).text(`Facture n\xB0 ${order.invoice_number || ""}`, {
+    align: "right",
+    width: doc.page.width - 200
+  });
+  doc.moveDown();
+  doc.fillColor("#000");
+  doc.fontSize(12).text(`Client : ${order.email}`);
+  doc.text(`Date : ${order.created_at ? order.created_at.slice(0, 10) : ""}`);
+  doc.text(`Adresse : ${brand.address}`);
+  doc.moveDown();
+  doc.fontSize(12).text("Items:", { underline: true });
+  doc.moveDown(0.5);
+  const tableTop = doc.y;
+  doc.fontSize(10).text("ID", 40, tableTop).text("Licence", 120, tableTop).text("Prix", 200, tableTop).text("Qt\xE9", 270, tableTop).text("Total", 320, tableTop);
+  let y = tableTop + 15;
+  items.forEach((item) => {
+    doc.text(String(item.beat_id ?? item.id ?? ""), 40, y).text(item.license_type || "", 120, y).text(`${String(item.price?.toFixed(2) || "")}\u20AC`, 200, y).text(String(item.quantity || 1), 270, y).text(`${String((item.price || 0) * (item.quantity || 1))}\u20AC`, 320, y);
+    y += 15;
+  });
+  doc.moveTo(40, y).lineTo(500, y).stroke();
+  y += 10;
+  doc.fontSize(12).text(`Total : ${order.total?.toFixed(2) || ""}\u20AC`, 320, y);
+  doc.end();
+  return doc;
+}
+
+// server/services/InvoiceService.ts
+var InvoiceService = class {
+  convex;
+  brandConfig;
+  constructor(convexUrl) {
+    this.convex = new ConvexHttpClient7(convexUrl);
+    this.brandConfig = {
+      name: process.env.BRAND_NAME || "BroLab Entertainment",
+      email: process.env.BRAND_EMAIL || "billing@brolabentertainment.com",
+      address: process.env.BRAND_ADDRESS || "",
+      logoPath: process.env.BRAND_LOGO_PATH || ""
+    };
+  }
+  /**
+   * Generate invoice PDF and upload to Convex storage
+   *
+   * @param order - Order data
+   * @param items - Order items
+   * @returns Invoice result with URL, number, and storage ID
+   */
+  async generateInvoice(order, items) {
+    try {
+      console.log("\u{1F4C4} Generating invoice PDF for order:", order.id);
+      const orderForPdf = {
+        id: 1,
+        // PDF library expects number
+        status: "completed",
+        created_at: order.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+        invoice_number: order.invoiceNumber || this.generateInvoiceNumber(),
+        user_id: order.userId ? 1 : null,
+        session_id: order.sessionId || null,
+        email: order.email,
+        total: order.total,
+        stripe_payment_intent_id: order.paymentIntentId || null,
+        items: [],
+        invoice_pdf_url: void 0,
+        shipping_address: null
+      };
+      const pdfItems = items.map((item) => {
+        const validLicenseTypes = ["unlimited", "basic", "premium"];
+        const licenseType = item.type && typeof item.type === "string" && validLicenseTypes.includes(item.type) ? item.type : "basic";
+        return {
+          id: typeof item.productId === "number" ? item.productId : Number.parseInt(String(item.productId || "0")) || 0,
+          beat_id: typeof item.productId === "number" ? item.productId : Number.parseInt(String(item.productId || "0")) || 0,
+          license_type: licenseType,
+          price: centsToDollars(item.totalPrice || item.unitPrice || 0),
+          quantity: item.qty || 1,
+          created_at: (/* @__PURE__ */ new Date()).toISOString(),
+          session_id: null,
+          user_id: null
+        };
+      });
+      const pdfStream = await buildInvoicePdfStreamAsync(orderForPdf, pdfItems, this.brandConfig);
+      const chunks = [];
+      for await (const chunk of pdfStream) {
+        if (Buffer.isBuffer(chunk)) {
+          chunks.push(chunk);
+        } else if (typeof chunk === "string") {
+          chunks.push(Buffer.from(chunk));
+        }
+      }
+      const buffer = Buffer.concat(chunks);
+      const uploadUrlResult = await this.convex.action("files:generateUploadUrl", {});
+      const { url } = uploadUrlResult;
+      const uploadRes = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/pdf" },
+        body: buffer
+      });
+      if (!uploadRes.ok) {
+        throw new Error(`Failed to upload PDF: ${uploadRes.statusText}`);
+      }
+      const uploadJson = await uploadRes.json();
+      const storageId = uploadJson.storageId;
+      if (typeof storageId !== "string") {
+        throw new TypeError("Invalid storage ID returned from upload");
+      }
+      const orderId = order.id;
+      const result = await this.convex.mutation("orders:setInvoiceForOrder", {
+        orderId,
+        storageId,
+        amount: Number(order.total || 0),
+        currency: String(order.currency || "USD").toUpperCase(),
+        taxAmount: 0,
+        // No tax in current implementation
+        billingInfo: { email: order.email }
+      });
+      const resultData = result && typeof result === "object" ? result : null;
+      if (!resultData?.url || !resultData?.number) {
+        throw new Error("Failed to get invoice URL or number from Convex");
+      }
+      await this.logInvoiceGeneration(order.id, order.userId, storageId);
+      console.log("\u2705 Invoice generated successfully:", resultData.number);
+      return {
+        invoiceUrl: resultData.url,
+        invoiceNumber: resultData.number,
+        storageId
+      };
+    } catch (error) {
+      console.error("\u274C Failed to generate invoice:", error);
+      await this.logInvoiceGenerationError(
+        order.id,
+        order.userId,
+        error instanceof Error ? error.message : String(error)
+      );
+      throw new Error(
+        `Invoice generation failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  /**
+   * Send invoice email to customer
+   *
+   * @param email - Customer email address
+   * @param invoiceUrl - URL to download invoice
+   * @param invoiceNumber - Invoice number
+   */
+  async sendInvoiceEmail(email, invoiceUrl, invoiceNumber) {
+    try {
+      console.log("\u{1F4E7} Sending invoice email to:", email);
+      await sendMail({
+        to: email,
+        subject: `Votre facture ${invoiceNumber} - BroLab Entertainment`,
+        html: this.generateInvoiceEmailHtml(invoiceUrl, invoiceNumber)
+      });
+      console.log("\u2705 Invoice email sent successfully");
+    } catch (error) {
+      console.error("\u274C Failed to send invoice email:", error);
+      throw new Error(
+        `Invoice email sending failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  /**
+   * Generate invoice number
+   * Format: INV-YYYYMMDD-XXXXX
+   */
+  generateInvoiceNumber() {
+    const date = /* @__PURE__ */ new Date();
+    const dateStr = date.toISOString().slice(0, 10).replaceAll("-", "");
+    const random = Math.floor(Math.random() * 1e5).toString().padStart(5, "0");
+    return `INV-${dateStr}-${random}`;
+  }
+  /**
+   * Generate invoice email HTML
+   */
+  generateInvoiceEmailHtml(invoiceUrl, invoiceNumber) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="margin: 0; padding: 0; background: #f4f4f4; font-family: Arial, sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">Votre Facture</h1>
+            <p style="color: #E5E7EB; margin: 10px 0 0 0; font-size: 16px;">BroLab Entertainment</p>
+          </div>
+          
+          <div style="padding: 30px; background: white;">
+            <h2 style="color: #333; margin: 0 0 20px 0;">Merci pour votre paiement ! \u{1F389}</h2>
+            <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
+              Votre paiement a \xE9t\xE9 trait\xE9 avec succ\xE8s. Vous trouverez ci-dessous le lien pour t\xE9l\xE9charger votre facture.
+            </p>
+            
+            <div style="background: #EEF2FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>Num\xE9ro de facture :</strong> ${invoiceNumber}</p>
+              <p style="margin: 10px 0 0 0;"><strong>Date :</strong> ${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")}</p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${invoiceUrl}" 
+                 style="background: #8B5CF6; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                T\xE9l\xE9charger la facture
+              </a>
+            </div>
+            
+            <p style="color: #999; font-size: 14px; margin-top: 30px;">
+              Conservez cette facture pour vos dossiers. Si vous avez des questions, n'h\xE9sitez pas \xE0 nous contacter.
+            </p>
+          </div>
+          
+          <div style="background: #F9FAFB; padding: 20px; text-align: center; color: #6B7280; font-size: 14px;">
+            <p style="margin: 0;">BroLab Entertainment - Professional Music Production Services</p>
+            <p style="margin: 5px 0 0 0;">\u{1F4E7} ${this.brandConfig.email}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+  /**
+   * Log invoice generation to audit
+   */
+  async logInvoiceGeneration(orderId, userId, storageId) {
+    try {
+      await this.convex.mutation("audit:logAction", {
+        userId,
+        action: "invoice_generated",
+        resource: "orders",
+        resourceId: orderId,
+        metadata: {
+          storageId,
+          timestamp: Date.now()
+        }
+      });
+    } catch (error) {
+      console.error("\u274C Failed to log invoice generation to audit:", error);
+    }
+  }
+  /**
+   * Log invoice generation error to audit
+   */
+  async logInvoiceGenerationError(orderId, userId, errorMessage) {
+    try {
+      await this.convex.mutation("audit:logAction", {
+        userId,
+        action: "invoice_generation_error",
+        resource: "orders",
+        resourceId: orderId,
+        metadata: {
+          error: errorMessage,
+          timestamp: Date.now()
+        }
+      });
+    } catch (error) {
+      console.error("\u274C Failed to log invoice generation error to audit:", error);
+    }
+  }
+};
+var invoiceServiceInstance = null;
+var getInvoiceService = () => {
+  if (!invoiceServiceInstance) {
+    const convexUrl = process.env.VITE_CONVEX_URL;
+    if (!convexUrl) {
+      throw new Error("VITE_CONVEX_URL environment variable is required");
+    }
+    invoiceServiceInstance = new InvoiceService(convexUrl);
+  }
+  return invoiceServiceInstance;
+};
+
+// server/services/LicenseEmailService.ts
+function generateLicenseEmailHtml(data) {
+  const formattedDate = data.purchaseDate.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+  const licenseTypeDisplay = data.licenseType.charAt(0).toUpperCase() + data.licenseType.slice(1);
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="margin: 0; padding: 0; background: #f4f4f4; font-family: Arial, sans-serif;">
+      <div style="max-width: 600px; margin: 0 auto;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); padding: 30px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">\u{1F3B5} Your License Certificate</h1>
+          <p style="color: #E5E7EB; margin: 10px 0 0 0; font-size: 16px;">BroLab Entertainment</p>
+        </div>
+        
+        <!-- Content -->
+        <div style="padding: 30px; background: white;">
+          <h2 style="color: #333; margin: 0 0 20px 0;">Hey ${data.buyerName}! \u{1F389}</h2>
+          <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
+            Thank you for your purchase! Your license certificate for <strong>"${data.beatTitle}"</strong> is ready.
+          </p>
+          
+          <!-- License Info Box -->
+          <div style="background: #EEF2FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #7C3AED; margin: 0 0 15px 0;">License Details</h3>
+            <p style="margin: 5px 0;"><strong>Beat:</strong> ${data.beatTitle}</p>
+            <p style="margin: 5px 0;"><strong>License Type:</strong> ${licenseTypeDisplay}</p>
+            <p style="margin: 5px 0;"><strong>Reference:</strong> ${data.licenseNumber}</p>
+            <p style="margin: 5px 0;"><strong>Date:</strong> ${formattedDate}</p>
+            <p style="margin: 5px 0;"><strong>Amount:</strong> ${data.currency} ${data.price.toFixed(2)}</p>
+          </div>
+          
+          <!-- Download Button -->
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.licenseUrl}" 
+               style="background: #8B5CF6; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+              \u{1F4C4} Download License PDF
+            </a>
+          </div>
+          
+          <!-- Important Notice -->
+          <div style="background: #FEF3C7; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #F59E0B;">
+            <h4 style="color: #92400E; margin: 0 0 10px 0;">Important</h4>
+            <p style="color: #78350F; margin: 0; font-size: 14px;">
+              Keep this license certificate safe. It serves as proof of your purchase and outlines your usage rights.
+              Credit must be given as: "Produced by BroLab Entertainment"
+            </p>
+          </div>
+          
+          <!-- What's Included -->
+          <div style="margin: 20px 0;">
+            <h3 style="color: #333; margin: 0 0 15px 0;">What's Included in Your ${licenseTypeDisplay} License:</h3>
+            <ul style="color: #666; line-height: 1.8; padding-left: 20px;">
+              ${getLicenseFeaturesList(data.licenseType)}
+            </ul>
+          </div>
+          
+          <p style="color: #999; font-size: 14px; margin-top: 30px;">
+            Your files are also available in your dashboard. If you have any questions, don't hesitate to reach out!
+          </p>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background: #F9FAFB; padding: 20px; text-align: center; color: #6B7280; font-size: 14px;">
+          <p style="margin: 0;">BroLab Entertainment - Professional Music Production</p>
+          <p style="margin: 5px 0 0 0;">\u{1F4E7} licensing@brolabentertainment.com</p>
+          <p style="margin: 10px 0 0 0; font-size: 12px; color: #9CA3AF;">
+            Order #${data.orderId.substring(0, 12)}
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+function getLicenseFeaturesList(licenseType) {
+  const features = {
+    ["basic" /* BASIC */]: [
+      "Up to 2,000 copies/sales",
+      "Streaming on all platforms",
+      "Music video rights",
+      "Non-exclusive license"
+    ],
+    ["premium" /* PREMIUM */]: [
+      "Up to 10,000 copies/sales",
+      "Streaming on all platforms",
+      "Music video rights",
+      "Radio play rights",
+      "Non-exclusive license"
+    ],
+    ["unlimited" /* UNLIMITED */]: [
+      "Unlimited copies/sales",
+      "Streaming on all platforms",
+      "Music video rights",
+      "Radio play rights",
+      "Exclusive rights to the beat"
+    ]
+  };
+  return features[licenseType].map((f) => `<li>${f}</li>`).join("");
+}
+async function sendLicenseEmail(data) {
+  const html = generateLicenseEmailHtml(data);
+  const result = await sendMailWithResult({
+    to: data.buyerEmail,
+    subject: `\u{1F3B5} Your License Certificate - ${data.beatTitle} | BroLab Entertainment`,
+    html
+  });
+  if (result.success) {
+    console.log(`\u2705 License email sent to ${data.buyerEmail} for ${data.beatTitle}`);
+  } else {
+    console.error(`\u274C Failed to send license email to ${data.buyerEmail}:`, result.error);
+  }
+  return result;
+}
+
+// server/services/LicensePdfService.ts
+import { ConvexHttpClient as ConvexHttpClient8 } from "convex/browser";
+import crypto6 from "node:crypto";
+import PDFDocument2 from "pdfkit";
+var LicensePdfService = class _LicensePdfService {
+  static instance;
+  convex;
+  brandConfig;
+  constructor(convexUrl) {
+    this.convex = new ConvexHttpClient8(convexUrl);
+    this.brandConfig = {
+      name: process.env.BRAND_NAME || "BroLab Entertainment",
+      email: process.env.BRAND_EMAIL || "licensing@brolabentertainment.com",
+      website: process.env.BRAND_WEBSITE || "https://brolabentertainment.com",
+      logoUrl: process.env.BRAND_LOGO_URL
+    };
+  }
+  /**
+   * Get singleton instance
+   */
+  static getInstance() {
+    if (!_LicensePdfService.instance) {
+      const convexUrl = process.env.VITE_CONVEX_URL;
+      if (!convexUrl) {
+        throw new Error("VITE_CONVEX_URL environment variable is required");
+      }
+      _LicensePdfService.instance = new _LicensePdfService(convexUrl);
+    }
+    return _LicensePdfService.instance;
+  }
+  /**
+   * Generate a unique license reference number
+   * Format: LICENSE-<orderId>-<itemId>-<hash>
+   */
+  generateLicenseNumber(orderId, itemId) {
+    const hash = crypto6.createHash("sha256").update(`${orderId}-${itemId}-${Date.now()}`).digest("hex").substring(0, 8).toUpperCase();
+    return `LICENSE-${orderId.substring(0, 8).toUpperCase()}-${itemId}-${hash}`;
+  }
+  /**
+   * Get license terms description based on license type
+   */
+  getLicenseTermsText(licenseType) {
+    const terms = DEFAULT_LICENSE_TERMS[licenseType];
+    const copiesLine = terms.copiesSold === -1 ? "\u2022 Unlimited copies/sales" : `\u2022 Up to ${terms.copiesSold.toLocaleString()} copies/sales`;
+    return [
+      `License Type: ${licenseType.toUpperCase()}`,
+      `Price: ${LICENSE_PRICING[licenseType]}`,
+      "",
+      "RIGHTS GRANTED:",
+      copiesLine,
+      `\u2022 Streaming: ${terms.streaming ? "Yes" : "No"}`,
+      `\u2022 Music Videos: ${terms.musicVideos ? "Yes" : "No"}`,
+      `\u2022 Radio Play: ${terms.radioPlay ? "Yes" : "No"}`,
+      `\u2022 Exclusive Rights: ${terms.exclusive ? "Yes" : "No"}`
+    ];
+  }
+  /**
+   * Build the license PDF document
+   */
+  async buildLicensePdf(input, licenseNumber) {
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument2({
+          size: "A4",
+          margin: 40,
+          info: {
+            Title: `License Certificate - ${input.beat.title}`,
+            Author: this.brandConfig.name,
+            Subject: `Beat License - ${licenseNumber}`,
+            Keywords: "license, beat, music, certificate"
+          }
+        });
+        const chunks = [];
+        doc.on("data", (chunk) => chunks.push(chunk));
+        doc.on("end", () => resolve(Buffer.concat(chunks)));
+        doc.on("error", reject);
+        const pageWidth = doc.page.width;
+        const pageHeight = doc.page.height;
+        const margin = 40;
+        const contentWidth = pageWidth - margin * 2;
+        doc.rect(0, 0, pageWidth, 120).fill("#7C3AED");
+        doc.rect(0, 100, pageWidth, 20).fill("#8B5CF6");
+        doc.fillColor("#FFFFFF").fontSize(28).font("Helvetica-Bold");
+        doc.text(this.brandConfig.name, margin, 35, { width: contentWidth });
+        doc.fontSize(14).font("Helvetica");
+        doc.text("OFFICIAL LICENSE CERTIFICATE", margin, 70, { width: contentWidth });
+        doc.fontSize(10);
+        doc.text(licenseNumber, margin, 90, { width: contentWidth });
+        let yPos = 140;
+        doc.fillColor("#1F2937").fontSize(12).font("Helvetica-Bold");
+        doc.text("LICENSED BEAT", margin, yPos);
+        yPos += 20;
+        doc.fontSize(22).fillColor("#7C3AED");
+        doc.text(input.beat.title, margin, yPos, { width: contentWidth });
+        yPos += 35;
+        if (input.beat.producer) {
+          doc.fontSize(12).fillColor("#6B7280").font("Helvetica");
+          doc.text(`Produced by: ${input.beat.producer}`, margin, yPos);
+          yPos += 25;
+        }
+        doc.moveTo(margin, yPos).lineTo(pageWidth - margin, yPos).stroke("#E5E7EB");
+        yPos += 20;
+        const col1X = margin;
+        const col2X = pageWidth / 2 + 20;
+        const colWidth = (contentWidth - 40) / 2;
+        doc.fillColor("#1F2937").fontSize(11).font("Helvetica-Bold");
+        doc.text("LICENSEE INFORMATION", col1X, yPos);
+        yPos += 18;
+        doc.fontSize(10).font("Helvetica").fillColor("#374151");
+        doc.text(`Name: ${input.buyer.name}`, col1X, yPos, { width: colWidth });
+        yPos += 15;
+        doc.text(`Email: ${input.buyer.email}`, col1X, yPos, { width: colWidth });
+        yPos += 15;
+        doc.text(
+          `Date: ${input.purchaseDate.toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric"
+          })}`,
+          col1X,
+          yPos,
+          { width: colWidth }
+        );
+        let rightYPos = yPos - 48;
+        doc.fillColor("#1F2937").fontSize(11).font("Helvetica-Bold");
+        doc.text("LICENSE DETAILS", col2X, rightYPos);
+        rightYPos += 18;
+        doc.fontSize(10).font("Helvetica").fillColor("#374151");
+        doc.text(`Type: ${input.licenseType.toUpperCase()}`, col2X, rightYPos, { width: colWidth });
+        rightYPos += 15;
+        doc.text(`Price: ${input.currency} ${input.price.toFixed(2)}`, col2X, rightYPos, {
+          width: colWidth
+        });
+        rightYPos += 15;
+        doc.text(`Order: ${input.orderId.substring(0, 12)}...`, col2X, rightYPos, {
+          width: colWidth
+        });
+        yPos += 40;
+        doc.moveTo(margin, yPos).lineTo(pageWidth - margin, yPos).stroke("#E5E7EB");
+        yPos += 20;
+        const termsBoxHeight = 180;
+        doc.rect(margin, yPos, contentWidth, termsBoxHeight).fill("#F3F4F6");
+        doc.fillColor("#1F2937").fontSize(11).font("Helvetica-Bold");
+        doc.text("LICENSE TERMS & CONDITIONS", margin + 15, yPos + 15);
+        const termsLines = this.getLicenseTermsText(input.licenseType);
+        let termsY = yPos + 35;
+        doc.fontSize(9).font("Helvetica").fillColor("#374151");
+        for (const line of termsLines) {
+          doc.text(line, margin + 15, termsY, { width: contentWidth - 30 });
+          termsY += 14;
+        }
+        yPos += termsBoxHeight + 20;
+        doc.rect(margin, yPos, contentWidth, 60).fill("#FEF3C7");
+        doc.fillColor("#92400E").fontSize(9).font("Helvetica-Bold");
+        doc.text("IMPORTANT NOTICE", margin + 15, yPos + 12);
+        doc.font("Helvetica").fontSize(8);
+        doc.text(
+          `This license is non-transferable and grants the licensee the rights specified above. The producer retains all ownership rights to the beat. Credit must be given as: "Produced by ${input.beat.producer || this.brandConfig.name}"`,
+          margin + 15,
+          yPos + 28,
+          { width: contentWidth - 30 }
+        );
+        doc.rect(0, pageHeight - 80, pageWidth, 80).fill("#1F2937");
+        doc.fillColor("#9CA3AF").fontSize(8).font("Helvetica");
+        doc.text(
+          `This license certificate was generated on ${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}`,
+          margin,
+          pageHeight - 65,
+          { width: contentWidth, align: "center" }
+        );
+        doc.fillColor("#FFFFFF").fontSize(9);
+        doc.text(this.brandConfig.website, margin, pageHeight - 50, {
+          width: contentWidth,
+          align: "center"
+        });
+        doc.fillColor("#9CA3AF").fontSize(7);
+        doc.text(`License Reference: ${licenseNumber}`, margin, pageHeight - 35, {
+          width: contentWidth,
+          align: "center"
+        });
+        doc.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+  /**
+   * Check if license PDF already exists for this order item
+   */
+  async checkExistingLicense(orderId, itemId) {
+    try {
+      const convexClient2 = this.convex;
+      const existing = await convexClient2.query("licenses:getLicenseByOrderItem", {
+        orderId,
+        itemId
+      });
+      if (existing && typeof existing === "object") {
+        const license = existing;
+        return {
+          licenseNumber: license.licenseNumber,
+          licenseUrl: license.pdfUrl,
+          storageId: license.storageId
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * Upload PDF to Convex storage
+   */
+  async uploadPdfToStorage(pdfBuffer) {
+    const convexClient2 = this.convex;
+    const uploadUrlResult = await convexClient2.action("files:generateUploadUrl", {});
+    const { url } = uploadUrlResult;
+    const uploadRes = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/pdf" },
+      body: pdfBuffer
+    });
+    if (!uploadRes.ok) {
+      throw new Error(`Failed to upload PDF: ${uploadRes.statusText}`);
+    }
+    const uploadJson = await uploadRes.json();
+    const storageId = uploadJson.storageId;
+    const pdfUrl = await this.getStorageUrl(storageId);
+    return { storageId, url: pdfUrl };
+  }
+  /**
+   * Get storage URL for a file
+   */
+  async getStorageUrl(storageId) {
+    const convexClient2 = this.convex;
+    try {
+      const url = await convexClient2.mutation("files:getStorageUrl", { storageId });
+      return url || "";
+    } catch {
+      return `${process.env.VITE_CONVEX_URL?.replace(".cloud", ".site")}/api/storage/${storageId}`;
+    }
+  }
+  /**
+   * Save license record to database
+   */
+  async saveLicenseRecord(input, licenseNumber, storageId, pdfUrl) {
+    try {
+      const convexClient2 = this.convex;
+      await convexClient2.mutation("licenses:createLicense", {
+        orderId: input.orderId,
+        itemId: input.itemId,
+        beatId: input.beat.id,
+        beatTitle: input.beat.title,
+        licenseType: input.licenseType,
+        licenseNumber,
+        buyerEmail: input.buyer.email,
+        buyerName: input.buyer.name,
+        buyerUserId: input.buyer.userId,
+        price: input.price,
+        currency: input.currency,
+        pdfStorageId: storageId,
+        pdfUrl,
+        purchaseDate: input.purchaseDate.getTime()
+      });
+    } catch (error) {
+      console.warn("Failed to save license record to database:", error);
+    }
+  }
+  /**
+   * Generate license PDF for a beat purchase
+   *
+   * @param input - License generation input
+   * @returns License PDF result with URL and reference number
+   */
+  async generateLicense(input) {
+    console.log(`\u{1F4C4} Generating license PDF for order ${input.orderId}, item ${input.itemId}`);
+    const existing = await this.checkExistingLicense(input.orderId, input.itemId);
+    if (existing) {
+      console.log(`\u2139\uFE0F License already exists: ${existing.licenseNumber}`);
+      return existing;
+    }
+    const licenseNumber = this.generateLicenseNumber(input.orderId, input.itemId);
+    const pdfBuffer = await this.buildLicensePdf(input, licenseNumber);
+    console.log(`\u2705 PDF generated: ${pdfBuffer.length} bytes`);
+    const { storageId, url: pdfUrl } = await this.uploadPdfToStorage(pdfBuffer);
+    console.log(`\u2705 PDF uploaded: ${storageId}`);
+    await this.saveLicenseRecord(input, licenseNumber, storageId, pdfUrl);
+    return {
+      licenseUrl: pdfUrl,
+      licenseNumber,
+      storageId
+    };
+  }
+  /**
+   * Generate licenses for all items in an order
+   */
+  async generateLicensesForOrder(orderId, items, buyer, currency = "USD") {
+    const results = [];
+    const purchaseDate = /* @__PURE__ */ new Date();
+    for (const item of items) {
+      try {
+        const result = await this.generateLicense({
+          orderId,
+          itemId: item.itemId,
+          beat: item.beat,
+          licenseType: item.licenseType,
+          buyer,
+          purchaseDate,
+          price: item.price,
+          currency
+        });
+        results.push(result);
+      } catch (error) {
+        console.error(`Failed to generate license for item ${item.itemId}:`, error);
+      }
+    }
+    return results;
+  }
+};
+var getLicensePdfService = () => {
+  return LicensePdfService.getInstance();
+};
+
+// server/services/ReservationPaymentService.ts
+init_api();
+init_convex();
+var convex6 = getConvex();
+var ReservationPaymentService = class _ReservationPaymentService {
+  static instance;
+  constructor() {
+  }
+  /**
+   * Get singleton instance
+   */
+  static getInstance() {
+    if (!_ReservationPaymentService.instance) {
+      _ReservationPaymentService.instance = new _ReservationPaymentService();
+    }
+    return _ReservationPaymentService.instance;
+  }
+  /**
+   * Handle successful reservation payment
+   * Updates reservation status to "confirmed" and sends confirmation email
+   *
+   * @param reservationIds - Array of reservation IDs to confirm
+   * @param paymentData - Payment information from Stripe
+   * @param session - Stripe checkout session
+   */
+  async handleReservationPaymentSuccess(reservationIds, paymentData, session2) {
+    const startTime = Date.now();
+    try {
+      console.log(
+        `\u2705 Processing successful reservation payment for ${reservationIds.length} reservation(s)`
+      );
+      const reservations = await this.fetchReservationDetails(reservationIds);
+      if (reservations.length === 0) {
+        throw new Error("No reservations found for the provided IDs");
+      }
+      const updatePromises = reservationIds.map(
+        (id) => this.updateReservationStatus(id, "confirmed", "Payment confirmed")
+      );
+      await Promise.all(updatePromises);
+      console.log(`\u2705 Updated ${reservationIds.length} reservation(s) to confirmed status`);
+      await this.sendConfirmationEmail(
+        session2.customer_email || paymentData.sessionId || "unknown@example.com",
+        reservations,
+        paymentData
+      );
+      const duration = Date.now() - startTime;
+      console.log(`\u2705 Reservation payment success processed in ${duration}ms`);
+      await this.logToAudit({
+        action: "reservation_payment_success",
+        resource: "reservations",
+        details: {
+          reservationIds,
+          paymentIntentId: paymentData.paymentIntentId,
+          amount: paymentData.amount,
+          currency: paymentData.currency,
+          duration
+        }
+      });
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error("Error processing reservation payment success", {
+        duration,
+        reservationIds,
+        paymentIntentId: paymentData.paymentIntentId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      await this.logToAudit({
+        action: "reservation_payment_success_error",
+        resource: "reservations",
+        details: {
+          reservationIds,
+          error: error instanceof Error ? error.message : String(error),
+          duration
+        }
+      });
+      throw error;
+    }
+  }
+  /**
+   * Handle failed reservation payment
+   * Updates reservation status and sends failure notification email
+   *
+   * @param reservationIds - Array of reservation IDs
+   * @param paymentData - Payment information from Stripe
+   * @param paymentIntent - Stripe payment intent with failure details
+   */
+  async handleReservationPaymentFailure(reservationIds, paymentData, paymentIntent) {
+    const startTime = Date.now();
+    try {
+      console.log(
+        `\u26A0\uFE0F Processing failed reservation payment for ${reservationIds.length} reservation(s)`
+      );
+      const failureReason = paymentIntent.last_payment_error?.message || "Payment processing failed";
+      const reservations = await this.fetchReservationDetails(reservationIds);
+      if (reservations.length === 0) {
+        throw new Error("No reservations found for the provided IDs");
+      }
+      const updatePromises = reservationIds.map(
+        (id) => this.updateReservationStatus(
+          id,
+          "pending",
+          `Payment failed: ${failureReason}`
+        )
+      );
+      await Promise.all(updatePromises);
+      console.log(`\u2705 Updated ${reservationIds.length} reservation(s) with payment failure notes`);
+      const userEmail = reservations[0]?.details?.email || "unknown@example.com";
+      await this.sendFailureEmail(userEmail, reservationIds, paymentData, failureReason);
+      const duration = Date.now() - startTime;
+      console.log(`\u2705 Reservation payment failure processed in ${duration}ms`);
+      await this.logToAudit({
+        action: "reservation_payment_failure",
+        resource: "reservations",
+        details: {
+          reservationIds,
+          paymentIntentId: paymentData.paymentIntentId,
+          failureReason,
+          amount: paymentData.amount,
+          currency: paymentData.currency,
+          duration
+        }
+      });
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error("Error processing reservation payment failure", {
+        duration,
+        reservationIds,
+        paymentIntentId: paymentData.paymentIntentId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      await this.logToAudit({
+        action: "reservation_payment_failure_error",
+        resource: "reservations",
+        details: {
+          reservationIds,
+          error: error instanceof Error ? error.message : String(error),
+          duration
+        }
+      });
+      throw error;
+    }
+  }
+  /**
+   * Update reservation status in Convex
+   * Private method to update a single reservation's status
+   *
+   * @param reservationId - Reservation ID to update
+   * @param status - New status to set
+   * @param notes - Optional notes about the status change
+   */
+  async updateReservationStatus(reservationId, status, notes) {
+    try {
+      await convex6.mutation(api.reservations.updateReservationStatus, {
+        reservationId,
+        status,
+        notes,
+        skipEmailNotification: true
+      });
+      console.log(`\u2705 Updated reservation ${reservationId} to status: ${status}`);
+    } catch (error) {
+      logger.error("Error updating reservation status", {
+        reservationId,
+        status,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw new Error(
+        `Failed to update reservation status: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    }
+  }
+  /**
+   * Send confirmation email using existing email templates
+   * Private method to send reservation confirmation email
+   *
+   * @param userEmail - User's email address
+   * @param reservations - Array of reservation data
+   * @param payment - Payment information
+   */
+  async sendConfirmationEmail(userEmail, reservations, payment) {
+    try {
+      console.log(`\u{1F4E7} Sending confirmation email to ${userEmail}`);
+      await sendReservationConfirmationEmail(userEmail, reservations, payment);
+      console.log(`\u2705 Confirmation email sent successfully to ${userEmail}`);
+      return { success: true };
+    } catch (error) {
+      logger.error("Error sending confirmation email", {
+        userEmail,
+        reservationCount: reservations.length,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      await this.logToAudit({
+        action: "confirmation_email_error",
+        resource: "emails",
+        details: {
+          userEmail,
+          reservationCount: reservations.length,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      };
+    }
+  }
+  /**
+   * Send failure email for payment failure notifications
+   * Private method to send payment failure notification
+   *
+   * @param userEmail - User's email address
+   * @param reservationIds - Array of reservation IDs
+   * @param payment - Payment information
+   * @param failureReason - Reason for payment failure
+   */
+  async sendFailureEmail(userEmail, reservationIds, payment, failureReason) {
+    try {
+      console.log(`\u{1F4E7} Sending payment failure email to ${userEmail}`);
+      await sendPaymentFailureEmail(userEmail, reservationIds, payment, failureReason);
+      console.log(`\u2705 Payment failure email sent successfully to ${userEmail}`);
+      return { success: true };
+    } catch (error) {
+      logger.error("Error sending payment failure email", {
+        userEmail,
+        reservationIds,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      await this.logToAudit({
+        action: "failure_email_error",
+        resource: "emails",
+        details: {
+          userEmail,
+          reservationIds,
+          failureReason,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      };
+    }
+  }
+  /**
+   * Fetch reservation details from Convex
+   * Helper method to retrieve reservation data for email templates
+   *
+   * @param reservationIds - Array of reservation IDs
+   * @returns Array of reservation email data
+   */
+  async fetchReservationDetails(reservationIds) {
+    try {
+      const reservations = [];
+      for (const id of reservationIds) {
+        const allReservations = await convex6.query(api.reservations.listReservations, {
+          limit: 100
+        });
+        const found = allReservations.find((r) => r._id === id);
+        if (found) {
+          reservations.push({
+            id: found._id,
+            serviceType: found.serviceType,
+            preferredDate: found.preferredDate,
+            durationMinutes: found.durationMinutes,
+            totalPrice: found.totalPrice,
+            status: found.status,
+            notes: found.notes,
+            details: found.details
+          });
+        }
+      }
+      return reservations;
+    } catch (error) {
+      logger.error("Error fetching reservation details", {
+        reservationIds,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw new Error(
+        `Failed to fetch reservation details: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    }
+  }
+  /**
+   * Log to audit trail
+   * Helper method to log events to Convex audit system
+   *
+   * @param entry - Audit log entry
+   */
+  async logToAudit(entry) {
+    try {
+      await convex6.mutation(api.audit.log, {
+        action: entry.action,
+        resource: entry.resource,
+        details: entry.details
+      });
+    } catch (error) {
+      logger.error("Failed to log to audit", {
+        action: entry.action,
+        resource: entry.resource,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+};
+var reservationPaymentService = ReservationPaymentService.getInstance();
+
+// server/services/PaymentService.ts
+var stripeClient3 = null;
+function getStripeClient() {
+  if (!stripeClient3) {
+    const secretKey = process.env.STRIPE_SECRET_KEY;
+    if (!secretKey) {
+      throw new PaymentError(
+        "STRIPE_SECRET_KEY is required for payment operations",
+        "MISSING_CONFIGURATION" /* MISSING_CONFIGURATION */,
+        { service: "stripe", missingConfig: "STRIPE_SECRET_KEY" }
+      );
+    }
+    stripeClient3 = new Stripe5(secretKey, {
+      apiVersion: "2025-08-27.basil"
+    });
+  }
+  return stripeClient3;
+}
+var convex7 = getConvex();
+var PaymentService = class _PaymentService {
+  static instance;
+  reservationPaymentService;
+  invoiceService;
+  constructor() {
+    this.reservationPaymentService = ReservationPaymentService.getInstance();
+    this.invoiceService = getInvoiceService();
+  }
+  /**
+   * Get singleton instance
+   */
+  static getInstance() {
+    if (!_PaymentService.instance) {
+      _PaymentService.instance = new _PaymentService();
+    }
+    return _PaymentService.instance;
+  }
+  /**
+   * Create payment intent with order metadata
+   * Completes within 3 seconds
+   */
+  async createPaymentIntent(order) {
+    const startTime = Date.now();
+    try {
+      const idempotencyKey = order.idempotencyKey || `order_${order._id}_${Date.now()}`;
+      const paymentIntent = await getStripeClient().paymentIntents.create(
+        {
+          amount: Math.round(order.total),
+          // Amount in cents
+          currency: (order.currency || "USD").toLowerCase(),
+          metadata: {
+            orderId: order._id,
+            email: order.email,
+            userId: order.userId || "",
+            itemCount: order.items.length.toString()
+          },
+          automatic_payment_methods: {
+            enabled: true
+          }
+        },
+        {
+          idempotencyKey
+        }
+      );
+      await saveStripeCheckoutSessionWithRetry({
+        orderId: order._id,
+        checkoutSessionId: paymentIntent.id,
+        paymentIntentId: paymentIntent.id
+      });
+      const duration = Date.now() - startTime;
+      console.log(`\u2705 Payment intent created in ${duration}ms: ${paymentIntent.id}`);
+      return {
+        id: paymentIntent.id,
+        client_secret: paymentIntent.client_secret,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        status: paymentIntent.status
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(`\u274C Failed to create payment intent after ${duration}ms:`, error);
+      await this.logToAudit({
+        action: "payment_intent_creation_failed",
+        resource: "payments",
+        details: {
+          orderId: order._id,
+          error: error instanceof Error ? error.message : String(error),
+          duration
+        }
+      });
+      throw new Error(
+        `Failed to create payment intent: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+    }
+  }
+  /**
+   * Handle Stripe webhook with signature verification
+   * Routes events to appropriate handlers based on metadata
+   * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 5.1, 5.2, 5.3, 5.4, 5.5
+   */
+  async handleStripeWebhook(payload, signature) {
+    const startTime = Date.now();
+    try {
+      const event = await this.verifyStripeSignature(payload, signature);
+      console.log(`\u{1F4E8} Stripe webhook received: ${event.type} (${event.id})`);
+      const idempotencyResult = await markProcessedEventWithRetry({
+        provider: "stripe",
+        eventId: event.id
+      });
+      if (idempotencyResult?.alreadyProcessed) {
+        console.log(`\u2139\uFE0F Event ${event.id} already processed, skipping`);
+        return {
+          success: true,
+          message: "Event already processed"
+        };
+      }
+      const result = await this.routeStripeEvent(event);
+      const duration = Date.now() - startTime;
+      console.log(`\u2705 Stripe webhook processed in ${duration}ms: ${event.type}`);
+      await this.logToAudit({
+        action: "webhook_processed",
+        resource: "payments",
+        details: {
+          provider: "stripe",
+          eventType: event.type,
+          eventId: event.id,
+          duration
+        }
+      });
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`\u274C Error handling Stripe webhook after ${duration}ms:`, errorMessage);
+      await this.logToAudit({
+        action: "webhook_processing_error",
+        resource: "payments",
+        details: {
+          provider: "stripe",
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : void 0,
+          duration
+        }
+      });
+      let eventType = "unknown";
+      let eventId = "unknown";
+      try {
+        const event = await this.verifyStripeSignature(payload, signature);
+        eventType = event.type;
+        eventId = event.id;
+      } catch {
+      }
+      await adminNotificationService.notifyWebhookProcessingError(
+        "stripe",
+        eventType,
+        eventId,
+        errorMessage
+      );
+      throw error;
+    }
+  }
+  /**
+   * Route Stripe event to appropriate handler
+   * Checks metadata.type for reservation payments
+   * Requirements: 1.2, 5.1, 5.2
+   */
+  async routeStripeEvent(event) {
+    try {
+      switch (event.type) {
+        case "checkout.session.completed":
+          return await this.handleCheckoutSessionCompleted(event.data.object);
+        case "payment_intent.succeeded":
+          return await this.handlePaymentSuccess(event.data.object);
+        case "payment_intent.payment_failed":
+          return await this.handlePaymentFailure(event.data.object);
+        case "charge.refunded":
+          return await this.handleRefund(event.data.object);
+        default:
+          console.log(`\u2139\uFE0F Unhandled Stripe event type: ${event.type}`);
+          return {
+            success: true,
+            message: `Unhandled event type: ${event.type}`
+          };
+      }
+    } catch (error) {
+      console.error(`\u274C Error routing Stripe event ${event.type}:`, error);
+      throw error;
+    }
+  }
+  /**
+   * Handle reservation payment from checkout session
+   */
+  async handleReservationCheckout(session2, reservationIds) {
+    const ids = JSON.parse(reservationIds);
+    const paymentData = {
+      provider: "stripe",
+      status: "succeeded",
+      amount: session2.amount_total || 0,
+      currency: session2.currency || "usd",
+      sessionId: session2.id,
+      paymentIntentId: typeof session2.payment_intent === "string" ? session2.payment_intent : void 0,
+      eventId: session2.id
+    };
+    await this.reservationPaymentService.handleReservationPaymentSuccess(ids, paymentData, session2);
+    return {
+      success: true,
+      message: "Reservation payment processed successfully",
+      reservationIds: ids
+    };
+  }
+  /**
+   * Process order payment and confirmation
+   */
+  async processOrderPayment(session2, orderId) {
+    await recordPaymentWithRetry({
+      orderId,
+      provider: "stripe",
+      status: "succeeded",
+      amount: session2.amount_total || 0,
+      currency: session2.currency || "usd",
+      stripeEventId: session2.id,
+      stripePaymentIntentId: typeof session2.payment_intent === "string" ? session2.payment_intent : void 0
+    });
+    await confirmPaymentWithRetry({
+      orderId,
+      paymentIntentId: typeof session2.payment_intent === "string" ? session2.payment_intent : session2.id,
+      status: "succeeded"
+    });
+  }
+  /**
+   * Generate and send invoice for order
+   */
+  async generateOrderInvoice(session2, orderId) {
+    try {
+      const order = await convex7.query(api.orders.getOrder, { orderId });
+      if (!order || typeof order !== "object" || !("items" in order) || !Array.isArray(order.items)) {
+        return;
+      }
+      const invoiceItems = order.items.map(
+        (item) => ({
+          productId: item.productId || 0,
+          title: item.title || item.name || "Unknown Item",
+          unitPrice: item.price || 0,
+          totalPrice: (item.price || 0) * (item.quantity || item.qty || 1),
+          qty: item.quantity || item.qty || 1,
+          type: item.license || item.type
+        })
+      );
+      const orderData = {
+        id: orderId,
+        userId: "userId" in order && typeof order.userId === "string" ? order.userId : void 0,
+        email: "email" in order && typeof order.email === "string" ? order.email : "",
+        total: session2.amount_total || 0,
+        currency: session2.currency || "usd",
+        sessionId: session2.id,
+        paymentIntentId: typeof session2.payment_intent === "string" ? session2.payment_intent : void 0
+      };
+      const invoice = await this.invoiceService.generateInvoice(orderData, invoiceItems);
+      await this.invoiceService.sendInvoiceEmail(
+        orderData.email,
+        invoice.invoiceUrl,
+        invoice.invoiceNumber
+      );
+    } catch (invoiceError) {
+      console.error("\u26A0\uFE0F Failed to generate/send invoice:", invoiceError);
+    }
+  }
+  /**
+   * Generate and send license PDFs for order items (beat purchases)
+   */
+  async generateOrderLicenses(session2, orderId) {
+    try {
+      const order = await convex7.query(api.orders.getOrder, { orderId });
+      if (!order || typeof order !== "object" || !("items" in order) || !Array.isArray(order.items)) {
+        return;
+      }
+      const buyerEmail = "email" in order && typeof order.email === "string" ? order.email : "";
+      const buyerName = session2.customer_details?.name || buyerEmail.split("@")[0] || "Customer";
+      const buyerUserId = "userId" in order && typeof order.userId === "string" ? order.userId : void 0;
+      if (!buyerEmail) {
+        console.warn("\u26A0\uFE0F No buyer email found, skipping license generation");
+        return;
+      }
+      const licensePdfService = getLicensePdfService();
+      const currency = (session2.currency || "usd").toUpperCase();
+      for (let i = 0; i < order.items.length; i++) {
+        const item = order.items[i];
+        if (item.type && item.type !== "beat") {
+          continue;
+        }
+        const licenseType = this.validateLicenseType(item.license);
+        if (!licenseType) {
+          console.warn(`\u26A0\uFE0F Invalid license type for item ${i}: ${item.license}`);
+          continue;
+        }
+        try {
+          const licenseResult = await licensePdfService.generateLicense({
+            orderId: String(orderId),
+            itemId: String(i),
+            beat: {
+              id: item.productId || 0,
+              title: item.title || item.name || `Beat ${item.productId}`,
+              producer: "BroLab Entertainment"
+            },
+            licenseType,
+            buyer: {
+              name: buyerName,
+              email: buyerEmail,
+              userId: buyerUserId
+            },
+            purchaseDate: /* @__PURE__ */ new Date(),
+            price: centsToDollars(item.price || 0),
+            currency
+          });
+          console.log(`\u2705 License generated: ${licenseResult.licenseNumber}`);
+          await sendLicenseEmail({
+            buyerEmail,
+            buyerName,
+            beatTitle: item.title || item.name || `Beat ${item.productId}`,
+            licenseType,
+            licenseNumber: licenseResult.licenseNumber,
+            licenseUrl: licenseResult.licenseUrl,
+            orderId: String(orderId),
+            purchaseDate: /* @__PURE__ */ new Date(),
+            price: centsToDollars(item.price || 0),
+            currency
+          });
+          console.log(`\u2705 License email sent for: ${item.title || item.name}`);
+        } catch (itemError) {
+          console.error(`\u26A0\uFE0F Failed to generate license for item ${i}:`, itemError);
+        }
+      }
+    } catch (licenseError) {
+      console.error("\u26A0\uFE0F Failed to generate/send licenses:", licenseError);
+    }
+  }
+  /**
+   * Validate and convert license type string to LicenseType enum
+   */
+  validateLicenseType(license) {
+    if (!license) return null;
+    const normalized = license.toLowerCase();
+    if (normalized === "basic") return "basic" /* BASIC */;
+    if (normalized === "premium") return "premium" /* PREMIUM */;
+    if (normalized === "unlimited") return "unlimited" /* UNLIMITED */;
+    return null;
+  }
+  /**
+   * Handle checkout.session.completed event
+   * Routes to reservation handler if metadata.type === "reservation_payment"
+   * Requirements: 4.2, 5.1, 5.2
+   */
+  async handleCheckoutSessionCompleted(session2) {
+    try {
+      const paymentType = session2.metadata?.type;
+      const reservationIds = session2.metadata?.reservationIds;
+      console.log(`\u{1F4B3} Checkout session completed: ${session2.id}`, {
+        paymentType,
+        hasReservationIds: !!reservationIds
+      });
+      if (paymentType === "reservation_payment" && reservationIds) {
+        return await this.handleReservationCheckout(session2, reservationIds);
+      }
+      const orderId = session2.metadata?.orderId;
+      if (!orderId) {
+        console.error("\u274C No orderId in checkout session metadata");
+        return {
+          success: false,
+          message: "No orderId in checkout session metadata"
+        };
+      }
+      await this.processOrderPayment(session2, orderId);
+      await this.generateOrderInvoice(session2, orderId);
+      await this.generateOrderLicenses(session2, orderId);
+      console.log(`\u2705 Order payment processed successfully: ${orderId}`);
+      return {
+        success: true,
+        message: "Order payment processed successfully",
+        orderId
+      };
+    } catch (error) {
+      console.error("\u274C Error handling checkout session completed:", error);
+      throw error;
+    }
+  }
+  /**
+   * Handle PayPal webhook with signature verification
+   * Routes events to appropriate handlers based on event type
+   * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 5.1, 5.2, 5.3, 5.4, 5.5
+   */
+  async handlePayPalWebhook(payload, headers) {
+    const startTime = Date.now();
+    try {
+      const isValid = await this.verifyPayPalSignature(payload, headers);
+      if (!isValid) {
+        await this.logToAudit({
+          action: "webhook_signature_verification_failed",
+          resource: "payments",
+          details: {
+            provider: "paypal",
+            statusCode: 400
+          }
+        });
+        return {
+          success: false,
+          message: "Webhook signature verification failed"
+        };
+      }
+      const event = JSON.parse(payload.toString());
+      console.log(`\u{1F4E8} PayPal webhook received: ${event.event_type} (${event.id})`);
+      const idempotencyResult = await markProcessedEventWithRetry({
+        provider: "paypal",
+        eventId: event.id
+      });
+      if (idempotencyResult?.alreadyProcessed) {
+        console.log(`\u2139\uFE0F Event ${event.id} already processed, skipping`);
+        return {
+          success: true,
+          message: "Event already processed"
+        };
+      }
+      const result = await this.routePayPalEvent(event);
+      const duration = Date.now() - startTime;
+      console.log(`\u2705 PayPal webhook processed in ${duration}ms: ${event.event_type}`);
+      await this.logToAudit({
+        action: "webhook_processed",
+        resource: "payments",
+        details: {
+          provider: "paypal",
+          eventType: event.event_type,
+          eventId: event.id,
+          duration
+        }
+      });
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`\u274C Error handling PayPal webhook after ${duration}ms:`, errorMessage);
+      await this.logToAudit({
+        action: "webhook_processing_error",
+        resource: "payments",
+        details: {
+          provider: "paypal",
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : void 0,
+          duration
+        }
+      });
+      let eventType = "unknown";
+      let eventId = "unknown";
+      try {
+        const event = JSON.parse(payload.toString());
+        eventType = event.event_type || "unknown";
+        eventId = event.id || "unknown";
+      } catch {
+      }
+      await adminNotificationService.notifyWebhookProcessingError(
+        "paypal",
+        eventType,
+        eventId,
+        errorMessage
+      );
+      throw error;
+    }
+  }
+  /**
+   * Route PayPal event to appropriate handler
+   * Checks custom_id to determine if it's a reservation payment
+   * Requirements: 2.2, 5.1, 5.2
+   */
+  async routePayPalEvent(event) {
+    try {
+      switch (event.event_type) {
+        case "PAYMENT.CAPTURE.COMPLETED":
+          return await this.handlePayPalPaymentSuccess(event);
+        case "PAYMENT.CAPTURE.DENIED":
+        case "PAYMENT.CAPTURE.DECLINED":
+          return await this.handlePayPalPaymentFailure(event);
+        case "PAYMENT.CAPTURE.REFUNDED":
+          return await this.handlePayPalRefund(event);
+        default:
+          console.log(`\u2139\uFE0F Unhandled PayPal event type: ${event.event_type}`);
+          return {
+            success: true,
+            message: `Unhandled event type: ${event.event_type}`
+          };
+      }
+    } catch (error) {
+      console.error(`\u274C Error routing PayPal event ${event.event_type}:`, error);
+      throw error;
+    }
+  }
+  /**
+   * Verify Stripe webhook signature
+   * Requirements: 3.1, 3.2, 3.3, 8.3, 8.4
+   */
+  async verifyStripeSignature(payload, signature) {
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error("\u274C STRIPE_WEBHOOK_SECRET not configured");
+      await adminNotificationService.notifyConfigurationError("Stripe Webhooks", [
+        "STRIPE_WEBHOOK_SECRET"
+      ]);
+      throw new PaymentError(
+        "STRIPE_WEBHOOK_SECRET not configured",
+        "MISSING_CONFIGURATION" /* MISSING_CONFIGURATION */,
+        { service: "stripe", missingConfig: "STRIPE_WEBHOOK_SECRET" }
+      );
+    }
+    try {
+      const event = getStripeClient().webhooks.constructEvent(payload, signature, webhookSecret);
+      console.log(`\u2705 Stripe signature verified: ${event.id}`);
+      return event;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("\u274C Stripe signature verification failed:", errorMessage);
+      await this.logToAudit({
+        action: "signature_verification_failed",
+        resource: "security",
+        details: {
+          provider: "stripe",
+          error: errorMessage,
+          timestamp: Date.now()
+        }
+      });
+      await adminNotificationService.notifySignatureVerificationFailure("stripe", errorMessage);
+      throw new PaymentError(
+        "Invalid Stripe signature",
+        "STRIPE_INVALID_SIGNATURE" /* STRIPE_INVALID_SIGNATURE */,
+        { provider: "stripe", error: errorMessage }
+      );
+    }
+  }
+  /**
+   * Verify PayPal webhook signature using PayPal SDK
+   * Requirements: 2.3, 2.4, 3.2, 3.3, 3.5, 8.3, 8.4
+   */
+  async verifyPayPalSignature(payload, headers) {
+    const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+    if (!webhookId) {
+      console.error("\u274C PAYPAL_WEBHOOK_ID not configured");
+      await adminNotificationService.notifyConfigurationError("PayPal Webhooks", [
+        "PAYPAL_WEBHOOK_ID"
+      ]);
+      return false;
+    }
+    const {
+      "paypal-transmission-id": transmissionId,
+      "paypal-transmission-time": timestamp,
+      "paypal-transmission-sig": signature,
+      "paypal-cert-url": certUrl,
+      "paypal-auth-algo": authAlgo
+    } = headers;
+    if (!transmissionId || !timestamp || !signature || !certUrl || !authAlgo) {
+      console.error("\u274C Missing PayPal webhook headers");
+      return false;
+    }
+    try {
+      const body = payload.toString();
+      const isValid = await paypal_default.verifyWebhookSignature(
+        webhookId,
+        transmissionId,
+        timestamp,
+        certUrl,
+        authAlgo,
+        signature,
+        body
+      );
+      if (!isValid) {
+        await this.logToAudit({
+          action: "signature_verification_failed",
+          resource: "security",
+          details: {
+            provider: "paypal",
+            webhookId: webhookId.substring(0, 10) + "...",
+            timestamp: Date.now()
+          }
+        });
+        await adminNotificationService.notifySignatureVerificationFailure(
+          "paypal",
+          "PayPal webhook signature verification failed"
+        );
+      }
+      return isValid;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("\u274C PayPal signature verification failed:", errorMessage);
+      await this.logToAudit({
+        action: "signature_verification_failed",
+        resource: "security",
+        details: {
+          provider: "paypal",
+          error: errorMessage,
+          timestamp: Date.now()
+        }
+      });
+      await adminNotificationService.notifySignatureVerificationFailure("paypal", errorMessage);
+      return false;
+    }
+  }
+  /**
+   * Handle successful payment intent
+   * Requirements: 5.2, 5.3, 7.2
+   */
+  async handlePaymentSuccess(paymentIntent) {
+    const orderId = paymentIntent.metadata.orderId;
+    if (!orderId) {
+      console.error("\u274C No orderId in payment intent metadata");
+      return {
+        success: false,
+        message: "No orderId in payment intent metadata"
+      };
+    }
+    try {
+      await recordPaymentWithRetry({
+        orderId,
+        provider: "stripe",
+        status: "succeeded",
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        stripeEventId: paymentIntent.id,
+        stripePaymentIntentId: paymentIntent.id,
+        stripeChargeId: typeof paymentIntent.latest_charge === "string" ? paymentIntent.latest_charge : void 0
+      });
+      await confirmPaymentWithRetry({
+        orderId,
+        paymentIntentId: paymentIntent.id,
+        status: "succeeded"
+      });
+      console.log(`\u2705 Payment succeeded for order: ${orderId}`);
+      return {
+        success: true,
+        message: "Payment processed successfully",
+        orderId
+      };
+    } catch (error) {
+      console.error("\u274C Error processing payment success:", error);
+      throw error;
+    }
+  }
+  /**
+   * Handle failed payment intent
+   * Requirements: 5.2, 5.3, 7.2, 8.1, 8.2, 8.4
+   */
+  async handlePaymentFailure(paymentIntent) {
+    const orderId = paymentIntent.metadata.orderId;
+    if (!orderId) {
+      console.error("\u274C No orderId in payment intent metadata");
+      return {
+        success: false,
+        message: "No orderId in payment intent metadata"
+      };
+    }
+    try {
+      const failureReason = paymentIntent.last_payment_error?.message || "Unknown reason";
+      const failureCode = paymentIntent.last_payment_error?.code;
+      const declineCode = paymentIntent.last_payment_error?.decline_code;
+      await recordPaymentWithRetry({
+        orderId,
+        provider: "stripe",
+        status: "failed",
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        stripeEventId: paymentIntent.id,
+        stripePaymentIntentId: paymentIntent.id
+      });
+      await this.logToAudit({
+        action: "payment_failed",
+        resource: "payments",
+        details: {
+          orderId,
+          paymentIntentId: paymentIntent.id,
+          amount: paymentIntent.amount,
+          currency: paymentIntent.currency,
+          failureMessage: failureReason,
+          failureCode,
+          declineCode
+        }
+      });
+      const failureCodePart = failureCode ? ` (${failureCode})` : "";
+      const declineCodePart = declineCode ? ` [${declineCode}]` : "";
+      const fullFailureMessage = `${failureReason}${failureCodePart}${declineCodePart}`;
+      await adminNotificationService.notifyPaymentFailure(
+        orderId,
+        paymentIntent.id,
+        paymentIntent.amount,
+        paymentIntent.currency,
+        fullFailureMessage
+      );
+      console.log(`\u26A0\uFE0F Payment failed for order: ${orderId}`);
+      return {
+        success: true,
+        message: "Payment failure recorded",
+        orderId
+      };
+    } catch (error) {
+      console.error("\u274C Error processing payment failure:", error);
+      throw error;
+    }
+  }
+  /**
+   * Handle refund
+   * Requirements: 5.3, 7.2, 8.1, 8.2
+   */
+  async handleRefund(charge) {
+    const paymentIntentId = charge.payment_intent;
+    if (!paymentIntentId) {
+      console.error("\u274C No payment intent ID in charge");
+      return {
+        success: false,
+        message: "No payment intent ID in charge"
+      };
+    }
+    try {
+      const orders = await convex7.query(api.orders.listOrdersAdmin, {
+        limit: 100
+      });
+      const ordersList = Array.isArray(orders) ? orders : [];
+      const order = ordersList.find(
+        (o) => o.paymentIntentId === paymentIntentId
+      );
+      if (!order || !("_id" in order)) {
+        console.error("\u274C No order found for payment intent:", paymentIntentId);
+        return {
+          success: false,
+          message: "Order not found"
+        };
+      }
+      await recordPaymentWithRetry({
+        orderId: order._id,
+        provider: "stripe",
+        status: "refunded",
+        amount: charge.amount_refunded,
+        currency: charge.currency,
+        stripeEventId: charge.id,
+        stripeChargeId: charge.id
+      });
+      const refundReason = charge.refunds?.data[0]?.reason || void 0;
+      await this.logToAudit({
+        action: "payment_refunded",
+        resource: "payments",
+        details: {
+          orderId: order._id,
+          chargeId: charge.id,
+          amountRefunded: charge.amount_refunded,
+          currency: charge.currency,
+          refundReason
+        }
+      });
+      await adminNotificationService.notifyRefundProcessed(
+        order._id,
+        charge.id,
+        charge.amount_refunded,
+        charge.currency,
+        refundReason
+      );
+      console.log(`\u2705 Refund processed for order: ${order._id}`);
+      return {
+        success: true,
+        message: "Refund processed successfully",
+        orderId: order._id
+      };
+    } catch (error) {
+      console.error("\u274C Error processing refund:", error);
+      throw error;
+    }
+  }
+  /**
+   * Handle PayPal payment success
+   * Checks custom_id to determine if it's a reservation or order payment
+   * Requirements: 2.5, 5.2, 5.3, 7.2
+   */
+  async handlePayPalPaymentSuccess(event) {
+    const customId = event.resource?.custom_id;
+    if (!customId) {
+      console.error("\u274C No custom_id in PayPal event");
+      return {
+        success: false,
+        message: "No custom_id in PayPal event"
+      };
+    }
+    try {
+      const amount = Number.parseFloat(event.resource?.amount?.value || "0") * 100;
+      const currency = event.resource?.amount?.currency_code || "USD";
+      const transactionId = event.resource?.id || event.id;
+      if (customId.startsWith("reservation_")) {
+        const reservationIds = [customId];
+        const paymentData = {
+          provider: "paypal",
+          status: "succeeded",
+          amount: Math.round(amount),
+          currency: currency.toLowerCase(),
+          transactionId,
+          eventId: event.id
+        };
+        const mockSession = {
+          id: transactionId,
+          customer_email: null
+        };
+        await this.reservationPaymentService.handleReservationPaymentSuccess(
+          reservationIds,
+          paymentData,
+          mockSession
+        );
+        return {
+          success: true,
+          message: "PayPal reservation payment processed successfully",
+          reservationIds
+        };
+      }
+      const orderId = customId;
+      await recordPaymentWithRetry({
+        orderId,
+        provider: "paypal",
+        status: "succeeded",
+        amount: Math.round(amount),
+        currency,
+        paypalTransactionId: transactionId
+      });
+      await confirmPaymentWithRetry({
+        orderId,
+        paymentIntentId: transactionId,
+        status: "succeeded"
+      });
+      console.log(`\u2705 PayPal payment succeeded for order: ${orderId}`);
+      return {
+        success: true,
+        message: "PayPal payment processed successfully",
+        orderId
+      };
+    } catch (error) {
+      console.error("\u274C Error processing PayPal payment success:", error);
+      throw error;
+    }
+  }
+  /**
+   * Handle PayPal payment failure
+   * Checks custom_id to determine if it's a reservation or order payment
+   * Requirements: 2.5, 5.2, 5.3, 7.2
+   */
+  async handlePayPalPaymentFailure(event) {
+    const customId = event.resource?.custom_id;
+    if (!customId) {
+      console.error("\u274C No custom_id in PayPal event");
+      return {
+        success: false,
+        message: "No custom_id in PayPal event"
+      };
+    }
+    try {
+      const amount = Number.parseFloat(event.resource?.amount?.value || "0") * 100;
+      const currency = event.resource?.amount?.currency_code || "USD";
+      const transactionId = event.resource?.id || event.id;
+      if (customId.startsWith("reservation_")) {
+        const reservationIds = [customId];
+        const paymentData = {
+          provider: "paypal",
+          status: "failed",
+          amount: Math.round(amount),
+          currency: currency.toLowerCase(),
+          transactionId,
+          eventId: event.id
+        };
+        const mockPaymentIntent = {
+          id: transactionId,
+          last_payment_error: {
+            message: `PayPal payment ${event.event_type}`
+          }
+        };
+        await this.reservationPaymentService.handleReservationPaymentFailure(
+          reservationIds,
+          paymentData,
+          mockPaymentIntent
+        );
+        return {
+          success: true,
+          message: "PayPal reservation payment failure recorded",
+          reservationIds
+        };
+      }
+      const orderId = customId;
+      await recordPaymentWithRetry({
+        orderId,
+        provider: "paypal",
+        status: "failed",
+        amount: Math.round(amount),
+        currency,
+        paypalTransactionId: transactionId
+      });
+      await this.logToAudit({
+        action: "payment_failed",
+        resource: "payments",
+        details: {
+          orderId,
+          provider: "paypal",
+          eventId: event.id,
+          eventType: event.event_type
+        }
+      });
+      console.log(`\u26A0\uFE0F PayPal payment failed for order: ${orderId}`);
+      return {
+        success: true,
+        message: "PayPal payment failure recorded",
+        orderId
+      };
+    } catch (error) {
+      console.error("\u274C Error processing PayPal payment failure:", error);
+      throw error;
+    }
+  }
+  /**
+   * Handle PayPal refund
+   * Requirements: 2.5, 5.3, 7.2
+   */
+  async handlePayPalRefund(event) {
+    const customId = event.resource?.custom_id;
+    if (!customId) {
+      console.error("\u274C No custom_id in PayPal refund event");
+      return {
+        success: false,
+        message: "No custom_id in PayPal refund event"
+      };
+    }
+    try {
+      const amount = Number.parseFloat(event.resource?.amount?.value || "0") * 100;
+      const currency = event.resource?.amount?.currency_code || "USD";
+      const transactionId = event.resource?.id || event.id;
+      const orderId = customId;
+      await recordPaymentWithRetry({
+        orderId,
+        provider: "paypal",
+        status: "refunded",
+        amount: Math.round(amount),
+        currency,
+        paypalTransactionId: transactionId
+      });
+      console.log(`\u2705 PayPal refund processed for order: ${orderId}`);
+      return {
+        success: true,
+        message: "PayPal refund processed successfully",
+        orderId
+      };
+    } catch (error) {
+      console.error("\u274C Error processing PayPal refund:", error);
+      throw error;
+    }
+  }
+  /**
+   * Log to audit trail
+   * Requirements: 8.1, 8.2, 8.3
+   */
+  async logToAudit(entry) {
+    await logAuditWithRetry({
+      action: entry.action,
+      resource: entry.resource,
+      details: entry.details
+    });
+  }
+  /**
+   * Retry webhook processing with exponential backoff
+   * 3 attempts: 1s, 2s, 4s delays
+   */
+  async retryWebhookProcessing(fn, maxRetries = 3) {
+    let lastError;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (attempt < maxRetries - 1) {
+          const delay = Math.pow(2, attempt) * 1e3;
+          console.log(`\u23F3 Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
+    throw lastError || new Error("Webhook processing failed after retries");
+  }
+};
+var paymentService = PaymentService.getInstance();
+
+// server/routes/webhooks.ts
+var router25 = Router24();
+router25.post("/stripe", async (req, res) => {
+  const requestId = randomUUID4();
+  try {
+    const signature = req.headers["stripe-signature"];
+    logger.info("Processing Stripe webhook", { requestId });
+    if (!signature || typeof signature !== "string") {
+      logger.warn("Missing Stripe signature", { requestId });
+      const errorResponse = createErrorResponse2(
+        "Missing signature",
+        "STRIPE_MISSING_SIGNATURE" /* STRIPE_MISSING_SIGNATURE */,
+        "Stripe signature header is required for webhook verification",
+        requestId
+      );
+      res.status(400).json(errorResponse);
+      return;
+    }
+    const payload = req.body;
+    const result = await paymentService.retryWebhookProcessing(
+      () => paymentService.handleStripeWebhook(payload, signature),
+      3
+      // 3 attempts with exponential backoff
+    );
+    if (result.success) {
+      logger.info("Stripe webhook processed", {
+        requestId,
+        message: result.message,
+        orderId: result.orderId
+      });
+      res.status(200).json({
+        received: true,
+        message: result.message,
+        requestId,
+        orderId: result.orderId,
+        reservationIds: result.reservationIds,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      });
+    } else {
+      logger.error("Stripe webhook failed", { requestId, message: result.message });
+      const errorResponse = createErrorResponse2(
+        result.message,
+        "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */,
+        "Failed to process Stripe webhook event",
+        requestId
+      );
+      res.status(400).json(errorResponse);
+    }
+  } catch (error) {
+    logger.error("Error processing Stripe webhook", { requestId, error });
+    if (error instanceof PaymentError) {
+      const errorResponse2 = error.toErrorResponse(requestId);
+      const statusCode = error.code === "STRIPE_INVALID_SIGNATURE" /* STRIPE_INVALID_SIGNATURE */ ? 400 : 500;
+      res.status(statusCode).json(errorResponse2);
+      return;
+    }
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    const errorResponse = createErrorResponse2(
+      "Webhook processing failed",
+      "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */,
+      sanitizeErrorMessage(errorObj),
+      requestId,
+      { stack: errorObj.stack }
+    );
+    res.status(500).json(errorResponse);
+  }
+});
+router25.post("/paypal", async (req, res) => {
+  const requestId = randomUUID4();
+  try {
+    const payload = req.body;
+    const headers = {};
+    const relevantHeaders = [
+      "paypal-transmission-id",
+      "paypal-transmission-time",
+      "paypal-transmission-sig",
+      "paypal-cert-url",
+      "paypal-auth-algo"
+    ];
+    for (const header of relevantHeaders) {
+      const value = req.headers[header];
+      if (value && typeof value === "string") {
+        headers[header] = value;
+      }
+    }
+    logger.info("Processing PayPal webhook", { requestId });
+    const missingHeaders = relevantHeaders.filter((h) => !headers[h]);
+    if (missingHeaders.length > 0) {
+      logger.warn("Missing PayPal headers", { requestId, missingHeaders });
+      const errorResponse = createErrorResponse2(
+        "Missing required headers",
+        "PAYPAL_MISSING_HEADERS" /* PAYPAL_MISSING_HEADERS */,
+        `PayPal webhook requires headers: ${missingHeaders.join(", ")}`,
+        requestId,
+        { missingHeaders }
+      );
+      res.status(400).json(errorResponse);
+      return;
+    }
+    const result = await paymentService.retryWebhookProcessing(
+      () => paymentService.handlePayPalWebhook(payload, headers),
+      3
+      // 3 attempts with exponential backoff
+    );
+    if (result.success) {
+      logger.info("PayPal webhook processed", {
+        requestId,
+        message: result.message,
+        orderId: result.orderId
+      });
+      res.status(200).json({
+        received: true,
+        message: result.message,
+        requestId,
+        orderId: result.orderId,
+        reservationIds: result.reservationIds,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      });
+    } else {
+      logger.error("PayPal webhook failed", { requestId, message: result.message });
+      const errorResponse = createErrorResponse2(
+        result.message,
+        "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */,
+        "Failed to process PayPal webhook event",
+        requestId
+      );
+      res.status(400).json(errorResponse);
+    }
+  } catch (error) {
+    logger.error("Error processing PayPal webhook", { requestId, error });
+    if (error instanceof PaymentError) {
+      const errorResponse2 = error.toErrorResponse(requestId);
+      const statusCode = error.code === "PAYPAL_INVALID_SIGNATURE" /* PAYPAL_INVALID_SIGNATURE */ ? 400 : 500;
+      res.status(statusCode).json(errorResponse2);
+      return;
+    }
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    const errorResponse = createErrorResponse2(
+      "Webhook processing failed",
+      "WEBHOOK_PROCESSING_ERROR" /* WEBHOOK_PROCESSING_ERROR */,
+      sanitizeErrorMessage(errorObj),
+      requestId,
+      { stack: errorObj.stack }
+    );
+    res.status(500).json(errorResponse);
+  }
+});
+router25.get("/health", (_req, res) => {
+  const requestId = randomUUID4();
+  try {
+    const stripeConfigured = !!process.env.STRIPE_SECRET_KEY && !!process.env.STRIPE_WEBHOOK_SECRET;
+    const paypalConfigured = !!process.env.PAYPAL_CLIENT_ID && !!process.env.PAYPAL_CLIENT_SECRET && !!process.env.PAYPAL_WEBHOOK_ID;
+    const convexConfigured = !!process.env.VITE_CONVEX_URL;
+    const allConfigured = stripeConfigured && paypalConfigured && convexConfigured;
+    const healthStatus = {
+      status: allConfigured ? "healthy" : "degraded",
+      requestId,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      webhooks: {
+        stripe: {
+          endpoint: "/api/webhooks/stripe",
+          configured: stripeConfigured,
+          events: [
+            "payment_intent.succeeded",
+            "payment_intent.payment_failed",
+            "checkout.session.completed",
+            "charge.refunded"
+          ]
+        },
+        paypal: {
+          endpoint: "/api/webhooks/paypal",
+          configured: paypalConfigured,
+          events: [
+            "PAYMENT.CAPTURE.COMPLETED",
+            "PAYMENT.CAPTURE.DENIED",
+            "PAYMENT.CAPTURE.REFUNDED"
+          ]
+        }
+      },
+      services: {
+        convex: {
+          configured: convexConfigured,
+          url: convexConfigured ? process.env.VITE_CONVEX_URL : "not configured"
+        },
+        paymentService: {
+          status: "operational",
+          features: ["stripe", "paypal", "reservations", "invoices"]
+        }
+      },
+      version: process.env.npm_package_version || "unknown"
+    };
+    const statusCode = allConfigured ? 200 : 503;
+    logger.info("Health check completed", { requestId, status: healthStatus.status });
+    res.status(statusCode).json(healthStatus);
+  } catch (error) {
+    logger.error("Health check error", { requestId, error });
+    const errorResponse = createErrorResponse2(
+      "Health check failed",
+      "HEALTH_CHECK_ERROR",
+      error instanceof Error ? error.message : "Unknown error occurred",
+      requestId
+    );
+    res.status(500).json(errorResponse);
+  }
+});
+var webhooks_default = router25;
 
 // server/routes/wishlist.ts
 init_api();
 init_auth();
 init_convex();
-import { getAuth as getAuth4 } from "@clerk/express";
-import { Router as Router20 } from "express";
-var router21 = Router20();
+import { getAuth as getAuth7 } from "@clerk/express";
+import { Router as Router25 } from "express";
+var router26 = Router25();
 function getClerkId(req) {
   try {
-    const { userId } = getAuth4(req);
+    const { userId } = getAuth7(req);
     return userId;
   } catch {
     return null;
   }
 }
-router21.get("/", isAuthenticated, async (req, res) => {
+router26.get("/", isAuthenticated, async (req, res) => {
   try {
     const clerkId = getClerkId(req);
     if (!clerkId) {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
-    const convex6 = getConvex();
-    const favorites2 = await convex6.query(api.favorites.serverFunctions.getFavoritesByClerkId, {
+    const convex8 = getConvex();
+    const favorites2 = await convex8.query(api.favorites.serverFunctions.getFavoritesByClerkId, {
       clerkId
     });
     res.json(favorites2);
@@ -13492,7 +19056,7 @@ router21.get("/", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to fetch wishlist");
   }
 });
-router21.post("/", isAuthenticated, async (req, res) => {
+router26.post("/", isAuthenticated, async (req, res) => {
   try {
     const clerkId = getClerkId(req);
     if (!clerkId) {
@@ -13504,9 +19068,9 @@ router21.post("/", isAuthenticated, async (req, res) => {
       res.status(400).json({ error: "Valid beat_id is required" });
       return;
     }
-    const convex6 = getConvex();
+    const convex8 = getConvex();
     try {
-      const result = await convex6.mutation(api.favorites.serverFunctions.addFavoriteByClerkId, {
+      const result = await convex8.mutation(api.favorites.serverFunctions.addFavoriteByClerkId, {
         clerkId,
         beatId: beat_id
       });
@@ -13527,7 +19091,7 @@ router21.post("/", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to add to wishlist");
   }
 });
-router21.delete("/:beatId", isAuthenticated, async (req, res) => {
+router26.delete("/:beatId", isAuthenticated, async (req, res) => {
   try {
     const clerkId = getClerkId(req);
     if (!clerkId) {
@@ -13539,8 +19103,8 @@ router21.delete("/:beatId", isAuthenticated, async (req, res) => {
       res.status(400).json({ error: "Valid beat_id is required" });
       return;
     }
-    const convex6 = getConvex();
-    await convex6.mutation(api.favorites.serverFunctions.removeFavoriteByClerkId, {
+    const convex8 = getConvex();
+    await convex8.mutation(api.favorites.serverFunctions.removeFavoriteByClerkId, {
       clerkId,
       beatId
     });
@@ -13549,15 +19113,15 @@ router21.delete("/:beatId", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to remove from wishlist");
   }
 });
-router21.delete("/", isAuthenticated, async (req, res) => {
+router26.delete("/", isAuthenticated, async (req, res) => {
   try {
     const clerkId = getClerkId(req);
     if (!clerkId) {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
-    const convex6 = getConvex();
-    const result = await convex6.mutation(api.favorites.serverFunctions.clearFavoritesByClerkId, {
+    const convex8 = getConvex();
+    const result = await convex8.mutation(api.favorites.serverFunctions.clearFavoritesByClerkId, {
       clerkId
     });
     res.json({ message: "Wishlist cleared successfully", deletedCount: result.deletedCount });
@@ -13565,10 +19129,10 @@ router21.delete("/", isAuthenticated, async (req, res) => {
     handleRouteError(error, res, "Failed to clear wishlist");
   }
 });
-var wishlist_default = router21;
+var wishlist_default = router26;
 
 // server/routes/woo.ts
-import { Router as Router21 } from "express";
+import { Router as Router26 } from "express";
 
 // server/services/woo-validation.ts
 function validateWooCommerceQuery(query) {
@@ -13870,10 +19434,31 @@ async function fetchWooProducts(filters = {}) {
     const response = await fetch(url, {
       headers: createWooCommerceHeaders(config)
     });
+    const responseText = await response.text();
+    if (responseText.trim().startsWith("<!") || responseText.trim().startsWith("<html")) {
+      console.error("\u274C WooCommerce API returned HTML instead of JSON. This usually means:");
+      console.error("   1. Invalid API credentials (consumer key/secret)");
+      console.error("   2. WooCommerce REST API is not enabled on the site");
+      console.error("   3. The site requires HTTPS for API access");
+      console.error(
+        "   Check WOOCOMMERCE_CONSUMER_KEY and WOOCOMMERCE_CONSUMER_SECRET in your environment variables"
+      );
+      return [];
+    }
     if (!response.ok) {
       throw new Error(`WooCommerce API error: ${response.status} ${response.statusText}`);
     }
-    const rawData = await response.json();
+    let rawData;
+    try {
+      rawData = JSON.parse(responseText);
+    } catch (error) {
+      console.error(
+        "Failed to parse WooCommerce response as JSON:",
+        responseText.substring(0, 500)
+      );
+      console.error("Parse error:", error);
+      return [];
+    }
     const products = extractArrayFromResponse(rawData);
     if (products.length === 0 && rawData && typeof rawData === "object") {
       console.error("WooCommerce API returned non-array data:", rawData);
@@ -13939,10 +19524,21 @@ async function fetchWooCategories(query = {}) {
     const response = await fetch(url, {
       headers: createWooCommerceHeaders(config)
     });
+    const responseText = await response.text();
+    if (responseText.trim().startsWith("<!") || responseText.trim().startsWith("<html")) {
+      console.error("\u274C WooCommerce Categories API returned HTML - check API credentials");
+      return [];
+    }
     if (!response.ok) {
       throw new Error(`WooCommerce API error: ${response.status} ${response.statusText}`);
     }
-    const rawData = await response.json();
+    let rawData;
+    try {
+      rawData = JSON.parse(responseText);
+    } catch {
+      console.error("Failed to parse WooCommerce categories response");
+      return [];
+    }
     const categories = Array.isArray(rawData) ? rawData : [];
     return validateCategories(categories);
   } catch (error) {
@@ -13961,20 +19557,33 @@ function validateCategories(categories) {
 }
 
 // server/routes/woo.ts
-var router22 = Router21();
+var router27 = Router26();
 function safeString(value) {
   if (value === null || value === void 0) return "";
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   return "";
 }
+function fixAudioUrl(url) {
+  if (!url) return url;
+  return url.replaceAll(
+    "https://brolabentertainment.com/wp-content/",
+    "https://wp.brolabentertainment.com/wp-content/"
+  ).replaceAll(
+    "https://www.brolabentertainment.com/wp-content/",
+    "https://wp.brolabentertainment.com/wp-content/"
+  );
+}
 function extractAudioUrlsFromTrack(track) {
-  const audioPreview = safeString(track.audio_preview);
-  const trackMp3 = safeString(track.track_mp3);
-  const src = safeString(track.src);
-  const url = safeString(track.url);
+  const audioPreview = fixAudioUrl(safeString(track.audio_preview));
+  const trackMp3 = fixAudioUrl(safeString(track.track_mp3));
+  const src = fixAudioUrl(safeString(track.src));
+  const url = fixAudioUrl(safeString(track.url));
   const downloadUrl = trackMp3 || src || url || null;
-  const previewUrl = audioPreview || downloadUrl;
+  const previewUrl = audioPreview || trackMp3 || src || url || null;
+  console.log(
+    `\u{1F50D} Track URLs - audio_preview: "${audioPreview}", track_mp3: "${trackMp3}" => preview: "${previewUrl}"`
+  );
   return { previewUrl, downloadUrl };
 }
 function extractAudioFromTrack(track) {
@@ -13991,28 +19600,93 @@ function parseTrackData(value) {
   }
   return value;
 }
-async function fetchMediaTitle(mediaId) {
+async function fetchMediaDetails(mediaId) {
   try {
     const wpApiUrl = process.env.WORDPRESS_API_URL || "https://brolabentertainment.com/wp-json/wp/v2";
     const response = await fetch(`${wpApiUrl}/media/${mediaId}`);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.log(`\u274C Media ${mediaId} fetch failed: ${response.status}`);
+      return { title: null, description: null, mediaDetailsBpm: null };
+    }
     const media = await response.json();
-    return media.title?.rendered || null;
+    const title = media.title?.rendered || media.title?.raw || null;
+    const mediaDetailsBpm = media.media_details?.bpm || null;
+    console.log(`\u{1F4CB} Media ${mediaId} ALL FIELDS:`, {
+      title: media.title?.rendered?.substring(0, 50),
+      description_rendered: media.description?.rendered?.substring(0, 150),
+      description_raw: media.description?.raw?.substring(0, 150),
+      caption_rendered: media.caption?.rendered?.substring(0, 150),
+      caption_raw: media.caption?.raw?.substring(0, 150),
+      media_details_bpm: mediaDetailsBpm
+    });
+    const possibleDescriptions = [
+      media.description?.raw,
+      // RAW description - highest priority
+      media.caption?.raw,
+      media.caption?.rendered,
+      media.description?.rendered,
+      media.alt_text
+    ].filter(Boolean);
+    const bestDescription = findBestDescription(possibleDescriptions);
+    return { title, description: bestDescription, mediaDetailsBpm };
   } catch (error) {
     console.error(`Failed to fetch media ${mediaId}:`, error);
-    return null;
+    return { title: null, description: null, mediaDetailsBpm: null };
   }
+}
+function cleanDescription(desc) {
+  return desc.replaceAll(/<[^>]*>/g, " ").replaceAll(/&[^;]+;/g, " ").replaceAll(/\s+/g, " ").trim();
+}
+function findBestDescription(possibleDescriptions) {
+  for (const desc of possibleDescriptions) {
+    if (desc) {
+      const cleanDesc = cleanDescription(desc);
+      const hasBpm = /(\d{2,3})BPM/i.test(cleanDesc);
+      const hasKey = /([A-G][#b]?m(?:in)?|[A-G][#b]?\s*(?:maj|min))/i.test(cleanDesc);
+      if (hasBpm || hasKey) {
+        console.log(`\u2705 Found metadata in description: ${cleanDesc.substring(0, 100)}`);
+        return cleanDesc;
+      }
+    }
+  }
+  if (possibleDescriptions[0]) {
+    return cleanDescription(possibleDescriptions[0]);
+  }
+  return null;
 }
 async function enrichTracksWithMediaTitles(tracks) {
   const enrichedTracks = await Promise.all(
     tracks.map(async (track) => {
-      if (track.title) return track;
       if (track.mediaId) {
-        const mediaTitle = await fetchMediaTitle(track.mediaId);
-        if (mediaTitle) {
-          console.log(`\u{1F3B5} Fetched media title for ID ${track.mediaId}: ${mediaTitle}`);
-          return { ...track, title: mediaTitle };
+        const { title, description, mediaDetailsBpm } = await fetchMediaDetails(track.mediaId);
+        const enrichedTrack = { ...track };
+        if (title && !track.title) {
+          enrichedTrack.title = title;
+          console.log(`\u{1F3B5} Fetched media title for ID ${track.mediaId}: ${title}`);
         }
+        if (description) {
+          enrichedTrack.mediaDescription = description;
+          const trackBpm = extractBpmFromText(description);
+          if (trackBpm) {
+            enrichedTrack.bpm = trackBpm;
+            console.log(`\u{1F3B9} Track ${track.mediaId} BPM from DESCRIPTION: ${trackBpm}`);
+          }
+          const trackKey = extractKeyFromText(description);
+          if (trackKey) {
+            enrichedTrack.key = trackKey;
+            console.log(`\u{1F3B9} Track ${track.mediaId} Key from DESCRIPTION: ${trackKey}`);
+          }
+        }
+        if (!enrichedTrack.bpm && mediaDetailsBpm) {
+          enrichedTrack.bpm = mediaDetailsBpm;
+          console.log(`\u{1F3B9} Track ${track.mediaId} BPM from ID3 TAGS (fallback): ${mediaDetailsBpm}`);
+        }
+        console.log(`\u{1F4DD} Track ${track.mediaId} enriched:`, {
+          title: enrichedTrack.title,
+          bpm: enrichedTrack.bpm,
+          key: enrichedTrack.key
+        });
+        return enrichedTrack;
       }
       return track;
     })
@@ -14102,9 +19776,18 @@ function getFallbackTrack(audioUrlMeta, productId) {
 }
 function extractAudioTracks(albTracklistMeta, audioUrlMeta, productId) {
   if (!albTracklistMeta?.value) {
+    console.log(`\u{1F3B5} Product ${productId} - No alb_tracklist metadata, using fallback`);
     return getFallbackTrack(audioUrlMeta, productId);
   }
+  console.log(
+    `\u{1F3B5} Product ${productId} - Raw alb_tracklist:`,
+    JSON.stringify(albTracklistMeta.value).substring(0, 200)
+  );
   const trackData = parseTrackData(albTracklistMeta.value);
+  console.log(
+    `\u{1F3B5} Product ${productId} - Parsed trackData type:`,
+    Array.isArray(trackData) ? "array" : typeof trackData
+  );
   if (Array.isArray(trackData) && trackData.length > 0) {
     return processTrackArray(trackData, productId);
   }
@@ -14127,6 +19810,68 @@ function hasTagWithName(tags, searchTerm) {
     (tag) => tag && typeof tag === "object" && "name" in tag && String(tag.name).toLowerCase().includes(searchTerm.toLowerCase())
   ) ?? false;
 }
+function extractBpmFromText(text) {
+  if (!text) return "";
+  const patterns = [
+    /(\d{2,3})\s*bpm/i,
+    /bpm[:\s]*(\d{2,3})/i,
+    /_(\d{2,3})BPM_/i,
+    /(\d{2,3})BPM/i,
+    /tempo[:\s]*(\d{2,3})/i
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (match?.[1]) {
+      const bpm = Number.parseInt(match[1], 10);
+      if (bpm >= 40 && bpm <= 300) return match[1];
+    }
+  }
+  return "";
+}
+function normalizeKeyFormat(note, mode) {
+  const upperNote = note.toUpperCase();
+  const lowerMode = mode.toLowerCase();
+  if (upperNote.endsWith("M")) {
+    return upperNote.slice(0, -1) + "m";
+  }
+  if (lowerMode === "m" || lowerMode === "min" || lowerMode === "minor") {
+    return `${upperNote}m`;
+  }
+  if (lowerMode === "maj" || lowerMode === "major") {
+    return `${upperNote} Major`;
+  }
+  return upperNote + (lowerMode ? ` ${lowerMode}` : "");
+}
+function extractKeyFromText(text) {
+  if (!text) return "";
+  const patterns = [
+    /\bkey[:\s]*([A-G][#b]?)\s*(maj(?:or)?|min(?:or)?|m)?\b/i,
+    /_([A-G][#b]?m)(?:in)?_/i,
+    /_([A-G][#b]?)min_/i,
+    /\b([A-G][#b]?)\s*(maj(?:or)?|min(?:or)?)\b/i,
+    /\b([A-G][#b]?m)\b/i
+  ];
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (match?.[1]) {
+      return normalizeKeyFormat(match[1], match[2] || "");
+    }
+  }
+  return "";
+}
+function extractMoodFromText(text) {
+  if (!text) return "";
+  const pattern = /\b(dark|chill|upbeat|sad|happy|aggressive|energetic|mellow|dreamy|intense|smooth|hard|soft|emotional|epic|ambient)\b/i;
+  const match = pattern.exec(text);
+  if (match?.[1]) {
+    return match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+  }
+  return "";
+}
+function stripHtml2(html) {
+  if (!html) return "";
+  return html.replaceAll(/<[^>]*>/g, " ").replaceAll(/&[^;]+;/g, " ").replaceAll(/\s+/g, " ").trim();
+}
 async function mapProductToBeat(product) {
   const albTracklistMeta = product.meta_data?.find(
     (meta) => meta.key === "alb_tracklist"
@@ -14144,6 +19889,43 @@ async function mapProductToBeat(product) {
     `download: ${downloadUrl?.substring(0, 60)}...`,
     `(${audioTracks.length} tracks)`
   );
+  const mediaDescriptions = audioTracks.map((t) => t.mediaDescription || "").join(" ");
+  const trackTitles = audioTracks.map((t) => t.title || "").join(" ");
+  const trackUrls = audioTracks.map((t) => `${t.url || ""} ${t.downloadUrl || ""}`).join(" ");
+  const description = stripHtml2(product.description);
+  const shortDescription = stripHtml2(product.short_description);
+  const highestPrioritySource = mediaDescriptions;
+  const mediumPrioritySource = `${description} ${shortDescription} ${trackUrls} ${audioUrl || ""} ${downloadUrl || ""}`;
+  const lowPrioritySource = trackTitles;
+  const fallbackSource = `${product.name || ""}`;
+  console.log(`\u{1F50D} Product ${product.id} - Text sources:`, {
+    mediaDescriptions: mediaDescriptions.substring(0, 100),
+    description: description.substring(0, 50)
+  });
+  const bpmFromMeta = safeString(findMetaValue(product.meta_data, "bpm"));
+  let bpm = bpmFromMeta;
+  if (!bpm) bpm = extractBpmFromText(highestPrioritySource);
+  if (!bpm) bpm = extractBpmFromText(mediumPrioritySource);
+  if (!bpm) bpm = extractBpmFromText(lowPrioritySource);
+  if (!bpm) bpm = extractBpmFromText(fallbackSource);
+  const keyFromMeta = safeString(findMetaValue(product.meta_data, "key"));
+  let key = keyFromMeta;
+  if (!key) key = extractKeyFromText(highestPrioritySource);
+  if (!key) key = extractKeyFromText(mediumPrioritySource);
+  if (!key) key = extractKeyFromText(lowPrioritySource);
+  if (!key) key = extractKeyFromText(fallbackSource);
+  const moodFromMeta = safeString(findMetaValue(product.meta_data, "mood"));
+  let mood = moodFromMeta;
+  if (!mood) mood = extractMoodFromText(highestPrioritySource);
+  if (!mood) mood = extractMoodFromText(mediumPrioritySource);
+  if (!mood) mood = extractMoodFromText(lowPrioritySource);
+  if (!mood) mood = extractMoodFromText(fallbackSource);
+  console.log(`\u{1F3B5} Product ${product.id} metadata:`, {
+    bpm,
+    key,
+    mood,
+    mediaDescriptions: mediaDescriptions.substring(0, 80)
+  });
   return {
     ...product,
     audio_url: audioUrl,
@@ -14154,9 +19936,9 @@ async function mapProductToBeat(product) {
     // All tracks for multi-track navigation
     hasVocals: findMetaValue(product.meta_data, "has_vocals") === "yes" || hasTagWithName(product.tags, "vocals"),
     stems: findMetaValue(product.meta_data, "stems") === "yes" || hasTagWithName(product.tags, "stems"),
-    bpm: safeString(findMetaValue(product.meta_data, "bpm")),
-    key: safeString(findMetaValue(product.meta_data, "key")),
-    mood: safeString(findMetaValue(product.meta_data, "mood")),
+    bpm,
+    key,
+    mood,
     instruments: safeString(findMetaValue(product.meta_data, "instruments")),
     duration: safeString(findMetaValue(product.meta_data, "duration")),
     is_free: product.price === "0" || product.price === ""
@@ -14176,7 +19958,7 @@ function isWooCommerceConfigured() {
   }
   return isConfigured;
 }
-router22.get("/products", async (req, res) => {
+router27.get("/products", async (req, res) => {
   try {
     if (!isWooCommerceConfigured()) {
       console.log("\u26A0\uFE0F WooCommerce not configured, returning sample data");
@@ -14252,56 +20034,60 @@ router22.get("/products", async (req, res) => {
     handleRouteError(error, res, "Failed to fetch products");
   }
 });
-router22.get("/products/:id", async (req, res) => {
-  try {
-    if (!isWooCommerceConfigured()) {
-      console.log("\u26A0\uFE0F WooCommerce not configured, returning sample product");
-      const sampleProduct = {
-        id: Number.parseInt(req.params.id, 10),
-        name: "Sample Beat",
-        price: "29.99",
-        regular_price: "39.99",
-        sale_price: "29.99",
-        description: "A sample beat for testing",
-        short_description: "Sample beat",
-        images: [{ src: "/api/placeholder/300/300" }],
-        categories: [{ name: "Hip Hop" }],
-        meta_data: [
-          { key: "bpm", value: "140" },
-          { key: "key", value: "C" },
-          { key: "mood", value: "Energetic" },
-          { key: "instruments", value: "Drums, Bass, Synth" },
-          { key: "duration", value: "3:45" },
-          { key: "has_vocals", value: "no" },
-          { key: "stems", value: "yes" }
-        ],
-        tags: [],
-        total_sales: 0,
-        hasVocals: false,
-        stems: true,
-        bpm: "140",
-        key: "C",
-        mood: "Energetic",
-        instruments: "Drums, Bass, Synth",
-        duration: "3:45",
-        is_free: false,
-        audio_url: null
-      };
-      res.json({ beat: sampleProduct });
-      return;
+router27.get(
+  "/products/:id",
+  validateParams(CommonParams.numericId),
+  async (req, res) => {
+    try {
+      if (!isWooCommerceConfigured()) {
+        console.log("\u26A0\uFE0F WooCommerce not configured, returning sample product");
+        const sampleProduct = {
+          id: Number.parseInt(req.params.id, 10),
+          name: "Sample Beat",
+          price: "29.99",
+          regular_price: "39.99",
+          sale_price: "29.99",
+          description: "A sample beat for testing",
+          short_description: "Sample beat",
+          images: [{ src: "/api/placeholder/300/300" }],
+          categories: [{ name: "Hip Hop" }],
+          meta_data: [
+            { key: "bpm", value: "140" },
+            { key: "key", value: "C" },
+            { key: "mood", value: "Energetic" },
+            { key: "instruments", value: "Drums, Bass, Synth" },
+            { key: "duration", value: "3:45" },
+            { key: "has_vocals", value: "no" },
+            { key: "stems", value: "yes" }
+          ],
+          tags: [],
+          total_sales: 0,
+          hasVocals: false,
+          stems: true,
+          bpm: "140",
+          key: "C",
+          mood: "Energetic",
+          instruments: "Drums, Bass, Synth",
+          duration: "3:45",
+          is_free: false,
+          audio_url: null
+        };
+        res.json({ beat: sampleProduct });
+        return;
+      }
+      const product = await fetchWooProduct(req.params.id);
+      if (!product) {
+        res.status(404).json({ error: "Product not found" });
+        return;
+      }
+      const beat = await mapProductToBeat(product);
+      res.json(beat);
+    } catch (error) {
+      handleRouteError(error, res, "Failed to fetch product");
     }
-    const product = await fetchWooProduct(req.params.id);
-    if (!product) {
-      res.status(404).json({ error: "Product not found" });
-      return;
-    }
-    const beat = await mapProductToBeat(product);
-    res.json(beat);
-  } catch (error) {
-    handleRouteError(error, res, "Failed to fetch product");
   }
-});
-router22.get("/categories", async (_req, res) => {
+);
+router27.get("/categories", async (_req, res) => {
   try {
     if (!isWooCommerceConfigured()) {
       console.log("\u26A0\uFE0F WooCommerce not configured, returning sample categories");
@@ -14320,10 +20106,10 @@ router22.get("/categories", async (_req, res) => {
     handleRouteError(error, res, "Failed to fetch categories");
   }
 });
-var woo_default = router22;
+var woo_default = router27;
 
 // server/routes/wp.ts
-import { Router as Router22 } from "express";
+import { Router as Router27 } from "express";
 
 // server/services/wp.ts
 function toQueryParamValue(value) {
@@ -14388,8 +20174,8 @@ async function fetchWPPageBySlug(slug) {
 }
 
 // server/routes/wp.ts
-var router23 = Router22();
-router23.get("/pages/:slug", async (req, res, next) => {
+var router28 = Router27();
+router28.get("/pages/:slug", async (req, res, next) => {
   try {
     const page = await fetchWPPageBySlug(req.params.slug);
     if (!page) res.status(404).json({ error: "Page not found" });
@@ -14399,7 +20185,7 @@ router23.get("/pages/:slug", async (req, res, next) => {
     next(e);
   }
 });
-router23.get("/posts", async (req, res, next) => {
+router28.get("/posts", async (req, res, next) => {
   try {
     const params = req.query;
     const posts = await fetchWPPosts(params);
@@ -14408,7 +20194,7 @@ router23.get("/posts", async (req, res, next) => {
     next(e);
   }
 });
-router23.get("/posts/:slug", async (req, res, next) => {
+router28.get("/posts/:slug", async (req, res, next) => {
   try {
     const post = await fetchWPPostBySlug(req.params.slug);
     if (!post) res.status(404).json({ error: "Post not found" });
@@ -14418,15 +20204,25 @@ router23.get("/posts/:slug", async (req, res, next) => {
     next(e);
   }
 });
-var wp_default = router23;
+var wp_default = router28;
 
 // server/app.ts
 var app = express3();
+app.set("trust proxy", 1);
 app.use(corsMiddleware);
 app.use(helmetMiddleware);
 app.use(compressionMiddleware);
 app.use(bodySizeLimits);
-app.use(express3.json({ limit: "10mb" }));
+app.use("/api/webhooks/stripe", express3.raw({ type: "application/json", limit: "10mb" }));
+app.use("/api/webhooks/paypal", express3.raw({ type: "application/json", limit: "10mb" }));
+app.use(
+  express3.json({
+    limit: "10mb",
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    }
+  })
+);
 app.use(express3.urlencoded({ extended: false, limit: "10mb" }));
 logger.info("Server starting", {
   nodeEnv: env.NODE_ENV,
@@ -14442,6 +20238,8 @@ app.use((_req, res, next) => {
 });
 app.use("/api/activity", apiRateLimiter, activity_default);
 app.use("/api/avatar", apiRateLimiter, avatar_default);
+app.use("/api/beats", apiRateLimiter, beats_default);
+app.use("/api/contact", authRateLimiter, contact_default);
 app.use("/api/downloads", downloadRateLimiter, downloads_default);
 app.use("/api/email", authRateLimiter, email_default);
 app.use("/api/monitoring", monitoring_default2);
@@ -14451,17 +20249,20 @@ app.use("/api/payment/paypal", paymentRateLimiter, paypal_default2);
 app.use("/api/payment/stripe", paymentRateLimiter, stripe_default);
 app.use("/api/clerk", apiRateLimiter, clerk_default);
 app.use("/api/payments", paymentRateLimiter, payments_default);
+app.use("/api/webhooks", webhooks_default);
 app.use("/api/webhooks/clerk-billing", clerk_billing_default);
 app.use("/api/schema", apiRateLimiter, schema_default);
 app.use("/api/security", apiRateLimiter, security_default);
 app.use("/api/service-orders", apiRateLimiter, serviceOrders_default);
 app.use("/api/storage", apiRateLimiter, storage_default);
+app.use("/api/subscription", apiRateLimiter, subscription_default);
 app.use("/api/uploads", apiRateLimiter, uploads_default);
 app.use("/api/wishlist", apiRateLimiter, wishlist_default);
 app.use("/api/wp", apiRateLimiter, wp_default);
 app.use("/api/sync", apiRateLimiter, sync_default);
 app.use("/api/categories", apiRateLimiter, categories_default);
 app.use("/api/reservations", apiRateLimiter, reservations_default);
+app.use("/api/admin/reconciliation", apiRateLimiter, reconciliation_default);
 app.use("/api/woocommerce", apiRateLimiter, woo_default);
 app.use("/", sitemap_default);
 if (env.NODE_ENV === "development" || env.NODE_ENV === "test") {
@@ -14469,9 +20270,6 @@ if (env.NODE_ENV === "development" || env.NODE_ENV === "test") {
   app.use(testSpriteModule.default);
   logger.info("TestSprite compatibility endpoints loaded");
 }
-
-// api/index.ts
-var index_default = app;
 export {
-  index_default as default
+  app as default
 };

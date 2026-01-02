@@ -53,7 +53,16 @@ class RealtimeConnectionManager {
     // FIX: Check if WebSocket is disabled before attempting connection
     const url = wsUrl || this.getWebSocketUrl();
     if (!url) {
-      console.log("[DashboardRealtime] WebSocket disabled, skipping connection");
+      if (import.meta.env.DEV) {
+        console.log("[DashboardRealtime] WebSocket disabled, skipping connection");
+      }
+      this.onStatusChange("disconnected");
+      return;
+    }
+
+    // FIX: Don't attempt connection if tab is hidden to prevent background resource usage
+    if (typeof document !== "undefined" && document.hidden) {
+      console.log("[DashboardRealtime] Tab hidden, deferring WebSocket connection");
       this.onStatusChange("disconnected");
       return;
     }
@@ -217,6 +226,20 @@ class RealtimeConnectionManager {
   }
 
   private scheduleReconnect(): void {
+    // FIX: Don't reconnect in production or if tab is hidden
+    const isProduction = import.meta.env.PROD || import.meta.env.MODE === "production";
+    if (isProduction) {
+      console.log("[DashboardRealtime] Reconnection disabled in production");
+      this.onStatusChange("disconnected");
+      return;
+    }
+
+    if (typeof document !== "undefined" && document.hidden) {
+      console.log("[DashboardRealtime] Tab hidden, skipping reconnect");
+      this.onStatusChange("disconnected");
+      return;
+    }
+
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.log("Max reconnection attempts reached");
       this.onStatusChange("error");
@@ -284,6 +307,7 @@ class RealtimeConnectionManager {
 
   private getWebSocketUrl(): string {
     // FIX: Detect Vercel/serverless and return empty to prevent connection attempts
+    // Also check if tab is hidden to prevent background connections
     const isVercelOrServerless =
       globalThis.window !== undefined &&
       (globalThis.window.location.hostname.includes("vercel.app") ||
@@ -293,19 +317,19 @@ class RealtimeConnectionManager {
     // Check environment variable override
     const disableWebSocket = import.meta.env.VITE_DISABLE_WEBSOCKET === "true";
 
-    if (isVercelOrServerless || disableWebSocket) {
+    // FIX: Also disable WebSocket in production entirely - Vercel doesn't support it
+    const isProduction = import.meta.env.PROD || import.meta.env.MODE === "production";
+
+    if (isVercelOrServerless || disableWebSocket || isProduction) {
       // Return empty string - WebSocket will not be used
-      console.log("[DashboardRealtime] WebSocket disabled on serverless platform");
+      if (import.meta.env.DEV) {
+        console.log("[DashboardRealtime] WebSocket disabled (serverless/production)");
+      }
       return "";
     }
 
-    // In development, use a mock WebSocket server
-    if (process.env.NODE_ENV === "development") {
-      return "ws://localhost:3001/ws";
-    }
-
-    // In production with WebSocket support, use the actual URL
-    return process.env.VITE_CONVEX_WS_URL || "wss://api.brolab.com/ws";
+    // In development only, use a mock WebSocket server
+    return "ws://localhost:3001/ws";
   }
 }
 
