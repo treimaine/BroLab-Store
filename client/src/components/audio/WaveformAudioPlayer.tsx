@@ -178,7 +178,7 @@ export function WaveformAudioPlayer({
 
     const animate = (): void => {
       // FIX: Stop animation loop if effect is no longer active or tab is hidden
-      if (!isActive || !TabVisibilityManager.isVisible()) return;
+      if (!isActive || !TabVisibilityManager.isVisible) return;
 
       drawWaveform();
       animationFrame = requestAnimationFrame(animate);
@@ -188,7 +188,7 @@ export function WaveformAudioPlayer({
       // FIX: Don't restart if effect is no longer active
       if (!isActive) return;
 
-      if (TabVisibilityManager.isVisible() && isPlaying) {
+      if (TabVisibilityManager.isVisible && isPlaying) {
         // Cancel any pending frame and restart cleanly after a small delay
         if (animationFrame) {
           cancelAnimationFrame(animationFrame);
@@ -200,7 +200,7 @@ export function WaveformAudioPlayer({
         // Stagger restart to prevent thundering herd
         const staggerDelay = Math.random() * 200 + 50;
         staggerTimeoutId = setTimeout(() => {
-          if (isActive && TabVisibilityManager.isVisible() && isPlaying) {
+          if (isActive && isPlaying && TabVisibilityManager.isVisible) {
             animate();
           }
         }, staggerDelay);

@@ -361,6 +361,13 @@ function SpectrumBars({ isPlaying, barCount = 5 }: SpectrumBarsProps): JSX.Eleme
 }
 
 /**
+ * Check if conditions are met for animation
+ */
+function shouldAnimate(isActive: boolean, isPlaying: boolean): boolean {
+  return isActive && isPlaying && TabVisibilityManager.isVisible;
+}
+
+/**
  * BicolorWaveform - Static waveform visualization that works with cross-origin audio
  * Uses a pre-generated waveform pattern instead of Web Audio API to avoid CORS issues
  * with audio files from WordPress/WooCommerce
@@ -422,7 +429,7 @@ function BicolorWaveform({
         // Use pre-generated waveform data with slight animation when playing
         let heightMultiplier = waveformData[i] || 0.5;
 
-        if (isPlaying && TabVisibilityManager.isVisible()) {
+        if (isPlaying && TabVisibilityManager.isVisible) {
           // Add subtle animation when playing (only if tab is visible)
           const time = Date.now() / 1000;
           const animOffset = Math.sin(time * 3 + i * 0.2) * 0.1;
@@ -448,7 +455,7 @@ function BicolorWaveform({
 
     const animate = (): void => {
       // FIX: Stop animation loop if effect is no longer active or tab is hidden
-      if (!isActive || !TabVisibilityManager.isVisible()) return;
+      if (!isActive || !TabVisibilityManager.isVisible) return;
 
       drawWaveform();
       animationRef.current = requestAnimationFrame(animate);
@@ -458,7 +465,7 @@ function BicolorWaveform({
       // FIX: Don't restart if effect is no longer active
       if (!isActive) return;
 
-      if (TabVisibilityManager.isVisible() && isPlaying) {
+      if (isPlaying && TabVisibilityManager.isVisible) {
         // Cancel any pending frame and restart cleanly with staggered delay
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current);
@@ -471,9 +478,8 @@ function BicolorWaveform({
         // Stagger restart to prevent thundering herd
         const staggerDelay = Math.random() * 200 + 100;
         staggerTimeoutId = setTimeout(() => {
-          if (isActive && TabVisibilityManager.isVisible() && isPlaying) {
-            animate();
-          }
+          if (!shouldAnimate(isActive, isPlaying)) return;
+          animate();
         }, staggerDelay);
       }
     };
@@ -684,7 +690,7 @@ export function SonaarModernPlayer(): JSX.Element | null {
     };
 
     const handleLoadedMetadata = (): void => {
-      if (audio.duration && !Number.isNaN(audio.duration) && Number.isFinite(audio.duration)) {
+      if (audio.duration > 0 && Number.isFinite(audio.duration) && !Number.isNaN(audio.duration)) {
         setDuration(audio.duration);
       }
     };

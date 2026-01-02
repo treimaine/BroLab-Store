@@ -66,7 +66,7 @@ export class ServiceVisibilityManager {
   constructor(serviceName: string, config: Partial<ServiceVisibilityConfig> = {}) {
     this.serviceName = serviceName;
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.isVisible = typeof document !== "undefined" ? !document.hidden : true;
+    this.isVisible = typeof document === "undefined" || !document.hidden;
     this.lastVisibilityChange = Date.now();
 
     this.setupVisibilityListener();
@@ -183,7 +183,7 @@ export class ServiceVisibilityManager {
     this.resumeTimeouts = [];
 
     // Remove visibility listener
-    if (this.visibilityHandler && typeof document !== "undefined") {
+    if (this.visibilityHandler && typeof document === "object" && document !== null) {
       document.removeEventListener("visibilitychange", this.visibilityHandler);
       this.visibilityHandler = null;
     }
@@ -194,7 +194,7 @@ export class ServiceVisibilityManager {
   // Private methods
 
   private setupVisibilityListener(): void {
-    if (typeof document === "undefined") return;
+    if (typeof document === "undefined" || document === null) return;
 
     this.visibilityHandler = () => {
       const wasVisible = this.isVisible;
@@ -328,7 +328,7 @@ export function createVisibilityAwareInterval(
  * Check if the current tab is visible
  */
 export function isTabVisible(): boolean {
-  if (typeof document === "undefined") return true;
+  if (typeof document === "undefined" || document === null) return true;
   return !document.hidden;
 }
 
@@ -337,7 +337,7 @@ export function isTabVisible(): boolean {
  * Returns an unsubscribe function
  */
 export function onVisibilityChange(callback: (isVisible: boolean) => void): () => void {
-  if (typeof document === "undefined") {
+  if (typeof document === "undefined" || document === null) {
     return () => {};
   }
 

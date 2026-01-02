@@ -208,7 +208,10 @@ export function useDebouncedVisibility(debounceMs: number = 150): boolean {
 
 // Export singleton state accessors for non-React code
 export const TabVisibilityManager = {
-  isVisible: (): boolean => isTabVisible,
+  get isVisible(): boolean {
+    return isTabVisible;
+  },
+  isVisibleFn: (): boolean => isTabVisible,
   getLastChangeTime: (): number => lastVisibilityChange,
   getTimeSinceChange: (): number => Date.now() - lastVisibilityChange,
 };

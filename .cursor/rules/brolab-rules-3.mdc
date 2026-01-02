@@ -183,9 +183,12 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
 VITE_CONVEX_URL=https://...
 
-# Clerk Billing (Phase 3)
-CLERK_WEBHOOK_SECRET=whsec_...
-CLERK_BILLING_ENABLED=true
+# Stripe & PayPal (Paiements directs)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+PAYPAL_CLIENT_ID=...
+PAYPAL_CLIENT_SECRET=...
 ```
 
 ### 2.2 Amélioration Hook useClerkSync
@@ -498,7 +501,7 @@ export function Sidebar({ className }: SidebarProps) {
 }
 ```
 
-## 4. Préparation Phase 3 - Système Paiement Clerk
+## 4. Système Paiement - Stripe + PayPal (Implémenté)
 
 ### 4.1 Configuration Plans d'Abonnement
 
@@ -562,66 +565,21 @@ export const SUBSCRIPTION_PLANS = {
 } as const;
 ```
 
-### 4.2 Hook useClerkBilling Préparatoire
+### 4.2 Système de Paiement Actuel
 
 ```typescript
-// client/src/hooks/useClerkBilling.ts
-import { useUser } from "@clerk/clerk-react";
-import { useState, useEffect } from "react";
-import { SUBSCRIPTION_PLANS } from "../../shared/subscription-plans";
+// Système de paiement : Stripe + PayPal (implémenté)
+// Les paiements sont gérés directement via :
+// - Stripe Checkout pour les paiements par carte
+// - PayPal SDK pour les paiements PayPal
+// - Webhooks validés pour la synchronisation
 
-export function useClerkBilling() {
-  const { user } = useUser();
-  const [currentPlan, setCurrentPlan] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (user) {
-      // TODO: Récupérer le plan actuel depuis Clerk Billing
-      // Pour l'instant, plan gratuit par défaut
-      setCurrentPlan("free");
-      setIsLoading(false);
-    }
-  }, [user]);
-
-  const hasPlan = (planId: string) => {
-    return currentPlan === planId;
-  };
-
-  const canDownload = (licenseType: string) => {
-    switch (licenseType) {
-      case "basic":
-        return hasPlan("basic") || hasPlan("artist") || hasPlan("ultimate");
-      case "premium":
-        return hasPlan("artist") || hasPlan("ultimate");
-      case "unlimited":
-        return hasPlan("ultimate");
-      default:
-        return false;
-    }
-  };
-
-  const getDownloadQuota = () => {
-    if (hasPlan("ultimate")) {
-      return { remaining: Infinity, total: Infinity };
-    } else if (hasPlan("artist")) {
-      return { remaining: 20, total: 20 }; // TODO: Calculer depuis l'usage réel
-    } else if (hasPlan("basic")) {
-      return { remaining: 5, total: 5 }; // TODO: Calculer depuis l'usage réel
-    } else {
-      return { remaining: 0, total: 0 };
-    }
-  };
-
-  return {
-    currentPlan,
-    isLoading,
-    hasPlan,
-    canDownload,
-    getDownloadQuota,
-    plans: SUBSCRIPTION_PLANS,
-  };
-}
+// Licences disponibles (one-time purchases)
+const LICENSES = {
+  basic: { price: 2999, name: "Basic License" },
+  premium: { price: 4999, name: "Premium License" },
+  unlimited: { price: 14999, name: "Unlimited License" }
+};
 ```
 
 ## 5. Métriques de Performance Cibles
@@ -684,13 +642,13 @@ export class PerformanceMonitor {
 - [ ] Système de design complet
 - [ ] Layout responsive finalisé
 
-### 📋 Prochaines Tâches Phase 3
+### 📋 Système de Paiement (Implémenté)
 
-- [ ] Configuration Clerk Billing
-- [ ] Implémentation plans d'abonnement
-- [ ] Système de paiement unifié
-- [ ] Webhooks Clerk
-- [ ] Tests de paiement
+- [x] Intégration Stripe Checkout
+- [x] Intégration PayPal SDK
+- [x] Webhooks Stripe et PayPal
+- [x] Gestion des licences PDF
+- [x] Historique des paiements
 
 ## 7. Conclusion Phase 2
 

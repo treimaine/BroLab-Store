@@ -2,6 +2,8 @@
 
 _Finalisation Reconstruction - Janvier 2025 - État Réel Confirmé_
 
+**Note** : Le système de paiement utilise Stripe + PayPal directement, pas Clerk Billing.
+
 ## 🎯 Objectifs Phase 4
 
 Finaliser la reconstruction de BroLab Entertainment en supprimant les fichiers obsolètes, optimisant les performances, et préparant le déploiement sur o2switch.
@@ -10,9 +12,9 @@ Finaliser la reconstruction de BroLab Entertainment en supprimant les fichiers o
 
 ### ✅ Phases Précédentes Complétées
 
-- **Phase 1** : Migration Supabase → Convex (100%)
-- **Phase 2** : Reconstruction Dashboard + Clerk Auth (95%)
-- **Phase 3** : Système Paiement Clerk Billing (En cours)
+- **Phase 1** : Migration Supabase → Convex (100% - 19 tables)
+- **Phase 2** : Reconstruction Dashboard + Clerk Auth (100%)
+- **Phase 3** : Système Paiement Stripe + PayPal (100% - Implémenté)
 
 ### 🔍 Analyse Actuelle du Projet - État Réel
 
@@ -899,6 +901,8 @@ La Phase 4 finalise la reconstruction complète de BroLab Entertainment avec :
 ---
 
 **📅 Dernière mise à jour :** 26 janvier 2025  
-**🔄 Version :** 4.0 - Plan Nettoyage & Optimisation  
-**👨‍💻 Statut :** Phase 4 - Prêt à Démarrer  
+**🔄 Version :** 4.1 - Plan Nettoyage & Optimisation  
+**👨‍💻 Statut :** Phase 4 - En Cours  
 **🎯 Prochaine étape :** Nettoyage et optimisation finale
+
+**Note importante** : Le système utilise Stripe et PayPal directement pour les paiements. Clerk est utilisé uniquement pour l'authentification.

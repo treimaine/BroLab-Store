@@ -491,7 +491,7 @@ export function EnhancedGlobalAudioPlayer() {
 
     const animate = (currentTime: number): void => {
       // FIX: Stop animation loop if effect is no longer active or tab is hidden
-      if (!isActive || !TabVisibilityManager.isVisible()) {
+      if (!isActive || !TabVisibilityManager.isVisible) {
         return;
       }
 
@@ -530,7 +530,7 @@ export function EnhancedGlobalAudioPlayer() {
       // FIX: Don't restart if effect is no longer active
       if (!isActive) return;
 
-      if (TabVisibilityManager.isVisible() && isPlaying) {
+      if (TabVisibilityManager.isVisible && isPlaying) {
         // Cancel any pending frame first
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current);
@@ -543,7 +543,7 @@ export function EnhancedGlobalAudioPlayer() {
         // Stagger restart with longer delay to prevent thundering herd
         const staggerDelay = Math.random() * 500 + 300;
         staggerTimeoutId = setTimeout(() => {
-          if (isActive && TabVisibilityManager.isVisible() && isPlaying) {
+          if (isActive && isPlaying && TabVisibilityManager.isVisible) {
             lastFrameTime = 0; // Reset frame timing
             animationRef.current = requestAnimationFrame(animate);
           }

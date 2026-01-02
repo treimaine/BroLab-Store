@@ -10,57 +10,65 @@ alwaysApply: true
 
 **Stack Principal :**
 
-- **Frontend** : React 18 + TypeScript + Vite + Tailwind CSS
-- **Backend** : Express.js + TypeScript + Node.js
-- **Base de données** : Convex (PostgreSQL compatible)
-- **Authentification** : Clerk (remplacement Supabase Auth)
-- **Paiements** : Clerk Billing (remplacement Stripe)
-- **Routing** : Wouter (remplacement React Router)
-- **State Management** : TanStack Query + Convex + Zustand
-- **UI Components** : Radix UI + shadcn/ui + Framer Motion
+- **Frontend** : React 18.3.1 + TypeScript 5.6.3 + Vite 6.3.5 + Tailwind CSS 3.4.17
+- **Backend** : Express.js 4.21.2 + TypeScript + Node.js 24.x
+- **Base de données** : Convex 1.31.2 (19 tables)
+- **Authentification** : Clerk 5.59.2 (remplacement Supabase Auth)
+- **Paiements** : Stripe 18.4.0 + PayPal SDK 1.1.0 (intégration directe)
+- **Routing** : Wouter 3.3.5 (remplacement React Router)
+- **State Management** : TanStack Query 5.60.5 + Convex + Zustand 5.0.6
+- **UI Components** : Radix UI + shadcn/ui + Framer Motion 11.18.2
+- **Audio** : WaveSurfer.js 7.10.0
 
 **Migration Complétée :**
 
-- ✅ **Supabase → Convex** : Base de données migrée
-- ✅ **Supabase Auth → Clerk** : Authentification migrée
-- ✅ **Stripe → Clerk Billing** : Paiements migrés
-- ✅ **React Router → Wouter** : Routing migré
+- ✅ **Supabase → Convex** : Base de données migrée (19 tables)
+- ✅ **Supabase Auth → Clerk** : Authentification migrée (Clerk 5.59.2)
+- ✅ **React Router → Wouter** : Routing migré (Wouter 3.3.5)
+- ✅ **Paiements** : Stripe + PayPal intégrés directement (pas Clerk Billing)
+
+**Note importante** : Clerk est utilisé uniquement pour l'authentification. Les paiements utilisent Stripe et PayPal directement via leurs SDKs respectifs.
 
 ### 🎯 FONCTIONNALITÉS PRINCIPALES
 
 #### 1. **Store de Beats**
 
-- Catalogue complet avec filtres avancés
-- Recherche en temps réel
-- Affichage grille/tableau
+- Catalogue complet avec filtres avancés (genre, BPM, clé, mood)
+- Recherche en temps réel avec suggestions
+- Affichage grille/tableau avec pagination
 - Système de favoris
-- Prévisualisation audio
-- Gestion des licences (Basic, Premium, Unlimited)
+- Prévisualisation audio avec WaveSurfer.js
+- Gestion des licences (Basic $29.99, Premium $49.99, Unlimited $149.99)
+- Synchronisation WooCommerce pour le catalogue
 
 #### 2. **Système d'Authentification**
 
 - Inscription/Connexion via Clerk
 - Profils utilisateurs complets
-- Synchronisation automatique Clerk ↔ Convex
+- Synchronisation automatique Clerk ↔ Convex (useClerkSync)
 - Gestion des rôles (user, admin, artist)
-- Protection des routes
+- Protection des routes (ProtectedRoute)
+- Gestion des sessions et tokens
 
 #### 3. **Dashboard Utilisateur**
 
-- Vue d'ensemble des statistiques
-- Gestion des téléchargements
-- Historique des commandes
+- Vue d'ensemble des statistiques (commandes, téléchargements, favoris)
+- Gestion des téléchargements avec licences PDF
+- Historique des commandes avec détails
 - Gestion des favoris
-- Profil utilisateur
+- Profil utilisateur avec préférences
 - Paramètres du compte
+- Analytics avec graphiques (Recharts)
 
 #### 4. **Système de Paiement**
 
-- Intégration Clerk Billing
-- Plans d'abonnement (Basic, Artist, Ultimate)
-- Gestion des quotas de téléchargement
-- Historique des paiements
-- Facturation automatique
+- Intégration Stripe Checkout (18.4.0)
+- Intégration PayPal SDK (1.1.0)
+- Gestion des licences (Basic $29.99, Premium $49.99, Unlimited $149.99)
+- Webhooks Stripe et PayPal validés
+- Historique des paiements et factures PDF
+- Gestion des quotas de téléchargement par licence
+- Support multi-devises
 
 #### 5. **Services de Production**
 
@@ -68,53 +76,72 @@ alwaysApply: true
 - Sessions d'enregistrement
 - Consultation production
 - Commandes de beats personnalisés
-- Gestion des réservations
+- Gestion des réservations avec calendrier ICS
+- Notifications email automatiques
 
 ### 🔧 COMPOSANTS PRINCIPAUX
 
 #### **Composants UI (shadcn/ui)**
 
 ```typescript
-// Composants disponibles
+// Composants disponibles (36 composants)
 - Button, Input, Card, Badge, Modal
 - Tabs, Accordion, Collapsible, Select
 - Slider, Checkbox, Radio, Switch
 - Toast, Tooltip, Dialog, Popover
 - Table, Pagination, Loading states
+- Progress, Separator, ScrollArea
 ```
 
-#### **Composants Métier**
+#### **Composants Métier (Organisés par feature)**
 
 ```typescript
-// Store & Beats
--BeatCard,
-  TableBeatView,
-  OptimizedBeatGrid - UnifiedFilterPanel,
-  AdvancedBeatFilters - FeaturedBeatsCarousel,
-  RecentlyViewedBeats -
-    // Dashboard
-    LazyDashboard,
-  UserProfile,
-  DashboardSkeleton - DownloadsTable,
-  OrdersTable,
-  AnalyticsCharts - DataExportManager,
+// Structure : client/src/components/[feature]/
+
+// Store & Beats (beats/)
+(-BeatCard,
+  ResponsiveBeatCard,
+  TableBeatView - OptimizedBeatGrid,
+  UnifiedFilterPanel - AdvancedBeatFilters,
+  FeaturedBeatsCarousel - RecentlyViewedBeats,
+  BeatStemsDelivery -
+    // Dashboard (dashboard/)
+    ModernDashboard,
+  EnhancedAnalytics - StatsCards,
+  OrdersTab,
+  DownloadsTable - ReservationsTab,
+  ActivityFeed - DataExportManager,
   NotificationCenter -
-    // Audio & Media
+    // Audio & Media (audio/)
     WaveformPlayer,
-  GlobalAudioPlayer,
-  HoverPlayButton - SonaarAudioPlayer,
-  EnhancedWaveformPlayer -
-    // Paiements
-    ClerkPaymentForm,
-  ClerkNativeCheckout - CompletePaymentFlow,
-  PaymentTestComponent - LicensePicker,
+  EnhancedWaveformPlayer - GlobalAudioPlayer,
+  EnhancedGlobalAudioPlayer - SonaarAudioPlayer,
+  SonaarModernPlayer - HoverPlayButton,
+  ProductArtworkPlayer -
+    // Paiements (payments/)
+    StripeCheckout,
+  PayPalButton - CompletePaymentFlow,
+  PaymentWebhookHandler -
+    // Licences (licenses/)
+    LicensePicker,
   LicensePreviewModal -
-    // Layout & Navigation
+    license -
+    preview -
+    // Layout & Navigation (layout/)
     Navbar,
   Footer,
-  MobileBottomNav - ProtectedRoute,
-  AuthenticatedContent - ErrorBoundary,
-  LoadingFallback;
+  MobileBottomNav - SearchHero,
+  ServicesStrip,
+  SocialProofStrip -
+    // Auth (auth/)
+    ProtectedRoute,
+  AuthenticatedContent - UserProfile,
+  ClerkSyncProvider - ClerkErrorBoundary,
+  ClerkFallback -
+    // Errors (errors/)
+    ErrorBoundary,
+  EnhancedErrorHandling - BroLabErrorHandler,
+  ErrorContext);
 ```
 
 ### 📱 PAGES PRINCIPALES
@@ -123,8 +150,8 @@ alwaysApply: true
 
 ```typescript
 - / (Home) : Page d'accueil avec hero et beats featured
-- /shop : Catalogue complet des beats
-- /product/:id : Détail d'un beat
+- /shop : Catalogue complet des beats avec filtres
+- /product/:id : Détail d'un beat avec preview audio
 - /about : À propos de BroLab
 - /contact : Formulaire de contact
 - /faq : Questions fréquentes
@@ -135,10 +162,10 @@ alwaysApply: true
 
 ```typescript
 - /dashboard : Dashboard utilisateur principal
-- /membership : Gestion des abonnements
+- /membership : Gestion des abonnements (si applicable)
 - /wishlist : Liste des favoris
 - /cart : Panier d'achat
-- /checkout : Processus de paiement
+- /checkout : Processus de paiement Stripe/PayPal
 - /order-confirmation : Confirmation de commande
 ```
 
@@ -154,7 +181,7 @@ alwaysApply: true
 
 ### 🗄️ SCHÉMA DE BASE DE DONNÉES (Convex)
 
-#### **Tables Principales**
+#### **Tables Principales (19 tables)**
 
 ```typescript
 // Users
@@ -168,13 +195,13 @@ users: {
   role?: string,            // 'user', 'admin', 'artist'
   isActive?: boolean,       // Compte actif
   lastLoginAt?: number,     // Dernière connexion
-  preferences?: any,        // Préférences
-  metadata?: any,           // Métadonnées
+  preferences?: object,     // Préférences structurées
+  metadata?: object,        // Métadonnées
   createdAt: number,        // Date création
   updatedAt: number         // Date modification
 }
 
-// Beats
+// Beats/Products
 beats: {
   wordpressId: number,      // ID WordPress
   title: string,            // Titre du beat
@@ -198,24 +225,30 @@ beats: {
 
 // Orders
 orders: {
-  userId?: Id<"users">,     // ID utilisateur
+  userId?: Id<"users">,     // ID utilisateur Convex
+  clerkUserId?: string,     // ID utilisateur Clerk
   sessionId?: string,       // ID session
-  woocommerceId?: number,   // ID WooCommerce
-  email: string,            // Email
-  total: number,            // Montant total
-  status: string,           // Statut commande
   items: any[],             // Items commande
-  paymentId?: string,       // ID paiement Clerk
-  paymentStatus?: string,   // Statut paiement
-  invoiceUrl?: string,      // URL facture
-  currency?: string,        // Devise
-  taxAmount?: number,       // Montant taxes
-  discountAmount?: number,  // Montant remise
-  shippingAddress?: any,    // Adresse livraison
-  billingAddress?: any,     // Adresse facturation
-  notes?: string,           // Notes
+  amount: number,           // Montant total (centimes)
+  currency: string,         // Devise
+  status: string,           // Statut commande
+  paymentMethod?: string,   // 'stripe' | 'paypal'
+  paymentIntentId?: string, // ID Stripe Payment Intent
+  metadata?: any,           // Métadonnées
   createdAt: number,        // Date création
   updatedAt: number         // Date modification
+}
+
+// Payments (Stripe)
+payments: {
+  orderId: Id<"orders">,    // ID commande
+  provider: string,         // 'stripe' | 'paypal'
+  status: string,           // 'succeeded' | 'failed' | 'refunded'
+  amount: number,           // Montant en centimes
+  currency: string,         // Devise
+  stripePaymentIntentId?: string, // ID Stripe
+  stripeChargeId?: string, // ID charge Stripe
+  createdAt: number         // Date création
 }
 
 // Downloads
@@ -249,16 +282,32 @@ reservations: {
   updatedAt: number         // Date modification
 }
 
-// Subscriptions
+// Licenses (PDF certificates)
+licenses: {
+  orderId: string,          // ID commande
+  itemId: string,           // ID item commande
+  beatId: number,           // ID beat
+  beatTitle: string,        // Titre beat
+  licenseType: string,      // 'basic' | 'premium' | 'unlimited'
+  licenseNumber: string,    // Numéro licence unique
+  buyerEmail: string,       // Email acheteur
+  buyerName: string,        // Nom acheteur
+  buyerUserId?: string,     // ID utilisateur Clerk
+  price: number,            // Prix payé (centimes)
+  currency: string,         // Devise
+  pdfStorageId: string,     // ID stockage Convex
+  pdfUrl: string,           // URL publique PDF
+  purchaseDate: number,     // Date achat
+  createdAt: number,        // Date création
+  updatedAt: number         // Date modification
+}
+
+// Subscriptions (si système d'abonnement utilisé)
 subscriptions: {
   userId: Id<"users">,      // ID utilisateur
-  clerkSubscriptionId: string, // ID abonnement Clerk
-  plan: string,             // Plan (basic, artist, ultimate)
-  status: string,           // Statut (active, cancelled, past_due)
-  currentPeriodStart: number, // Début période
-  currentPeriodEnd: number,   // Fin période
-  cancelAtPeriodEnd?: boolean, // Annulation programmée
-  features: string[],       // Fonctionnalités incluses
+  plan: string,             // Plan (si applicable)
+  status: string,           // Statut
+  features: string[],       // Fonctionnalités
   downloadQuota: number,    // Quota téléchargements
   downloadUsed: number,     // Téléchargements utilisés
   createdAt: number,        // Date création
@@ -295,29 +344,30 @@ subscriptions: {
 // useClerkSync.ts
 - Synchronisation automatique des utilisateurs
 - Gestion des états de chargement
-- Protection contre les synchronisations multiples
-- Gestion des erreurs et retry
+- Protection contre les synchronisations multiples (globalSyncInProgress)
+- Gestion des erreurs et retry avec backoff
+- Utilisation de startTransition pour éviter les suspensions
 ```
 
-### 💳 SYSTÈME DE PAIEMENT (Clerk Billing)
+### 💳 SYSTÈME DE PAIEMENT (Stripe + PayPal)
 
-#### **Plans d'Abonnement**
+#### **Licences de Beats (One-time purchases)**
 
 ```typescript
-// Plans disponibles
+// Licences disponibles
 basic: {
-  price: 999,              // 9.99€/mois
-  features: ["basic_license", "mp3_format", "5_downloads_per_month"]
+  price: 2999,              // $29.99 (one-time)
+  features: ["mp3_format", "non-exclusive", "standard_license"]
 }
 
-artist: {
-  price: 1999,             // 19.99€/mois
-  features: ["premium_license", "wav_format", "20_downloads_per_month"]
+premium: {
+  price: 4999,             // $49.99 (one-time)
+  features: ["wav_format", "commercial_use", "premium_license"]
 }
 
-ultimate: {
-  price: 4999,             // 49.99€/mois
-  features: ["exclusive_license", "unlimited_downloads", "all_formats"]
+unlimited: {
+  price: 14999,            // $149.99 (one-time)
+  features: ["all_formats", "exclusive_rights", "unlimited_license"]
 }
 ```
 
@@ -325,10 +375,21 @@ ultimate: {
 
 ```typescript
 // Composants disponibles
-- ClerkPaymentForm : Formulaire de paiement
-- ClerkNativeCheckout : Checkout natif Clerk
-- ClerkUnifiedCheckout : Interface unifiée
+- StripeCheckout : Intégration Stripe Checkout
+- PayPalButton : Intégration PayPal SDK
 - CompletePaymentFlow : Flux complet de paiement
+- PaymentWebhookHandler : Gestion webhooks Stripe/PayPal
+- LicensePicker : Sélecteur de licence
+- LicensePreviewModal : Aperçu licence avant achat
+```
+
+#### **Webhooks**
+
+```typescript
+// Webhooks gérés
+- Stripe : payment_intent.succeeded, payment_intent.failed
+- PayPal : PAYMENT.SALE.COMPLETED, PAYMENT.SALE.DENIED
+- Validation avec idempotence (table processedEvents)
 ```
 
 ### 🎨 SYSTÈME DE DESIGN
@@ -429,11 +490,12 @@ xl: 1280px  // Desktop
 #### **Suite de Tests**
 
 ```typescript
-// Tests disponibles
+// Tests disponibles (50+ fichiers de tests)
 - Tests unitaires : Jest + React Testing Library
 - Tests d'intégration : Convex Testing Helper
 - Tests de performance : Bundle size, load time
 - Tests de sécurité : Authentification, autorisations
+- Tests API : Supertest pour routes Express
 ```
 
 #### **Scripts de Test**
@@ -485,11 +547,12 @@ npm run clean:db          # Nettoyage base de données
 
 ```typescript
 // Erreur connue dans useClerkSync.ts
-client/src/hooks/useClerkSync.ts:18:40 - error TS2589:
+client/src/hooks/useClerkSync.ts:19:40 - error TS2589:
 Type instantiation is excessively deep and possibly infinite.
 
-// Solution temporaire : Utiliser any pour la mutation
-const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser as any);
+// Solution : Utiliser @ts-expect-error avec commentaire explicatif
+// @ts-expect-error - Convex type instantiation depth issue with complex mutations
+const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser);
 ```
 
 #### **Limitations Actuelles**
@@ -497,6 +560,7 @@ const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser as any);
 - Extension Tailwind CSS manquante dans VS Code (erreur "Unknown at rule @tailwind")
 - Certains composants legacy encore présents
 - Tests de paiement en mode développement uniquement
+- 18 tests échoués sur 145 (principalement API 500 et problèmes Jest)
 
 ### 🎯 PROCHAINES ÉTAPES
 
@@ -507,6 +571,7 @@ const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser as any);
 - [ ] Amélioration des performances
 - [ ] Tests de paiement complets
 - [ ] Documentation finale
+- [ ] Correction des tests échoués
 
 #### **Phase 5 - Déploiement Production**
 
@@ -593,609 +658,8 @@ console.log("🖼️ Image loaded:", imageUrl);
 ---
 
 **📅 Dernière mise à jour :** 26 janvier 2025  
-**🔄 Version :** 2.0 - Architecture Convex + Clerk  
+**🔄 Version :** 2.1 - Architecture Convex + Clerk + Stripe/PayPal  
 **👨‍💻 Statut :** Phase 4 - Nettoyage & Optimisation  
 **🎯 Prochaine étape :** Déploiement production o2switch
 
-```
-
-```
-
-# 🎵 BROLAB ENTERTAINMENT - RÈGLES DE DÉVELOPPEMENT
-
-## 📋 ÉTAT ACTUEL DE L'APPLICATION (Janvier 2025)
-
-### 🏗️ ARCHITECTURE TECHNIQUE
-
-**Stack Principal :**
-
-- **Frontend** : React 18 + TypeScript + Vite + Tailwind CSS
-- **Backend** : Express.js + TypeScript + Node.js
-- **Base de données** : Convex (PostgreSQL compatible)
-- **Authentification** : Clerk (remplacement Supabase Auth)
-- **Paiements** : Clerk Billing (remplacement Stripe)
-- **Routing** : Wouter (remplacement React Router)
-- **State Management** : TanStack Query + Convex + Zustand
-- **UI Components** : Radix UI + shadcn/ui + Framer Motion
-
-**Migration Complétée :**
-
-- ✅ **Supabase → Convex** : Base de données migrée
-- ✅ **Supabase Auth → Clerk** : Authentification migrée
-- ✅ **Stripe → Clerk Billing** : Paiements migrés
-- ✅ **React Router → Wouter** : Routing migré
-
-### 🎯 FONCTIONNALITÉS PRINCIPALES
-
-#### 1. **Store de Beats**
-
-- Catalogue complet avec filtres avancés
-- Recherche en temps réel
-- Affichage grille/tableau
-- Système de favoris
-- Prévisualisation audio
-- Gestion des licences (Basic, Premium, Unlimited)
-
-#### 2. **Système d'Authentification**
-
-- Inscription/Connexion via Clerk
-- Profils utilisateurs complets
-- Synchronisation automatique Clerk ↔ Convex
-- Gestion des rôles (user, admin, artist)
-- Protection des routes
-
-#### 3. **Dashboard Utilisateur**
-
-- Vue d'ensemble des statistiques
-- Gestion des téléchargements
-- Historique des commandes
-- Gestion des favoris
-- Profil utilisateur
-- Paramètres du compte
-
-#### 4. **Système de Paiement**
-
-- Intégration Clerk Billing
-- Plans d'abonnement (Basic, Artist, Ultimate)
-- Gestion des quotas de téléchargement
-- Historique des paiements
-- Facturation automatique
-
-#### 5. **Services de Production**
-
-- Réservation mixing/mastering
-- Sessions d'enregistrement
-- Consultation production
-- Commandes de beats personnalisés
-- Gestion des réservations
-
-### 🔧 COMPOSANTS PRINCIPAUX
-
-#### **Composants UI (shadcn/ui)**
-
-```typescript
-// Composants disponibles
-- Button, Input, Card, Badge, Modal
-- Tabs, Accordion, Collapsible, Select
-- Slider, Checkbox, Radio, Switch
-- Toast, Tooltip, Dialog, Popover
-- Table, Pagination, Loading states
-```
-
-#### **Composants Métier**
-
-```typescript
-// Store & Beats
--BeatCard,
-  TableBeatView,
-  OptimizedBeatGrid - UnifiedFilterPanel,
-  AdvancedBeatFilters - FeaturedBeatsCarousel,
-  RecentlyViewedBeats -
-    // Dashboard
-    LazyDashboard,
-  UserProfile,
-  DashboardSkeleton - DownloadsTable,
-  OrdersTable,
-  AnalyticsCharts - DataExportManager,
-  NotificationCenter -
-    // Audio & Media
-    WaveformPlayer,
-  GlobalAudioPlayer,
-  HoverPlayButton - SonaarAudioPlayer,
-  EnhancedWaveformPlayer -
-    // Paiements
-    ClerkPaymentForm,
-  ClerkNativeCheckout - CompletePaymentFlow,
-  PaymentTestComponent - LicensePicker,
-  LicensePreviewModal -
-    // Layout & Navigation
-    Navbar,
-  Footer,
-  MobileBottomNav - ProtectedRoute,
-  AuthenticatedContent - ErrorBoundary,
-  LoadingFallback;
-```
-
-### 📱 PAGES PRINCIPALES
-
-#### **Pages Publiques**
-
-```typescript
-- / (Home) : Page d'accueil avec hero et beats featured
-- /shop : Catalogue complet des beats
-- /product/:id : Détail d'un beat
-- /about : À propos de BroLab
-- /contact : Formulaire de contact
-- /faq : Questions fréquentes
-- /terms, /privacy, /copyright : Pages légales
-```
-
-#### **Pages Authentifiées**
-
-```typescript
-- /dashboard : Dashboard utilisateur principal
-- /membership : Gestion des abonnements
-- /wishlist : Liste des favoris
-- /cart : Panier d'achat
-- /checkout : Processus de paiement
-- /order-confirmation : Confirmation de commande
-```
-
-#### **Pages de Services**
-
-```typescript
-- /mixing-mastering : Réservation services
-- /recording-sessions : Sessions d'enregistrement
-- /custom-beats : Commandes personnalisées
-- /production-consultation : Consultation production
-- /premium-downloads : Téléchargements premium
-```
-
-### 🗄️ SCHÉMA DE BASE DE DONNÉES (Convex)
-
-#### **Tables Principales**
-
-```typescript
-// Users
-users: {
-  clerkId: string,           // ID Clerk
-  email: string,            // Email utilisateur
-  username?: string,        // Nom d'utilisateur
-  firstName?: string,       // Prénom
-  lastName?: string,        // Nom
-  imageUrl?: string,        // Avatar
-  role?: string,            // 'user', 'admin', 'artist'
-  isActive?: boolean,       // Compte actif
-  lastLoginAt?: number,     // Dernière connexion
-  preferences?: any,        // Préférences
-  metadata?: any,           // Métadonnées
-  createdAt: number,        // Date création
-  updatedAt: number         // Date modification
-}
-
-// Beats
-beats: {
-  wordpressId: number,      // ID WordPress
-  title: string,            // Titre du beat
-  description?: string,     // Description
-  genre: string,            // Genre musical
-  bpm: number,              // BPM
-  key?: string,             // Clé musicale
-  mood?: string,            // Ambiance
-  price: number,            // Prix (centimes)
-  audioUrl?: string,        // URL audio
-  imageUrl?: string,        // URL image
-  tags?: string[],          // Tags
-  featured?: boolean,       // Mis en avant
-  downloads?: number,       // Nombre téléchargements
-  views?: number,           // Nombre vues
-  duration?: number,        // Durée
-  isActive?: boolean,       // Actif
-  createdAt: number,        // Date création
-  updatedAt?: number        // Date modification
-}
-
-// Orders
-orders: {
-  userId?: Id<"users">,     // ID utilisateur
-  sessionId?: string,       // ID session
-  woocommerceId?: number,   // ID WooCommerce
-  email: string,            // Email
-  total: number,            // Montant total
-  status: string,           // Statut commande
-  items: any[],             // Items commande
-  paymentId?: string,       // ID paiement Clerk
-  paymentStatus?: string,   // Statut paiement
-  invoiceUrl?: string,      // URL facture
-  currency?: string,        // Devise
-  taxAmount?: number,       // Montant taxes
-  discountAmount?: number,  // Montant remise
-  shippingAddress?: any,    // Adresse livraison
-  billingAddress?: any,     // Adresse facturation
-  notes?: string,           // Notes
-  createdAt: number,        // Date création
-  updatedAt: number         // Date modification
-}
-
-// Downloads
-downloads: {
-  userId: Id<"users">,      // ID utilisateur
-  beatId: number,           // ID beat
-  licenseType: string,      // Type licence
-  downloadUrl: string,      // URL téléchargement
-  timestamp: number,        // Timestamp
-  metadata?: any            // Métadonnées
-}
-
-// Favorites
-favorites: {
-  userId: Id<"users">,      // ID utilisateur
-  beatId: number,           // ID beat
-  createdAt: number         // Date création
-}
-
-// Reservations
-reservations: {
-  userId?: Id<"users">,     // ID utilisateur
-  serviceType: string,      // Type service
-  status: string,           // Statut réservation
-  details: any,             // Détails
-  preferredDate: string,    // Date souhaitée
-  durationMinutes: number,  // Durée (minutes)
-  totalPrice: number,       // Prix total
-  notes?: string,           // Notes
-  createdAt: number,        // Date création
-  updatedAt: number         // Date modification
-}
-
-// Subscriptions
-subscriptions: {
-  userId: Id<"users">,      // ID utilisateur
-  clerkSubscriptionId: string, // ID abonnement Clerk
-  plan: string,             // Plan (basic, artist, ultimate)
-  status: string,           // Statut (active, cancelled, past_due)
-  currentPeriodStart: number, // Début période
-  currentPeriodEnd: number,   // Fin période
-  cancelAtPeriodEnd?: boolean, // Annulation programmée
-  features: string[],       // Fonctionnalités incluses
-  downloadQuota: number,    // Quota téléchargements
-  downloadUsed: number,     // Téléchargements utilisés
-  createdAt: number,        // Date création
-  updatedAt: number         // Date modification
-}
-```
-
-### 🔐 SYSTÈME D'AUTHENTIFICATION (Clerk)
-
-#### **Configuration**
-
-```typescript
-// main.tsx
-<ClerkProvider publishableKey={clerkPublishableKey}>
-  <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-    <App />
-  </ConvexProviderWithClerk>
-</ClerkProvider>
-```
-
-#### **Hooks d'Authentification**
-
-```typescript
-// Hooks disponibles
-- useUser() : Informations utilisateur Clerk
-- useAuth() : État authentification
-- useClerkSync() : Synchronisation Clerk ↔ Convex
-- useConvexAuth() : Authentification Convex
-```
-
-#### **Synchronisation Automatique**
-
-```typescript
-// useClerkSync.ts
-- Synchronisation automatique des utilisateurs
-- Gestion des états de chargement
-- Protection contre les synchronisations multiples
-- Gestion des erreurs et retry
-```
-
-### 💳 SYSTÈME DE PAIEMENT (Clerk Billing)
-
-#### **Plans d'Abonnement**
-
-```typescript
-// Plans disponibles
-basic: {
-  price: 999,              // 9.99€/mois
-  features: ["basic_license", "mp3_format", "5_downloads_per_month"]
-}
-
-artist: {
-  price: 1999,             // 19.99€/mois
-  features: ["premium_license", "wav_format", "20_downloads_per_month"]
-}
-
-ultimate: {
-  price: 4999,             // 49.99€/mois
-  features: ["exclusive_license", "unlimited_downloads", "all_formats"]
-}
-```
-
-#### **Composants de Paiement**
-
-```typescript
-// Composants disponibles
-- ClerkPaymentForm : Formulaire de paiement
-- ClerkNativeCheckout : Checkout natif Clerk
-- ClerkUnifiedCheckout : Interface unifiée
-- CompletePaymentFlow : Flux complet de paiement
-```
-
-### 🎨 SYSTÈME DE DESIGN
-
-#### **Variables CSS (design-tokens.css)**
-
-```css
-:root {
-  /* Couleurs principales */
-  --deep-black: hsl(240, 10%, 3.9%);
-  --accent-purple: #a259ff;
-  --accent-cyan: #00d4ff;
-  --color-gold: #ffd700;
-
-  /* Couleurs secondaires */
-  --dark-gray: hsl(240, 10%, 3.9%);
-  --medium-gray: hsl(240, 10%, 3.9%);
-  --light-gray: hsl(240, 10%, 3.9%);
-
-  /* Couleurs UI */
-  --success: #10b981;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --info: #3b82f6;
-}
-```
-
-#### **Classes Tailwind Personnalisées**
-
-```css
-/* Classes utilitaires */
-.card-dark {
-  @apply bg-gray-900 border border-gray-700 rounded-lg;
-}
-.form-input {
-  @apply bg-gray-800 border border-gray-600 text-white;
-}
-.btn-primary {
-  @apply bg-[var(--accent-purple)] hover:bg-purple-700;
-}
-```
-
-### 📱 RESPONSIVE DESIGN
-
-#### **Breakpoints**
-
-```typescript
-// Breakpoints Tailwind
-sm: 640px   // Mobile landscape
-md: 768px   // Tablet portrait
-lg: 1024px  // Tablet landscape
-xl: 1280px  // Desktop
-2xl: 1536px // Large desktop
-```
-
-#### **Composants Responsive**
-
-```typescript
-// Composants adaptatifs
-- MobileBottomNav : Navigation mobile
-- ResponsiveBeatCard : Carte beat responsive
-- OptimizedBeatGrid : Grille optimisée mobile
-- UnifiedFilterPanel : Filtres adaptatifs
-```
-
-### 🚀 OPTIMISATIONS DE PERFORMANCE
-
-#### **Lazy Loading**
-
-```typescript
-// Composants chargés à la demande
-- LazyDashboard : Dashboard avec Suspense
-- LazyComponents : Composants lourds
-- LoadingFallback : États de chargement
-- DashboardSkeleton : Squelettes de chargement
-```
-
-#### **Optimisations Images**
-
-```typescript
-// Utilitaires d'optimisation
-- optimizeImage() : Optimisation des images
-- OptimizedImage : Composant image optimisé
-- preloadCriticalResources() : Préchargement ressources
-```
-
-#### **Monitoring Performance**
-
-```typescript
-// Outils de monitoring
-- PerformanceMonitor : Mesures de performance
-- ErrorTracker : Suivi des erreurs
-- HealthMonitor : Vérification des services
-```
-
-### 🧪 TESTS ET VALIDATION
-
-#### **Suite de Tests**
-
-```typescript
-// Tests disponibles
-- Tests unitaires : Jest + React Testing Library
-- Tests d'intégration : Convex Testing Helper
-- Tests de performance : Bundle size, load time
-- Tests de sécurité : Authentification, autorisations
-```
-
-#### **Scripts de Test**
-
-```bash
-npm run test              # Tests unitaires
-npm run type-check        # Vérification TypeScript
-npm run lint              # Linting ESLint
-npm run pre-check         # Vérifications pré-build
-```
-
-### 🔧 SCRIPTS ET UTILITAIRES
-
-#### **Scripts de Développement**
-
-```bash
-npm run dev               # Serveur de développement
-npm run client            # Client Vite
-npm run build             # Build production
-npm run start             # Serveur production
-npm run clean             # Nettoyage complet
-```
-
-#### **Scripts de Migration**
-
-```bash
-npm run clean:all         # Nettoyage complet
-npm run clean:logs        # Nettoyage logs
-npm run clean:db          # Nettoyage base de données
-```
-
-### 📚 DOCUMENTATION
-
-#### **Fichiers de Documentation**
-
-```markdown
-- README.md : Documentation principale
-- README-local.md : Guide développement local
-- README-deployment.md : Guide déploiement
-- README-responsive.md : Guide responsive design
-- LOCAL_DEVELOPMENT_GUIDE.md : Guide développement détaillé
-- TESTING_GUIDE.md : Guide des tests
-- UNIFIED_FILTERING_SYSTEM.md : Système de filtrage
-```
-
-### 🚨 PROBLÈMES CONNUS
-
-#### **Erreurs TypeScript**
-
-```typescript
-// Erreur connue dans useClerkSync.ts
-client/src/hooks/useClerkSync.ts:18:40 - error TS2589:
-Type instantiation is excessively deep and possibly infinite.
-
-// Solution temporaire : Utiliser any pour la mutation
-const syncUserMutation = useMutation(api.users.clerkSync.syncClerkUser as any);
-```
-
-#### **Limitations Actuelles**
-
-- Extension Tailwind CSS manquante dans VS Code (erreur "Unknown at rule @tailwind")
-- Certains composants legacy encore présents
-- Tests de paiement en mode développement uniquement
-
-### 🎯 PROCHAINES ÉTAPES
-
-#### **Phase 4 - Nettoyage & Optimisation**
-
-- [ ] Suppression des composants obsolètes
-- [ ] Optimisation du bundle size
-- [ ] Amélioration des performances
-- [ ] Tests de paiement complets
-- [ ] Documentation finale
-
-#### **Phase 5 - Déploiement Production**
-
-- [ ] Configuration o2switch
-- [ ] Tests de charge
-- [ ] Monitoring production
-- [ ] Backup et sécurité
-- [ ] Formation équipe
-
-### 📋 RÈGLES DE DÉVELOPPEMENT
-
-#### **Conventions de Code**
-
-```typescript
-// Naming conventions
-- Composants : PascalCase (BeatCard, UserProfile)
-- Hooks : camelCase avec use (useClerkSync, useUnifiedFilters)
-- Fichiers : kebab-case (beat-card.tsx, user-profile.tsx)
-- Types : PascalCase (BeatProduct, UnifiedFilters)
-- Variables : camelCase (isLoading, hasActiveFilters)
-```
-
-#### **Structure des Composants**
-
-```typescript
-// Ordre des imports
-1. React et hooks
-2. Composants UI (shadcn/ui)
-3. Composants métier
-4. Hooks personnalisés
-5. Utilitaires et types
-6. Styles et assets
-
-// Structure du composant
-1. Interface Props
-2. Hooks et état
-3. Fonctions de gestion
-4. Rendu conditionnel
-5. Rendu principal
-6. Export
-```
-
-#### **Gestion des Erreurs**
-
-```typescript
-// Pattern d'erreur
-try {
-  // Logique métier
-} catch (error) {
-  console.error("❌ Error description:", error);
-  // Gestion d'erreur utilisateur
-}
-
-// Composants d'erreur
-- ErrorBoundary : Capture erreurs React
-- EnhancedErrorHandling : Gestion avancée
-- LoadingFallback : États de chargement
-```
-
-### 🔍 DÉBOGAGE ET MONITORING
-
-#### **Logs de Développement**
-
-```typescript
-// Console logs avec emojis
-console.log("🚀 Starting application...");
-console.log("✅ User synced successfully");
-console.log("❌ Error syncing user:", error);
-console.log("🎵 Playing audio:", audioUrl);
-console.log("🖼️ Image loaded:", imageUrl);
-```
-
-#### **Monitoring en Production**
-
-```typescript
-// Métriques de performance
-- First Contentful Paint (FCP)
-- Largest Contentful Paint (LCP)
-- Time to Interactive (TTI)
-- Cumulative Layout Shift (CLS)
-- Bundle size et chunks
-```
-
----
-
-**📅 Dernière mise à jour :** 26 janvier 2025  
-**🔄 Version :** 2.0 - Architecture Convex + Clerk  
-**👨‍💻 Statut :** Phase 4 - Nettoyage & Optimisation  
-**🎯 Prochaine étape :** Déploiement production o2switch
-
-```
-
-```
+**Note importante** : Le système utilise Stripe et PayPal directement pour les paiements, pas Clerk Billing. Clerk est utilisé uniquement pour l'authentification et la gestion des utilisateurs.

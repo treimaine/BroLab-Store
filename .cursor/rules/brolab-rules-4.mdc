@@ -2,13 +2,13 @@
 alwaysApply: true
 ---
 
-# 📋 PHASE 3 - SYSTÈME DE PAIEMENT CLERK
+# 📋 SYSTÈME DE PAIEMENT - STRIPE + PAYPAL
 
 ## Documentation Complète - BroLab Entertainment
 
 **Date :** 26 janvier 2025  
-**Statut :** 🚀 PRÊT À DÉMARRER  
-**Phases Précédentes :** ✅ Phase 1 & 2 COMPLÈTES
+**Statut :** ✅ IMPLÉMENTÉ  
+**Note :** Le système utilise Stripe et PayPal directement, pas Clerk Billing. Clerk est utilisé uniquement pour l'authentification.
 
 ---
 
@@ -37,19 +37,19 @@ alwaysApply: true
 
 ---
 
-## 🎯 OBJECTIFS PHASE 3
+## 🎯 SYSTÈME DE PAIEMENT ACTUEL
 
 ### Mission Principale
 
-**Finaliser l'intégration Clerk Billing pour un système de paiement complet et sécurisé**
+**Système de paiement complet et sécurisé avec Stripe et PayPal**
 
-### Objectifs Spécifiques
+### Fonctionnalités Implémentées
 
-1. **Configuration Clerk Billing** : Plans d'abonnement et features
-2. **Système de permissions** : Gestion des quotas par plan
-3. **Interface de paiement** : Composants natifs Clerk
-4. **Webhooks et synchronisation** : Événements de paiement
-5. **Tests de paiement** : Validation complète du flux
+1. **Intégration Stripe Checkout** : Paiements par carte bancaire
+2. **Intégration PayPal SDK** : Paiements PayPal
+3. **Gestion des licences** : Basic ($29.99), Premium ($49.99), Unlimited ($149.99)
+4. **Webhooks validés** : Synchronisation automatique Stripe/PayPal
+5. **Licences PDF** : Génération automatique de certificats de licence
 
 ---
 
@@ -57,123 +57,106 @@ alwaysApply: true
 
 ### Composants de Paiement Existants
 
-#### 1. Page Membership
+#### 1. Page Checkout
 
 ```typescript
-// client/src/pages/MembershipPage.tsx
-- PricingTable (Clerk natif)
-- Gestion billing cycle (monthly/yearly)
+// client/src/pages/checkout.tsx
+- StripeCheckout : Intégration Stripe Checkout
+- PayPalButton : Intégration PayPal SDK
+- LicensePicker : Sélection de licence
 - Interface responsive
-- Intégration complète avec Clerk
+- Gestion des erreurs de paiement
 ```
 
 #### 2. Composants de Paiement
 
 ```typescript
-// Composants disponibles :
--ClerkPaymentForm.tsx - // Paiements directs
-  ClerkPayment.tsx - // Interface de base
-  ClerkNativeCheckout.tsx - // Checkout natif
-  ClerkUnifiedCheckout.tsx; // Interface unifiée
+// Composants disponibles (client/src/components/payments/) :
+- StripeCheckout : Intégration Stripe Checkout
+- PayPalButton : Intégration PayPal SDK
+- CompletePaymentFlow : Flux complet de paiement
+- PaymentWebhookHandler : Gestion webhooks
 ```
 
 #### 3. Dashboard de Paiement
 
 ```typescript
-// client/src/pages/payment-dashboard.tsx
-- Gestion des abonnements
+// client/src/pages/dashboard
+- Historique des commandes (OrdersTab)
 - Historique des paiements
-- Sélecteur de plans
+- Gestion des licences téléchargées
+- Factures PDF
 ```
 
 ### Hooks et Services
 
-#### Hook useClerkBilling
+#### Hooks de Paiement
 
 ```typescript
-// client/src/hooks/useClerkBilling.ts
-- Gestion des permissions
-- Vérification des quotas
-- Synchronisation avec Convex
+// Hooks disponibles
+- useStripeCheckout : Gestion Stripe Checkout
+- usePayPalPayment : Gestion PayPal
+- usePaymentHistory : Historique des paiements
+- useLicenseManagement : Gestion des licences
 ```
 
 ---
 
-## 📋 PLANS D'ABONNEMENT
+## 📋 LICENCES DE BEATS (One-time purchases)
 
-### Plan Basic - 9,99€/mois
+### License Basic - $29.99
 
 ```json
 {
-  "name": "Basic",
-  "price": 999,
-  "interval": "month",
-  "features": ["basic_license", "mp3_format", "email_support", "5_downloads_per_month"]
+  "name": "Basic License",
+  "price": 2999,
+  "type": "one-time",
+  "features": ["mp3_format", "non-exclusive", "standard_license"]
 }
 ```
 
 **Fonctionnalités :**
 
-- 🎵 License standard MP3
+- 🎵 Format MP3
+- 📄 License non-exclusive
+- 🎧 Usage standard
 - 📧 Support par email
-- ⬇️ 5 téléchargements/mois
-- 🎧 Accès au catalogue complet
 
-### Plan Artist - 19,99€/mois
+### License Premium - $49.99
 
 ```json
 {
-  "name": "Artist",
-  "price": 1999,
-  "interval": "month",
-  "features": [
-    "premium_license",
-    "wav_format",
-    "trackouts_available",
-    "priority_support",
-    "20_downloads_per_month",
-    "early_access"
-  ]
+  "name": "Premium License",
+  "price": 4999,
+  "type": "one-time",
+  "features": ["wav_format", "commercial_use", "premium_license"]
 }
 ```
 
 **Fonctionnalités :**
 
-- 🎵 License commerciale WAV
+- 🎵 Format WAV haute qualité
+- 💼 Usage commercial autorisé
 - 🎛️ Trackouts disponibles
 - 🚀 Support prioritaire
-- ⬇️ 20 téléchargements/mois
-- ⭐ Accès anticipé aux nouveautés
 
-### Plan Ultimate - 49,99€/mois
+### License Unlimited - $149.99
 
 ```json
 {
-  "name": "Ultimate",
-  "price": 4999,
-  "interval": "month",
-  "features": [
-    "exclusive_license",
-    "all_formats",
-    "unlimited_downloads",
-    "custom_requests",
-    "direct_contact",
-    "24_7_support",
-    "mixing_discounts",
-    "exclusive_events"
-  ]
+  "name": "Unlimited License",
+  "price": 14999,
+  "type": "one-time",
+  "features": ["all_formats", "exclusive_rights", "unlimited_license"]
 }
 ```
 
 **Fonctionnalités :**
 
-- 🏆 License exclusive tous formats
-- ∞ Téléchargements illimités
-- 🎯 Demandes personnalisées
-- 📞 Contact direct producteur
-- 🕐 Support 24/7
-- 💰 Remises mixing/mastering
-- 🎪 Événements exclusifs
+- 🏆 Tous formats (MP3, WAV, STEMS)
+- ⭐ Droits exclusifs
+- 🎯 Usage illimité
+- 📞 Support direct
 
 ---
 
@@ -182,316 +165,147 @@ alwaysApply: true
 ### Variables d'Environnement
 
 ```env
-# Clerk Configuration
+# Clerk Configuration (Authentification uniquement)
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
-
-# Clerk Billing
 CLERK_WEBHOOK_SECRET=whsec_...
-CLERK_BILLING_ENABLED=true
+
+# Stripe Configuration (Paiements)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# PayPal Configuration (Paiements)
+PAYPAL_CLIENT_ID=...
+PAYPAL_CLIENT_SECRET=...
+PAYPAL_WEBHOOK_ID=...
+PAYPAL_MODE=sandbox  # ou 'production'
 
 # Convex
 VITE_CONVEX_URL=https://...
 ```
 
-### Schéma Convex - Table Subscriptions
+### Schéma Convex - Tables Paiements
 
 ```typescript
 // convex/schema.ts
-subscriptions: defineTable({
-  userId: v.id("users"),
-  clerkSubscriptionId: v.string(),
-  plan: v.string(), // 'basic', 'artist', 'ultimate'
-  status: v.string(), // 'active', 'cancelled', 'past_due'
-  currentPeriodStart: v.number(),
-  currentPeriodEnd: v.number(),
-  cancelAtPeriodEnd: v.optional(v.boolean()),
-  features: v.array(v.string()),
-  downloadQuota: v.number(),
-  downloadUsed: v.number(),
+
+// Payments (Stripe/PayPal)
+payments: defineTable({
+  orderId: v.id("orders"),
+  provider: v.string(), // 'stripe' | 'paypal'
+  status: v.string(), // 'succeeded' | 'failed' | 'refunded'
+  amount: v.number(),
+  currency: v.string(),
+  stripePaymentIntentId: v.optional(v.string()),
+  stripeChargeId: v.optional(v.string()),
+  createdAt: v.number(),
+})
+  .index("by_order", ["orderId"])
+  .index("by_pi", ["stripePaymentIntentId"]);
+
+// Licenses (PDF certificates)
+licenses: defineTable({
+  orderId: v.string(),
+  itemId: v.string(),
+  beatId: v.number(),
+  beatTitle: v.string(),
+  licenseType: v.string(), // 'basic' | 'premium' | 'unlimited'
+  licenseNumber: v.string(),
+  buyerEmail: v.string(),
+  buyerName: v.string(),
+  buyerUserId: v.optional(v.string()),
+  price: v.number(),
+  currency: v.string(),
+  pdfStorageId: v.string(),
+  pdfUrl: v.string(),
+  purchaseDate: v.number(),
   createdAt: v.number(),
   updatedAt: v.number(),
 })
-  .index("by_user", ["userId"])
-  .index("by_clerk_id", ["clerkSubscriptionId"])
-  .index("by_status", ["status"]);
+  .index("by_order", ["orderId"])
+  .index("by_license_number", ["licenseNumber"])
+  .index("by_buyer_email", ["buyerEmail"]);
 ```
 
 ---
 
-## 🚀 ÉTAPES D'IMPLÉMENTATION
+## 🚀 SYSTÈME DE PAIEMENT IMPLÉMENTÉ
 
-### Étape 1 : Configuration Clerk Dashboard
+### Architecture Actuelle
 
-**Durée estimée :** 2 heures
+Le système utilise **Stripe** et **PayPal** directement pour les paiements, avec les fonctionnalités suivantes :
 
-1. **Activer Clerk Billing**
+1. **Stripe Checkout** : Paiements par carte bancaire
+2. **PayPal SDK** : Paiements PayPal
+3. **Webhooks validés** : Synchronisation automatique
+4. **Licences PDF** : Génération automatique de certificats
+5. **Historique complet** : Suivi de tous les paiements
 
-   - Accéder au Dashboard Clerk
-   - Activer le module Billing
-   - Connecter la passerelle de paiement
-
-2. **Créer les Plans**
-
-   - Plan Basic (9,99€/mois)
-   - Plan Artist (19,99€/mois)
-   - Plan Ultimate (49,99€/mois)
-
-3. **Définir les Features**
-   ```
-   - basic_license, premium_license, exclusive_license
-   - mp3_format, wav_format, all_formats
-   - email_support, priority_support, 24_7_support
-   - 5_downloads_per_month, 20_downloads_per_month, unlimited_downloads
-   - trackouts_available, early_access, custom_requests
-   - direct_contact, mixing_discounts, exclusive_events
-   ```
-
-### Étape 2 : Mise à jour du Hook useClerkBilling
-
-**Durée estimée :** 3 heures
+### Composants Implémentés
 
 ```typescript
-// client/src/hooks/useClerkBilling.ts
-export function useClerkBilling() {
-  const { user } = useUser();
-  const subscription = useQuery(
-    api.subscriptions.getUserSubscription,
-    user ? { userId: user.id } : "skip"
-  );
+// client/src/components/payments/
+- StripeCheckout : Intégration Stripe Checkout
+- PayPalButton : Intégration PayPal SDK
+- CompletePaymentFlow : Flux complet
+- PaymentWebhookHandler : Gestion webhooks
 
-  // Vérifier les permissions de téléchargement
-  const canDownload = (licenseType: string) => {
-    if (!subscription) return false;
-
-    switch (licenseType) {
-      case "basic":
-        return (
-          subscription.features.includes("basic_license") ||
-          subscription.features.includes("premium_license") ||
-          subscription.features.includes("exclusive_license")
-        );
-      case "premium":
-        return (
-          subscription.features.includes("premium_license") ||
-          subscription.features.includes("exclusive_license")
-        );
-      case "unlimited":
-        return subscription.features.includes("exclusive_license");
-      default:
-        return false;
-    }
-  };
-
-  // Vérifier les quotas de téléchargement
-  const getDownloadQuota = () => {
-    if (!subscription) return { remaining: 0, total: 0 };
-
-    if (subscription.features.includes("unlimited_downloads")) {
-      return { remaining: Infinity, total: Infinity };
-    }
-
-    const remaining = subscription.downloadQuota - subscription.downloadUsed;
-    return { remaining: Math.max(0, remaining), total: subscription.downloadQuota };
-  };
-
-  return {
-    subscription,
-    canDownload,
-    getDownloadQuota,
-    hasFeature: (feature: string) => subscription?.features.includes(feature) || false,
-  };
-}
+// client/src/components/licenses/
+- LicensePicker : Sélection de licence
+- LicensePreviewModal : Aperçu avant achat
+- license-preview : Composant d'aperçu
 ```
 
-### Étape 3 : Webhooks Clerk
-
-**Durée estimée :** 4 heures
+### Webhooks Implémentés
 
 ```typescript
-// convex/clerk/webhooks.ts
-import { httpRouter } from "convex/server";
-import { internal } from "../_generated/api";
+// server/routes/webhooks/
+- stripe.ts : Gestion webhooks Stripe
+- paypal.ts : Gestion webhooks PayPal
 
-const http = httpRouter();
-
-http.route({
-  path: "/clerk-webhooks",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    const event = await request.json();
-
-    switch (event.type) {
-      case "subscription.created":
-        await ctx.runMutation(internal.subscriptions.create, {
-          userId: event.data.user_id,
-          clerkSubscriptionId: event.data.id,
-          plan: event.data.plan.name.toLowerCase(),
-          status: event.data.status,
-          currentPeriodStart: event.data.current_period_start,
-          currentPeriodEnd: event.data.current_period_end,
-          features: event.data.plan.features,
-          downloadQuota: getDownloadQuotaForPlan(event.data.plan.name),
-        });
-        break;
-
-      case "subscription.updated":
-        await ctx.runMutation(internal.subscriptions.update, {
-          clerkSubscriptionId: event.data.id,
-          status: event.data.status,
-          currentPeriodEnd: event.data.current_period_end,
-          cancelAtPeriodEnd: event.data.cancel_at_period_end,
-        });
-        break;
-
-      case "subscription.deleted":
-        await ctx.runMutation(internal.subscriptions.cancel, {
-          clerkSubscriptionId: event.data.id,
-        });
-        break;
-    }
-
-    return new Response("OK", { status: 200 });
-  }),
-});
-
-export default http;
+// Événements gérés :
+- Stripe : payment_intent.succeeded, payment_intent.failed
+- PayPal : PAYMENT.SALE.COMPLETED, PAYMENT.SALE.DENIED
+- Validation avec idempotence (table processedEvents)
 ```
 
-### Étape 4 : Interface de Gestion des Abonnements
+### Flux de Paiement
 
-**Durée estimée :** 3 heures
-
-```typescript
-// client/src/components/SubscriptionManager.tsx
-export function SubscriptionManager() {
-  const { subscription, getDownloadQuota } = useClerkBilling();
-  const quota = getDownloadQuota();
-
-  return (
-    <Card className="bg-gray-900 border-gray-700">
-      <CardHeader>
-        <CardTitle className="text-white flex items-center">
-          <Crown className="w-5 h-5 mr-2" />
-          Mon Abonnement
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {subscription ? (
-          <>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-300">Plan actuel</span>
-              <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
-                {subscription.plan.toUpperCase()}
-              </Badge>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-300">Téléchargements</span>
-                <span className="text-white">
-                  {quota.remaining === Infinity ? '∞' : quota.remaining} / {quota.total === Infinity ? '∞' : quota.total}
-                </span>
-              </div>
-              {quota.total !== Infinity && (
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className="bg-purple-500 h-2 rounded-full transition-all"
-                    style={{ width: `${(quota.remaining / quota.total) * 100}%` }}
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-400">Période actuelle</span>
-                <p className="text-white">
-                  {new Date(subscription.currentPeriodStart).toLocaleDateString()} -
-                  {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
-                </p>
-              </div>
-              <div>
-                <span className="text-gray-400">Statut</span>
-                <p className="text-green-400 capitalize">{subscription.status}</p>
-              </div>
-            </div>
-
-            <div className="flex space-x-2">
-              <Button className="bg-purple-600 hover:bg-purple-700">
-                Modifier le plan
-              </Button>
-              <Button variant="outline" className="border-gray-600 text-gray-300">
-                Gérer la facturation
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className="text-center py-6">
-            <p className="text-gray-400 mb-4">Aucun abonnement actif</p>
-            <Button className="bg-purple-600 hover:bg-purple-700">
-              Choisir un plan
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-```
-
-### Étape 5 : Tests de Paiement
-
-**Durée estimée :** 2 heures
-
-```typescript
-// __tests__/payment-flow.test.ts
-describe("Payment Flow", () => {
-  test("should create subscription successfully", async () => {
-    // Test de création d'abonnement
-  });
-
-  test("should handle webhook events", async () => {
-    // Test des webhooks
-  });
-
-  test("should enforce download quotas", async () => {
-    // Test des quotas
-  });
-
-  test("should update permissions on plan change", async () => {
-    // Test changement de plan
-  });
-});
-```
+1. **Sélection de licence** : Utilisateur choisit Basic/Premium/Unlimited
+2. **Checkout** : Redirection vers Stripe Checkout ou PayPal
+3. **Paiement** : Traitement du paiement
+4. **Webhook** : Synchronisation automatique avec Convex
+5. **Licence PDF** : Génération et envoi automatique
+6. **Confirmation** : Page de confirmation avec détails
 
 ---
 
-## ✅ CRITÈRES DE VALIDATION
+## ✅ SYSTÈME VALIDÉ
 
-### Tests Fonctionnels
+### Tests Fonctionnels (Implémentés)
 
-- [ ] **Création d'abonnement** : Flux complet Basic → Artist → Ultimate
-- [ ] **Gestion des quotas** : Respect des limites de téléchargement
-- [ ] **Permissions** : Accès aux fonctionnalités selon le plan
-- [ ] **Webhooks** : Synchronisation automatique des événements
-- [ ] **Interface** : Affichage correct des informations d'abonnement
+- [x] **Paiements Stripe** : Flux complet avec Stripe Checkout
+- [x] **Paiements PayPal** : Flux complet avec PayPal SDK
+- [x] **Gestion des licences** : Génération PDF automatique
+- [x] **Webhooks** : Synchronisation automatique Stripe/PayPal
+- [x] **Interface** : Affichage correct des commandes et licences
 
-### Tests Techniques
+### Tests Techniques (Implémentés)
 
-- [ ] **Sécurité** : Validation des webhooks Clerk
-- [ ] **Performance** : Temps de réponse < 500ms
-- [ ] **Erreurs** : Gestion des cas d'échec de paiement
-- [ ] **Synchronisation** : Cohérence Clerk ↔ Convex
-- [ ] **Responsive** : Interface mobile optimisée
+- [x] **Sécurité** : Validation des webhooks Stripe/PayPal
+- [x] **Performance** : Temps de réponse < 500ms
+- [x] **Erreurs** : Gestion des cas d'échec de paiement
+- [x] **Synchronisation** : Cohérence Stripe/PayPal ↔ Convex
+- [x] **Responsive** : Interface mobile optimisée
 
-### Tests de Paiement
+### Tests de Paiement (Implémentés)
 
-- [ ] **Cartes de test** : Validation avec cartes Stripe test
-- [ ] **Échecs de paiement** : Gestion des erreurs
-- [ ] **Remboursements** : Processus de remboursement
-- [ ] **Annulations** : Annulation d'abonnement
-- [ ] **Renouvellements** : Renouvellement automatique
+- [x] **Cartes de test** : Validation avec cartes Stripe test
+- [x] **Échecs de paiement** : Gestion des erreurs
+- [x] **Remboursements** : Processus de remboursement
+- [x] **Historique** : Suivi complet des paiements
+- [x] **Licences PDF** : Génération et téléchargement
 
 ---
 
@@ -591,10 +405,10 @@ describe("Payment Flow", () => {
 
 ---
 
-**🚀 La Phase 3 est prête à démarrer !**
+**✅ Système de paiement opérationnel !**
 
-_Toutes les fondations sont en place grâce aux Phases 1 et 2. Il ne reste plus qu'à finaliser l'intégration Clerk Billing pour avoir un système de paiement complet et professionnel._
+_Le système utilise Stripe et PayPal directement pour les paiements. Clerk est utilisé uniquement pour l'authentification. Toutes les fonctionnalités de paiement sont implémentées et opérationnelles._
 
 ---
 
-_Document généré le 26 janvier 2025 - Version 1.0_
+_Document mis à jour le 26 janvier 2025 - Version 2.0_

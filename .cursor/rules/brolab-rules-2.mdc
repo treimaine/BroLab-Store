@@ -49,7 +49,7 @@ graph TD
 - **Backend**: Express@4 + TypeScript (API layer minimal)
 - **Database**: Convex (remplacement Supabase)
 - **Authentication**: Clerk (remplacement système custom)
-- **Payments**: Clerk Billing (remplacement Stripe)
+- **Payments**: Stripe 18.4.0 + PayPal SDK 1.1.0 (intégration directe)
 - **Storage**: Convex File Storage
 - **Email**: Nodemailer + SMTP
 - **External**: WooCommerce REST API
@@ -62,11 +62,11 @@ graph TD
 | /shop                      | Catalogue complet des beats avec filtres avancés       |
 | /product/:id               | Page détail d'un beat avec preview et options d'achat  |
 | /cart                      | Panier d'achat avec récapitulatif et checkout          |
-| /checkout                  | Processus de paiement via Clerk Billing                |
+| /checkout                  | Processus de paiement via Stripe Checkout ou PayPal     |
 | /dashboard                 | Dashboard utilisateur unifié (reconstruction complète) |
 | /dashboard/downloads       | Gestion des téléchargements et licences                |
 | /dashboard/reservations    | Suivi des réservations de services                     |
-| /dashboard/subscription    | Gestion abonnement Clerk Billing                       |
+| /dashboard/subscription    | Gestion abonnement (si système d'abonnement utilisé)  |
 | /services/mixing-mastering | Formulaire réservation mixing/mastering                |
 | /services/recording        | Formulaire réservation sessions d'enregistrement       |
 | /services/custom-beats     | Formulaire commande beats personnalisés                |
@@ -163,13 +163,16 @@ POST /api/webhooks/clerk/user
 
 Gère les événements : user.created, user.updated, user.deleted
 
-#### Subscription Events
+#### Payment Webhooks
 
 ```
-POST /api/webhooks/clerk/subscription
+POST /api/webhooks/stripe
+POST /api/webhooks/paypal
 ```
 
-Gère les événements : subscription.created, subscription.updated, subscription.cancelled
+Gère les événements :
+- Stripe : payment_intent.succeeded, payment_intent.failed
+- PayPal : PAYMENT.SALE.COMPLETED, PAYMENT.SALE.DENIED
 
 ## 5. Server Architecture Diagram
 
@@ -489,10 +492,20 @@ export const createOrder = mutation({
 NODE_ENV=production
 PORT=3000
 
-# Clerk Configuration
+# Clerk Configuration (Authentification uniquement)
 CLERK_SECRET_KEY=sk_live_...
 VITE_CLERK_PUBLISHABLE_KEY=pk_live_...
 CLERK_WEBHOOK_SECRET=whsec_...
+
+# Stripe Configuration (Paiements)
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# PayPal Configuration (Paiements)
+PAYPAL_CLIENT_ID=...
+PAYPAL_CLIENT_SECRET=...
+PAYPAL_WEBHOOK_ID=...
 
 # Convex Configuration
 VITE_CONVEX_URL=https://...
