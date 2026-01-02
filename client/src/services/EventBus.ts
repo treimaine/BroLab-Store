@@ -1,4 +1,5 @@
 import BrowserEventEmitter from "@/utils/BrowserEventEmitter";
+import { ServiceVisibilityManager } from "@/utils/ServiceVisibilityManager";
 
 // Core event interfaces
 export type EventSource = "user" | "server" | "system";
@@ -75,7 +76,13 @@ export class EventBus extends BrowserEventEmitter {
   };
   private processingTimes: number[] = [];
   private readonly maxProcessingTimeHistory = 100;
-  private metricsInterval: NodeJS.Timeout | null = null;
+
+  // FIX: Use visibility-aware interval management to prevent browser freezes
+  private readonly visibilityManager = new ServiceVisibilityManager("EventBus", {
+    resumeBaseDelay: 700,
+    resumeStaggerRange: 1400,
+    minVisibleTime: 300,
+  });
 
   constructor() {
     super();
@@ -331,10 +338,8 @@ export class EventBus extends BrowserEventEmitter {
    * Clear all event listeners and reset state
    */
   public clear(): void {
-    if (this.metricsInterval) {
-      clearInterval(this.metricsInterval);
-      this.metricsInterval = null;
-    }
+    // FIX: Clean up visibility manager to prevent memory leaks
+    this.visibilityManager.destroy();
     this.removeAllListeners();
     this.eventHistory = [];
     this.duplicateFilter.clear();
@@ -567,12 +572,20 @@ export class EventBus extends BrowserEventEmitter {
     });
   }
 
+  /**
+   * Start metrics collection with visibility-aware interval
+   * FIX: Uses ServiceVisibilityManager to pause when tab is hidden
+   */
   private startMetricsCollection(): void {
-    // Update metrics every 5 seconds
-    this.metricsInterval = setInterval(() => {
-      this.updateMetrics();
-      this.cleanupDuplicateFilter();
-    }, 5000);
+    // Update metrics every 5 seconds with visibility-aware interval
+    this.visibilityManager.createInterval(
+      "metricsCollection",
+      () => {
+        this.updateMetrics();
+        this.cleanupDuplicateFilter();
+      },
+      5000
+    );
   }
 
   private log(message: string, data?: unknown): void {

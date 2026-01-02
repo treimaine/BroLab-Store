@@ -6,6 +6,7 @@
  */
 
 import BrowserEventEmitter from "@/utils/BrowserEventEmitter";
+import { ServiceVisibilityManager } from "@/utils/ServiceVisibilityManager";
 import type {
   ConnectionStatus,
   RecoveryAction,
@@ -579,9 +580,15 @@ export class ConnectionManager extends BrowserEventEmitter {
   private connectionStatus: ConnectionStatus;
   private readonly metrics: ConnectionMetrics;
   private reconnectTimeout: NodeJS.Timeout | null = null;
-  private qualityCheckInterval: NodeJS.Timeout | null = null;
   private fallbackStrategy: FallbackStrategy = "quality_based";
   private isDestroyed = false;
+
+  // FIX: Use visibility-aware interval management to prevent browser freezes
+  private readonly visibilityManager = new ServiceVisibilityManager("ConnectionManager", {
+    resumeBaseDelay: 500,
+    resumeStaggerRange: 1000,
+    minVisibleTime: 300,
+  });
 
   constructor(config: Partial<ConnectionConfig> = {}) {
     super();
@@ -870,6 +877,8 @@ export class ConnectionManager extends BrowserEventEmitter {
     this.isDestroyed = true;
     this.disconnect();
     this.clearQualityMonitoring();
+    // FIX: Clean up visibility manager to prevent memory leaks
+    this.visibilityManager.destroy();
     this.removeAllListeners();
   }
 
@@ -1122,34 +1131,39 @@ export class ConnectionManager extends BrowserEventEmitter {
     return btoa(JSON.stringify(fingerprintData)).substring(0, 16);
   }
 
+  /**
+   * Start quality monitoring with visibility-aware intervals
+   * FIX: Uses ServiceVisibilityManager to pause when tab is hidden
+   */
   private startQualityMonitoring(): void {
-    this.qualityCheckInterval = setInterval(() => {
-      if (this.currentConnection && this.connectionStatus.connected) {
-        const stats = this.currentConnection.getStats();
+    this.visibilityManager.createInterval(
+      "qualityCheck",
+      () => {
+        if (this.currentConnection && this.connectionStatus.connected) {
+          const stats = this.currentConnection.getStats();
 
-        // Check if quality is below threshold
-        if (stats.qualityScore < 0.5) {
-          this.emit("connection_quality_degraded", { stats });
+          // Check if quality is below threshold
+          if (stats.qualityScore < 0.5) {
+            this.emit("connection_quality_degraded", { stats });
 
-          // Consider switching strategy
-          if (this.fallbackStrategy === "quality_based") {
-            const fallback = this.getFallbackStrategy(this.connectionStatus.type);
-            if (fallback) {
-              this.connectWithStrategy(fallback).catch(() => {
-                // Fallback failed, stay with current connection
-              });
+            // Consider switching strategy
+            if (this.fallbackStrategy === "quality_based") {
+              const fallback = this.getFallbackStrategy(this.connectionStatus.type);
+              if (fallback) {
+                this.connectWithStrategy(fallback).catch(() => {
+                  // Fallback failed, stay with current connection
+                });
+              }
             }
           }
         }
-      }
-    }, this.config.qualityCheckInterval);
+      },
+      this.config.qualityCheckInterval
+    );
   }
 
   private clearQualityMonitoring(): void {
-    if (this.qualityCheckInterval) {
-      clearInterval(this.qualityCheckInterval);
-      this.qualityCheckInterval = null;
-    }
+    this.visibilityManager.clearInterval("qualityCheck");
   }
 
   private clearReconnectTimeout(): void {

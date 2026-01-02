@@ -75,11 +75,10 @@ export interface SyncData {
  * and event-driven synchronization system for dashboard data
  */
 import BrowserEventEmitter from "@/utils/BrowserEventEmitter";
+import { ServiceVisibilityManager } from "@/utils/ServiceVisibilityManager";
 
 export class SyncManager extends BrowserEventEmitter {
   private websocket: WebSocket | null = null;
-  private pollingTimer: NodeJS.Timeout | null = null;
-  private heartbeatTimer: NodeJS.Timeout | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
 
   private status: SyncStatus;
@@ -87,6 +86,13 @@ export class SyncManager extends BrowserEventEmitter {
   private reconnectAttempts = 0;
   private isDestroyed = false;
   private debugMode = false;
+
+  // FIX: Use visibility-aware interval management to prevent browser freezes
+  private readonly visibilityManager = new ServiceVisibilityManager("SyncManager", {
+    resumeBaseDelay: 600,
+    resumeStaggerRange: 1200,
+    minVisibleTime: 300,
+  });
 
   // Metrics tracking
   private readonly syncStartTimes = new Map<string, number>();
@@ -357,6 +363,8 @@ export class SyncManager extends BrowserEventEmitter {
 
     this.isDestroyed = true;
     this.stopSync();
+    // FIX: Clean up visibility manager to prevent memory leaks
+    this.visibilityManager.destroy();
     this.removeAllListeners();
   }
 
@@ -494,6 +502,10 @@ export class SyncManager extends BrowserEventEmitter {
     }, backoffDelay);
   }
 
+  /**
+   * Start polling mode with visibility-aware intervals
+   * FIX: Uses ServiceVisibilityManager to pause when tab is hidden
+   */
   private startPolling(): void {
     this.log("Starting polling mode");
 
@@ -509,10 +521,14 @@ export class SyncManager extends BrowserEventEmitter {
     // Immediate sync
     this.performPollingSync();
 
-    // Schedule regular polling
-    this.pollingTimer = setInterval(() => {
-      this.performPollingSync();
-    }, this.config.pollingInterval);
+    // Schedule regular polling with visibility-aware interval
+    this.visibilityManager.createInterval(
+      "polling",
+      () => {
+        this.performPollingSync();
+      },
+      this.config.pollingInterval
+    );
   }
 
   private async performPollingSync(force = false): Promise<void> {
@@ -551,18 +567,26 @@ export class SyncManager extends BrowserEventEmitter {
     }
   }
 
+  /**
+   * Start heartbeat with visibility-aware interval
+   * FIX: Uses ServiceVisibilityManager to pause when tab is hidden
+   */
   private startHeartbeat(): void {
-    this.heartbeatTimer = setInterval(() => {
-      if (this.websocket?.readyState === WebSocket.OPEN) {
-        this.sendWebSocketMessage({
-          type: "heartbeat",
-          payload: {},
-          timestamp: Date.now(),
-          source: "client",
-          id: this.generateSyncId(),
-        });
-      }
-    }, this.config.heartbeatInterval);
+    this.visibilityManager.createInterval(
+      "heartbeat",
+      () => {
+        if (this.websocket?.readyState === WebSocket.OPEN) {
+          this.sendWebSocketMessage({
+            type: "heartbeat",
+            payload: {},
+            timestamp: Date.now(),
+            source: "client",
+            id: this.generateSyncId(),
+          });
+        }
+      },
+      this.config.heartbeatInterval
+    );
   }
 
   private async sendWebSocketMessage(data: SyncData): Promise<void> {
@@ -573,16 +597,13 @@ export class SyncManager extends BrowserEventEmitter {
     }
   }
 
+  /**
+   * Clear all timers including visibility-aware intervals
+   * FIX: Uses ServiceVisibilityManager for proper cleanup
+   */
   private clearTimers(): void {
-    if (this.pollingTimer) {
-      clearInterval(this.pollingTimer);
-      this.pollingTimer = null;
-    }
-
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
+    // Clear visibility-aware intervals
+    this.visibilityManager.clearAllIntervals();
 
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);

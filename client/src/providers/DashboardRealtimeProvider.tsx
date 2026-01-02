@@ -242,11 +242,32 @@ class RealtimeConnectionManager {
   }
 
   private startHeartbeat(): void {
-    this.heartbeatTimer = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
+    // FIX: Use visibility-aware heartbeat to prevent browser freezes
+    // Only send heartbeats when tab is visible
+    const sendHeartbeat = (): void => {
+      if (this.ws?.readyState === WebSocket.OPEN && !document.hidden) {
         this.send({ type: "ping" });
       }
-    }, this.heartbeatInterval);
+    };
+
+    this.heartbeatTimer = setInterval(sendHeartbeat, this.heartbeatInterval);
+
+    // Also listen for visibility changes to pause/resume heartbeat
+    const handleVisibilityChange = (): void => {
+      if (!document.hidden && this.ws?.readyState === WebSocket.OPEN) {
+        // Tab became visible, send immediate heartbeat after a small delay
+        setTimeout(sendHeartbeat, 500 + Math.random() * 1000);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
+
+    // Store cleanup reference
+    const originalClearTimers = this.clearTimers.bind(this);
+    this.clearTimers = (): void => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      originalClearTimers();
+    };
   }
 
   private clearTimers(): void {

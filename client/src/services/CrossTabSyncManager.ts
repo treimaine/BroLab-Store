@@ -7,6 +7,7 @@
  */
 
 import BrowserEventEmitter from "@/utils/BrowserEventEmitter";
+import { ServiceVisibilityManager } from "@/utils/ServiceVisibilityManager";
 import type { DashboardData } from "@shared/types/dashboard";
 import type { OptimisticUpdate } from "@shared/types/sync";
 
@@ -112,10 +113,12 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
   private readonly pendingConflicts = new Map<string, ConflictInfo>();
   private isDestroyed = false;
 
-  // Timers
-  private heartbeatTimer: NodeJS.Timeout | null = null;
-  private cleanupTimer: NodeJS.Timeout | null = null;
-  private focusCheckTimer: NodeJS.Timeout | null = null;
+  // FIX: Use visibility-aware interval management to prevent browser freezes
+  private readonly visibilityManager = new ServiceVisibilityManager("CrossTabSyncManager", {
+    resumeBaseDelay: 800,
+    resumeStaggerRange: 1600,
+    minVisibleTime: 400,
+  });
 
   // Focus detection
   private isFocused = true;
@@ -256,19 +259,8 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
 
     this.isDestroyed = true;
 
-    // Clear timers
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
-      this.cleanupTimer = null;
-    }
-    if (this.focusCheckTimer) {
-      clearInterval(this.focusCheckTimer);
-      this.focusCheckTimer = null;
-    }
+    // FIX: Clean up visibility manager (handles all intervals)
+    this.visibilityManager.destroy();
 
     // Remove event listeners
     if (this.storageListener) {
@@ -402,45 +394,58 @@ export class CrossTabSyncManager extends BrowserEventEmitter {
   }
 
   /**
-   * Setup focus detection
-   * FIX: Increased focus check interval from 5s to 10s (15s in production)
-   * to reduce CPU usage and prevent browser freezes
+   * Setup focus detection with visibility-aware interval
+   * FIX: Uses ServiceVisibilityManager to pause when tab is hidden
    */
   private setupFocusDetection(): void {
     globalThis.addEventListener("focus", this.handleFocus);
     globalThis.addEventListener("blur", this.handleBlur);
     globalThis.addEventListener("beforeunload", this.handleBeforeUnload);
 
-    // Check focus state periodically - use longer interval in production
+    // Check focus state periodically with visibility-aware interval
     const isProduction =
       globalThis.window !== undefined && globalThis.window.location.hostname !== "localhost";
     const focusCheckInterval = isProduction ? 15000 : 10000;
 
-    this.focusCheckTimer = setInterval(() => {
-      this.updateTabActivity();
-    }, focusCheckInterval);
+    this.visibilityManager.createInterval(
+      "focusCheck",
+      () => {
+        this.updateTabActivity();
+      },
+      focusCheckInterval
+    );
   }
 
   /**
-   * Start heartbeat to keep tab alive
+   * Start heartbeat with visibility-aware interval
+   * FIX: Uses ServiceVisibilityManager to pause when tab is hidden
    */
   private startHeartbeat(): void {
-    this.heartbeatTimer = setInterval(() => {
-      if (!this.isDestroyed) {
-        this.sendHeartbeat();
-      }
-    }, this.config.heartbeatInterval);
+    this.visibilityManager.createInterval(
+      "heartbeat",
+      () => {
+        if (!this.isDestroyed) {
+          this.sendHeartbeat();
+        }
+      },
+      this.config.heartbeatInterval
+    );
   }
 
   /**
-   * Start cleanup of inactive tabs
+   * Start cleanup with visibility-aware interval
+   * FIX: Uses ServiceVisibilityManager to pause when tab is hidden
    */
   private startCleanup(): void {
-    this.cleanupTimer = setInterval(() => {
-      if (!this.isDestroyed) {
-        this.cleanupInactiveTabs();
-      }
-    }, this.config.tabTimeout / 2);
+    this.visibilityManager.createInterval(
+      "cleanup",
+      () => {
+        if (!this.isDestroyed) {
+          this.cleanupInactiveTabs();
+        }
+      },
+      this.config.tabTimeout / 2
+    );
   }
 
   /**
