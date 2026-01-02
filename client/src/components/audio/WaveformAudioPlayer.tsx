@@ -138,7 +138,14 @@ export function WaveformAudioPlayer({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // FIX: Track if effect is still active to prevent stale callbacks
+    let isActive = true;
+    let animationFrame: number;
+    let staggerTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
     const drawWaveform = () => {
+      if (!isActive) return;
+
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -169,28 +176,31 @@ export function WaveformAudioPlayer({
 
     drawWaveform();
 
-    // Use centralized TabVisibilityManager to prevent duplicate listeners
-    let animationFrame: number;
-
     const animate = (): void => {
-      // Stop animation loop if tab is hidden to prevent accumulation
-      if (!TabVisibilityManager.isVisible()) return;
+      // FIX: Stop animation loop if effect is no longer active or tab is hidden
+      if (!isActive || !TabVisibilityManager.isVisible()) return;
 
       drawWaveform();
       animationFrame = requestAnimationFrame(animate);
     };
 
     const handleVisibilityChange = (): void => {
+      // FIX: Don't restart if effect is no longer active
+      if (!isActive) return;
+
       if (TabVisibilityManager.isVisible() && isPlaying) {
         // Cancel any pending frame and restart cleanly after a small delay
-        // to stagger with other components
         if (animationFrame) {
           cancelAnimationFrame(animationFrame);
         }
+        // Clear any pending stagger timeout
+        if (staggerTimeoutId) {
+          clearTimeout(staggerTimeoutId);
+        }
         // Stagger restart to prevent thundering herd
         const staggerDelay = Math.random() * 200 + 50;
-        setTimeout(() => {
-          if (TabVisibilityManager.isVisible() && isPlaying) {
+        staggerTimeoutId = setTimeout(() => {
+          if (isActive && TabVisibilityManager.isVisible() && isPlaying) {
             animate();
           }
         }, staggerDelay);
@@ -204,9 +214,14 @@ export function WaveformAudioPlayer({
     }
 
     return () => {
+      // FIX: Mark effect as inactive to prevent stale callbacks
+      isActive = false;
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (animationFrame) {
         cancelAnimationFrame(animationFrame);
+      }
+      if (staggerTimeoutId) {
+        clearTimeout(staggerTimeoutId);
       }
     };
   }, [isPlaying, currentTime, duration, staticWaveform, showWaveform]);

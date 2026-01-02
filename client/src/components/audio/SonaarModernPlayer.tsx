@@ -399,7 +399,13 @@ function BicolorWaveform({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // FIX: Track if effect is still active to prevent stale callbacks
+    let isActive = true;
+    let staggerTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
     const drawWaveform = (): void => {
+      if (!isActive) return;
+
       const width = canvas.width;
       const height = canvas.height;
       const progress = duration > 0 ? currentTime / duration : 0;
@@ -441,23 +447,31 @@ function BicolorWaveform({
     };
 
     const animate = (): void => {
-      // Stop animation loop if tab is hidden to prevent accumulation
-      if (!TabVisibilityManager.isVisible()) return;
+      // FIX: Stop animation loop if effect is no longer active or tab is hidden
+      if (!isActive || !TabVisibilityManager.isVisible()) return;
 
       drawWaveform();
       animationRef.current = requestAnimationFrame(animate);
     };
 
     const handleVisibilityChange = (): void => {
+      // FIX: Don't restart if effect is no longer active
+      if (!isActive) return;
+
       if (TabVisibilityManager.isVisible() && isPlaying) {
         // Cancel any pending frame and restart cleanly with staggered delay
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current);
+          animationRef.current = undefined;
+        }
+        // Clear any pending stagger timeout
+        if (staggerTimeoutId) {
+          clearTimeout(staggerTimeoutId);
         }
         // Stagger restart to prevent thundering herd
         const staggerDelay = Math.random() * 200 + 100;
-        setTimeout(() => {
-          if (TabVisibilityManager.isVisible() && isPlaying) {
+        staggerTimeoutId = setTimeout(() => {
+          if (isActive && TabVisibilityManager.isVisible() && isPlaying) {
             animate();
           }
         }, staggerDelay);
@@ -473,9 +487,15 @@ function BicolorWaveform({
     }
 
     return () => {
+      // FIX: Mark effect as inactive to prevent stale callbacks
+      isActive = false;
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = undefined;
+      }
+      if (staggerTimeoutId) {
+        clearTimeout(staggerTimeoutId);
       }
     };
   }, [currentTime, duration, isPlaying]);
@@ -650,7 +670,18 @@ export function SonaarModernPlayer(): JSX.Element | null {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = (): void => setCurrentTime(audio.currentTime);
+    // FIX: Throttle timeupdate to max 4 updates per second (250ms)
+    // This prevents excessive Zustand store updates that cause freezes
+    let lastTimeUpdate = 0;
+    const TIME_UPDATE_THROTTLE = 250; // ms
+
+    const updateTime = (): void => {
+      const now = Date.now();
+      if (now - lastTimeUpdate >= TIME_UPDATE_THROTTLE) {
+        lastTimeUpdate = now;
+        setCurrentTime(audio.currentTime);
+      }
+    };
 
     const handleLoadedMetadata = (): void => {
       if (audio.duration && !Number.isNaN(audio.duration) && Number.isFinite(audio.duration)) {

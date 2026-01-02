@@ -227,12 +227,22 @@ export function EnhancedGlobalAudioPlayer() {
   };
 
   // Audio event listeners
+  // FIX: Added throttling to timeupdate to prevent excessive re-renders
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
+    // FIX: Throttle timeupdate to max 4 updates per second (250ms)
+    // This prevents excessive Zustand store updates that cause freezes
+    let lastTimeUpdate = 0;
+    const TIME_UPDATE_THROTTLE = 250; // ms
+
     const updateTime = (): void => {
-      setCurrentTime(audio.currentTime);
+      const now = Date.now();
+      if (now - lastTimeUpdate >= TIME_UPDATE_THROTTLE) {
+        lastTimeUpdate = now;
+        setCurrentTime(audio.currentTime);
+      }
     };
 
     const handleLoadedMetadata = (): void => {
@@ -462,7 +472,7 @@ export function EnhancedGlobalAudioPlayer() {
   };
 
   // Waveform animation - visibility-aware to prevent freeze on tab switch
-  // FIX: Added throttling and better cleanup to prevent accumulation
+  // FIX: Added throttling, isActive flag, and better cleanup to prevent accumulation
   useEffect(() => {
     const analyser = analyserRef.current;
     const dataArray = dataArrayRef.current;
@@ -472,14 +482,16 @@ export function EnhancedGlobalAudioPlayer() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let isAnimating = true;
+    // FIX: Track if effect is still active to prevent stale callbacks
+    let isActive = true;
     let lastFrameTime = 0;
+    let staggerTimeoutId: ReturnType<typeof setTimeout> | null = null;
     const targetFPS = 30; // Limit to 30 FPS to reduce CPU usage
     const frameInterval = 1000 / targetFPS;
 
     const animate = (currentTime: number): void => {
-      // Stop animation loop if tab is hidden or component unmounted
-      if (!isAnimating || !TabVisibilityManager.isVisible()) {
+      // FIX: Stop animation loop if effect is no longer active or tab is hidden
+      if (!isActive || !TabVisibilityManager.isVisible()) {
         return;
       }
 
@@ -515,16 +527,23 @@ export function EnhancedGlobalAudioPlayer() {
     };
 
     const handleVisibilityChange = (): void => {
-      if (TabVisibilityManager.isVisible() && isPlaying && isAnimating) {
+      // FIX: Don't restart if effect is no longer active
+      if (!isActive) return;
+
+      if (TabVisibilityManager.isVisible() && isPlaying) {
         // Cancel any pending frame first
         if (animationRef.current) {
           cancelAnimationFrame(animationRef.current);
           animationRef.current = undefined;
         }
+        // Clear any pending stagger timeout
+        if (staggerTimeoutId) {
+          clearTimeout(staggerTimeoutId);
+        }
         // Stagger restart with longer delay to prevent thundering herd
         const staggerDelay = Math.random() * 500 + 300;
-        setTimeout(() => {
-          if (TabVisibilityManager.isVisible() && isPlaying && isAnimating) {
+        staggerTimeoutId = setTimeout(() => {
+          if (isActive && TabVisibilityManager.isVisible() && isPlaying) {
             lastFrameTime = 0; // Reset frame timing
             animationRef.current = requestAnimationFrame(animate);
           }
@@ -536,11 +555,15 @@ export function EnhancedGlobalAudioPlayer() {
     animationRef.current = requestAnimationFrame(animate);
 
     return () => {
-      isAnimating = false;
+      // FIX: Mark effect as inactive to prevent stale callbacks
+      isActive = false;
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = undefined;
+      }
+      if (staggerTimeoutId) {
+        clearTimeout(staggerTimeoutId);
       }
     };
   }, [isPlaying]);
