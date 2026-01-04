@@ -306,30 +306,20 @@ class RealtimeConnectionManager {
   }
 
   private getWebSocketUrl(): string {
-    // FIX: Detect Vercel/serverless and return empty to prevent connection attempts
-    // Also check if tab is hidden to prevent background connections
-    const isVercelOrServerless =
-      globalThis.window !== undefined &&
-      (globalThis.window.location.hostname.includes("vercel.app") ||
-        globalThis.window.location.hostname === "brolabentertainment.com" ||
-        globalThis.window.location.hostname.includes("brolabentertainment"));
+    // FIX: ALWAYS disable WebSocket - it causes freezes due to reconnection loops
+    // Vercel/serverless environments don't support WebSockets
+    // The app works fine without real-time updates via polling/Convex subscriptions
 
-    // Check environment variable override
-    const disableWebSocket = import.meta.env.VITE_DISABLE_WEBSOCKET === "true";
+    // Only enable in development with explicit flag
+    const enableWebSocketDev = import.meta.env.VITE_ENABLE_WEBSOCKET_DEV === "true";
 
-    // FIX: Also disable WebSocket in production entirely - Vercel doesn't support it
-    const isProduction = import.meta.env.PROD || import.meta.env.MODE === "production";
-
-    if (isVercelOrServerless || disableWebSocket || isProduction) {
-      // Return empty string - WebSocket will not be used
-      if (import.meta.env.DEV) {
-        console.log("[DashboardRealtime] WebSocket disabled (serverless/production)");
-      }
-      return "";
+    if (import.meta.env.DEV && enableWebSocketDev) {
+      console.log("[DashboardRealtime] WebSocket enabled in dev mode");
+      return "ws://localhost:3001/ws";
     }
 
-    // In development only, use a mock WebSocket server
-    return "ws://localhost:3001/ws";
+    // Disabled by default everywhere
+    return "";
   }
 }
 

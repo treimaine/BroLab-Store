@@ -7,13 +7,13 @@ import { mutation, type MutationCtx } from "../../_generated/server";
 
 // Tarifs standards par service (en centimes)
 const SERVICE_RATES = {
-  recording: 15000, // $150/heure
-  mixing: 10000, // $100/heure
-  mastering: 8000, // $80/heure
-  consultation: 15000, // $150/heure
-  custom_beat: 20000, // $200 forfait
-  beat_remake: 15000, // $150/heure
-  full_production: 50000, // $500/heure
+  recording: 3000, // $30/heure
+  mixing: 7000, // $70/heure
+  mastering: 5000, // $50/heure
+  consultation: 5000, // $50/heure
+  custom_beat: 15000, // $150 forfait
+  beat_remake: 25000, // $250/heure
+  full_production: 15000, // $150/heure
 } as const;
 
 export const fixReservationPrices = mutation({

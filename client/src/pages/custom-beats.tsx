@@ -1,4 +1,5 @@
 import { CustomBeatRequest } from "@/components/reservations/CustomBeatRequest";
+import { CUSTOM_BEAT_BASE_PRICE } from "@/components/reservations/CustomBeatRequestConstants";
 import { ReservationErrorBoundary } from "@/components/reservations/ReservationErrorBoundary";
 import {
   AuthenticationLoading,
@@ -6,13 +7,14 @@ import {
   SuccessState,
 } from "@/components/reservations/ReservationLoadingStates";
 import { StandardHero } from "@/components/ui/StandardHero";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useEnhancedFormSubmission } from "@/hooks/useEnhancedFormSubmission";
 import { logger } from "@/lib/logger";
 import { useUser } from "@clerk/clerk-react";
 import { AlertTriangle, CheckCircle, Clock, Loader2, Music, Star } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
 interface BeatRequest {
@@ -40,6 +42,18 @@ export default function CustomBeats() {
   const [, setLocation] = useLocation();
   const { user: clerkUser, isSignedIn, isLoaded: clerkLoaded } = useUser();
   const [isPageLoading, setIsPageLoading] = useState(true);
+
+  // Refs for scroll navigation
+  const formRef = useRef<HTMLDivElement>(null);
+  const samplesRef = useRef<HTMLDivElement>(null);
+
+  const scrollToForm = useCallback(() => {
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const scrollToSamples = useCallback(() => {
+    samplesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   // Authentication state management
   const [authState, setAuthState] = useState({
@@ -247,8 +261,34 @@ Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadlin
       <div className="min-h-screen bg-[var(--deep-black)] text-white">
         <StandardHero
           title="Custom Beat Production"
-          subtitle="Get a professionally produced beat tailored exactly to your vision. Our producers will create something unique just for you."
-        />
+          subtitle="Get a professionally produced beat tailored exactly to your vision."
+        >
+          <p className="text-gray-300 mt-2">
+            From ${CUSTOM_BEAT_BASE_PRICE} • WAV + Stems • Exclusive ownership • 5–7 days
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
+            <Button
+              size="lg"
+              className="bg-[var(--accent-purple)] hover:bg-[var(--accent-purple)]/90 text-white px-8 py-3 text-lg font-semibold"
+              onClick={scrollToForm}
+            >
+              Get a quote
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="border-gray-500 text-white hover:bg-white/10 px-8 py-3 text-lg"
+              onClick={scrollToSamples}
+            >
+              Hear examples
+            </Button>
+          </div>
+
+          <p className="text-gray-400 text-sm mt-4">
+            2 revisions included • Secure checkout • Work starts after payment
+          </p>
+        </StandardHero>
 
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Enhanced Authentication Loading State */}
@@ -344,10 +384,26 @@ Custom Beat Request - Priority: ${request.priority}, Delivery: ${request.deadlin
                 </Card>
               </div>
 
+              {/* Sample Beats Section (placeholder) */}
+              <div ref={samplesRef} className="mb-10 scroll-mt-24">
+                <Card className="card-dark">
+                  <CardContent className="p-8 text-center">
+                    <Music className="w-16 h-16 mx-auto mb-4 text-[var(--accent-purple)]/50" />
+                    <h3 className="text-xl font-semibold text-white mb-2">
+                      Sample Beats Coming Soon
+                    </h3>
+                    <p className="text-gray-400">
+                      Listen to examples of our custom beat productions to get inspired for your
+                      project.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
               {/* Main Content */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Request Form */}
-                <div className="lg:col-span-2">
+                <div ref={formRef} className="lg:col-span-2 scroll-mt-24">
                   <CustomBeatRequest onSubmit={handleSubmitRequest} isSubmitting={isSubmitting} />
                 </div>
 

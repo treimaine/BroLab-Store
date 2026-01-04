@@ -541,16 +541,16 @@ export const DEFAULT_SERVICE_DURATIONS: Record<ServiceType, number> = {
   [ServiceType.GHOST_PRODUCTION]: 480, // 8 hours
 } as const;
 
-/** Base pricing for services (in USD) */
+/** Base pricing for services (in USD) - aligned with business-logic.ts SERVICE_HOURLY_RATES */
 export const BASE_SERVICE_PRICING: Record<ServiceType, number> = {
-  [ServiceType.MIXING]: 150,
-  [ServiceType.MASTERING]: 75,
-  [ServiceType.RECORDING]: 100,
-  [ServiceType.CUSTOM_BEAT]: 300,
-  [ServiceType.CONSULTATION]: 50,
-  [ServiceType.VOCAL_TUNING]: 100,
-  [ServiceType.BEAT_LEASING]: 25,
-  [ServiceType.GHOST_PRODUCTION]: 500,
+  [ServiceType.MIXING]: 70, // $70/hour
+  [ServiceType.MASTERING]: 50, // $50/hour
+  [ServiceType.RECORDING]: 30, // $30/hour
+  [ServiceType.CUSTOM_BEAT]: 150, // $150 flat rate
+  [ServiceType.CONSULTATION]: 50, // $50/hour
+  [ServiceType.VOCAL_TUNING]: 75, // $75/hour
+  [ServiceType.BEAT_LEASING]: 29.99, // $29.99 (Basic License price)
+  [ServiceType.GHOST_PRODUCTION]: 500, // $500 flat rate
 } as const;
 
 /** Reservation status flow - valid transitions */

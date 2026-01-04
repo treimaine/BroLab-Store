@@ -370,14 +370,46 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
   );
 
   // Auto-play carousel (visual rotation, not audio)
+  // FIX: Only run autoplay when tab is visible to prevent background CPU usage
   useEffect(() => {
     if (!autoPlay || isPaused || beats.length <= 1) return;
 
-    const interval = setInterval(() => {
-      setActiveIndex(prev => (prev + 1) % beats.length);
-    }, autoPlayInterval);
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
-    return () => clearInterval(interval);
+    const startAutoplay = (): void => {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(() => {
+        setActiveIndex(prev => (prev + 1) % beats.length);
+      }, autoPlayInterval);
+    };
+
+    const stopAutoplay = (): void => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopAutoplay();
+      } else {
+        // Stagger restart to prevent thundering herd
+        setTimeout(startAutoplay, Math.random() * 500 + 200);
+      }
+    };
+
+    // Only start if tab is visible
+    if (!document.hidden) {
+      startAutoplay();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      stopAutoplay();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [autoPlay, autoPlayInterval, beats.length, isPaused]);
 
   // Handle play/pause toggle using global store

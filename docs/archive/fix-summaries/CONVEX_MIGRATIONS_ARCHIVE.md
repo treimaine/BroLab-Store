@@ -84,13 +84,13 @@ This document catalogs the Convex migration files that were created for one-time
 **What it does**:
 
 - Applies standard hourly rates for services:
-  - Recording: $150/hour
-  - Mixing: $100/hour
-  - Mastering: $80/hour
-  - Consultation: $150/hour
-  - Custom Beat: $200 flat rate
-  - Beat Remake: $150/hour
-  - Full Production: $500/hour
+  - Recording: $30/hour
+  - Mixing: $70/hour
+  - Mastering: $50/hour
+  - Consultation: $50/hour
+  - Custom Beat: $150 flat rate
+  - Beat Remake: $250/hour
+  - Full Production: $150/hour
 - Recalculates prices based on duration
 - Provides price analysis and listing functions
 

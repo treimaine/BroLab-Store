@@ -147,10 +147,10 @@ const SUBSCRIPTION_PRICES_ANNUAL: Record<SubscriptionPlan, number> = {
 
 /** Service hourly rates in cents */
 const SERVICE_HOURLY_RATES: Record<string, number> = {
-  mixing: 10000, // $100/hour
-  mastering: 8000, // $80/hour
-  recording: 15000, // $150/hour
-  custom_beat: 20000, // $200 flat rate
+  mixing: 7000, // $70/hour
+  mastering: 5000, // $50/hour
+  recording: 3000, // $30/hour
+  custom_beat: 15000, // $150 flat rate
   consultation: 5000, // $50/hour
 };
 

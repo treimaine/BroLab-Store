@@ -1,5 +1,8 @@
 import { Clock, Music, Star } from "lucide-react";
 
+// Base price for custom beat production
+export const CUSTOM_BEAT_BASE_PRICE = 150;
+
 // Priority configuration
 export const PRIORITY_CONFIG = {
   standard: { fee: 0, delivery: "5-7 days", icon: Music, iconColor: "text-gray-400" },

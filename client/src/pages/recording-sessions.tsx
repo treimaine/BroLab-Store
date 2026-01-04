@@ -90,13 +90,14 @@ export default function RecordingSessions() {
         action: "form_submission_start",
       });
       // Convert form data to reservation format using new schema
+      // Budget ranges aligned with UI Select options
       const budgetMap: Record<string, number> = {
-        "300-500": 40000, // $400 in cents
-        "500-1000": 75000, // $750 in cents
-        "1000-2000": 150000, // $1500 in cents
-        "2000+": 250000, // $2500+ in cents
+        "30-100": 6500, // ~$65 average in cents
+        "100-200": 15000, // ~$150 average in cents
+        "200-400": 30000, // ~$300 average in cents
+        "500+": 50000, // $500+ in cents
       };
-      const budgetAmount = budgetMap[formData.budget] ?? 250000;
+      const budgetAmount = budgetMap[formData.budget] ?? 15000;
 
       const reservationData = {
         serviceType: "recording" as const,
@@ -207,13 +208,13 @@ export default function RecordingSessions() {
                 <div className="p-4 bg-purple-600/10 border border-purple-600/20 rounded-lg">
                   <h3 className="font-semibold text-purple-400 mb-2">Solo Recording</h3>
                   <p className="text-gray-300 text-sm mb-2">Individual artist recording sessions</p>
-                  <p className="text-white font-bold">$150/hour</p>
+                  <p className="text-white font-bold">$30/hour</p>
                 </div>
 
                 <div className="p-4 bg-blue-600/10 border border-blue-600/20 rounded-lg">
                   <h3 className="font-semibold text-blue-400 mb-2">Group Recording</h3>
                   <p className="text-gray-300 text-sm mb-2">Band or group recording sessions</p>
-                  <p className="text-white font-bold">$250/hour</p>
+                  <p className="text-white font-bold">$100/hour</p>
                 </div>
 
                 <div className="p-4 bg-green-600/10 border border-green-600/20 rounded-lg">
@@ -221,7 +222,7 @@ export default function RecordingSessions() {
                   <p className="text-gray-300 text-sm mb-2">
                     Complete recording, mixing, and mastering
                   </p>
-                  <p className="text-white font-bold">$500/session</p>
+                  <p className="text-white font-bold">$150/session</p>
                 </div>
 
                 <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
@@ -353,10 +354,10 @@ export default function RecordingSessions() {
                         <SelectValue placeholder="Select budget" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="300-500">$300 - $500</SelectItem>
-                        <SelectItem value="500-1000">$500 - $1000</SelectItem>
-                        <SelectItem value="1000-2000">$1000 - $2000</SelectItem>
-                        <SelectItem value="2000+">$2000+</SelectItem>
+                        <SelectItem value="30-100">$30 - $100</SelectItem>
+                        <SelectItem value="100-200">$100 - $200</SelectItem>
+                        <SelectItem value="200-400">$200 - $400</SelectItem>
+                        <SelectItem value="500+">$500+</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -94,16 +94,17 @@ export default function ProductionConsultation() {
         action: "form_submission_start",
       });
       // Convert form data to reservation format using new schema
+      // Prices aligned with UI cards: $50 (30min), $100 (60min), $200 (90min), $500 (monthly)
       const getPriceAmount = (duration: string): number => {
         switch (duration) {
           case "30":
-            return 7500; // $75 in cents
+            return 5000; // $50 in cents (Quick Consultation)
           case "60":
-            return 15000; // $150 in cents
+            return 10000; // $100 in cents (Standard Consultation)
           case "90":
-            return 20000; // $200 in cents
+            return 20000; // $200 in cents (Extended Consultation)
           default:
-            return 40000; // $400 for monthly mentorship
+            return 50000; // $500 for monthly mentorship
         }
       };
       const priceAmount = getPriceAmount(formData.duration);
@@ -224,13 +225,13 @@ Additional Message: ${formData.message}`,
                   <p className="text-gray-300 text-sm mb-2">
                     30-minute session for specific questions
                   </p>
-                  <p className="text-white font-bold">$75/session</p>
+                  <p className="text-white font-bold">$50/session</p>
                 </div>
 
                 <div className="p-4 bg-blue-600/10 border border-blue-600/20 rounded-lg">
                   <h3 className="font-semibold text-blue-400 mb-2">Standard Consultation</h3>
                   <p className="text-gray-300 text-sm mb-2">60-minute comprehensive session</p>
-                  <p className="text-white font-bold">$150/session</p>
+                  <p className="text-white font-bold">$100/session</p>
                 </div>
 
                 <div className="p-4 bg-green-600/10 border border-green-600/20 rounded-lg">
@@ -244,7 +245,7 @@ Additional Message: ${formData.message}`,
                 <div className="p-4 bg-gold-600/10 border border-gold-600/20 rounded-lg">
                   <h3 className="font-semibold text-gold-400 mb-2">Ongoing Mentorship</h3>
                   <p className="text-gray-300 text-sm mb-2">Monthly 1-on-1 sessions for 3 months</p>
-                  <p className="text-white font-bold">$400/month</p>
+                  <p className="text-white font-bold">$500/month</p>
                 </div>
 
                 <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
@@ -406,10 +407,10 @@ Additional Message: ${formData.message}`,
                           <SelectValue placeholder="Select duration" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="30">30 minutes - $75</SelectItem>
-                          <SelectItem value="60">60 minutes - $150</SelectItem>
+                          <SelectItem value="30">30 minutes - $50</SelectItem>
+                          <SelectItem value="60">60 minutes - $100</SelectItem>
                           <SelectItem value="90">90 minutes - $200</SelectItem>
-                          <SelectItem value="monthly">Monthly Mentorship - $400/mo</SelectItem>
+                          <SelectItem value="monthly">Monthly Mentorship - $500/mo</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

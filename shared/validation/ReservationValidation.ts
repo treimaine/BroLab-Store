@@ -413,16 +413,16 @@ export const validateServicePricing = (
   duration: number,
   additionalServices: string[] = []
 ): number => {
-  // Base pricing in cents
+  // Base pricing in cents - aligned with business-logic.ts SERVICE_HOURLY_RATES
   const basePricing: Record<string, number> = {
-    consultation: 5000, // $50/hour
-    mixing: 10000, // $100/hour
-    mastering: 8000, // $80/hour
-    recording: 15000, // $150/hour
-    custom_beat: 20000, // $200 flat rate
+    consultation: 5000, // $50/hour (aligned with business-logic.ts)
+    mixing: 7000, // $70/hour
+    mastering: 5000, // $50/hour
+    recording: 3000, // $30/hour
+    custom_beat: 15000, // $150 flat rate
     vocal_tuning: 7500, // $75/hour
-    beat_remake: 15000, // $150 flat rate
-    full_production: 50000, // $500 flat rate
+    beat_remake: 35000, // $350 flat rate
+    full_production: 15000, // $150 flat rate
   };
 
   const hourlyRate = basePricing[serviceType] || 10000;

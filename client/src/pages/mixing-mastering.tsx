@@ -4,27 +4,29 @@ import { FormValidationStatus } from "@/components/mixing-mastering/FormValidati
 import { ProgressIndicator } from "@/components/mixing-mastering/ProgressIndicator";
 import { ServiceCard } from "@/components/mixing-mastering/ServiceCard";
 import { ReservationErrorBoundary } from "@/components/reservations/ReservationErrorBoundary";
+import { Button } from "@/components/ui/button";
 import { StandardHero } from "@/components/ui/StandardHero";
 import { useToast } from "@/hooks/use-toast";
 import { useFormSubmissionWithRetry } from "@/hooks/useApiWithRetry";
 import { useAuthState } from "@/hooks/useAuthState";
 import { useFormValidation } from "@/hooks/useFormValidation";
 import { addBreadcrumb, errorTracker } from "@/lib/errorTracker";
-import { logAuthError, logFileUpload, logUserAction, logger } from "@/lib/logger";
+import { logAuthError, logFileUpload, logger, logUserAction } from "@/lib/logger";
 import {
   performanceMonitor,
   startTimer,
   trackComponentPerformance,
   trackUserInteraction,
 } from "@/lib/performanceMonitor";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useClerk } from "@clerk/clerk-react";
 import {
   mixingMasteringSubmissionSchema,
   type MixingMasteringSubmissionInput,
 } from "@shared/validation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
+// Services with "Best for" + "Outcome" copy for conversion
 const services = [
   {
     id: "mixing",
@@ -32,13 +34,13 @@ const services = [
     price: 70,
     duration: "3-5 business days",
     description: "Professional mixing with EQ, compression, effects, and spatial processing",
+    bestFor: "Vocals need clarity, instruments need space",
+    outcome: "Balanced mix, ready for mastering",
     features: [
       "Professional EQ and compression",
       "Spatial processing and effects",
       "Stereo width enhancement",
-      "Dynamic range optimization",
       "Up to 3 revisions included",
-      "Stems delivery available",
     ],
   },
   {
@@ -47,28 +49,29 @@ const services = [
     price: 50,
     duration: "1-2 business days",
     description: "Professional mastering for streaming platforms and distribution",
+    bestFor: "Final polish before release",
+    outcome: "Loud, clear, translates on all devices",
     features: [
       "Loudness optimization",
-      "Frequency balance correction",
       "Streaming platform compliance",
       "Multiple format delivery",
       "Reference track matching",
-      "Quality assurance check",
     ],
   },
   {
     id: "mixing-mastering",
     name: "Mixing + Mastering",
-    price: 150,
+    price: 109,
+    originalPrice: 120,
     duration: "4-6 business days",
     description: "Complete mixing and mastering package for your track",
+    bestFor: "Release-ready single or EP",
+    outcome: "Ready to upload to Spotify, Apple Music",
     features: [
-      "Everything in mixing package",
-      "Everything in mastering package",
-      "Seamless workflow integration",
-      "Priority turnaround time",
-      "Extended revision period",
-      "Bonus stems package",
+      "Full mixing + mastering workflow",
+      "Priority turnaround",
+      "5 revisions included",
+      "Stems delivery included",
     ],
   },
 ];
@@ -78,7 +81,6 @@ const timeSlots = ["9:00 AM", "10:00 AM", "11:00 AM", "1:00 PM", "2:00 PM", "3:0
 // Helper function to convert time slot to 24-hour format
 const convertTimeSlotTo24Hour = (timeSlot: string): string => {
   if (!timeSlot) return "09:00";
-
   const timeMap: Record<string, string> = {
     "9:00 AM": "09:00",
     "10:00 AM": "10:00",
@@ -88,38 +90,65 @@ const convertTimeSlotTo24Hour = (timeSlot: string): string => {
     "3:00 PM": "15:00",
     "4:00 PM": "16:00",
   };
-
   return timeMap[timeSlot] || "09:00";
 };
 
-function MixingMasteringContent() {
+function MixingMasteringContent(): JSX.Element {
   const componentMountTimer = startTimer("mixing_mastering_component_mount");
   const [, setLocation] = useLocation();
   const { authState, clerkUser, clerkLoaded, isSignedIn } = useAuthState();
   const { getToken } = useAuth();
+  const { openSignIn } = useClerk();
+
+  // Refs for smooth scrolling
+  const servicesRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // State
+  const [selectedService, setSelectedService] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [fileUploadErrors, setFileUploadErrors] = useState<string[]>([]);
+  const { toast } = useToast();
+
+  // Calculate current step based on state
+  const getCurrentStep = (): 1 | 2 | 3 => {
+    if (!selectedService) return 1;
+    return 2; // Step 3 only after successful submission (handled by redirect)
+  };
+
+  const currentStep = getCurrentStep();
+  const selectedServiceData = services.find(s => s.id === selectedService);
+
+  // Scroll handlers
+  const scrollToServices = useCallback(() => {
+    servicesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    trackUserInteraction("cta_click", "book_session_hero", undefined, {
+      component: "mixing_mastering",
+      action: "scroll_to_services",
+    });
+  }, []);
+
+  const scrollToForm = useCallback(() => {
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }, []);
 
   // Log component mount
   useEffect(() => {
     const mountTime = componentMountTimer();
     trackComponentPerformance("MixingMasteringContent", mountTime, true);
-
     logger.logInfo("MixingMasteringContent component mounted", {
       component: "mixing_mastering",
       action: "component_mount",
       mountTime,
     });
-
-    // Add breadcrumb for page load
     addBreadcrumb({
       category: "navigation",
       message: "Mixing & Mastering page loaded",
       level: "info",
-      data: {
-        url: globalThis.location.href,
-        mountTime,
-      },
+      data: { url: globalThis.location.href, mountTime },
     });
-
     return () => {
       logger.logInfo("MixingMasteringContent component unmounting", {
         component: "mixing_mastering",
@@ -128,7 +157,12 @@ function MixingMasteringContent() {
     };
   }, [componentMountTimer]);
 
-  // Enhanced error handler that doesn't block page rendering
+  // Auto-scroll to top on mount
+  useEffect(() => {
+    globalThis.scrollTo(0, 0);
+  }, []);
+
+  // Error handler
   const handleApiError = useCallback((error: Error, context?: string) => {
     const errorId = errorTracker.trackError(error, {
       errorType: context === "authentication" ? "authentication" : "api",
@@ -139,7 +173,6 @@ function MixingMasteringContent() {
       recoverable: true,
       context: context || "unknown",
     });
-
     if (context === "authentication") {
       logAuthError(`Authentication error in ${context}`, error, {
         component: "mixing_mastering",
@@ -157,11 +190,6 @@ function MixingMasteringContent() {
     }
   }, []);
 
-  const [selectedService, setSelectedService] = useState("mixing-mastering");
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [fileUploadErrors, setFileUploadErrors] = useState<string[]>([]);
-  const { toast } = useToast();
-
   // File upload handlers
   const handleFileUploadSuccess = useCallback(
     (file: File) => {
@@ -173,20 +201,9 @@ function MixingMasteringContent() {
         fileType: file.type,
         totalFiles: uploadedFiles.length + 1,
       });
-      addBreadcrumb({
-        category: "user_action",
-        message: `File uploaded successfully: ${file.name}`,
-        level: "info",
-        data: { fileName: file.name, fileSize: file.size, fileType: file.type },
-      });
-      performanceMonitor.recordMetric("file_upload_success", file.size, "bytes", {
-        component: "file_upload",
-        fileName: file.name,
-        fileType: file.type,
-      });
       toast({
-        title: "File Uploaded Successfully",
-        description: `${file.name} has been uploaded and will be included with your reservation.`,
+        title: "File Uploaded",
+        description: `${file.name} added to your booking.`,
         variant: "default",
       });
     },
@@ -201,13 +218,7 @@ function MixingMasteringContent() {
       recoverable?: boolean;
     }) => {
       const errorObj = new Error(error.message);
-      Object.assign(errorObj, {
-        code: error.code,
-        severity: error.severity,
-        recoverable: error.recoverable,
-      });
-
-      const errorId = errorTracker.trackError(errorObj, {
+      errorTracker.trackError(errorObj, {
         errorType: "file_upload",
         component: "mixing_mastering",
         action: "file_upload_failed",
@@ -215,30 +226,27 @@ function MixingMasteringContent() {
         recoverable: error.recoverable ?? true,
         severity: error.severity,
       });
-
-      addBreadcrumb({
-        category: "error",
-        message: `File upload failed: ${error.message}`,
-        level: error.severity === "warning" ? "warning" : "error",
-        data: { errorCode: error.code, errorMessage: error.message, errorId },
+      toast({
+        title: error.severity === "warning" ? "Upload Warning" : "Upload Failed",
+        description: error.message,
+        variant: error.severity === "warning" ? "default" : "destructive",
       });
-
-      performanceMonitor.recordMetric("file_upload_error", 1, "count", {
-        component: "file_upload",
-        errorCode: error.code,
-        severity: error.severity,
-      });
-
-      const toastVariant = error.severity === "warning" ? "default" : "destructive";
-      const toastTitle = error.severity === "warning" ? "Upload Warning" : "Upload Failed";
-
-      toast({ title: toastTitle, description: error.message, variant: toastVariant });
       setFileUploadErrors(prev => [...prev, error.message]);
     },
     [toast]
   );
 
-  // Initialize form validation with enhanced schema
+  const handleFileRemove = (index: number) => {
+    const fileToRemove = uploadedFiles[index];
+    logFileUpload("File removed by user", fileToRemove?.name, {
+      component: "mixing_mastering",
+      action: "file_remove",
+      fileIndex: index,
+    });
+    setUploadedFiles(files => files.filter((_, i) => i !== index));
+  };
+
+  // Form validation
   const initialFormData = {
     name: "",
     email: "",
@@ -246,11 +254,11 @@ function MixingMasteringContent() {
     preferredDate: "",
     timeSlot: "",
     projectDetails: "",
-    trackCount: "",
+    trackCount: "1",
     genre: "",
     reference: "",
     specialRequests: "",
-    selectedService: selectedService as "mixing" | "mastering" | "mixing-mastering",
+    selectedService: "mixing" as "mixing" | "mastering" | "mixing-mastering",
   };
 
   const {
@@ -264,7 +272,6 @@ function MixingMasteringContent() {
     handleSubmit: createSubmitHandler,
     setData: setFormData,
     getFieldError,
-    isFieldValid: _isFieldValid,
   } = useFormValidation({
     schema: mixingMasteringSubmissionSchema,
     initialData: initialFormData,
@@ -273,10 +280,9 @@ function MixingMasteringContent() {
     debounceMs: 500,
   });
 
-  // Enhanced API submission with retry mechanism
+  // API submission with retry
   const {
     isLoading: isSubmitting,
-    error: _submissionError,
     retryCount,
     submitForm,
   } = useFormSubmissionWithRetry({
@@ -287,88 +293,27 @@ function MixingMasteringContent() {
     customErrorMessages: {
       401: "Please sign in to make a reservation.",
       422: "Please check your form data and try again.",
-      429: "Too many requests. Please wait a moment before trying again.",
+      429: "Too many requests. Please wait a moment.",
     },
     getAuthToken: getToken,
   });
 
-  // Auto-scroll to top when page loads
+  // Auto-fill form when user data available
   useEffect(() => {
-    globalThis.scrollTo(0, 0);
-  }, []);
-
-  // Auto-fill form data when user data is available - with proper error handling
-  useEffect(() => {
-    // Only auto-fill if authentication is loaded and successful
     if (!authState.isLoading && authState.isAuthenticated && clerkUser) {
-      const autoFillTimer = startTimer("form_auto_fill");
-
       try {
-        const autoFillData = {
-          name: clerkUser.fullName ?? "",
-          email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
-          phone: clerkUser.phoneNumbers?.[0]?.phoneNumber ?? "",
-        };
-
-        // Only update fields that are currently empty to avoid overwriting user input
         const fieldsToUpdate = {
-          name: formData.name || autoFillData.name,
-          email: formData.email || autoFillData.email,
-          phone: formData.phone || autoFillData.phone,
+          name: formData.name || clerkUser.fullName || "",
+          email: formData.email || clerkUser.emailAddresses[0]?.emailAddress || "",
         };
-
         setFormData(fieldsToUpdate);
-
-        const autoFillTime = autoFillTimer();
-
-        // Log successful auto-fill
         logger.logInfo("Form auto-fill completed", {
           component: "mixing_mastering",
           action: "form_auto_fill",
           userId: clerkUser.id,
-          autoFillTime,
-          fieldsAutoFilled: Object.keys(fieldsToUpdate).filter(
-            key =>
-              fieldsToUpdate[key as keyof typeof fieldsToUpdate] &&
-              !formData[key as keyof typeof formData]
-          ),
-        });
-
-        // Add breadcrumb for auto-fill
-        addBreadcrumb({
-          category: "state_change",
-          message: "Form auto-fill completed",
-          level: "info",
-          data: {
-            userId: clerkUser.id,
-            autoFillTime,
-            fieldsAutoFilled: Object.keys(fieldsToUpdate).filter(
-              key =>
-                fieldsToUpdate[key as keyof typeof fieldsToUpdate] &&
-                !formData[key as keyof typeof formData]
-            ),
-          },
-        });
-
-        // Track auto-fill performance
-        performanceMonitor.recordMetric("form_auto_fill_time", autoFillTime, "ms", {
-          component: "form_auto_fill",
-          userId: clerkUser.id,
         });
       } catch (error) {
-        const autoFillTime = autoFillTimer();
-
-        // Log auto-fill error
-        logger.logError("Form auto-fill failed", error, {
-          errorType: "validation",
-          component: "mixing_mastering",
-          action: "form_auto_fill_error",
-          userId: clerkUser?.id,
-          autoFillTime,
-        });
-
         handleApiError(error instanceof Error ? error : new Error(String(error)), "auto-fill");
-        // Don't block page rendering - auto-fill is optional
       }
     }
   }, [
@@ -379,142 +324,77 @@ function MixingMasteringContent() {
     setFormData,
     formData.name,
     formData.email,
-    formData.phone,
-    formData,
   ]);
 
-  // Update selected service in form data when service selection changes
+  // Update selected service in form
   useEffect(() => {
-    updateField("selectedService", selectedService);
+    if (selectedService) {
+      updateField(
+        "selectedService",
+        selectedService as "mixing" | "mastering" | "mixing-mastering"
+      );
+    }
   }, [selectedService, updateField]);
 
-  const selectedServiceData = services.find(s => s.id === selectedService);
+  // Handle service selection
+  const handleServiceSelect = (serviceId: string) => {
+    logUserAction(`Service selected: ${serviceId}`, {
+      component: "mixing_mastering",
+      action: "service_selection",
+      serviceId,
+      previousService: selectedService,
+    });
+    trackUserInteraction("service_selection", "service_card", undefined, {
+      serviceId,
+      previousService: selectedService,
+    });
+    setSelectedService(serviceId);
+    scrollToForm();
+  };
 
   const handleInputChange = (field: keyof MixingMasteringSubmissionInput, value: string) => {
-    // Log form field changes for debugging
     logUserAction(`Form field changed: ${field}`, {
       component: "mixing_mastering",
       action: "form_field_change",
       field,
-      valueLength: value.length,
     });
-
-    // Track user interaction
-    trackUserInteraction("form_field_change", field, undefined, {
-      field,
-      valueLength: value.length,
-    });
-
     updateField(field, value);
   };
 
-  const handleFileRemove = (index: number) => {
-    const fileToRemove = uploadedFiles[index];
-
-    // Log file removal
-    logFileUpload("File removed by user", fileToRemove?.name, {
-      component: "mixing_mastering",
-      action: "file_remove",
-      fileIndex: index,
-      totalFiles: uploadedFiles.length,
-    });
-
-    // Track user interaction
-    trackUserInteraction("file_remove", "remove_button", undefined, {
-      fileName: fileToRemove?.name,
-      fileIndex: index,
-      totalFiles: uploadedFiles.length,
-    });
-
-    // Add breadcrumb for file removal
-    addBreadcrumb({
-      category: "user_action",
-      message: `File removed: ${fileToRemove?.name || "unknown"}`,
-      level: "info",
-      data: {
-        fileName: fileToRemove?.name,
-        fileIndex: index,
-        totalFiles: uploadedFiles.length,
-      },
-    });
-
-    setUploadedFiles(files => files.filter((_, i) => i !== index));
-  };
-
-  // Wrapper for getFieldError to accept string
   const getFieldErrorWrapper = (field: string): string | undefined => {
     return getFieldError(field as keyof MixingMasteringSubmissionInput);
   };
 
+  // Form submission
   const handleSubmit = createSubmitHandler(
     async (validatedData: MixingMasteringSubmissionInput) => {
       const submissionTimer = startTimer("form_submission");
 
       try {
-        // Log form submission start
-        logger.logInfo("Form submission started", {
-          component: "mixing_mastering",
-          action: "form_submission_start",
-          userId: clerkUser?.id,
-          selectedService,
-          hasFiles: uploadedFiles.length > 0,
-          formDataKeys: Object.keys(validatedData),
-        });
-
-        // Add breadcrumb for form submission
-        addBreadcrumb({
-          category: "user_action",
-          message: "Form submission started",
-          level: "info",
-          data: {
-            userId: clerkUser?.id,
-            selectedService,
-            hasFiles: uploadedFiles.length > 0,
-            formDataKeys: Object.keys(validatedData),
-          },
-        });
-
-        // Check authentication status - non-blocking approach
+        // Check auth - trigger Clerk sign-in if not authenticated
         if (!clerkLoaded) {
-          logger.logWarning("Form submission blocked: authentication still loading", {
-            component: "mixing_mastering",
-            action: "form_submission_blocked",
-            reason: "auth_loading",
-          });
-
           toast({
             title: "Please Wait",
-            description: "Authentication is still loading. Please try again in a moment.",
+            description: "Loading authentication...",
             variant: "default",
           });
           return;
         }
 
         if (!isSignedIn || !clerkUser) {
-          logger.logWarning("Form submission blocked: user not authenticated", {
-            component: "mixing_mastering",
-            action: "form_submission_blocked",
-            reason: "not_authenticated",
-            isSignedIn,
-            hasClerkUser: !!clerkUser,
-          });
-
-          toast({
-            title: "Authentication Required",
-            description: "Please sign in to make a reservation.",
-            variant: "destructive",
+          // Trigger Clerk sign-in modal
+          openSignIn({
+            redirectUrl: globalThis.location.href,
           });
           return;
         }
 
-        logger.logInfo("Form submission proceeding with authenticated user", {
+        logger.logInfo("Form submission proceeding", {
           component: "mixing_mastering",
           action: "form_submission_proceeding",
           userId: clerkUser.id,
-          userName: clerkUser.fullName,
         });
 
-        // Create reservation with correct schema format
         const reservationData = {
           serviceType:
             validatedData.selectedService === "mixing-mastering"
@@ -524,74 +404,44 @@ function MixingMasteringContent() {
             firstName: validatedData.name.split(" ")[0] || validatedData.name,
             lastName: validatedData.name.split(" ").slice(1).join(" ") || "User",
             email: validatedData.email,
-            phone: validatedData.phone || "0000000000", // Provide default phone if empty
+            phone: validatedData.phone || "0000000000",
           },
           preferredDate: new Date(
             `${validatedData.preferredDate}T${convertTimeSlotTo24Hour(validatedData.timeSlot)}`
           ).toISOString(),
-          preferredDuration: 180, // 3 hours default for mixing/mastering
+          preferredDuration: 180,
           serviceDetails: {
             trackCount: Number.parseInt(validatedData.trackCount || "1", 10) || 1,
             genre: validatedData.genre || undefined,
-            includeRevisions: 3,
+            includeRevisions: selectedService === "mixing-mastering" ? 5 : 3,
             rushDelivery: false,
           },
-          notes: (() => {
-            let notes = `${validatedData.projectDetails}\n\nSpecial Requests: ${validatedData.specialRequests}\n\nReference Track: ${validatedData.reference}`;
-
-            // Add file upload status to notes for better service delivery
-            if (uploadedFiles.length > 0) {
-              notes += `\n\nFiles Uploaded: ${uploadedFiles.map(f => f.name).join(", ")} (${uploadedFiles.length} file${uploadedFiles.length > 1 ? "s" : ""})`;
-            } else {
-              notes +=
-                "\n\nFiles: Client will provide files via email or cloud storage after booking confirmation.";
-            }
-
-            // Add file upload error context if any occurred
-            if (fileUploadErrors.length > 0) {
-              notes += `\n\nNote: Client experienced file upload issues during booking but chose to proceed. Files can be sent separately.`;
-            }
-
-            return notes.trim();
-          })(),
-          budget: (selectedServiceData?.price || 0) * 100, // Convert to cents
+          notes: [
+            validatedData.projectDetails,
+            validatedData.specialRequests
+              ? `Special Requests: ${validatedData.specialRequests}`
+              : "",
+            validatedData.reference ? `Reference: ${validatedData.reference}` : "",
+            uploadedFiles.length > 0 ? `Files: ${uploadedFiles.map(f => f.name).join(", ")}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n")
+            .trim(),
+          budget: (selectedServiceData?.price || 0) * 100,
           acceptTerms: true,
         };
 
-        logger.logInfo("Sending reservation data to API", {
-          component: "mixing_mastering",
-          action: "reservation_api_call",
-          userId: clerkUser.id,
-          serviceType: reservationData.serviceType,
-          budget: reservationData.budget,
-          hasNotes: !!reservationData.notes,
-        });
-
-        // Submit reservation using enhanced API with retry
         const reservationResult = (await submitForm("/api/reservations", reservationData)) as {
           id: string;
         };
 
-        logger.logInfo("Reservation created successfully", {
+        logger.logInfo("Reservation created", {
           component: "mixing_mastering",
           action: "reservation_created",
-          userId: clerkUser.id,
           reservationId: reservationResult.id,
         });
 
-        // Add breadcrumb for successful reservation
-        addBreadcrumb({
-          category: "api_call",
-          message: "Reservation created successfully",
-          level: "info",
-          data: {
-            userId: clerkUser.id,
-            reservationId: reservationResult.id,
-            serviceType: reservationData.serviceType,
-          },
-        });
-
-        // Create pending payment for checkout (consistent with other services)
+        // Store for checkout
         const pendingPayment = {
           service: selectedService,
           serviceName: selectedServiceData?.name || "Mixing & Mastering",
@@ -601,94 +451,29 @@ function MixingMasteringContent() {
           quantity: 1,
         };
 
-        // Add to existing services array (consistent with other services)
         const existingServices = JSON.parse(sessionStorage.getItem("pendingServices") || "[]");
-        const updatedServices = [...existingServices, pendingPayment];
-        sessionStorage.setItem("pendingServices", JSON.stringify(updatedServices));
+        sessionStorage.setItem(
+          "pendingServices",
+          JSON.stringify([...existingServices, pendingPayment])
+        );
 
-        const submissionTime = submissionTimer();
-
-        // Log successful form submission
-        logger.logInfo("Form submission completed successfully", {
-          component: "mixing_mastering",
-          action: "form_submission_success",
-          userId: clerkUser.id,
-          reservationId: reservationResult.id,
-          submissionTime,
-          selectedService,
-          totalPrice: selectedServiceData?.price || 0,
-        });
-
-        // Add success breadcrumb
-        addBreadcrumb({
-          category: "user_action",
-          message: "Form submission completed successfully",
-          level: "info",
-          data: {
-            userId: clerkUser.id,
-            reservationId: reservationResult.id,
-            submissionTime,
-            selectedService,
-          },
-        });
-
-        // Track successful submission performance
-        performanceMonitor.recordMetric("form_submission_success", submissionTime, "ms", {
+        performanceMonitor.recordMetric("form_submission_success", submissionTimer(), "ms", {
           component: "form_submission",
-          userId: clerkUser.id,
           selectedService,
         });
 
         toast({
-          title: "Service Added!",
-          description: "Your mixing & mastering service has been added to checkout.",
-        });
-
-        // Log navigation to checkout
-        logUserAction("Navigating to checkout page", {
-          component: "mixing_mastering",
-          action: "checkout_navigation",
-          userId: clerkUser.id,
-          reservationId: reservationResult.id,
+          title: "Added to Checkout",
+          description: "Redirecting to payment...",
         });
 
         setLocation("/checkout");
       } catch (error) {
-        const submissionTime = submissionTimer();
-
-        // Log form submission error
         logger.logError("Form submission failed", error, {
           errorType: "api",
           component: "mixing_mastering",
           action: "form_submission_error",
-          userId: clerkUser?.id,
-          submissionTime,
-          selectedService,
-          hasFiles: uploadedFiles.length > 0,
         });
-
-        // Add error breadcrumb
-        addBreadcrumb({
-          category: "error",
-          message: "Form submission failed",
-          level: "error",
-          data: {
-            userId: clerkUser?.id,
-            submissionTime,
-            selectedService,
-            errorMessage: error instanceof Error ? error.message : String(error),
-          },
-        });
-
-        // Track failed submission performance
-        performanceMonitor.recordMetric("form_submission_error", submissionTime, "ms", {
-          component: "form_submission",
-          userId: clerkUser?.id,
-          selectedService,
-          errorType: error instanceof Error ? error.name : "unknown",
-        });
-
-        // Error handling is managed by the useFormSubmissionWithRetry hook
       }
     }
   );
@@ -696,9 +481,30 @@ function MixingMasteringContent() {
   return (
     <div className="min-h-screen bg-[var(--deep-black)]">
       <StandardHero
-        title="Mixing & Mastering"
-        subtitle="Professional audio engineering services to make your music sound radio-ready. Get professional mixing and mastering from industry experts."
-      />
+        title="Radio-ready Mix & Master in 4–6 business days"
+        subtitle="Industry-standard mix, loudness optimized for streaming, delivered in WAV."
+      >
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
+          <Button
+            size="lg"
+            className="bg-[var(--accent-purple)] hover:bg-[var(--accent-purple)]/90 text-white px-8 py-3 text-lg font-semibold"
+            onClick={scrollToServices}
+          >
+            Book a session
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            className="border-gray-500 text-white hover:bg-white/10 px-8 py-3 text-lg"
+            onClick={scrollToServices}
+          >
+            Listen to samples
+          </Button>
+        </div>
+        <p className="text-gray-400 text-sm">
+          Up to 5 revisions • Turnaround 4–6 business days • Cancel anytime before work starts
+        </p>
+      </StandardHero>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <AuthStatusBanner
@@ -716,88 +522,62 @@ function MixingMasteringContent() {
         />
 
         <ProgressIndicator
+          currentStep={currentStep}
           selectedServiceName={selectedServiceData?.name}
           selectedServicePrice={selectedServiceData?.price}
         />
 
-        {/* Service Selection Header */}
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-white mb-2">Choose Your Service</h2>
-          <p className="text-gray-300 max-w-2xl mx-auto">
-            Select the perfect audio engineering service for your project. All services include
-            professional quality and fast turnaround.
-          </p>
-        </div>
-
         {/* Services Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-          {services.map(service => (
-            <ServiceCard
-              key={service.id}
-              service={service}
-              isSelected={selectedService === service.id}
-              onSelect={() => {
-                logUserAction(`Service selected: ${service.name}`, {
-                  component: "mixing_mastering",
-                  action: "service_selection",
-                  serviceId: service.id,
-                  serviceName: service.name,
-                  servicePrice: service.price,
-                  previousService: selectedService,
-                });
-
-                trackUserInteraction("service_selection", "service_card", undefined, {
-                  serviceId: service.id,
-                  serviceName: service.name,
-                  servicePrice: service.price,
-                  previousService: selectedService,
-                });
-
-                addBreadcrumb({
-                  category: "user_action",
-                  message: `Service selected: ${service.name}`,
-                  level: "info",
-                  data: {
-                    serviceId: service.id,
-                    serviceName: service.name,
-                    servicePrice: service.price,
-                    previousService: selectedService,
-                  },
-                });
-
-                setSelectedService(service.id);
-              }}
-            />
-          ))}
+        <div ref={servicesRef} className="scroll-mt-32">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {services.map(service => (
+              <ServiceCard
+                key={service.id}
+                service={service}
+                isSelected={selectedService === service.id}
+                onSelect={() => handleServiceSelect(service.id)}
+              />
+            ))}
+          </div>
         </div>
 
-        {/* Booking Form */}
-        <BookingForm
-          selectedServiceData={selectedServiceData}
-          authState={authState}
-          formData={formData}
-          isFormValid={isFormValid}
-          isValidating={isValidating}
-          hasBeenSubmitted={hasBeenSubmitted}
-          isSubmitting={isSubmitting}
-          uploadedFiles={uploadedFiles}
-          fileUploadErrors={fileUploadErrors}
-          timeSlots={timeSlots}
-          onInputChange={handleInputChange}
-          onBlur={handleBlur}
-          onSubmit={handleSubmit}
-          onFileUploadSuccess={handleFileUploadSuccess}
-          onFileUploadError={handleFileUploadError}
-          onFileRemove={handleFileRemove}
-          getFieldError={getFieldErrorWrapper}
-        />
+        {/* Booking Form - only show when service selected */}
+        {selectedService && (
+          <div ref={formRef} className="scroll-mt-32">
+            <BookingForm
+              selectedServiceData={selectedServiceData}
+              authState={authState}
+              formData={formData}
+              isFormValid={isFormValid}
+              isValidating={isValidating}
+              hasBeenSubmitted={hasBeenSubmitted}
+              isSubmitting={isSubmitting}
+              uploadedFiles={uploadedFiles}
+              fileUploadErrors={fileUploadErrors}
+              timeSlots={timeSlots}
+              onInputChange={handleInputChange}
+              onBlur={handleBlur}
+              onSubmit={handleSubmit}
+              onFileUploadSuccess={handleFileUploadSuccess}
+              onFileUploadError={handleFileUploadError}
+              onFileRemove={handleFileRemove}
+              getFieldError={getFieldErrorWrapper}
+            />
+          </div>
+        )}
+
+        {/* CTA when no service selected */}
+        {!selectedService && (
+          <div className="text-center py-8">
+            <p className="text-gray-400 text-lg">👆 Select a package above to continue</p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// Main component with safe error boundary
-export default function MixingMastering() {
+export default function MixingMastering(): JSX.Element {
   return (
     <ReservationErrorBoundary
       serviceName="Mixing & Mastering"
