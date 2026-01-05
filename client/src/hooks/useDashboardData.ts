@@ -4,8 +4,13 @@
  * This hook replaces mock data with real data from Convex database.
  * It integrates with the unified dashboard store to provide consistent,
  * real-time data across all dashboard sections.
+ *
+ * FIX: Added visibility-aware query control to prevent "thundering herd"
+ * freeze when tab becomes visible. Convex queries are paused when tab
+ * is hidden and resumed with staggered delays when visible.
  */
 
+import { useConvexQueryEnabled } from "@/providers/ConvexVisibilityProvider";
 import { useDashboardStore } from "@/stores/useDashboardStore";
 import type { DashboardData } from "@shared/types/dashboard";
 import { SyncErrorType, type ConsistentUserStats } from "@shared/types/sync";
@@ -48,19 +53,28 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
   // Track if we've initialized data to prevent unnecessary re-fetching
   const initializedRef = useRef(false);
 
+  // FIX: Check if Convex queries should be active (visibility-aware)
+  // This prevents the "thundering herd" freeze when tab becomes visible
+  const isConvexEnabled = useConvexQueryEnabled();
+
   // Fetch dashboard data from Convex with real-time updates
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore - Type inference issue with Convex API
-  const dashboardData = useQuery(api.dashboard.getDashboardData, {
-    includeChartData,
-    includeTrends,
-    period,
-    activityLimit,
-    ordersLimit,
-    downloadsLimit,
-    favoritesLimit,
-    reservationsLimit,
-  });
+  // FIX: Use "skip" to disable query when tab is hidden
+  const dashboardData = useQuery(
+    // @ts-expect-error - Type instantiation is excessively deep with Convex conditional args
+    api.dashboard.getDashboardData,
+    isConvexEnabled
+      ? {
+          includeChartData,
+          includeTrends,
+          period,
+          activityLimit,
+          ordersLimit,
+          downloadsLimit,
+          favoritesLimit,
+          reservationsLimit,
+        }
+      : "skip"
+  );
 
   // Handle loading states and data updates
   useEffect(() => {
@@ -205,9 +219,15 @@ export function useDashboardData(options: UseDashboardDataOptions = {}) {
  * Hook to fetch analytics data for specific time periods
  */
 export function useAnalyticsData(period: "7d" | "30d" | "90d" | "1y" = "30d") {
+  // FIX: Check if Convex queries should be active (visibility-aware)
+  const isConvexEnabled = useConvexQueryEnabled();
+
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore - Type inference issue with Convex API
-  const analyticsData = useQuery(api.dashboard.getAnalyticsData, { period });
+  const analyticsData = useQuery(
+    api.dashboard.getAnalyticsData,
+    isConvexEnabled ? { period } : "skip"
+  );
 
   return {
     data: analyticsData,
@@ -220,9 +240,12 @@ export function useAnalyticsData(period: "7d" | "30d" | "90d" | "1y" = "30d") {
  * Hook to fetch lightweight dashboard stats only
  */
 export function useDashboardStats() {
+  // FIX: Check if Convex queries should be active (visibility-aware)
+  const isConvexEnabled = useConvexQueryEnabled();
+
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore - Type inference issue with Convex API
-  const stats = useQuery(api.dashboard.getDashboardStats);
+  const stats = useQuery(api.dashboard.getDashboardStats, isConvexEnabled ? {} : "skip");
 
   return {
     stats,

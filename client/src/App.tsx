@@ -26,6 +26,9 @@ import { destroySyncManager } from "@/services/SyncManager";
 // Import performance monitoring cleanup
 import { stopMemoryMonitoring } from "@/lib/performanceMonitoring";
 
+// FIX: Import ConvexVisibilityProvider to prevent "thundering herd" freeze
+import { ConvexVisibilityProvider } from "@/providers/ConvexVisibilityProvider";
+
 // Critical components - loaded immediately for core UX
 import { Navbar } from "@/components/layout/navbar";
 
@@ -407,79 +410,84 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <CacheProvider>
-        <HelmetProvider>
-          <TooltipProvider>
-            <LoadingStateProvider>
-              <CartProvider>
-                <ScrollToTop />
-                <div className="min-h-screen bg-[var(--deep-black)] text-white">
-                  <a
-                    href="#main-content"
-                    className="skip-to-content sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[var(--color-accent)] text-white px-4 py-2 rounded-lg z-50"
-                    aria-label="Skip to main content"
-                  >
-                    Skip to content
-                  </a>
+        {/* FIX: ConvexVisibilityProvider prevents "thundering herd" freeze
+            by pausing Convex subscriptions when tab is hidden and resuming
+            them with staggered delays when tab becomes visible */}
+        <ConvexVisibilityProvider resumeDelay={500} staggerRange={1000} minVisibleTime={300}>
+          <HelmetProvider>
+            <TooltipProvider>
+              <LoadingStateProvider>
+                <CartProvider>
+                  <ScrollToTop />
+                  <div className="min-h-screen bg-[var(--deep-black)] text-white">
+                    <a
+                      href="#main-content"
+                      className="skip-to-content sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-[var(--color-accent)] text-white px-4 py-2 rounded-lg z-50"
+                      aria-label="Skip to main content"
+                    >
+                      Skip to content
+                    </a>
 
-                  {/* Global loading indicator */}
-                  <GlobalLoadingIndicator />
+                    {/* Global loading indicator */}
+                    <GlobalLoadingIndicator />
 
-                  {/* Offline indicator - lazy loaded and deferred */}
-                  {mountOffline && (
-                    <div className="fixed bottom-4 right-4 z-40">
+                    {/* Offline indicator - lazy loaded and deferred */}
+                    {mountOffline && (
+                      <div className="fixed bottom-4 right-4 z-40">
+                        <Suspense fallback={null}>
+                          <OfflineIndicator showDetails />
+                        </Suspense>
+                      </div>
+                    )}
+
+                    {/* Navbar always visible for navigation */}
+                    <Navbar />
+
+                    <main id="main-content" role="main">
+                      <ErrorBoundary>
+                        <Suspense fallback={<RouteLoadingFallback />}>
+                          <Router />
+                        </Suspense>
+                        {/* Component preloader for route-based optimization */}
+                        <ComponentPreloader />
+
+                        {/* Performance monitoring (development only, lazy loaded) */}
+                        <DevOnlyMonitors />
+                      </ErrorBoundary>
+                    </main>
+
+                    {/* Footer - lazy loaded */}
+                    <Suspense fallback={<MinimalLoadingFallback />}>
+                      <Footer />
+                    </Suspense>
+
+                    {/* Mobile bottom navigation - lazy loaded and deferred */}
+                    {mountMobileNav && (
                       <Suspense fallback={null}>
-                        <OfflineIndicator showDetails />
+                        <MobileBottomNav />
                       </Suspense>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Navbar always visible for navigation */}
-                  <Navbar />
+                    {/* Global audio player - lazy loaded, deferred as it's heavy */}
+                    {/* Hidden on product pages where ProductArtworkPlayer handles playback */}
+                    {/* Gated by enableGlobalAudioPlayer feature flag to save bandwidth on non-audio pages */}
+                    {isGlobalAudioEnabled && mountAudioPlayer && <GlobalAudioPlayerWrapper />}
 
-                  <main id="main-content" role="main">
-                    <ErrorBoundary>
-                      <Suspense fallback={<RouteLoadingFallback />}>
-                        <Router />
+                    {/* Newsletter modal - lazy loaded */}
+                    {isOpen && (
+                      <Suspense fallback={null}>
+                        <NewsletterModal isOpen={isOpen} onClose={closeModal} />
                       </Suspense>
-                      {/* Component preloader for route-based optimization */}
-                      <ComponentPreloader />
+                    )}
 
-                      {/* Performance monitoring (development only, lazy loaded) */}
-                      <DevOnlyMonitors />
-                    </ErrorBoundary>
-                  </main>
-
-                  {/* Footer - lazy loaded */}
-                  <Suspense fallback={<MinimalLoadingFallback />}>
-                    <Footer />
-                  </Suspense>
-
-                  {/* Mobile bottom navigation - lazy loaded and deferred */}
-                  {mountMobileNav && (
-                    <Suspense fallback={null}>
-                      <MobileBottomNav />
-                    </Suspense>
-                  )}
-
-                  {/* Global audio player - lazy loaded, deferred as it's heavy */}
-                  {/* Hidden on product pages where ProductArtworkPlayer handles playback */}
-                  {/* Gated by enableGlobalAudioPlayer feature flag to save bandwidth on non-audio pages */}
-                  {isGlobalAudioEnabled && mountAudioPlayer && <GlobalAudioPlayerWrapper />}
-
-                  {/* Newsletter modal - lazy loaded */}
-                  {isOpen && (
-                    <Suspense fallback={null}>
-                      <NewsletterModal isOpen={isOpen} onClose={closeModal} />
-                    </Suspense>
-                  )}
-
-                  {/* Toaster for notifications */}
-                  <Toaster />
-                </div>
-              </CartProvider>
-            </LoadingStateProvider>
-          </TooltipProvider>
-        </HelmetProvider>
+                    {/* Toaster for notifications */}
+                    <Toaster />
+                  </div>
+                </CartProvider>
+              </LoadingStateProvider>
+            </TooltipProvider>
+          </HelmetProvider>
+        </ConvexVisibilityProvider>
       </CacheProvider>
     </QueryClientProvider>
   );

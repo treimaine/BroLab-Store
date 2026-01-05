@@ -1,3 +1,4 @@
+import { useConvexQueryEnabled } from "@/providers/ConvexVisibilityProvider";
 import { useUser } from "@clerk/clerk-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -5,10 +6,20 @@ import { api } from "../../../convex/_generated/api";
 export default function TestConvex() {
   const { user: clerkUser } = useUser();
 
-  // Test the favorites function
-  const favorites = useQuery(api.favorites.getFavorites.getFavorites, clerkUser ? {} : "skip");
+  // FIX: Check if Convex queries should be active (visibility-aware)
+  const isConvexEnabled = useConvexQueryEnabled();
 
-  const userStats = useQuery(api.users.getUserStats.getUserStats, clerkUser ? {} : "skip");
+  // Test the favorites function
+  // FIX: Use "skip" to disable query when tab is hidden
+  const favorites = useQuery(
+    api.favorites.getFavorites.getFavorites,
+    clerkUser && isConvexEnabled ? {} : "skip"
+  );
+
+  const userStats = useQuery(
+    api.users.getUserStats.getUserStats,
+    clerkUser && isConvexEnabled ? {} : "skip"
+  );
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
