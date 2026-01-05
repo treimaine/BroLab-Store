@@ -15196,8 +15196,11 @@ var MessageQueueManager = class {
   CLEANUP_INTERVAL = 60 * 1e3;
   // 1 minute
   cleanupTimer = null;
+  disableTimers = Boolean(process.env.VERCEL) || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
   constructor() {
-    this.startCleanupTimer();
+    if (!this.disableTimers) {
+      this.startCleanupTimer();
+    }
   }
   /**
    * Add a message to the queue
@@ -15319,8 +15322,11 @@ var WebSocketManager = class {
   // 1 minute
   heartbeatCheckInterval = 3e4;
   // 30 seconds
+  disableTimers = Boolean(process.env.VERCEL) || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
   constructor() {
-    this.setupHeartbeatMonitoring();
+    if (!this.disableTimers) {
+      this.setupHeartbeatMonitoring();
+    }
   }
   /**
    * Initialize WebSocket server

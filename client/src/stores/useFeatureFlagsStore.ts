@@ -222,7 +222,7 @@ export const useFeatureFlagsStore = create<FeatureFlagsState & FeatureFlagsActio
           ...currentState,
           flags: {
             ...defaultFeatureFlags, // 1. Base defaults
-            ...(persisted?.flags ?? {}), // 2. User overrides from localStorage
+            ...persisted?.flags, // 2. User overrides from localStorage
             ...envFlags, // 3. Env variables (highest priority)
           },
         };

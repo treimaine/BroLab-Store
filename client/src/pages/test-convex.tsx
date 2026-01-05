@@ -1,4 +1,4 @@
-import { useConvexQueryEnabled } from "@/providers/ConvexVisibilityProvider";
+import { useConvexQueryEnabled } from "@/hooks/useConvexVisibility";
 import { useUser } from "@clerk/clerk-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";

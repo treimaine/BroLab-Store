@@ -369,6 +369,11 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
     [currentTrack, isPlaying]
   );
 
+  // Autoplay interval callback - extracted to reduce nesting depth
+  const incrementActiveIndex = useCallback((): void => {
+    setActiveIndex(prev => (prev + 1) % beats.length);
+  }, [beats.length]);
+
   // Auto-play carousel (visual rotation, not audio)
   // FIX: Only run autoplay when tab is visible to prevent background CPU usage
   useEffect(() => {
@@ -378,9 +383,7 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
 
     const startAutoplay = (): void => {
       if (intervalId) clearInterval(intervalId);
-      intervalId = setInterval(() => {
-        setActiveIndex(prev => (prev + 1) % beats.length);
-      }, autoPlayInterval);
+      intervalId = setInterval(incrementActiveIndex, autoPlayInterval);
     };
 
     const stopAutoplay = (): void => {
@@ -395,7 +398,8 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
         stopAutoplay();
       } else {
         // Stagger restart to prevent thundering herd
-        setTimeout(startAutoplay, Math.random() * 500 + 200);
+        const delay = Math.random() * 500 + 200;
+        setTimeout(startAutoplay, delay);
       }
     };
 
@@ -410,7 +414,7 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
       stopAutoplay();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [autoPlay, autoPlayInterval, beats.length, isPaused]);
+  }, [autoPlay, autoPlayInterval, beats.length, isPaused, incrementActiveIndex]);
 
   // Handle play/pause toggle using global store
   const handlePlay = useCallback(
@@ -420,14 +424,11 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
 
       const currentTrackIdx = getTrackIndex(beat.id);
       const trackId = `carousel-${beat.id}-${currentTrackIdx}`;
+      const isSameTrack = currentTrack?.id === trackId;
 
       // If same track, toggle play/pause
-      if (currentTrack?.id === trackId && isPlaying) {
-        setIsPlaying(false);
-        return;
-      }
-      if (currentTrack?.id === trackId && !isPlaying) {
-        setIsPlaying(true);
+      if (isSameTrack) {
+        setIsPlaying(!isPlaying);
         return;
       }
 
@@ -436,7 +437,8 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
       setQueue(storeTracks);
 
       // Set current track and play
-      setCurrentTrack(storeTracks[currentTrackIdx] || storeTracks[0]);
+      const targetTrack = storeTracks[currentTrackIdx] ?? storeTracks[0];
+      setCurrentTrack(targetTrack);
       playTrackFromQueue(currentTrackIdx);
       setIsPlaying(true);
     },
@@ -545,6 +547,45 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
     return () => globalThis.removeEventListener("keydown", handleKeyDown);
   }, [goToPrev, goToNext]);
 
+  // Mouse enter/leave handlers - extracted to reduce nesting
+  const handleMouseEnter = useCallback((): void => {
+    setIsPaused(true);
+  }, []);
+
+  const handleMouseLeave = useCallback((): void => {
+    setIsPaused(false);
+  }, []);
+
+  // Calculate carousel item position - extracted to reduce nesting depth
+  const calculatePosition = useCallback(
+    (index: number): number => {
+      let position = index - activeIndex;
+      const halfLength = beats.length / 2;
+
+      if (position > halfLength) {
+        position -= beats.length;
+      } else if (position < -halfLength) {
+        position += beats.length;
+      }
+
+      return position;
+    },
+    [activeIndex, beats.length]
+  );
+
+  // Create item handlers - memoized to prevent recreation
+  const createItemHandlers = useCallback(
+    (beat: CarouselBeat) => ({
+      onPlay: () => handlePlay(beat),
+      onPrevTrack: () => handlePrevTrack(beat),
+      onNextTrack: () => handleNextTrack(beat),
+      onTrackSelect: (idx: number) => handleTrackSelect(beat, idx),
+      onSelect: () => onBeatSelect?.(beat),
+      onAddToCart: () => onAddToCart?.(beat),
+    }),
+    [handlePlay, handlePrevTrack, handleNextTrack, handleTrackSelect, onBeatSelect, onAddToCart]
+  );
+
   if (beats.length === 0) {
     return (
       <div className={cn("text-center py-12 text-gray-400", className)}>No beats to display</div>
@@ -556,8 +597,8 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
       ref={containerRef}
       aria-label="Beat carousel"
       className={cn("relative w-full overflow-hidden", "py-8 sm:py-12", className)}
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -567,18 +608,12 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
         style={{ perspective: "1000px" }}
       >
         {beats.map((beat, index) => {
-          // Calculate position relative to active
-          let position = index - activeIndex;
-
-          // Handle wrapping for infinite feel
-          if (position > beats.length / 2) {
-            position -= beats.length;
-          } else if (position < -beats.length / 2) {
-            position += beats.length;
-          }
+          const position = calculatePosition(index);
 
           // Only render visible items
           if (Math.abs(position) > 3) return null;
+
+          const handlers = createItemHandlers(beat);
 
           return (
             <CarouselItem
@@ -588,12 +623,12 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
               isActive={position === 0}
               isPlaying={isBeatPlaying(beat.id)}
               currentTrackIndex={getTrackIndex(beat.id)}
-              onPlay={() => handlePlay(beat)}
-              onPrevTrack={() => handlePrevTrack(beat)}
-              onNextTrack={() => handleNextTrack(beat)}
-              onTrackSelect={idx => handleTrackSelect(beat, idx)}
-              onSelect={() => onBeatSelect?.(beat)}
-              onAddToCart={() => onAddToCart?.(beat)}
+              onPlay={handlers.onPlay}
+              onPrevTrack={handlers.onPrevTrack}
+              onNextTrack={handlers.onNextTrack}
+              onTrackSelect={handlers.onTrackSelect}
+              onSelect={handlers.onSelect}
+              onAddToCart={handlers.onAddToCart}
             />
           );
         })}

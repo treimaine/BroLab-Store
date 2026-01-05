@@ -9,35 +9,12 @@
  * try to reconnect and resync simultaneously.
  */
 
-import { useTabVisible } from "@/hooks/useTabVisibilityManager";
 import {
-  createContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-
-interface ConvexVisibilityContextValue {
-  /** Whether Convex subscriptions should be active */
-  isConvexEnabled: boolean;
-  /** Whether the tab is currently visible */
-  isTabVisible: boolean;
-  /** Force enable Convex (bypass visibility check) */
-  forceEnable: () => void;
-  /** Force disable Convex */
-  forceDisable: () => void;
-}
-
-const ConvexVisibilityContext = createContext<ConvexVisibilityContextValue>({
-  isConvexEnabled: true,
-  isTabVisible: true,
-  forceEnable: () => {},
-  forceDisable: () => {},
-});
+  ConvexVisibilityContext,
+  type ConvexVisibilityContextValue,
+} from "@/contexts/ConvexVisibilityContext";
+import { useTabVisible } from "@/hooks/useTabVisibilityManager";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface ConvexVisibilityProviderProps {
   children: ReactNode;
@@ -146,20 +123,4 @@ export function ConvexVisibilityProvider({
       {children}
     </ConvexVisibilityContext.Provider>
   );
-}
-
-/**
- * Hook to access Convex visibility state
- */
-export function useConvexVisibility(): ConvexVisibilityContextValue {
-  return useContext(ConvexVisibilityContext);
-}
-
-/**
- * Hook that returns whether a Convex query should be active
- * Use this to conditionally skip Convex queries when tab is hidden
- */
-export function useConvexQueryEnabled(): boolean {
-  const { isConvexEnabled } = useConvexVisibility();
-  return isConvexEnabled;
 }

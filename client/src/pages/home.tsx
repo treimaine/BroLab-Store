@@ -12,8 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useScrollToTop } from "@/hooks/use-scroll-to-top";
 import { useWooCommerce } from "@/hooks/use-woocommerce";
+import { useConvexQueryEnabled } from "@/hooks/useConvexVisibility";
 import { api } from "@/lib/convex-api";
-import { useConvexQueryEnabled } from "@/providers/ConvexVisibilityProvider";
 import {
   hasRealAudio as checkHasRealAudio,
   getAudioUrl,
@@ -68,11 +68,11 @@ export default function Home() {
 
   // Get trending beats data from Convex (real view counts)
   // FIX: Use "skip" to disable query when tab is hidden
-
   const trendingData = useQuery(
-    api.beats.trending.getTrendingBeats as any,
+    // @ts-expect-error - Type inference issue with Convex API conditional skip
+    api.beats.trending.getTrendingBeats,
     isConvexEnabled ? { limit: 12 } : "skip"
-  );
+  ) as Array<{ wordpressId: number; views: number }> | undefined;
 
   useEffect(() => {
     if (error) {

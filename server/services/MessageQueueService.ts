@@ -23,15 +23,23 @@ interface MessageQueue {
 /**
  * Message Queue Manager
  * Singleton service for managing real-time messages
+ *
+ * FIX: Timers are disabled on Vercel/Lambda serverless to prevent
+ * functions from staying alive indefinitely.
  */
 class MessageQueueManager {
   private readonly queues: Map<string, MessageQueue> = new Map();
   private readonly MESSAGE_TTL = 5 * 60 * 1000; // 5 minutes
   private readonly CLEANUP_INTERVAL = 60 * 1000; // 1 minute
   private cleanupTimer: NodeJS.Timeout | null = null;
+  private readonly disableTimers =
+    Boolean(process.env.VERCEL) || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
 
   constructor() {
-    this.startCleanupTimer();
+    // FIX: Don't start timers on serverless platforms
+    if (!this.disableTimers) {
+      this.startCleanupTimer();
+    }
   }
 
   /**

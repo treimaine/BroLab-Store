@@ -573,6 +573,10 @@ class PollingConnection implements Connection {
 
 /**
  * Connection Manager with WebSocket-first, HTTP-polling fallback strategy
+ *
+ * FIX: WebSocket is disabled on Vercel/serverless platforms because they
+ * don't support persistent WebSocket connections. This prevents reconnection
+ * loops that cause browser freezes.
  */
 export class ConnectionManager extends BrowserEventEmitter {
   private readonly config: ConnectionConfig;
@@ -582,6 +586,7 @@ export class ConnectionManager extends BrowserEventEmitter {
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private fallbackStrategy: FallbackStrategy = "quality_based";
   private isDestroyed = false;
+  private readonly webSocketEnabled: boolean;
 
   // FIX: Use visibility-aware interval management to prevent browser freezes
   private readonly visibilityManager = new ServiceVisibilityManager("ConnectionManager", {
@@ -603,6 +608,18 @@ export class ConnectionManager extends BrowserEventEmitter {
     const wsBaseUrl = isProduction
       ? `${wsProtocol}//${globalThis.window.location.host}`
       : "ws://localhost:5000";
+
+    // FIX: Detect Vercel/serverless platforms and disable WebSocket
+    const isVercelOrServerless =
+      globalThis.window !== undefined &&
+      (globalThis.window.location.hostname.includes("vercel.app") ||
+        globalThis.window.location.hostname === "brolabentertainment.com" ||
+        globalThis.window.location.hostname.includes("brolabentertainment"));
+    const disableWebSocketEnv =
+      import.meta !== undefined &&
+      (import.meta as unknown as { env?: { VITE_DISABLE_WEBSOCKET?: string } }).env
+        ?.VITE_DISABLE_WEBSOCKET === "true";
+    this.webSocketEnabled = !isVercelOrServerless && !disableWebSocketEnv;
 
     this.config = {
       websocketUrl: config.websocketUrl || `${wsBaseUrl}/ws`,
@@ -889,6 +906,11 @@ export class ConnectionManager extends BrowserEventEmitter {
       throw new Error("Cannot connect in offline mode");
     }
 
+    // FIX: Force polling if WebSocket is disabled (Vercel/serverless)
+    if (strategy === "websocket" && !this.webSocketEnabled) {
+      strategy = "polling";
+    }
+
     // Disconnect current connection
     if (this.currentConnection) {
       this.currentConnection.close();
@@ -958,7 +980,10 @@ export class ConnectionManager extends BrowserEventEmitter {
   }
 
   private selectBestStrategy(): ConnectionStrategy {
-    const strategies: ConnectionStrategy[] = ["websocket", "polling"];
+    // FIX: Only include WebSocket if enabled (not on Vercel/serverless)
+    const strategies: ConnectionStrategy[] = this.webSocketEnabled
+      ? ["websocket", "polling"]
+      : ["polling"];
 
     // Sort strategies by performance
     strategies.sort((a, b) => {

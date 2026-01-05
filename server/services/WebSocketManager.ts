@@ -20,6 +20,9 @@ export interface ClientConnection {
 /**
  * WebSocket Manager for real-time dashboard synchronization
  * Handles client connections, message broadcasting, and heartbeat monitoring
+ *
+ * FIX: Timers are disabled on Vercel/Lambda serverless to prevent
+ * functions from staying alive indefinitely.
  */
 export class WebSocketManager {
   private wss: WebSocketServer | null = null;
@@ -27,9 +30,14 @@ export class WebSocketManager {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly heartbeatTimeout = 60000; // 1 minute
   private readonly heartbeatCheckInterval = 30000; // 30 seconds
+  private readonly disableTimers =
+    Boolean(process.env.VERCEL) || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
 
   constructor() {
-    this.setupHeartbeatMonitoring();
+    // FIX: Don't start timers on serverless platforms
+    if (!this.disableTimers) {
+      this.setupHeartbeatMonitoring();
+    }
   }
 
   /**

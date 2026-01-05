@@ -3,6 +3,11 @@
  *
  * Provides easy-to-use interface for managing real-time connections in React components
  * with automatic cleanup, status monitoring, and error handling.
+ *
+ * FIX: Auto-connect is disabled in production (Vercel) because:
+ * 1. Vercel serverless doesn't support WebSockets
+ * 2. WebSocket reconnection loops cause browser freezes
+ * 3. The polling fallback still creates unnecessary server load
  */
 
 import {
@@ -15,10 +20,17 @@ import {
 import type { ConnectionStatus, RecoveryAction, SyncError } from "@shared/types/sync";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// FIX: Detect if running on Vercel production (no WebSocket support)
+const isVercelProduction =
+  globalThis.window !== undefined &&
+  (globalThis.window.location.hostname.includes("vercel.app") ||
+    globalThis.window.location.hostname.includes("brolab") ||
+    import.meta.env.PROD);
+
 export interface UseConnectionManagerOptions {
   /** Connection configuration */
   config?: Partial<ConnectionConfig>;
-  /** Whether to auto-connect on mount */
+  /** Whether to auto-connect on mount (disabled in production by default) */
   autoConnect?: boolean;
   /** Whether to auto-reconnect on errors */
   autoReconnect?: boolean;
@@ -63,13 +75,17 @@ export interface UseConnectionManagerReturn {
 
 /**
  * Hook for managing real-time connections with automatic integration
+ *
+ * FIX: Auto-connect is disabled by default in production to prevent
+ * WebSocket reconnection loops that cause browser freezes on Vercel.
  */
 export const useConnectionManager = (
   options: UseConnectionManagerOptions = {}
 ): UseConnectionManagerReturn => {
   const {
     config,
-    autoConnect = true,
+    // FIX: Disable auto-connect in production (Vercel doesn't support WebSockets)
+    autoConnect = !isVercelProduction,
     autoReconnect: _autoReconnect = true,
     onError,
     onStatusChange,
@@ -150,10 +166,13 @@ export const useConnectionManager = (
     manager.on("connected", handleConnected);
 
     // Auto-connect if enabled
-    if (autoConnect) {
+    // FIX: Skip auto-connect in production to prevent WebSocket reconnection loops
+    if (autoConnect && !isVercelProduction) {
       manager.connect().catch(err => {
         console.error("Auto-connect failed:", err);
       });
+    } else if (isVercelProduction && import.meta.env.DEV) {
+      console.log("[useConnectionManager] Auto-connect disabled in production (Vercel)");
     }
 
     // Update metrics periodically - REDUCED frequency to prevent performance issues

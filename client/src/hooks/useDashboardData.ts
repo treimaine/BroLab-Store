@@ -10,7 +10,7 @@
  * is hidden and resumed with staggered delays when visible.
  */
 
-import { useConvexQueryEnabled } from "@/providers/ConvexVisibilityProvider";
+import { useConvexQueryEnabled } from "@/hooks/useConvexVisibility";
 import { useDashboardStore } from "@/stores/useDashboardStore";
 import type { DashboardData } from "@shared/types/dashboard";
 import { SyncErrorType, type ConsistentUserStats } from "@shared/types/sync";
