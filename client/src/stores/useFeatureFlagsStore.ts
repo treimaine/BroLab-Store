@@ -65,12 +65,14 @@ export const defaultFeatureFlags: FeatureFlags = {
   // Core features - enabled by default
   enableNewsletter: true,
   enableOfflineMode: true,
-  enablePerformanceMonitoring: globalThis.window !== undefined && import.meta.env.DEV,
-  enableBundleAnalyzer: globalThis.window !== undefined && import.meta.env.DEV,
+  // FIX: Disable performance monitoring by default - it can cause memory accumulation
+  enablePerformanceMonitoring: false,
+  enableBundleAnalyzer: false,
 
-  // Audio player - global player and Sonaar Modern Player enabled by default
-  enableGlobalAudioPlayer: true,
-  enableSonaarModernPlayer: true,
+  // Audio player - DISABLED by default to test if it's causing freezes
+  // Set VITE_ENABLE_GLOBAL_AUDIO_PLAYER=true to re-enable
+  enableGlobalAudioPlayer: false,
+  enableSonaarModernPlayer: false,
 
   // Services - enabled by default
   enableMixingMastering: true,

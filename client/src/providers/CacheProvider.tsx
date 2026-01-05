@@ -15,7 +15,6 @@
 
 import { toast } from "@/hooks/use-toast";
 import { useCacheWarming } from "@/hooks/useCachingStrategy";
-import { useStaggeredResume } from "@/hooks/useTabVisibilityManager";
 import { apiService } from "@/services/ApiService";
 import { useUser } from "@clerk/clerk-react";
 import {
@@ -105,18 +104,7 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
     clear: { failureCount: 0, currentDelay: BACKOFF_CONFIG.initialDelay, isPaused: false },
   });
 
-  // Helper to calculate backoff delay - uses ref to avoid dependency cycle
-  const calculateBackoffDelay = useCallback((operation: CacheOperationType): number => {
-    const status = operationStatusesRef.current[operation];
-    if (status.failureCount === 0) {
-      return operation === "metrics" ? 30_000 : 5 * 60_000; // Default intervals
-    }
-    const delay = Math.min(
-      BACKOFF_CONFIG.initialDelay * Math.pow(BACKOFF_CONFIG.multiplier, status.failureCount),
-      BACKOFF_CONFIG.maxDelay
-    );
-    return delay;
-  }, []);
+  // FIX: Removed calculateBackoffDelay - no longer needed since periodic timers are disabled
 
   // Helper to handle operation failure with backoff
   const handleOperationFailure = useCallback(
@@ -288,15 +276,9 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
     }
   }, [handleOperationSuccess, handleOperationFailure]);
 
-  // Use centralized tab visibility manager with staggered resume
-  // FIX: Increased delays significantly to prevent the "thundering herd" problem when tab becomes visible
-  const { isVisible: isTabVisible, isReady: isTabReady } = useStaggeredResume({
-    baseDelay: 800,
-    staggerRange: 1500,
-    minVisibleTime: 1200,
-  });
-  const metricsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const optimizationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // FIX: Removed unused refs - periodic timers are disabled to prevent freezes
+  // const metricsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // const optimizationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Initialize cache on mount (runs once) - DEFERRED to prevent freeze
   useEffect(() => {
@@ -361,103 +343,9 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
     };
   }, []); // Empty deps - run only once on mount
 
-  // Schedule metrics updates with backoff - stable callback using refs
-  const scheduleMetricsUpdate = useCallback(() => {
-    if (metricsTimeoutRef.current) {
-      clearTimeout(metricsTimeoutRef.current);
-    }
-
-    const delay = calculateBackoffDelay("metrics");
-
-    metricsTimeoutRef.current = setTimeout(() => {
-      updateMetrics();
-      // Reschedule if not paused (check ref for current value)
-      if (!operationStatusesRef.current.metrics.isPaused) {
-        scheduleMetricsUpdate();
-      }
-    }, delay);
-  }, [calculateBackoffDelay, updateMetrics]);
-
-  // Schedule optimization with backoff - stable callback using refs
-  const scheduleOptimization = useCallback(() => {
-    if (optimizationTimeoutRef.current) {
-      clearTimeout(optimizationTimeoutRef.current);
-    }
-
-    // Skip if paused (check ref for current value)
-    if (operationStatusesRef.current.optimization.isPaused) {
-      return;
-    }
-
-    const delay = calculateBackoffDelay("optimization");
-
-    optimizationTimeoutRef.current = setTimeout(async () => {
-      try {
-        await cachingStrategy.optimizeCache();
-        handleOperationSuccess("optimization");
-      } catch (error) {
-        console.error("Cache optimization failed:", error);
-        handleOperationFailure("optimization", error);
-      }
-      // Reschedule if not paused (check ref for current value)
-      if (!operationStatusesRef.current.optimization.isPaused) {
-        scheduleOptimization();
-      }
-    }, delay);
-  }, [calculateBackoffDelay, handleOperationSuccess, handleOperationFailure]);
-
-  // Manage periodic timers based on tab visibility (with staggered resume)
-  // FIX: Stagger operations to prevent "thundering herd" freeze on tab return
-  useEffect(() => {
-    const staggeredTimers: ReturnType<typeof setTimeout>[] = [];
-
-    // Clear existing timeouts when tab becomes hidden
-    const clearTimeouts = (): void => {
-      if (metricsTimeoutRef.current) {
-        clearTimeout(metricsTimeoutRef.current);
-        metricsTimeoutRef.current = null;
-      }
-      if (optimizationTimeoutRef.current) {
-        clearTimeout(optimizationTimeoutRef.current);
-        optimizationTimeoutRef.current = null;
-      }
-      // Clear staggered timers
-      staggeredTimers.forEach(clearTimeout);
-      staggeredTimers.length = 0;
-    };
-
-    if (!isTabVisible) {
-      clearTimeouts();
-      return;
-    }
-
-    // Wait for staggered resume to be ready before starting operations
-    if (!isTabReady) {
-      return;
-    }
-
-    // Tab is visible and ready - start scheduled operations with STAGGERED delays
-    // This prevents the "thundering herd" problem that causes freezes
-    // Use spread operator to batch push calls (SonarQube S7778)
-    staggeredTimers.push(
-      // Step 1: Update metrics after 100ms (lightweight operation first)
-      setTimeout(() => {
-        updateMetrics();
-      }, 100),
-      // Step 2: Schedule periodic metrics after 600ms
-      setTimeout(() => {
-        scheduleMetricsUpdate();
-      }, 600),
-      // Step 3: Schedule optimization after 1200ms (heaviest operation last)
-      setTimeout(() => {
-        scheduleOptimization();
-      }, 1200)
-    );
-
-    return clearTimeouts;
-    // Only re-run when visibility/ready state changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTabVisible, isTabReady]);
+  // FIX: Removed scheduleMetricsUpdate and scheduleOptimization functions
+  // These were causing memory accumulation and freezes via recursive setTimeout calls
+  // The cache still works, just without automatic background optimization
 
   // Cache actions - memoized to prevent unnecessary re-renders
   const warmCache = useCallback(async () => {

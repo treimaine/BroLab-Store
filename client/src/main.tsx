@@ -16,11 +16,15 @@ preloadCriticalResources();
 optimizeScrolling();
 
 // Lazy load performance monitoring only in development (top-level await)
-if (import.meta.env.DEV) {
-  const { initializePerformanceMonitoring } = await import("./lib/performanceMonitoring");
-  initializePerformanceMonitoring();
+// FIX: DISABLED - Performance monitoring was causing memory accumulation and freezes
+// Uncomment to re-enable for debugging
+// if (import.meta.env.DEV) {
+//   const { initializePerformanceMonitoring } = await import("./lib/performanceMonitoring");
+//   initializePerformanceMonitoring();
+// }
 
-  // Run i18n translation validation report
+// Run i18n translation validation report in dev only
+if (import.meta.env.DEV) {
   const { runValidationReport } = await import("./i18n/translationValidator");
   runValidationReport();
 }
