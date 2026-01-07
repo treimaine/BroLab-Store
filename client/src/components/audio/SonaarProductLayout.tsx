@@ -153,20 +153,36 @@ export const SonaarProductLayout = memo(function SonaarProductLayout({
 
       const audio = audioRef.current;
 
-      audio.addEventListener("loadedmetadata", () => {
+      // FIX: Throttle timeupdate to max 4 updates per second (250ms)
+      // This prevents excessive state updates that cause browser freezes
+      let lastTimeUpdate = 0;
+      const TIME_UPDATE_THROTTLE = 250; // ms
+
+      const handleLoadedMetadata = (): void => {
         setDuration(audio.duration);
-      });
+      };
 
-      audio.addEventListener("timeupdate", () => {
-        setCurrentTime(audio.currentTime);
-      });
+      const handleTimeUpdate = (): void => {
+        const now = Date.now();
+        if (now - lastTimeUpdate >= TIME_UPDATE_THROTTLE) {
+          lastTimeUpdate = now;
+          setCurrentTime(audio.currentTime);
+        }
+      };
 
-      audio.addEventListener("ended", () => {
+      const handleEnded = (): void => {
         setIsPlaying(false);
         setCurrentTime(0);
-      });
+      };
+
+      audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.addEventListener("timeupdate", handleTimeUpdate);
+      audio.addEventListener("ended", handleEnded);
 
       return (): void => {
+        audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+        audio.removeEventListener("timeupdate", handleTimeUpdate);
+        audio.removeEventListener("ended", handleEnded);
         audio.pause();
         audio.src = "";
       };

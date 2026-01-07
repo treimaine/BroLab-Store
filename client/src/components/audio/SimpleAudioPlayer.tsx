@@ -83,11 +83,22 @@ export function SimpleAudioPlayer() {
   }, [volume]);
 
   // Handle time updates
+  // FIX: Throttle timeupdate to max 4 updates per second (250ms)
+  // This prevents excessive state updates that cause browser freezes
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+    let lastTimeUpdate = 0;
+    const TIME_UPDATE_THROTTLE = 250; // ms
+
+    const handleTimeUpdate = (): void => {
+      const now = Date.now();
+      if (now - lastTimeUpdate >= TIME_UPDATE_THROTTLE) {
+        lastTimeUpdate = now;
+        setCurrentTime(audio.currentTime);
+      }
+    };
     const handleEnded = () => setIsPlaying(false);
 
     audio.addEventListener("timeupdate", handleTimeUpdate);

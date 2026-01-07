@@ -32,6 +32,7 @@ class CodeSplittingMonitor {
   private readonly metrics: CodeSplittingMetrics;
   private performanceObserver?: PerformanceObserver;
   private reportInterval?: NodeJS.Timeout;
+  private _visibilityHandler?: () => void;
 
   private constructor() {
     this.metrics = {
@@ -79,9 +80,40 @@ class CodeSplittingMonitor {
     });
 
     // Report metrics periodically
-    this.reportInterval = setInterval(() => {
-      this.reportMetrics();
-    }, 30000); // Every 30 seconds
+    // FIX: Added visibility awareness to pause reporting when tab is hidden
+    const startReportInterval = (): void => {
+      if (this.reportInterval) return;
+      this.reportInterval = setInterval(() => {
+        if (!document.hidden) {
+          this.reportMetrics();
+        }
+      }, 30000); // Every 30 seconds
+    };
+
+    const stopReportInterval = (): void => {
+      if (this.reportInterval) {
+        clearInterval(this.reportInterval);
+        this.reportInterval = undefined;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopReportInterval();
+      } else {
+        startReportInterval();
+      }
+    };
+
+    // Start if visible
+    if (!document.hidden) {
+      startReportInterval();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
+
+    // Store cleanup reference for destroy()
+    this._visibilityHandler = handleVisibilityChange;
   }
 
   private extractChunkName(url: string): string {
@@ -158,6 +190,11 @@ class CodeSplittingMonitor {
       this.reportInterval = undefined;
     }
     this.performanceObserver?.disconnect();
+    // FIX: Clean up visibility listener
+    if (this._visibilityHandler) {
+      document.removeEventListener("visibilitychange", this._visibilityHandler);
+      this._visibilityHandler = undefined;
+    }
   }
 }
 

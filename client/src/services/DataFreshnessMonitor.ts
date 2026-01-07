@@ -437,10 +437,53 @@ export class DataFreshnessMonitor {
         nextCheck: Date.now(),
       };
     }
+
+    // FIX: Add visibility change listener to pause/resume monitoring
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", this.handleVisibilityChange.bind(this), {
+        passive: true,
+      });
+    }
+  }
+
+  /**
+   * FIX: Handle visibility changes to pause/resume monitoring
+   */
+  private handleVisibilityChange(): void {
+    if (this.isDestroyed || !this.monitoringStatus.isActive) {
+      return;
+    }
+
+    if (document.hidden) {
+      // Tab hidden - stop the timer
+      if (this.checkTimer) {
+        clearTimeout(this.checkTimer);
+        this.checkTimer = undefined;
+      }
+    } else {
+      // Tab visible - resume with staggered delay to prevent thundering herd
+      const staggerDelay = Math.random() * 1000 + 500;
+      setTimeout(() => {
+        if (!this.isDestroyed && this.monitoringStatus.isActive && !document.hidden) {
+          this.scheduleNextCheck();
+        }
+      }, staggerDelay);
+    }
   }
 
   private scheduleNextCheck(): void {
     if (this.isDestroyed || !this.monitoringStatus.isActive) {
+      return;
+    }
+
+    // FIX: Clear any existing timer to prevent accumulation
+    if (this.checkTimer) {
+      clearTimeout(this.checkTimer);
+      this.checkTimer = undefined;
+    }
+
+    // FIX: Only schedule if tab is visible to prevent background CPU usage
+    if (typeof document !== "undefined" && document.hidden) {
       return;
     }
 
@@ -450,6 +493,12 @@ export class DataFreshnessMonitor {
   }
 
   private async performScheduledCheck(): Promise<void> {
+    // FIX: Skip check if tab is hidden
+    if (typeof document !== "undefined" && document.hidden) {
+      this.scheduleNextCheck();
+      return;
+    }
+
     try {
       await this.checkFreshness();
     } catch {
@@ -666,6 +715,11 @@ export class DataFreshnessMonitor {
     this.isDestroyed = true;
     this.stopMonitoring();
     this.eventListeners.clear();
+
+    // FIX: Remove visibility change listener
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", this.handleVisibilityChange.bind(this));
+    }
   }
 }
 

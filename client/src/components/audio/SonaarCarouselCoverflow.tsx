@@ -352,8 +352,7 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Use global audio store for synchronized playback
-  const { currentTrack, isPlaying, setCurrentTrack, setIsPlaying, setQueue, playTrackFromQueue } =
-    useAudioStore();
+  const { currentTrack, isPlaying, setIsPlaying, playFromQueueBatched } = useAudioStore();
 
   // Get current track index for a beat
   const getTrackIndex = useCallback(
@@ -383,7 +382,12 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
 
     const startAutoplay = (): void => {
       if (intervalId) clearInterval(intervalId);
-      intervalId = setInterval(incrementActiveIndex, autoPlayInterval);
+      // FIX: Add document.hidden check inside interval to prevent accumulated callbacks
+      intervalId = setInterval(() => {
+        if (!document.hidden) {
+          incrementActiveIndex();
+        }
+      }, autoPlayInterval);
     };
 
     const stopAutoplay = (): void => {
@@ -408,7 +412,7 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
       startAutoplay();
     }
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
 
     return () => {
       stopAutoplay();
@@ -434,23 +438,12 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
 
       // Convert all tracks to store format and set queue
       const storeTracks = tracks.map((t, i) => convertToStoreTrack(beat, t, i));
-      setQueue(storeTracks);
 
-      // Set current track and play
-      const targetTrack = storeTracks[currentTrackIdx] ?? storeTracks[0];
-      setCurrentTrack(targetTrack);
-      playTrackFromQueue(currentTrackIdx);
-      setIsPlaying(true);
+      // FIX: Use batched action to prevent multiple re-renders that cause freeze
+      // This combines setQueue + setCurrentTrack + setCurrentIndex + setIsPlaying into single update
+      playFromQueueBatched(storeTracks, currentTrackIdx, true);
     },
-    [
-      currentTrack,
-      isPlaying,
-      getTrackIndex,
-      setCurrentTrack,
-      setIsPlaying,
-      setQueue,
-      playTrackFromQueue,
-    ]
+    [currentTrack, isPlaying, getTrackIndex, setIsPlaying, playFromQueueBatched]
   );
 
   // Handle track change (prev/next)
@@ -466,13 +459,11 @@ export const SonaarCarouselCoverflow = memo(function SonaarCarouselCoverflow({
       // If currently playing this beat, switch to new track in global store
       if (isBeatPlaying(beat.id)) {
         const storeTracks = tracks.map((t, i) => convertToStoreTrack(beat, t, i));
-        setQueue(storeTracks);
-        setCurrentTrack(storeTracks[wrappedIndex]);
-        playTrackFromQueue(wrappedIndex);
-        setIsPlaying(true);
+        // FIX: Use batched action to prevent multiple re-renders
+        playFromQueueBatched(storeTracks, wrappedIndex, true);
       }
     },
-    [isBeatPlaying, setQueue, setCurrentTrack, playTrackFromQueue, setIsPlaying]
+    [isBeatPlaying, playFromQueueBatched]
   );
 
   // Handle previous track

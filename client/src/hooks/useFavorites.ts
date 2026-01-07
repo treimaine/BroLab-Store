@@ -1,3 +1,4 @@
+import { useConvexQueryEnabled } from "@/hooks/useConvexVisibility";
 import { api } from "@/lib/convex-api";
 import { useUser } from "@clerk/clerk-react";
 import { useMutation, useQuery } from "convex/react";
@@ -33,10 +34,13 @@ export function useFavorites() {
   const { user, isLoaded } = useUser();
   const isAuthenticated = Boolean(user && isLoaded);
 
-  // Query favorites - skip query if user is not authenticated
+  // FIX: Check if Convex queries should be active (visibility-aware)
+  const isConvexEnabled = useConvexQueryEnabled();
+
+  // Query favorites - skip query if user is not authenticated or tab is hidden
   const favorites = useQuery(
     api.favorites.getFavorites.getFavorites as never,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated && isConvexEnabled ? {} : "skip"
   ) as Favorite[] | undefined;
 
   // Mutations - typed as any to avoid Convex type instantiation issues

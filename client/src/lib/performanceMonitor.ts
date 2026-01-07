@@ -238,6 +238,9 @@ class PerformanceMonitor {
     }
   }
 
+  // FIX: Visibility handler for pausing intervals when tab is hidden
+  private memoryVisibilityHandler: (() => void) | null = null;
+
   private trackMemoryUsage(): void {
     // Chrome-specific memory API interface
     interface PerformanceMemory {
@@ -272,9 +275,44 @@ class PerformanceMonitor {
       });
     };
 
-    // Track memory usage every 30 seconds
-    trackMemory();
-    this.memoryInterval = setInterval(trackMemory, 30000);
+    // FIX: Use visibility-aware interval to prevent browser freezes
+    const startInterval = (): void => {
+      if (this.memoryInterval) return;
+      trackMemory(); // Track immediately when starting
+      this.memoryInterval = setInterval(() => {
+        if (!document.hidden) {
+          trackMemory();
+        }
+      }, 30000);
+    };
+
+    const stopInterval = (): void => {
+      if (this.memoryInterval) {
+        clearInterval(this.memoryInterval);
+        this.memoryInterval = undefined;
+      }
+    };
+
+    this.memoryVisibilityHandler = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        // Stagger restart to prevent thundering herd
+        setTimeout(
+          () => {
+            startInterval();
+          },
+          Math.random() * 500 + 400
+        );
+      }
+    };
+
+    // Start interval if tab is visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", this.memoryVisibilityHandler, { passive: true });
   }
 
   private trackPageLoadMetrics(): void {
@@ -548,6 +586,12 @@ class PerformanceMonitor {
   }
 
   public destroy(): void {
+    // FIX: Remove visibility listener to prevent memory leaks
+    if (this.memoryVisibilityHandler) {
+      document.removeEventListener("visibilitychange", this.memoryVisibilityHandler);
+      this.memoryVisibilityHandler = null;
+    }
+
     // Clean up memory interval
     if (this.memoryInterval) {
       clearInterval(this.memoryInterval);

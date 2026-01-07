@@ -136,7 +136,10 @@ export const EnhancedErrorProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   // Monitor network status
+  // FIX: Added visibility awareness to prevent network checks when tab is hidden
   useEffect(() => {
+    let speedCheckInterval: ReturnType<typeof setInterval> | null = null;
+
     const handleOnline = (): void => setNetworkStatus("online");
     const handleOffline = (): void => setNetworkStatus("offline");
 
@@ -144,6 +147,9 @@ export const EnhancedErrorProvider: React.FC<{ children: React.ReactNode }> = ({
     globalThis.addEventListener("offline", handleOffline);
 
     const checkConnectionSpeed = (): void => {
+      // Skip if tab is hidden
+      if (document.hidden) return;
+
       const start = Date.now();
       fetch("/api/health-check", { cache: "no-cache" })
         .then(() => {
@@ -153,12 +159,43 @@ export const EnhancedErrorProvider: React.FC<{ children: React.ReactNode }> = ({
         .catch(() => setNetworkStatus("offline"));
     };
 
-    const speedCheckInterval = setInterval(checkConnectionSpeed, 30000);
+    const startInterval = (): void => {
+      if (speedCheckInterval) return;
+      // FIX: Add document.hidden check inside interval to prevent accumulated callbacks
+      speedCheckInterval = setInterval(() => {
+        if (!document.hidden) {
+          checkConnectionSpeed();
+        }
+      }, 30000);
+    };
+
+    const stopInterval = (): void => {
+      if (speedCheckInterval) {
+        clearInterval(speedCheckInterval);
+        speedCheckInterval = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        startInterval();
+      }
+    };
+
+    // Start if visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
 
     return () => {
       globalThis.removeEventListener("online", handleOnline);
       globalThis.removeEventListener("offline", handleOffline);
-      clearInterval(speedCheckInterval);
+      stopInterval();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 

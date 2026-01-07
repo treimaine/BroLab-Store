@@ -548,6 +548,12 @@ export class ErrorLoggingService {
   public destroy(): void {
     this.isDestroyed = true;
 
+    // FIX: Remove visibility listener to prevent memory leaks
+    if (this.visibilityHandler) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
       this.flushTimer = undefined;
@@ -568,25 +574,77 @@ export class ErrorLoggingService {
   // PRIVATE METHODS
   // ================================
 
+  // FIX: Visibility handler for pausing intervals when tab is hidden
+  private visibilityHandler: (() => void) | null = null;
+
   private initializeService(): void {
     // Load existing logs from localStorage
     if (this.config.localStorage) {
       this.loadLogsFromStorage();
     }
 
-    // Set up remote logging flush timer
-    if (this.config.remote && this.config.remoteConfig) {
-      this.flushTimer = setInterval(() => {
-        if (this.remoteQueue.length > 0) {
-          this.flushRemoteLogs().catch(console.error);
-        }
-      }, this.config.remoteConfig.flushInterval);
+    // FIX: Use visibility-aware intervals to prevent browser freezes
+    this.setupVisibilityAwareIntervals();
+  }
+
+  /**
+   * FIX: Set up visibility-aware intervals that pause when tab is hidden
+   * This prevents accumulated callbacks from causing browser freezes
+   */
+  private setupVisibilityAwareIntervals(): void {
+    const startIntervals = (): void => {
+      // Set up remote logging flush timer
+      if (this.config.remote && this.config.remoteConfig && !this.flushTimer) {
+        this.flushTimer = setInterval(() => {
+          if (!document.hidden && this.remoteQueue.length > 0) {
+            this.flushRemoteLogs().catch(console.error);
+          }
+        }, this.config.remoteConfig.flushInterval);
+      }
+
+      // Set up periodic cleanup
+      if (!this.cleanupInterval) {
+        this.cleanupInterval = setInterval(() => {
+          if (!document.hidden) {
+            this.cleanupOldLogs();
+          }
+        }, 60000); // Clean up every minute
+      }
+    };
+
+    const stopIntervals = (): void => {
+      if (this.flushTimer) {
+        clearInterval(this.flushTimer);
+        this.flushTimer = undefined;
+      }
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+        this.cleanupInterval = undefined;
+      }
+    };
+
+    this.visibilityHandler = (): void => {
+      if (document.hidden) {
+        stopIntervals();
+      } else {
+        // Stagger restart to prevent thundering herd
+        setTimeout(
+          () => {
+            if (!this.isDestroyed) {
+              startIntervals();
+            }
+          },
+          Math.random() * 500 + 200
+        );
+      }
+    };
+
+    // Start intervals if tab is visible
+    if (!document.hidden) {
+      startIntervals();
     }
 
-    // Set up periodic cleanup
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupOldLogs();
-    }, 60000); // Clean up every minute
+    document.addEventListener("visibilitychange", this.visibilityHandler, { passive: true });
   }
 
   private createLogEntry(params: {

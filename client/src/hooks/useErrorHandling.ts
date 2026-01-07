@@ -410,9 +410,51 @@ export const useErrorHandling = (
       }));
     };
 
-    // 5 seconds is sufficient for recovery status updates - prevents freeze
-    const interval = setInterval(updateRecoveryStatuses, 5000);
-    return () => clearInterval(interval);
+    // FIX: Use visibility-aware interval to prevent browser freezes
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const startInterval = (): void => {
+      if (interval) return;
+      // 5 seconds is sufficient for recovery status updates - prevents freeze
+      interval = setInterval(() => {
+        if (!document.hidden) {
+          updateRecoveryStatuses();
+        }
+      }, 5000);
+    };
+
+    const stopInterval = (): void => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        // Stagger restart to prevent thundering herd
+        setTimeout(
+          () => {
+            startInterval();
+          },
+          Math.random() * 500 + 350
+        );
+      }
+    };
+
+    // Start interval if tab is visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
+
+    return () => {
+      stopInterval();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [state.errors]);
 
   // Initial analytics load

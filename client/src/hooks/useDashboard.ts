@@ -14,6 +14,7 @@
  * - 9.2: Guide users to re-authenticate when needed
  */
 
+import { useConvexQueryEnabled } from "@/hooks/useConvexVisibility";
 import { api } from "@/lib/convex-api";
 import { useUser } from "@clerk/clerk-react";
 import type {
@@ -143,6 +144,10 @@ export function useDashboard(options: DashboardOptions = {}): DashboardHookRetur
   const queryClient = useQueryClient();
   const errorHandler = useRef(new DashboardErrorHandler());
 
+  // FIX: Check if Convex queries should be active (visibility-aware)
+  // This prevents the "thundering herd" freeze when tab becomes visible
+  const isConvexEnabled = useConvexQueryEnabled();
+
   // Merge options with defaults
   const config = useMemo(() => ({ ...DEFAULT_OPTIONS, ...options }), [options]);
 
@@ -150,8 +155,9 @@ export function useDashboard(options: DashboardOptions = {}): DashboardHookRetur
   const isAuthenticated = Boolean(clerkUser && isClerkLoaded);
 
   // Query arguments for the unified dashboard API
+  // FIX: Also check isConvexEnabled to skip queries when tab is hidden
   const queryArgs = useMemo(() => {
-    if (!isAuthenticated) return "skip" as const;
+    if (!isAuthenticated || !isConvexEnabled) return "skip" as const;
 
     return {
       includeChartData: config.includeChartData,
@@ -162,7 +168,7 @@ export function useDashboard(options: DashboardOptions = {}): DashboardHookRetur
       favoritesLimit: config.favoritesLimit,
       reservationsLimit: config.reservationsLimit,
     };
-  }, [isAuthenticated, config]);
+  }, [isAuthenticated, isConvexEnabled, config]);
 
   // Main dashboard data query using the unified Convex function
   // Using type assertion to work around Convex's deep type instantiation issues
@@ -346,10 +352,13 @@ export function useDashboardStats(): {
   const { user: clerkUser, isLoaded } = useUser();
   const queryClient = useQueryClient();
 
+  // FIX: Check if Convex queries should be active (visibility-aware)
+  const isConvexEnabled = useConvexQueryEnabled();
+
   const isAuthenticated = Boolean(clerkUser && isLoaded);
   const statsData = useQuery(
     api.dashboard.getDashboardStats as unknown as FunctionReference<"query">,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated && isConvexEnabled ? {} : "skip"
   ) as UserStats | undefined;
 
   const isLoading = !isLoaded || (isAuthenticated && statsData === undefined);

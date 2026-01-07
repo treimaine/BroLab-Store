@@ -46,8 +46,14 @@ export function EnhancedGlobalAudioPlayer() {
   const lastPlayingRef = useRef<boolean>(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const audioContextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // FIX: Use ref to access isPlaying in event handlers without causing re-subscriptions
+  const isPlayingRef = useRef<boolean>(false);
 
   const { toast } = useToast();
+
+  // FIX: Keep isPlayingRef in sync with isPlaying state
+  // This allows event handlers to access current value without re-subscribing
+  isPlayingRef.current = isPlaying;
 
   // Web Audio API: initialize once and reuse for the lifetime of the audio element
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -193,6 +199,9 @@ export function EnhancedGlobalAudioPlayer() {
     // Only update if state actually changed
     if (lastPlayingRef.current === isPlaying) return;
 
+    // FIX: Set lastPlayingRef immediately to prevent re-entry during async operations
+    lastPlayingRef.current = isPlaying;
+
     console.log("🎵 Play/pause state changed:", {
       isPlaying,
       currentTrack: currentTrack.title,
@@ -206,8 +215,6 @@ export function EnhancedGlobalAudioPlayer() {
         console.log("⏸️ Pausing audio...");
         audio.pause();
       }
-
-      lastPlayingRef.current = isPlaying;
     };
 
     void handlePlayPause();
@@ -266,8 +273,9 @@ export function EnhancedGlobalAudioPlayer() {
       setLoadingProgress(100);
       clearLoadingTimeout();
 
+      // FIX: Use ref to check isPlaying to avoid dependency cycle
       // Auto-play if isPlaying is true
-      if (isPlaying && audio.paused) {
+      if (isPlayingRef.current && audio.paused) {
         console.log("🎵 Auto-playing after canplay");
         audio.play().catch(error => {
           console.error("❌ Auto-play failed:", error);
@@ -355,7 +363,9 @@ export function EnhancedGlobalAudioPlayer() {
       audio.removeEventListener("playing", handlePlaying);
       audio.removeEventListener("waiting", handleWaiting);
     };
-  }, [setCurrentTime, setDuration, setIsPlaying, nextTrack, toast, isPlaying]);
+    // FIX: Removed isPlaying from dependencies - using isPlayingRef instead
+    // This prevents event listener re-subscription on every play/pause toggle
+  }, [setCurrentTime, setDuration, setIsPlaying, nextTrack, toast]);
 
   useEffect(() => {
     const audio = audioRef.current;

@@ -6,7 +6,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { DataType, cachingStrategy } from "../services/cachingStrategy";
 
 // Hook options interface
@@ -311,25 +311,36 @@ export function useCacheMetrics() {
 /**
  * Hook for cache warming on component mount
  * Uses sequential requests with staggered delays to prevent main thread freeze
+ * FIX: Uses useRef to store warmingData to prevent re-runs on reference changes
  */
-export function useCacheWarming(
-  warmingData: Array<{
-    key: string;
-    dataType: DataType;
-    fetcher: () => Promise<unknown>;
-    priority?: "high" | "medium" | "low";
-  }>
-) {
+type WarmingPriority = "high" | "medium" | "low";
+
+interface WarmingDataItem {
+  key: string;
+  dataType: DataType;
+  fetcher: () => Promise<unknown>;
+  priority?: WarmingPriority;
+}
+
+export function useCacheWarming(warmingData: WarmingDataItem[]) {
+  // FIX: Use ref to store warmingData and only run once on mount
+  const warmingDataRef = useRef(warmingData);
+  const hasWarmedRef = useRef(false);
+
+  // Update ref when warmingData changes (but don't trigger effect)
+  warmingDataRef.current = warmingData;
+
   useEffect(() => {
-    // Skip if no data to warm
-    if (warmingData.length === 0) return;
+    // Skip if no data to warm or already warmed
+    if (warmingDataRef.current.length === 0 || hasWarmedRef.current) return;
 
     let isCancelled = false;
+    hasWarmedRef.current = true;
 
     const warmCache = async (): Promise<void> => {
       // Sort by priority using toSorted to avoid mutation
-      const sortedData = [...warmingData].toSorted((a, b) => {
-        const priorityOrder = { high: 0, medium: 1, low: 2 };
+      const priorityOrder: Record<WarmingPriority, number> = { high: 0, medium: 1, low: 2 };
+      const sortedData = [...warmingDataRef.current].toSorted((a, b) => {
         return priorityOrder[a.priority || "medium"] - priorityOrder[b.priority || "medium"];
       });
 
@@ -377,7 +388,7 @@ export function useCacheWarming(
       isCancelled = true;
       clearTimeout(timer);
     };
-  }, [warmingData]);
+  }, []); // Empty deps - run only once on mount
 }
 
 // Helper function to get stale time based on data type

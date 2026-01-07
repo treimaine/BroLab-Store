@@ -24,7 +24,12 @@ export function OrderStatusHistory({
   const [error, setError] = useState<string>();
   // Utiliser l'instance Supabase déjà configurée
   useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+
     const fetchHistory = async () => {
+      // Skip if tab is hidden
+      if (document.hidden) return;
+
       try {
         const response = await fetch(`/api/orders/${orderId}/history`);
         if (!response.ok) {
@@ -39,13 +44,39 @@ export function OrderStatusHistory({
       }
     };
 
-    fetchHistory();
+    const startInterval = (): void => {
+      if (interval) return;
+      fetchHistory(); // Run immediately when starting
+      // Mettre en place un polling pour les mises à jour
+      interval = setInterval(fetchHistory, 30000); // Rafraîchir toutes les 30 secondes
+    };
 
-    // Mettre en place un polling pour les mises à jour
-    const interval = setInterval(fetchHistory, 30000); // Rafraîchir toutes les 30 secondes
+    const stopInterval = (): void => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    // FIX: Added visibility awareness to prevent polling when tab is hidden
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        startInterval();
+      }
+    };
+
+    // Start if visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
 
     return () => {
-      clearInterval(interval);
+      stopInterval();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [orderId]);
 

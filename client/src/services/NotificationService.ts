@@ -360,18 +360,56 @@ class NotificationServiceImpl {
     return lowestIndex;
   }
 
+  // FIX: Visibility handler for pausing intervals when tab is hidden
+  private visibilityHandler: (() => void) | null = null;
+
   /**
    * Start cleanup interval for expired fingerprints
+   * FIX: Uses visibility-aware interval to prevent browser freezes
    */
   private startCleanupInterval(): void {
-    this.cleanupInterval = setInterval(() => {
-      const now = Date.now();
-      for (const [fingerprint, timestamp] of this.recentFingerprints.entries()) {
-        if (now - timestamp > this.config.deduplicationWindow * 2) {
-          this.recentFingerprints.delete(fingerprint);
+    const startInterval = (): void => {
+      if (this.cleanupInterval) return;
+
+      this.cleanupInterval = setInterval(() => {
+        if (document.hidden) return;
+
+        const now = Date.now();
+        for (const [fingerprint, timestamp] of this.recentFingerprints.entries()) {
+          if (now - timestamp > this.config.deduplicationWindow * 2) {
+            this.recentFingerprints.delete(fingerprint);
+          }
         }
+      }, 60000); // Clean up every minute
+    };
+
+    const stopInterval = (): void => {
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+        this.cleanupInterval = null;
       }
-    }, 60000); // Clean up every minute
+    };
+
+    this.visibilityHandler = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        // Stagger restart to prevent thundering herd
+        setTimeout(
+          () => {
+            startInterval();
+          },
+          Math.random() * 500 + 250
+        );
+      }
+    };
+
+    // Start interval if tab is visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", this.visibilityHandler, { passive: true });
   }
 
   // ================================
@@ -419,6 +457,12 @@ class NotificationServiceImpl {
    * Destroy the notification service and clean up resources
    */
   public destroy(): void {
+    // FIX: Remove visibility listener to prevent memory leaks
+    if (this.visibilityHandler) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;

@@ -305,8 +305,17 @@ export class CachingStrategyService {
 
   /**
    * Preload critical data for better UX
+   * FIX: Added flag to prevent repeated preloading
    */
+  private hasPreloadedCriticalData = false;
+
   async preloadCriticalData(): Promise<void> {
+    // FIX: Only preload once to prevent repeated calls causing freeze
+    if (this.hasPreloadedCriticalData) {
+      return;
+    }
+    this.hasPreloadedCriticalData = true;
+
     try {
       const criticalData = [
         { key: "subscription-plans", dataType: DataType.STATIC },

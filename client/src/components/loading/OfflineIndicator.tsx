@@ -3,9 +3,9 @@
  * Shows offline status and pending operations to users
  */
 
+import { useOfflineManager } from "@/hooks/useOfflineManager";
 import { AlertCircle, CheckCircle, Clock, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { useOfflineManager } from "@/hooks/useOfflineManager";
 
 interface OfflineIndicatorProps {
   className?: string;
@@ -32,8 +32,14 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Update stats periodically
+  // FIX: Added visibility awareness to prevent polling when tab is hidden
   useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+
     const updateStats = async () => {
+      // Skip if tab is hidden
+      if (document.hidden) return;
+
       try {
         const [operationStats, updates] = await Promise.all([
           getOperationStats(),
@@ -47,10 +53,38 @@ export const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
       }
     };
 
-    updateStats();
-    const interval = setInterval(updateStats, 3000);
+    const startInterval = (): void => {
+      if (interval) return;
+      updateStats(); // Run immediately when starting
+      interval = setInterval(updateStats, 3000);
+    };
 
-    return () => clearInterval(interval);
+    const stopInterval = (): void => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        startInterval();
+      }
+    };
+
+    // Start if visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
+
+    return () => {
+      stopInterval();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [getOperationStats, getPendingUpdates]);
 
   // Handle sync

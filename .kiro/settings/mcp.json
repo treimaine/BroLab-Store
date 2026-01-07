@@ -2,21 +2,32 @@
   "mcpServers": {
     "TestSprite": {
       "command": "npx",
-      "args": ["@testsprite/testsprite-mcp@latest"],
+      "args": [
+        "@testsprite/testsprite-mcp@latest"
+      ],
       "env": {
         "API_KEY": "${TESTSPRITE_API_KEY}"
       }
     },
     "firecrawl": {
       "command": "npx",
-      "args": ["-y", "firecrawl-mcp"],
+      "args": [
+        "-y",
+        "firecrawl-mcp"
+      ],
       "env": {
         "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
       }
     },
     "playwright": {
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"]
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "autoApprove": [
+        "browser_navigate"
+      ]
     }
   }
 }

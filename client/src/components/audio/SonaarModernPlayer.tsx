@@ -382,6 +382,13 @@ function BicolorWaveform({
   const animationRef = useRef<number>();
   // Pre-generate a consistent waveform pattern
   const waveformDataRef = useRef<number[]>([]);
+  // FIX: Use refs for currentTime and duration to avoid useEffect re-subscription
+  const currentTimeRef = useRef<number>(currentTime);
+  const durationRef = useRef<number>(duration);
+
+  // FIX: Keep refs in sync with props without causing re-renders
+  currentTimeRef.current = currentTime;
+  durationRef.current = duration;
 
   // Generate waveform data once
   useEffect(() => {
@@ -415,7 +422,8 @@ function BicolorWaveform({
 
       const width = canvas.width;
       const height = canvas.height;
-      const progress = duration > 0 ? currentTime / duration : 0;
+      // FIX: Use refs instead of closure variables to get current values
+      const progress = durationRef.current > 0 ? currentTimeRef.current / durationRef.current : 0;
       const progressX = progress * width;
 
       ctx.clearRect(0, 0, width, height);
@@ -447,7 +455,7 @@ function BicolorWaveform({
       }
 
       // Draw progress cursor
-      if (duration > 0) {
+      if (durationRef.current > 0) {
         ctx.fillStyle = SONAAR_COLORS.progressCursor;
         ctx.fillRect(progressX - 1, 0, 2, height);
       }
@@ -504,7 +512,9 @@ function BicolorWaveform({
         clearTimeout(staggerTimeoutId);
       }
     };
-  }, [currentTime, duration, isPlaying]);
+    // FIX: Only re-run when isPlaying changes, not on every currentTime/duration update
+    // The animation loop reads currentTimeRef and durationRef directly
+  }, [isPlaying]);
 
   return (
     <canvas
@@ -549,6 +559,13 @@ export function SonaarModernPlayer(): JSX.Element | null {
   const [showTracklist, setShowTracklist] = useState(false);
   const lastTrackRef = useRef<string | null>(null);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // FIX: Use ref to access isPlaying in event handlers without causing re-subscriptions
+  const isPlayingRef = useRef<boolean>(false);
+  // FIX: Track last playing state to prevent re-entry during async operations
+  const lastPlayingStateRef = useRef<boolean>(false);
+
+  // FIX: Keep isPlayingRef in sync with isPlaying state
+  isPlayingRef.current = isPlaying;
 
   // Check if there are multiple tracks in the queue
   const hasMultipleTracks = queue.length > 1;
@@ -614,6 +631,10 @@ export function SonaarModernPlayer(): JSX.Element | null {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentTrack) return;
+
+    // FIX: Prevent re-entry during async operations
+    if (lastPlayingStateRef.current === isPlaying) return;
+    lastPlayingStateRef.current = isPlaying;
 
     let isCancelled = false;
 
@@ -700,7 +721,8 @@ export function SonaarModernPlayer(): JSX.Element | null {
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
       }
-      if (isPlaying && audio.paused) {
+      // FIX: Use ref to check isPlaying to avoid dependency cycle
+      if (isPlayingRef.current && audio.paused) {
         audio.play().catch(() => undefined);
       }
     };
@@ -743,7 +765,9 @@ export function SonaarModernPlayer(): JSX.Element | null {
       audio.removeEventListener("playing", handlePlaying);
       audio.removeEventListener("waiting", handleWaiting);
     };
-  }, [setCurrentTime, setDuration, setIsPlaying, nextTrack, toast, isPlaying]);
+    // FIX: Removed isPlaying from dependencies - using isPlayingRef instead
+    // This prevents event listener re-subscription on every play/pause toggle
+  }, [setCurrentTime, setDuration, setIsPlaying, nextTrack, toast]);
 
   useEffect(() => {
     const audio = audioRef.current;

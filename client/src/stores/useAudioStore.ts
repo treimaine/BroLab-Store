@@ -52,6 +52,8 @@ interface AudioActions {
   nextTrack: () => void;
   previousTrack: () => void;
   playTrackFromQueue: (index: number) => void;
+  // FIX: Batched action to prevent multiple re-renders
+  playFromQueueBatched: (tracks: AudioTrack[], index: number, shouldPlay?: boolean) => void;
   playNext: () => void;
   playPrevious: () => void;
 
@@ -155,6 +157,20 @@ export const useAudioStore = create<AudioState & AudioActions>((set, get) => ({
         currentIndex: index,
         currentTrack: queue[index],
         currentTime: 0,
+      });
+    }
+  },
+
+  // FIX: Batched action to prevent multiple re-renders when starting playback
+  // Combines setQueue + setCurrentTrack + setCurrentIndex + setIsPlaying into single update
+  playFromQueueBatched: (tracks, index, shouldPlay = true) => {
+    if (index >= 0 && index < tracks.length) {
+      set({
+        queue: tracks,
+        currentIndex: index,
+        currentTrack: tracks[index],
+        currentTime: 0,
+        isPlaying: shouldPlay,
       });
     }
   },

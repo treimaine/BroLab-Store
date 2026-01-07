@@ -190,17 +190,51 @@ export const useMultipleEventSubscription = <T>(
  * Hook for monitoring EventBus metrics
  * FIX: Default interval increased from 1s to 5s to prevent performance issues
  * 1 second intervals were causing browser freezes due to excessive re-renders
+ * FIX: Added visibility awareness to pause metrics collection when tab is hidden
  */
 export const useEventBusMetrics = (updateInterval = 5000) => {
   const eventBus = getEventBus();
   const [metrics, setMetrics] = React.useState<EventMetrics>(() => eventBus.getMetrics());
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setMetrics(eventBus.getMetrics());
-    }, updateInterval);
+    let interval: ReturnType<typeof setInterval> | null = null;
 
-    return () => clearInterval(interval);
+    const startInterval = (): void => {
+      if (interval) return;
+      interval = setInterval(() => {
+        // Only update if tab is visible
+        if (!document.hidden) {
+          setMetrics(eventBus.getMetrics());
+        }
+      }, updateInterval);
+    };
+
+    const stopInterval = (): void => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        startInterval();
+      }
+    };
+
+    // Start if visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
+
+    return () => {
+      stopInterval();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [eventBus, updateInterval]);
 
   return metrics;
@@ -210,6 +244,7 @@ export const useEventBusMetrics = (updateInterval = 5000) => {
  * Hook for debugging events - provides event history and real-time monitoring
  * FIX: Increased update interval from 500ms to 2s to prevent performance issues
  * Fast intervals were causing browser freezes during debugging
+ * FIX: Added visibility awareness to pause debugging when tab is hidden
  */
 export const useEventBusDebug = () => {
   const eventBus = getEventBus();
@@ -220,14 +255,44 @@ export const useEventBusDebug = () => {
     // Enable debug mode
     eventBus.enableDebugMode(true);
 
-    // Update history and metrics periodically - 2s is sufficient for debugging
-    const interval = setInterval(() => {
-      setEventHistory([...eventBus.getEventHistory()]);
-      setMetrics(eventBus.getMetrics());
-    }, 2000);
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const startInterval = (): void => {
+      if (interval) return;
+      // Update history and metrics periodically - 2s is sufficient for debugging
+      interval = setInterval(() => {
+        if (!document.hidden) {
+          setEventHistory([...eventBus.getEventHistory()]);
+          setMetrics(eventBus.getMetrics());
+        }
+      }, 2000);
+    };
+
+    const stopInterval = (): void => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        startInterval();
+      }
+    };
+
+    // Start if visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
 
     return () => {
-      clearInterval(interval);
+      stopInterval();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       eventBus.enableDebugMode(false);
     };
   }, [eventBus]);

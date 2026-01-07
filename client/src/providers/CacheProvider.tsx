@@ -235,11 +235,15 @@ export function CacheProvider({ children }: Readonly<CacheProviderProps>) {
     []
   );
 
+  // Empty array constant to prevent re-renders when user is not signed in
+  const emptyWarmingData = useMemo(() => [], []);
+
   // Warm public data immediately
   useCacheWarming(publicWarmingData);
 
   // Warm auth-required data only after auth state is confirmed and user is signed in
-  useCacheWarming(authLoaded && isSignedIn ? authRequiredWarmingData : []);
+  // FIX: Use memoized empty array to prevent infinite re-renders
+  useCacheWarming(authLoaded && isSignedIn ? authRequiredWarmingData : emptyWarmingData);
 
   // Use refs to avoid dependency cycles in callbacks
   const operationStatusesRef = useRef(operationStatuses);

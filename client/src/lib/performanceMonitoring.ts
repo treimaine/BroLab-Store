@@ -29,13 +29,14 @@ interface NavigatorWithConnection {
 
 // Memory leak detection with optimized thresholds
 let memoryCheckInterval: NodeJS.Timeout | undefined;
+let visibilityHandler: (() => void) | undefined;
 
 export const startMemoryMonitoring = (): void => {
   if (memoryCheckInterval) {
     clearInterval(memoryCheckInterval);
   }
 
-  memoryCheckInterval = setInterval(() => {
+  const runMemoryCheck = (): void => {
     const performanceWithMemory = performance as PerformanceWithMemory;
     const memory = performanceWithMemory.memory;
 
@@ -70,7 +71,39 @@ export const startMemoryMonitoring = (): void => {
         }
       }
     }
-  }, 60000); // Check every 60 seconds
+  };
+
+  // FIX: Added visibility awareness to pause memory monitoring when tab is hidden
+  const startInterval = (): void => {
+    if (memoryCheckInterval) return;
+    memoryCheckInterval = setInterval(() => {
+      if (!document.hidden) {
+        runMemoryCheck();
+      }
+    }, 60000); // Check every 60 seconds
+  };
+
+  const stopInterval = (): void => {
+    if (memoryCheckInterval) {
+      clearInterval(memoryCheckInterval);
+      memoryCheckInterval = undefined;
+    }
+  };
+
+  visibilityHandler = (): void => {
+    if (document.hidden) {
+      stopInterval();
+    } else {
+      startInterval();
+    }
+  };
+
+  // Start if visible
+  if (!document.hidden) {
+    startInterval();
+  }
+
+  document.addEventListener("visibilitychange", visibilityHandler, { passive: true });
 };
 
 // Component cleanup for memory optimization
@@ -271,12 +304,18 @@ export const stopMemoryMonitoring = (): void => {
   if (memoryCheckInterval) {
     clearInterval(memoryCheckInterval);
     memoryCheckInterval = undefined;
-
-    logger.logInfo("Memory monitoring stopped", {
-      component: "performance_monitoring",
-      action: "stop",
-    });
   }
+
+  // FIX: Clean up visibility listener
+  if (visibilityHandler) {
+    document.removeEventListener("visibilitychange", visibilityHandler);
+    visibilityHandler = undefined;
+  }
+
+  logger.logInfo("Memory monitoring stopped", {
+    component: "performance_monitoring",
+    action: "stop",
+  });
 };
 
 // Initialize all performance monitoring

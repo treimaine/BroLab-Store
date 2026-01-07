@@ -310,9 +310,14 @@ export function ProductArtworkPlayer({
   }, [currentTrackIndex, currentAudioUrl, isLocalPlaying, setGlobalIsPlaying]);
 
   // Audio event handlers
+  // FIX: Throttle timeupdate to max 4 updates per second (250ms)
+  // This prevents excessive state updates that cause browser freezes
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    let lastTimeUpdate = 0;
+    const TIME_UPDATE_THROTTLE = 250; // ms
 
     const handleEnded = (): void => {
       setIsLocalPlaying(false);
@@ -329,10 +334,14 @@ export function ProductArtworkPlayer({
       setIsLocalPlaying(false);
       setHasError(true);
     };
-    // Sync current time to global store for handoff
+    // Sync current time to global store for handoff - throttled
     const handleTimeUpdate = (): void => {
-      if (isLocalPlaying) {
-        setGlobalCurrentTime(audio.currentTime);
+      const now = Date.now();
+      if (now - lastTimeUpdate >= TIME_UPDATE_THROTTLE) {
+        lastTimeUpdate = now;
+        if (isLocalPlaying) {
+          setGlobalCurrentTime(audio.currentTime);
+        }
       }
     };
 

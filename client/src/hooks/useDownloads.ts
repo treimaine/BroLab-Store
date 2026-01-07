@@ -43,11 +43,16 @@ type LogDownloadMutation = (args: LogDownloadArgs) => Promise<DownloadRecord | n
 export function useDownloads() {
   const { isAuthenticated } = useConvexAuth();
 
+  // FIX: Check if Convex queries should be active (visibility-aware)
+  const isConvexEnabled = useConvexQueryEnabled();
+
   // Lister les téléchargements avec Convex
   // Type assertion needed due to Convex deep type instantiation issue
-  const downloads = useConvexQuery(api.downloads.getUserDownloads, {}) as
-    | DownloadRecord[]
-    | undefined;
+  // FIX: Skip query when tab is hidden to prevent freeze
+  const downloads = useConvexQuery(
+    api.downloads.getUserDownloads,
+    isConvexEnabled ? {} : "skip"
+  ) as DownloadRecord[] | undefined;
 
   // Logger un téléchargement avec Convex
   // Type assertion needed due to Convex deep type instantiation issue

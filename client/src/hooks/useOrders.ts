@@ -23,8 +23,15 @@ export interface CreateOrderData {
 export function useOrders() {
   const { isAuthenticated } = useConvexAuth();
 
+  // FIX: Check if Convex queries should be active (visibility-aware)
+  const isConvexEnabled = useConvexQueryEnabled();
+
   // Lister les commandes avec Convex
-  const ordersResult = useConvexQuery(api.orders.listOrders, isAuthenticated ? {} : "skip");
+  // FIX: Skip query when tab is hidden to prevent freeze
+  const ordersResult = useConvexQuery(
+    api.orders.listOrders,
+    isAuthenticated && isConvexEnabled ? {} : "skip"
+  );
   const orders = ordersResult?.items || [];
 
   // Créer une commande avec Convex

@@ -273,15 +273,43 @@ class RealtimeConnectionManager {
       }
     };
 
-    this.heartbeatTimer = setInterval(sendHeartbeat, this.heartbeatInterval);
+    // FIX: Use visibility-aware interval that pauses when tab is hidden
+    const startInterval = (): void => {
+      if (this.heartbeatTimer) return;
+      this.heartbeatTimer = setInterval(() => {
+        if (!document.hidden) {
+          sendHeartbeat();
+        }
+      }, this.heartbeatInterval);
+    };
 
-    // Also listen for visibility changes to pause/resume heartbeat
-    const handleVisibilityChange = (): void => {
-      if (!document.hidden && this.ws?.readyState === WebSocket.OPEN) {
-        // Tab became visible, send immediate heartbeat after a small delay
-        setTimeout(sendHeartbeat, 500 + Math.random() * 1000);
+    const stopInterval = (): void => {
+      if (this.heartbeatTimer) {
+        clearInterval(this.heartbeatTimer);
+        this.heartbeatTimer = null;
       }
     };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        // Stagger restart to prevent thundering herd
+        setTimeout(
+          () => {
+            startInterval();
+            // Send immediate heartbeat after restart
+            setTimeout(sendHeartbeat, 500 + Math.random() * 500);
+          },
+          Math.random() * 500 + 200
+        );
+      }
+    };
+
+    // Start interval if tab is visible
+    if (!document.hidden) {
+      startInterval();
+    }
 
     document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
 

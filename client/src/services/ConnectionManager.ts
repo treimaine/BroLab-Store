@@ -258,24 +258,67 @@ class WebSocketConnection implements Connection {
     }
   }
 
+  // FIX: Visibility handler for pausing heartbeat when tab is hidden
+  private visibilityHandler: (() => void) | null = null;
+
   private startHeartbeat(): void {
-    this.heartbeatInterval = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        const heartbeat: ConnectionMessage = {
-          type: "heartbeat",
-          payload: { timestamp: Date.now() },
-          id: `hb_${Date.now()}`,
-          timestamp: Date.now(),
-        };
-        this.send(heartbeat).catch(() => {
-          // Heartbeat failed, connection might be dead
-          this.handleError(new Error("Heartbeat failed"));
-        });
+    const startInterval = (): void => {
+      if (this.heartbeatInterval) return;
+      this.heartbeatInterval = setInterval(() => {
+        // FIX: Skip heartbeat when tab is hidden to prevent accumulation
+        if (document.hidden) return;
+
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          const heartbeat: ConnectionMessage = {
+            type: "heartbeat",
+            payload: { timestamp: Date.now() },
+            id: `hb_${Date.now()}`,
+            timestamp: Date.now(),
+          };
+          this.send(heartbeat).catch(() => {
+            // Heartbeat failed, connection might be dead
+            this.handleError(new Error("Heartbeat failed"));
+          });
+        }
+      }, this.config.heartbeatInterval);
+    };
+
+    const stopInterval = (): void => {
+      if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = null;
       }
-    }, this.config.heartbeatInterval);
+    };
+
+    this.visibilityHandler = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        // Stagger restart to prevent thundering herd
+        setTimeout(
+          () => {
+            startInterval();
+          },
+          Math.random() * 500 + 100
+        );
+      }
+    };
+
+    // Start interval if tab is visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", this.visibilityHandler, { passive: true });
   }
 
   private stopHeartbeat(): void {
+    // FIX: Remove visibility listener to prevent memory leaks
+    if (this.visibilityHandler) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
@@ -436,10 +479,8 @@ class PollingConnection implements Connection {
 
   public close(): void {
     this.isActive = false;
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = null;
-    }
+    // FIX: Use stopPolling to properly clean up visibility handler
+    this.stopPolling();
     for (const handler of this.closeHandlers) {
       handler();
     }
@@ -539,22 +580,72 @@ class PollingConnection implements Connection {
     this.lastPollTime = Date.now();
   }
 
-  private startPolling(): void {
-    this.pollingInterval = setInterval(async () => {
-      if (!this.isActive) return;
+  // FIX: Visibility handler for pausing polling when tab is hidden
+  private visibilityHandler: (() => void) | null = null;
 
-      try {
-        await this.executePoll();
-      } catch (error) {
-        const pollingError =
-          error instanceof Error
-            ? error
-            : new Error(
-                `PollingConnection: Polling error - ${String(error)}. Connection quality may be degraded.`
-              );
-        this.handleError(pollingError);
+  private startPolling(): void {
+    const startInterval = (): void => {
+      if (this.pollingInterval) return;
+      this.pollingInterval = setInterval(async () => {
+        // FIX: Skip polling when tab is hidden to prevent accumulation
+        if (!this.isActive || document.hidden) return;
+
+        try {
+          await this.executePoll();
+        } catch (error) {
+          const pollingError =
+            error instanceof Error
+              ? error
+              : new Error(
+                  `PollingConnection: Polling error - ${String(error)}. Connection quality may be degraded.`
+                );
+          this.handleError(pollingError);
+        }
+      }, this.config.pollingInterval);
+    };
+
+    const stopInterval = (): void => {
+      if (this.pollingInterval) {
+        clearInterval(this.pollingInterval);
+        this.pollingInterval = null;
       }
-    }, this.config.pollingInterval);
+    };
+
+    this.visibilityHandler = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        // Stagger restart to prevent thundering herd
+        setTimeout(
+          () => {
+            if (this.isActive) {
+              startInterval();
+            }
+          },
+          Math.random() * 500 + 200
+        );
+      }
+    };
+
+    // Start interval if tab is visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", this.visibilityHandler, { passive: true });
+  }
+
+  private stopPolling(): void {
+    // FIX: Remove visibility listener to prevent memory leaks
+    if (this.visibilityHandler) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
   }
 
   private handleError(error: Error): void {

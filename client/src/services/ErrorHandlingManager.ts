@@ -701,6 +701,13 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
    */
   public destroy(): void {
     this.isDestroyed = true;
+
+    // FIX: Remove visibility listener to prevent memory leaks
+    if (this.visibilityHandler) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
@@ -1457,45 +1464,88 @@ export class ErrorHandlingManager extends BrowserEventEmitter {
     });
   }
 
+  // FIX: Visibility handler for pausing intervals when tab is hidden
+  private visibilityHandler: (() => void) | null = null;
+
   private setupCleanupInterval(): void {
-    // Clean up old errors and recovery attempts every 10 minutes
-    this.cleanupInterval = setInterval(
-      () => {
-        if (this.isDestroyed) return;
+    // FIX: Use visibility-aware interval to prevent browser freezes
+    const runCleanup = (): void => {
+      if (this.isDestroyed) return;
 
-        const cutoffTime = Date.now() - 24 * 60 * 60 * 1000; // 24 hours ago
+      const cutoffTime = Date.now() - 24 * 60 * 60 * 1000; // 24 hours ago
 
-        // Clean up old errors
-        this.errorHistory = this.errorHistory.filter(error => error.timestamp > cutoffTime);
+      // Clean up old errors
+      this.errorHistory = this.errorHistory.filter(error => error.timestamp > cutoffTime);
 
-        // Clean up old recovery attempts
-        for (const [errorId, attempts] of this.recoveryAttempts.entries()) {
-          const recentAttempts = attempts.filter(attempt => attempt.timestamp > cutoffTime);
-          if (recentAttempts.length === 0) {
-            this.recoveryAttempts.delete(errorId);
-          } else {
-            this.recoveryAttempts.set(errorId, recentAttempts);
+      // Clean up old recovery attempts
+      for (const [errorId, attempts] of this.recoveryAttempts.entries()) {
+        const recentAttempts = attempts.filter(attempt => attempt.timestamp > cutoffTime);
+        if (recentAttempts.length === 0) {
+          this.recoveryAttempts.delete(errorId);
+        } else {
+          this.recoveryAttempts.set(errorId, recentAttempts);
+        }
+      }
+
+      // Clean up old error fingerprints
+      for (const [fingerprint, timestamp] of this.errorFingerprints.entries()) {
+        if (timestamp < cutoffTime) {
+          this.errorFingerprints.delete(fingerprint);
+        }
+      }
+
+      // Clean up stale retry queue items
+      const now = Date.now();
+      const staleThreshold = 5 * 60 * 1000; // 5 minutes
+      const staleItems = this.retryQueue.filter(item => now - item.scheduledAt > staleThreshold);
+
+      for (const item of staleItems) {
+        this.cancelRetry(item.id);
+      }
+    };
+
+    const startInterval = (): void => {
+      if (this.cleanupInterval) return;
+      // Clean up old errors and recovery attempts every 10 minutes
+      this.cleanupInterval = setInterval(
+        () => {
+          if (!document.hidden) {
+            runCleanup();
           }
-        }
+        },
+        10 * 60 * 1000
+      );
+    };
 
-        // Clean up old error fingerprints
-        for (const [fingerprint, timestamp] of this.errorFingerprints.entries()) {
-          if (timestamp < cutoffTime) {
-            this.errorFingerprints.delete(fingerprint);
-          }
-        }
+    const stopInterval = (): void => {
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+        this.cleanupInterval = null;
+      }
+    };
 
-        // Clean up stale retry queue items
-        const now = Date.now();
-        const staleThreshold = 5 * 60 * 1000; // 5 minutes
-        const staleItems = this.retryQueue.filter(item => now - item.scheduledAt > staleThreshold);
+    this.visibilityHandler = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        // Stagger restart to prevent thundering herd
+        setTimeout(
+          () => {
+            if (!this.isDestroyed) {
+              startInterval();
+            }
+          },
+          Math.random() * 500 + 150
+        );
+      }
+    };
 
-        for (const item of staleItems) {
-          this.cancelRetry(item.id);
-        }
-      },
-      10 * 60 * 1000
-    );
+    // Start interval if tab is visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", this.visibilityHandler, { passive: true });
   }
 
   private generateSessionId(): string {

@@ -61,7 +61,18 @@ export function SonaarAudioPlayer({
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
+    // FIX: Throttle timeupdate to max 4 updates per second (250ms)
+    // This prevents excessive state updates that cause browser freezes
+    let lastTimeUpdate = 0;
+    const TIME_UPDATE_THROTTLE = 250; // ms
+
+    const updateTime = (): void => {
+      const now = Date.now();
+      if (now - lastTimeUpdate >= TIME_UPDATE_THROTTLE) {
+        lastTimeUpdate = now;
+        setCurrentTime(audio.currentTime);
+      }
+    };
     const updateDuration = () => {
       setDuration(audio.duration);
       setIsLoading(false);

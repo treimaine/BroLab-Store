@@ -47,14 +47,47 @@ export function FeaturedBeatsCarousel({
   const maxIndex = Math.max(0, filteredBeats.length - visibleItems);
 
   // Auto-scroll functionality (disabled on reduced motion)
+  // FIX: Added visibility awareness to prevent auto-scroll when tab is hidden
   useEffect(() => {
     if (prefersReducedMotion || isMobile) return;
 
-    const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev >= maxIndex ? 0 : prev + 1));
-    }, 5000);
+    let interval: ReturnType<typeof setInterval> | null = null;
 
-    return () => clearInterval(interval);
+    const startInterval = (): void => {
+      if (interval) return;
+      interval = setInterval(() => {
+        if (!document.hidden) {
+          setCurrentIndex(prev => (prev >= maxIndex ? 0 : prev + 1));
+        }
+      }, 5000);
+    };
+
+    const stopInterval = (): void => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        startInterval();
+      }
+    };
+
+    // Start if visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
+
+    return () => {
+      stopInterval();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [maxIndex, prefersReducedMotion, isMobile]);
 
   const scrollToIndex = useCallback(

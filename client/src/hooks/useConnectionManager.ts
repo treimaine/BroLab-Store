@@ -177,14 +177,47 @@ export const useConnectionManager = (
 
     // Update metrics periodically - REDUCED frequency to prevent performance issues
     // 10 seconds is sufficient for metrics display, 1 second was causing freezes
-    const metricsInterval = setInterval(handleMetricsUpdate, 10000);
+    // FIX: Added visibility awareness to pause metrics collection when tab is hidden
+    let metricsInterval: ReturnType<typeof setInterval> | null = null;
+
+    const startMetricsInterval = (): void => {
+      if (metricsInterval) return;
+      metricsInterval = setInterval(() => {
+        if (!document.hidden) {
+          handleMetricsUpdate();
+        }
+      }, 10000);
+    };
+
+    const stopMetricsInterval = (): void => {
+      if (metricsInterval) {
+        clearInterval(metricsInterval);
+        metricsInterval = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopMetricsInterval();
+      } else {
+        startMetricsInterval();
+      }
+    };
+
+    // Start if visible
+    if (!document.hidden) {
+      startMetricsInterval();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
 
     return () => {
       statusUnsubscribe();
       messageUnsubscribe();
       manager.off("sync_error", handleSyncError);
       manager.off("connected", handleConnected);
-      clearInterval(metricsInterval);
+      stopMetricsInterval();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [config, autoConnect, onError, onStatusChange, onMessage]);
 
@@ -402,21 +435,54 @@ export const useConnectionMessaging = () => {
 /**
  * Hook for connection metrics monitoring
  * FIX: Reduced default update interval from 1s to 5s to prevent performance issues
+ * FIX: Added visibility awareness to pause metrics collection when tab is hidden
  */
 export const useConnectionMetrics = (updateInterval = 5000) => {
   const { metrics } = useConnectionManager();
   const [history, setHistory] = useState<ConnectionMetrics[]>([]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setHistory(prev => {
-        const newHistory = [...prev, metrics];
-        // Keep only last 50 entries (reduced from 100 to save memory)
-        return newHistory.slice(-50);
-      });
-    }, updateInterval);
+    let interval: ReturnType<typeof setInterval> | null = null;
 
-    return () => clearInterval(interval);
+    const startInterval = (): void => {
+      if (interval) return;
+      interval = setInterval(() => {
+        if (!document.hidden) {
+          setHistory(prev => {
+            const newHistory = [...prev, metrics];
+            // Keep only last 50 entries (reduced from 100 to save memory)
+            return newHistory.slice(-50);
+          });
+        }
+      }, updateInterval);
+    };
+
+    const stopInterval = (): void => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        startInterval();
+      }
+    };
+
+    // Start if visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
+
+    return () => {
+      stopInterval();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [metrics, updateInterval]);
 
   const getAverageLatency = useCallback(

@@ -69,9 +69,8 @@ export const defaultFeatureFlags: FeatureFlags = {
   enablePerformanceMonitoring: false,
   enableBundleAnalyzer: false,
 
-  // Audio player - DISABLED by default to test if it's causing freezes
-  // Set VITE_ENABLE_GLOBAL_AUDIO_PLAYER=true to re-enable
-  enableGlobalAudioPlayer: false,
+  // Audio player - enabled by default for audio playback
+  enableGlobalAudioPlayer: true,
   enableSonaarModernPlayer: false,
 
   // Services - enabled by default

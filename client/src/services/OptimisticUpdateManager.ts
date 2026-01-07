@@ -438,6 +438,13 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
    */
   public destroy(): void {
     this.isDestroyed = true;
+
+    // FIX: Remove visibility listener to prevent memory leaks
+    if (this.visibilityHandler) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
@@ -585,26 +592,64 @@ export class OptimisticUpdateManager extends BrowserEventEmitter {
     this.emit("dashboard_event", event);
   }
 
+  // FIX: Visibility handler for pausing intervals when tab is hidden
+  private visibilityHandler: (() => void) | null = null;
+
   private setupCleanupInterval(): void {
-    // Clean up old confirmed updates every 5 minutes
-    this.cleanupInterval = setInterval(
-      () => {
-        if (this.isDestroyed) return;
+    // FIX: Use visibility-aware interval to prevent browser freezes
+    const startInterval = (): void => {
+      if (this.cleanupInterval) return;
 
-        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-        this.updateQueue.confirmed = this.updateQueue.confirmed.filter(
-          update => update.timestamp > fiveMinutesAgo
-        );
+      // Clean up old confirmed updates every 5 minutes
+      this.cleanupInterval = setInterval(
+        () => {
+          if (this.isDestroyed || document.hidden) return;
 
-        // Clean up old retry counters
-        for (const [updateId] of this.retryCounters) {
-          if (!this.findUpdate(updateId)) {
-            this.retryCounters.delete(updateId);
+          const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+          this.updateQueue.confirmed = this.updateQueue.confirmed.filter(
+            update => update.timestamp > fiveMinutesAgo
+          );
+
+          // Clean up old retry counters
+          for (const [updateId] of this.retryCounters) {
+            if (!this.findUpdate(updateId)) {
+              this.retryCounters.delete(updateId);
+            }
           }
-        }
-      },
-      5 * 60 * 1000
-    );
+        },
+        5 * 60 * 1000
+      );
+    };
+
+    const stopInterval = (): void => {
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+        this.cleanupInterval = null;
+      }
+    };
+
+    this.visibilityHandler = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        // Stagger restart to prevent thundering herd
+        setTimeout(
+          () => {
+            if (!this.isDestroyed) {
+              startInterval();
+            }
+          },
+          Math.random() * 500 + 300
+        );
+      }
+    };
+
+    // Start interval if tab is visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", this.visibilityHandler, { passive: true });
   }
 
   private generateUpdateId(): string {

@@ -181,18 +181,63 @@ export function useDashboardTabs(initialTab: DashboardTab = "overview"): Dashboa
 }
 
 // Hook for tab-specific polling fallback
+// FIX: Added visibility awareness to prevent polling when tab is hidden
+// This prevents CPU usage and potential freezes from background polling
 export function useTabPolling(tab: DashboardTab, callback: () => void, enabled: boolean = true) {
   const config = TAB_CONFIGS[tab];
+  const isTabVisible = useTabVisible();
 
   useEffect(() => {
-    if (!enabled || !config.refreshInterval) {
+    // FIX: Don't poll when tab is hidden or disabled
+    if (!enabled || !config.refreshInterval || !isTabVisible) {
       return;
     }
 
-    const interval = setInterval(callback, config.refreshInterval);
+    // FIX: Use visibility-aware interval to prevent browser freezes
+    let interval: ReturnType<typeof setInterval> | null = null;
 
-    return () => clearInterval(interval);
-  }, [callback, config.refreshInterval, enabled]);
+    const startInterval = (): void => {
+      if (interval) return;
+      interval = setInterval(() => {
+        if (!document.hidden) {
+          callback();
+        }
+      }, config.refreshInterval);
+    };
+
+    const stopInterval = (): void => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) {
+        stopInterval();
+      } else {
+        // Stagger restart to prevent thundering herd
+        setTimeout(
+          () => {
+            startInterval();
+          },
+          Math.random() * 500 + 250
+        );
+      }
+    };
+
+    // Start interval if tab is visible
+    if (!document.hidden) {
+      startInterval();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange, { passive: true });
+
+    return () => {
+      stopInterval();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [callback, config.refreshInterval, enabled, isTabVisible]);
 }
 
 // Singleton state for window focus (prevents duplicate event listeners)
